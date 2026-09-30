@@ -2,13 +2,25 @@ param([string[]]$ProjectPath, [int]$Port = 4318, [string]$BindAddress = '0.0.0.0
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
+$storagePath = if ($env:POCKET_DATA_DIR) { [IO.Path]::GetFullPath($env:POCKET_DATA_DIR) } else { Join-Path $env:USERPROFILE '.pocket-code' }
 if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) { throw 'Install Node.js 22 or newer: https://nodejs.org/' }
 $claudeCommand = Get-Command claude -ErrorAction SilentlyContinue
 $codexCommand = Get-Command codex -ErrorAction SilentlyContinue
 $desktopCodexPath = Join-Path $env:LOCALAPPDATA 'OpenAI/Codex/bin'
 if (-not $claudeCommand -and -not $codexCommand -and -not (Test-Path -LiteralPath $desktopCodexPath)) { throw 'Install Claude Code or Codex and sign in on this PC first.' }
 if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) {
-    throw ('Port ' + $Port + ' is already in use. Close the previous Pocket Code server window, then start this launcher again.')
+    $running=$null
+    try {
+        $token=if($env:POCKET_TOKEN){$env:POCKET_TOKEN}else{(Get-Content -LiteralPath (Join-Path $storagePath 'connection-key.txt') -Raw).Trim()}
+        $running=Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/health" -Headers @{Authorization='Bearer '+$token} -TimeoutSec 3
+    }catch{}
+    if($running.protocol -eq 1 -and $running.processId -and $running.version){
+        Write-Host 'Pocket Code is already running. No second server was started.'
+        $pairing=Join-Path $storagePath 'pairing.html'
+        if(Test-Path -LiteralPath $pairing){Start-Process -FilePath 'explorer.exe' -ArgumentList ('"'+$pairing+'"') -WindowStyle Hidden}
+        return
+    }
+    throw ('Port ' + $Port + ' belongs to another process. No process was stopped.')
 }
 if ($Internet) {
     Write-Host 'Internet mode: traffic passes through Cloudflare over HTTPS. Access still requires your private key.'
@@ -29,7 +41,6 @@ $env:POCKET_OPEN_PAIRING = '1'
 if ($claudeCommand) { $env:POCKET_CLAUDE_EXECUTABLE = $claudeCommand.Source }
 if (-not (Test-Path -LiteralPath 'node_modules')) { & npm.cmd ci; if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' } }
 if (-not (Test-Path -LiteralPath 'dist/index.html')) { & npm.cmd run build; if ($LASTEXITCODE -ne 0) { throw 'Application build failed' } }
-$storagePath = if ($env:POCKET_DATA_DIR) { [IO.Path]::GetFullPath($env:POCKET_DATA_DIR) } else { Join-Path $env:USERPROFILE '.pocket-code' }
 New-Item -ItemType Directory -Force -Path $storagePath | Out-Null
 $keyPath = Join-Path $storagePath 'connection-key.txt'
 if (-not (Test-Path -LiteralPath $keyPath)) {
@@ -49,7 +60,7 @@ Write-Host ''
 Write-Host ('Open on this PC: http://127.0.0.1:' + $Port)
 if ($Internet) { Write-Host 'Scan the new HTTPS QR code for mobile internet. Keep this window open.' }
 else { Write-Host 'For mobile internet, use Start Pocket Code Internet.cmd or configure Tailscale on both devices.' }
-Write-Host 'The server must keep running. Press Ctrl+C to stop it.'
+Write-Host 'Close this window or press Ctrl+C to fully quit Pocket Code and its tunnel.'
 Write-Host 'A QR pairing page will open in your browser after the server starts.'
 $managedPointer = Join-Path $storagePath 'host/current.json'
 if (Test-Path -LiteralPath $managedPointer) {
@@ -63,5 +74,4 @@ if (Test-Path -LiteralPath $managedPointer) {
         }
     } catch { Write-Host 'The saved PC update is unavailable. Starting the original version.' }
 }
-& npm.cmd run server
-if ($LASTEXITCODE -ne 0) { throw 'Server exited with an error' }
+& (Join-Path $PSScriptRoot 'run-host.ps1') -RuntimeDirectory (Get-Location).Path -StoragePath $storagePath -Port $Port

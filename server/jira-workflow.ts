@@ -80,7 +80,7 @@ export class JiraWorkflow {
     }
     if (changed) await this.save();
   }
-  async sync() { await this.ready; for (const entry of Object.values(this.records)) await this.syncLink(entry); }
+  async sync() { await this.ready; for (const entry of Object.values(this.records)) await this.syncLink(entry); await this.writes; }
   async view(site: string, key: string, provider: 'claude' | 'codex', role: JiraRole) {
     await this.ready;
     const record = this.records[this.recordKey(site, key, provider)]; await this.syncLink(record);

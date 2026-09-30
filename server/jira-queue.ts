@@ -71,5 +71,5 @@ export class JiraQueue {
       await this.save();
     } finally { this.busy = false; }
   }
-  close() { clearInterval(this.timer); this.paused = true; }
+  close() { clearInterval(this.timer); this.paused = true; return this.writes; }
 }

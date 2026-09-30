@@ -13,6 +13,7 @@ export class HostUpdater {
   private value: HostUpdateStatus;
   private timer?: ReturnType<typeof setInterval>;
   private active = false;
+  private closed = false;
   private prepared?: { version: string; stagedDir: string };
   private workerRunning = false;
   private file: string;
@@ -39,6 +40,7 @@ export class HostUpdater {
   }
   private async fail() { this.active = false; this.prepared = undefined; await this.save('failed', 'Could not update the PC. The current version is still available. Retry from Settings.'); }
   async check(appVersion: string) {
+    if (this.closed) throw new HttpError(409, 'Pocket Code is shutting down.');
     if (!versionPattern.test(appVersion)) throw new HttpError(400, 'Invalid app version.');
     if (!this.value.supported || this.active || compareVersions(appVersion, this.options.version) <= 0) return this.status();
     this.active = true; this.value.targetVersion = appVersion; await this.save('checking');
@@ -47,26 +49,32 @@ export class HostUpdater {
   }
   private async prepare(version: string) {
     const release = await this.releases.hostRelease(version);
+    if (this.closed) return;
     if (release.version !== version || compareVersions(release.version, this.options.version) <= 0) throw new Error('Unexpected PC release');
     await this.save('downloading');
     const bytes = await this.releases.downloadHost(release);
+    if (this.closed) return;
     const stagedDir = await unpackHost(bytes, release, path.join(this.options.directory, 'host', 'versions'));
+    if (this.closed) return;
     await this.save('installing');
     const npm = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'); await access(npm);
     await execute(process.execPath, [npm, 'ci', '--include=dev', '--no-audit', '--no-fund'], { cwd: stagedDir, windowsHide: true, timeout: 600000, maxBuffer: 4_000_000, env: { ...process.env, npm_config_update_notifier: 'false' } });
+    if (this.closed) return;
     // A broken install is rejected while the running host is still untouched.
     await execute(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', "await import('./server/app.ts'); await import('node-pty');"], { cwd: stagedDir, windowsHide: true, timeout: 30000, maxBuffer: 100000 });
     this.prepared = { version, stagedDir }; await this.save('waiting'); await this.launch();
   }
   private async launch() {
-    if (!this.prepared || this.workerRunning || this.draining || this.options.isBusy()) return;
+    if (this.closed || !this.prepared || this.workerRunning || this.draining || this.options.isBusy()) return;
     this.workerRunning = true;
     try {
       const config = { ...this.prepared, previousDir: this.options.previousDir, nodeExecutable: process.execPath, dataDir: this.options.directory, port: this.options.port, host: this.options.host, roots: this.options.roots, oldPid: process.pid, statusFile: this.file, ...this.options.tunnel() };
       const configFile = path.join(this.options.directory, 'host', 'pending.json');
       await writeFile(configFile, JSON.stringify(config), { mode: 0o600 }); await this.save('restarting');
+      if (this.closed) return;
       const log = await open(path.join(this.options.directory, 'host', 'worker.log'), 'a');
       try {
+        if (this.closed) return;
         const child = spawn(process.execPath, [path.join(this.options.previousDir, 'scripts', 'host-update-worker.mjs'), configFile], { cwd: this.options.previousDir, env: process.env, detached: true, windowsHide: true, stdio: ['ignore', log.fd, log.fd] });
         child.once('error', () => { this.workerRunning = false; void this.fail(); });
         child.once('exit', () => { this.workerRunning = false; if (!this.draining) void this.status().then(s => { if(s.state !== 'waiting')void this.fail(); }); }); child.unref();
@@ -74,10 +82,10 @@ export class HostUpdater {
     } catch (error) { this.workerRunning = false; throw error; }
   }
   handoff(version: string, expectedPid: number) {
-    if (this.draining || !this.prepared || version !== this.prepared.version || expectedPid !== process.pid || !this.workerRunning) throw new HttpError(409, 'PC update changed.');
+    if (this.closed || this.draining || !this.prepared || version !== this.prepared.version || expectedPid !== process.pid || !this.workerRunning) throw new HttpError(409, 'PC update changed.');
     if (this.options.isBusy()) throw new HttpError(409, 'PC is busy. Waiting for work to finish.');
     this.draining = true;
   }
-  finishHandoff() { setTimeout(() => this.options.shutdown(), 150).unref(); }
-  close() { if (this.timer) clearInterval(this.timer); }
+  finishHandoff() { setTimeout(() => { if(!this.closed)this.options.shutdown(); }, 150).unref(); }
+  close() { this.closed = true; if (this.timer) clearInterval(this.timer); }
 }

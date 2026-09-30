@@ -19,9 +19,13 @@ Android companion for Claude Code and Codex running on your own Windows PC. Conn
 
 ## Run the PC bridge
 
-Requires Windows and Node.js 22+. Install and sign in to Claude Code and/or Codex on the PC for the workspace you want to use. Install dependencies with `npm ci` and build with `npm run build`.
+Requires Windows 10 or newer and Node.js 22+. Install and sign in to Claude Code and/or Codex on the PC for the workspace you want to use. Install dependencies with `npm ci` and build with `npm run build`.
 
 Run **Start Pocket Code.cmd** for LAN or **Start Pocket Code Internet.cmd** for mobile internet. Choose the project folder that the phone may access. Keep the server running. The internet launcher installs Cloudflare's tunnel client locally and opens a pairing QR in your browser. A restarted temporary tunnel has a new address: scan its new QR.
+
+The launcher window owns the server and its child processes. Closing that window or pressing Ctrl+C ends the whole Pocket Code process tree, including the tunnel and any replacement host created by an update. It does not launch another instance. **Stop Pocket Code.cmd** requests a graceful exit when no tasks or update handoff are active. Starting the launcher again while Pocket Code is running reuses that instance. Closing only the QR browser tab or disconnecting the phone leaves the PC server running.
+
+On Windows, the launcher uses a [job object](https://learn.microsoft.com/windows/win32/procthread/job-objects) with termination on handle closure. The initial process joins the job atomically, and update workers and detached children stay inside it. Use the Windows launchers for this process-tree ownership; direct `npm run server` is intended for development.
 
 Automatic host handoffs preserve the running tunnel and pairing address. Closing or restarting the tunnel itself still changes a temporary address. PC updates live under the runtime directory's `host/versions`; project files and credentials are not overwritten. The launcher remembers the last verified host installation.
 

@@ -23,7 +23,7 @@ import type { JiraService } from './jira.js';
 import type { CodexService } from './codex.js';
 import { claudeSubagents, claudeSubagentMessages } from './subagents.js';
 
-export type Config = { hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -61,15 +61,31 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     failures.delete(ip); next();
   });
   app.use(express.json({ limit: '15mb' }));
-  let activeMutations = 0;
+  let activeMutations = 0, runtimeStopping = false;
+  const isBusy = () => activeMutations > 0 || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!workflow?.isBusy();
   app.use('/api', (req, res, next) => {
-    if (req.method === 'GET' || req.path.startsWith('/host-update/')) { next(); return; }
+    if (req.method === 'GET' || req.path === '/runtime/stop') { next(); return; }
+    if (runtimeStopping) { res.status(503).json({ error: 'The PC server is stopping.' }); return; }
+    if (req.path.startsWith('/host-update/')) { next(); return; }
     if (config.hostUpdater?.draining) { res.status(503).json({ error: 'The PC is restarting to finish its update. Please wait.' }); return; }
     activeMutations++;
     let released = false; const release = () => { if (!released) { released = true; activeMutations--; } };
     const end = res.end;
     res.end = function (this: express.Response, ...args: any[]) { try { return (end as any).apply(this, args); } finally { release(); } } as typeof res.end;
     res.once('finish', release); next();
+  });
+  app.get('/api/runtime', (_req, res) => res.json({ applicationId: 'app.pocketcode.host', processId: process.pid, version: packageJson.version, busy: isBusy(), internet: config.runtime?.internet() ?? false }));
+  app.post('/api/runtime/stop', (_req, res) => {
+    if (!config.runtime) throw new HttpError(404, 'Runtime control is unavailable.');
+    if (config.hostUpdater?.draining) throw new HttpError(409, 'The PC is handing off an update. Wait for it to finish.');
+    if (!runtimeStopping) {
+      if (isBusy()) throw new HttpError(409, 'The PC still has active tasks. Finish or stop them before closing the server.');
+      // Reserve shutdown before yielding: subsequent mutations and updater handoffs
+      // cannot race the idle check; duplicate stop requests remain idempotent.
+      runtimeStopping = true;
+      res.once('finish', () => { void Promise.resolve().then(() => config.runtime!.stop()).catch(() => console.error('Could not finish stopping the PC server.')); });
+    }
+    res.json({ accepted: true });
   });
   app.get('/api/host-update/status', async (_req, res) => res.json(config.hostUpdater ? await config.hostUpdater.status() : { supported: false, currentVersion: packageJson.version, state: 'idle' }));
   app.post('/api/host-update/check', async (req, res) => { const body = z.object({ appVersion: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/) }).parse(req.body); res.json(config.hostUpdater ? await config.hostUpdater.check(body.appVersion) : { supported: false, currentVersion: packageJson.version, state: 'idle' }); });
@@ -375,5 +391,5 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const status = error instanceof z.ZodError ? 400 : error.status || 500;
     res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message });
   });
-  return { app, jobs, terminals, queue, codexQueue, workflow, isBusy: () => activeMutations > 0 || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!workflow?.isBusy() };
+  return { app, jobs, terminals, queue, codexQueue, workflow, isBusy };
 }
