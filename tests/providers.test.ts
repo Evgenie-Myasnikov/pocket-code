@@ -59,3 +59,44 @@ test('provider routes isolate history and dispatch jobs, approvals and stop to t
     assert.equal(codexJira.status,200);const result=await codexJira.json();assert.equal(result.provider,'codex');assert.equal(result.jira.key,'TEST-3');
   }finally{runtime.queue?.close();runtime.codexQueue?.close();engine.close();claude.close();runtime.terminals.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(temporary,{recursive:true,force:true});}
 });
+
+
+test('shared projects include both providers while excluding out-of-scope and missing folders', async () => {
+  const temporary = await mkdtemp(path.join(os.tmpdir(), 'pocket-projects-'));
+  const root = path.join(temporary, 'allowed'), claudeRoot = path.join(root, 'claude'), codexRoot = path.join(root, 'codex'), outside = path.join(temporary, 'outside');
+  await Promise.all([mkdir(claudeRoot, {recursive:true}), mkdir(codexRoot, {recursive:true}), mkdir(outside)]);
+  const token = 'p'.repeat(43);
+  let claudeFails = false, codexFails = false;
+  const codex:any = {sessions: async () => {
+    if (codexFails) throw new Error('Synthetic unavailable provider');
+    return [{cwd:codexRoot}, {cwd:claudeRoot}, {cwd:outside}, {cwd:path.join(root, 'missing')}];
+  }};
+  const runtime = await createApp({roots:[root], uploads:path.join(temporary, 'uploads'), token, hostName:'Fixture', desktopSessionIndexes:[], codex}, new Jobs(), {
+    listSessions: async () => {
+      if (claudeFails) throw new Error('Synthetic unavailable provider');
+      return [{sessionId:randomUUID(), cwd:claudeRoot, lastModified:1}, {sessionId:randomUUID(), cwd:outside, lastModified:1}];
+    }, getSessionMessages:async()=>[],
+  } as any);
+  const server = runtime.app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve=>server.once('listening',resolve));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/projects`;
+  const list = async () => {
+    const response = await fetch(url, {headers:{Authorization:`Bearer ${token}`}});
+    assert.equal(response.status,200);return response.json();
+  };
+  try {
+    assert.equal((await fetch(url)).status,401);
+    assert.deepEqual(await list(), [root, claudeRoot, codexRoot]);
+    codexFails = true;
+    assert.deepEqual(await list(), [root, claudeRoot]);
+    claudeFails = true;codexFails = false;
+    assert.deepEqual(await list(), [root, codexRoot, claudeRoot]);
+    codexFails = true;
+    assert.deepEqual(await list(), [root]);
+  } finally {
+    runtime.jobs.close();runtime.terminals.close();
+    await new Promise<void>(resolve=>server.close(()=>resolve()));
+    assert.ok(path.resolve(temporary).startsWith(path.resolve(os.tmpdir())+path.sep));
+    await rm(temporary,{recursive:true,force:true});
+  }
+});

@@ -28,7 +28,7 @@ The bridge stores runtime files under `%USERPROFILE%/.pocket-code`, outside the 
 
 ## Workspaces
 
-Select **Claude** or **Codex** from **Workspace**. The model, project and conversation shown belong to that selection. Switching does not cancel a running task. To prevent conflicting edits, the bridge permits only one active agent or terminal per project folder. Before continuing an existing desktop chat, finish its current response on the PC and confirm the handover on the phone.
+Select **Claude** or **Codex** from **Workspace**. The model, project and conversation shown belong to that selection. The project picker shares allowed folders discovered from both providers, including nested project folders; chat histories stay separate. Switching does not cancel a running task. To prevent conflicting edits, the bridge permits only one active agent or terminal per project folder. Before continuing an existing desktop chat, finish its current response on the PC and confirm the handover on the phone.
 
 Codex Desktop can retain exclusive write access even after its response finishes. If Pocket Code says the chat is open on the PC, history is still readable; finish the desktop work, close Codex Desktop and retry on the phone. Pocket Code does not remove locks, stop Desktop or resend rejected messages automatically. This replaces the opaque `-32600` error for an active writer.
 

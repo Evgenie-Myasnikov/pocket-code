@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-30 - Shared project discovery across workspaces
+- Changed: Project selectors share configured roots and allowed folders discovered from Claude and Codex histories, including nested projects. Each workspace retains its selected folder after reload.
+- Why: Nested folders previously disappeared from the project picker when switching providers. Conversation histories and drafts remain separate.
+- Files: server/app.ts (`/api/projects`), src/App.tsx, tests/providers.test.ts, tests/workspaces.spec.ts, README.md.
+- Validation: TypeScript/Vite build, 102 Node tests and 16 Playwright workspace/navigation/project-document scenarios passed, including delayed discovery and provider failures.
+- Follow-up: Source fix only; no new APK release or deployment.
+
 ## 2026-09-30 - 0.11.0
 - Added Project with read-only Markdown rules, changelog discovery, live document refresh and Files navigation.
 - Added categorized chat Results, separate source attachments, inline image thumbnails and authenticated local previews. Recent results appear first; saved content and current PC files are distinguished.

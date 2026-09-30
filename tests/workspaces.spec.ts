@@ -80,3 +80,47 @@ for(const provider of ['claude','codex'] as const) test(`${provider} returns to 
   await expect(page.locator('.header-title')).toContainText('Current task',{timeout:10000});await expect(page.getByText(`${provider} completed reply`)).toHaveCount(1);await expect(composer).toHaveValue('Draft stays while syncing');
   desktopReply=true;await expect(page.getByText('Later reply from desktop')).toBeVisible({timeout:10000});await expect(composer).toHaveValue('Draft stays while syncing');
 });
+
+
+test('nested project folders stay available across providers and reload without mixing chats', async ({page}) => {
+  await mockHost(page);
+  const claudeProject = roots[0] + '\\claude-only';
+  const codexProject = roots[0] + '\\codex-only';
+  await page.route('**/api/projects', route => route.fulfill({json: [...roots, claudeProject, codexProject]}));
+  await connect(page);
+  const picker = page.locator('.project-picker select');
+  await expect(picker.locator('option')).toHaveCount(4);
+  await picker.selectOption(claudeProject);
+  await switchSidebar(page, 'codex');
+  await expect(picker.locator('option')).toHaveCount(4);
+  await picker.selectOption(claudeProject);
+  await expect(page.getByRole('button', {name:/Codex thread/})).toBeVisible();
+  await expect(page.getByRole('button', {name:/Claude thread/})).toHaveCount(0);
+  await page.getByRole('button', {name:'Settings', exact:true}).click();
+  await expect(page.getByLabel('Folder for new chats')).toHaveValue(claudeProject);
+  await page.getByLabel('Folder for new chats').selectOption(codexProject);
+  await page.reload();
+  await expect(picker).toHaveValue(codexProject);
+  await switchSidebar(page, 'claude');
+  await expect(picker).toHaveValue(claudeProject);
+  await expect(picker.locator('option')).toHaveCount(4);
+});
+
+
+test('slow project discovery does not overwrite a folder chosen in the meantime', async ({page}) => {
+  await mockHost(page);
+  const discovery = gate();
+  await page.route('**/api/projects', async route => {
+    await discovery.promise;
+    await route.fulfill({json:[...roots, roots[0] + '\\nested']});
+  });
+  await connect(page);
+  const picker = page.locator('.project-picker select');
+  await expect(picker).toHaveValue(roots[0]);
+  await picker.selectOption(roots[1]);
+  discovery.resolve();
+  await expect(picker.locator('option')).toHaveCount(3);
+  await expect(picker).toHaveValue(roots[1]);
+  await page.reload();
+  await expect(picker).toHaveValue(roots[1]);
+});

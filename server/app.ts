@@ -193,6 +193,19 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
     res.json([{ id: 'claude', name: 'Claude', available: true, models: [{ id: 'sonnet', name: 'Sonnet' }, { id: 'opus', name: 'Opus' }, { id: 'haiku', name: 'Haiku' }] }, { id: 'codex', name: 'Codex', ...state }]);
   });
+  // Project folders are shared; conversation histories remain provider-specific.
+  app.get('/api/projects', async (_req, res) => {
+    const results = await Promise.allSettled([sessions('claude'), sessions('codex')]);
+    const projects = new Set(roots);
+    for (const result of results) if (result.status === 'fulfilled') {
+      for (const session of result.value) {
+        if (!session.cwd || session.readOnly) continue;
+        try { projects.add(await allowedPath(roots, session.cwd, true)); }
+        catch { /* Missing and out-of-scope folders cannot grant project access. */ }
+      }
+    }
+    res.json([...projects]);
+  });
   app.get('/api/sessions', async (req, res) => res.json(await sessions(providerSchema.parse(req.query.provider))));
   app.get('/api/sessions/:id/messages', async (req, res) => {
     const provider = providerSchema.parse(req.query.provider);
