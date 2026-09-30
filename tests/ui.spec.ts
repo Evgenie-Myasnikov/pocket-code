@@ -27,7 +27,7 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await expect(page.getByText('History message 149.', { exact: false })).toBeVisible();
   await page.locator('.mobile-nav').getByRole('button', { name: 'Настройки', exact: true }).click();
   await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await page.getByLabel('Тема', { exact: true }).selectOption('light');
-  await page.getByRole('button', { name: 'Океан', exact: false }).click();
+  await page.getByRole('button', { name: 'Мята', exact: false }).click();
   await page.getByLabel('Размер текста чата', { exact: true }).focus(); await page.keyboard.press('End');
   await page.getByLabel('Масштаб интерфейса', { exact: true }).focus(); await page.keyboard.press('End');
   await page.getByLabel('Компактные отступы').check();
@@ -37,7 +37,7 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await page.reload();
   await page.locator('.mobile-nav').getByRole('button', { name: 'Настройки', exact: true }).click();
   await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('light');
-  await expect(page.getByRole('button', { name: /Океан/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: /Мята/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByLabel('Размер текста чата', { exact: true })).toHaveValue('22');
   await expect(page.getByLabel('Масштаб интерфейса', { exact: true })).toHaveValue('130');
   await expect(page.getByLabel('Компактные отступы')).toBeChecked();

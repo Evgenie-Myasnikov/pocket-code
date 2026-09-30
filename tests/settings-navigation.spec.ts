@@ -7,6 +7,7 @@ async function setup(page:Page){
     else if(path.endsWith('/sessions')||path.endsWith('/jobs'))body=[];
     else if(path.endsWith('/review/availability'))body={available:false,mode:'working'};
     else if(path.endsWith('/updates/latest'))body={enabled:false};
+    else if(path.endsWith('/usage'))body={buckets:[],checkedAt:Date.now()};
     else if(path.endsWith('/jira/status'))body={connected:false,sites:[]};
     return route.fulfill({json:body});
   });
@@ -21,13 +22,15 @@ test('home stays focused; categorized Settings restores focus and Back preserves
   await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'AI & workspace',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(page.getByLabel('Message Codex')).toHaveValue('Keep my draft');
   await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'About',exact:true}).click();await expect(page.locator('.settings-about')).toContainText('Pocket Code');await expect(page.locator('.settings-about')).toContainText('BETA');
 });
-for(const profile of [{width:320,height:640},{width:844,height:390}])test(`Settings footer stays separate from scrolling content at ${profile.width}x${profile.height}`,async({page})=>{
+for(const profile of [{width:320,height:640},{width:844,height:390}])test(`Disconnect stays at the end of the settings index only at ${profile.width}x${profile.height}`,async({page})=>{
   await page.setViewportSize(profile);await setup(page);await (profile.width<=760?page.locator('.mobile-nav'):page.locator('.desktop-tabs')).getByRole('button',{name:'Settings',exact:true}).click();
-  for(const category of ['', 'Appearance & language']){
-    if(category)await page.getByRole('button',{name:category,exact:true}).click();
-    const metrics=await page.locator('.settings-panel').evaluate(panel=>{const content=panel.querySelector('.settings-content')!.getBoundingClientRect(),footer=panel.querySelector('.settings-exit')!.getBoundingClientRect(),button=panel.querySelector('.settings-disconnect')!.getBoundingClientRect();return{contentBottom:content.bottom,footerTop:footer.top,footerBottom:footer.bottom,buttonHeight:button.height,spill:document.documentElement.scrollWidth-innerWidth};});
-    expect(metrics.contentBottom).toBeLessThanOrEqual(metrics.footerTop+1);expect(metrics.footerBottom).toBeLessThanOrEqual(profile.height);expect(metrics.buttonHeight).toBeGreaterThanOrEqual(48);expect(metrics.spill).toBeLessThanOrEqual(1);
-    await page.locator('.settings-content').evaluate(element=>{element.scrollTop=element.scrollHeight;});await expect(page.getByRole('button',{name:'Disconnect and forget',exact:true})).toBeVisible();
+  for(const category of ['Appearance & language','AI & workspace','Usage limits','Jira','Updates','PC connection','About']){
+    await page.getByRole('button',{name:category,exact:true}).click();
+    await expect(page.locator('.settings-exit')).toHaveCount(0);
+    await page.getByRole('button',{name:'All settings',exact:true}).click();
   }
+  await page.locator('.settings-content').evaluate(element=>{element.scrollTop=element.scrollHeight;});
+  const metrics=await page.locator('.settings-panel').evaluate(panel=>{const content=panel.querySelector('.settings-content')!.getBoundingClientRect(),index=panel.querySelector('.settings-index')!.getBoundingClientRect(),footer=panel.querySelector('.settings-exit')!.getBoundingClientRect(),button=panel.querySelector('.settings-disconnect')!.getBoundingClientRect();return{contentBottom:content.bottom,indexBottom:index.bottom,footerTop:footer.top,footerBottom:footer.bottom,buttonHeight:button.height,spill:document.documentElement.scrollWidth-innerWidth};});
+  expect(metrics.indexBottom).toBeLessThanOrEqual(metrics.footerTop);expect(metrics.footerBottom).toBeLessThanOrEqual(metrics.contentBottom+1);expect(metrics.buttonHeight).toBeGreaterThanOrEqual(48);expect(metrics.spill).toBeLessThanOrEqual(1);
   await page.screenshot({path:`artifacts/screenshots/settings-categories-${profile.width}.png`,fullPage:true});await page.getByRole('button',{name:'Disconnect and forget',exact:true}).click();await expect(page.getByRole('button',{name:'Connect computer',exact:true})).toBeVisible();
 });

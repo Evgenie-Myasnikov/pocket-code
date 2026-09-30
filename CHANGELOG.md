@@ -1,6 +1,13 @@
 # Changelog
 
-## 2026-10-01 - Windows process lifecycle fix (unreleased)
+## 2026-10-01 - 0.13.1
+- Added the Mint palette with English/Russian names and saved selection.
+- Moved Disconnect and forget to the end of the scrolling settings index; it is absent from settings subpages.
+- Includes the PC runtime shutdown fixes below. Console ownership is provided by the updated Windows launchers in the source repository.
+- Validation: Android/TypeScript/Vite build and APK signature compatibility passed, along with nine focused server tests, chat/update browser checks, and all three settings-navigation scenarios.
+- Updating: Use Android 0.13.0 to test the in-app update to 0.13.1. Older builds require one manual installation of 0.13.0 or newer. Android still confirms installation.
+
+## 2026-10-01 - Windows process lifecycle fix (included in 0.13.1)
 - Changed: Closing the launcher console ends the entire owned server/tunnel/update process tree, including a replacement host. Ordinary exit does not start another instance. Repeated Start recognizes an authenticated running host, and failed CMD launchers no longer wait indefinitely for a key press.
 - Changed: Added Stop Pocket Code.cmd and authenticated runtime controls. Graceful Stop refuses active work or an update handoff, waits for persistence and tunnel cleanup, and prevents new work during exit.
 - Files: Windows launchers, scripts/OwnedHost.cs, scripts/run-host.ps1, scripts/stop.ps1, server runtime/update handling and lifecycle tests.

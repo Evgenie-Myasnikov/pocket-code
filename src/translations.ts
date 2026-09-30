@@ -332,6 +332,7 @@ export const english: Record<string, string> = {
   "Сирень": "Lilac",
   "Роза": "Rose",
   "Янтарь": "Amber",
+  "Мята": "Mint",
   "Настройки применены, но сохранить их на устройстве не удалось.": "Settings were applied but could not be saved on this device.",
   "Настройки интерфейса": "Interface settings",
   "ОФОРМЛЕНИЕ": "APPEARANCE",

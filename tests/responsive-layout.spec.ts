@@ -105,11 +105,7 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   await page.getByRole('button',{name:language==='en'?'Updates':'Обновления',exact:true}).click();
   await expect(page.locator('.settings-panel #settings-updates .update-panel')).toBeVisible();
   await expect(page.locator('.appearance-settings')).toHaveCount(0);
-  const bounds=await page.locator('.settings-panel').evaluate(panel=>{
-    const content=panel.querySelector('.settings-content')!.getBoundingClientRect(),footer=panel.querySelector('.settings-exit')!.getBoundingClientRect();
-    return {contentBottom:content.bottom,footerTop:footer.top};
-  });
-  expect(bounds.contentBottom).toBeLessThanOrEqual(bounds.footerTop+1);
+  await expect(page.locator('.settings-exit')).toHaveCount(0);
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-updates.png`});
 
 }

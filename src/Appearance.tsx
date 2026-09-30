@@ -6,7 +6,8 @@ const palettes = [
 { id: 'ocean', name: 'Океан', color: '#9fcfff', hue: 211 },
 { id: 'lilac', name: 'Сирень', color: '#d2b5ff', hue: 267 },
 { id: 'rose', name: 'Роза', color: '#f4b7c9', hue: 340 },
-{ id: 'amber', name: 'Янтарь', color: '#f1cb89', hue: 38 }];
+{ id: 'amber', name: 'Янтарь', color: '#f1cb89', hue: 38 },
+{ id: 'mint', name: 'Мята', color: '#abe3da', hue: 170 }];
 
 type Appearance = {palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;compact: boolean;};
 const defaults: Appearance = { palette: 'sage', theme: 'dark', textSize: 14, scale: 100, spacing: 1.85, compact: false };
