@@ -9,8 +9,17 @@ export async function review(roots:string[],input:string,mode:'working'|'staged'
   const cwd=await allowedPath(roots,input,true);
   let root=cwd;
   while(true){try{await stat(path.join(root,'.git'));break;}catch{const parent=path.dirname(root);if(parent===root)throw new HttpError(400,'This project is not a Git repository.');root=parent;}}
+  const filterOverrides:string[]=[];
+  // Reading a worktree diff otherwise runs configured clean/process filters.
+  const safeArgs=['--no-optional-locks','-c',`safe.directory=${root}`,'-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-c','core.quotePath=false'];
+  let filterKeys='';
+  try { filterKeys=(await execute('git',[...safeArgs,'-C',root,'config','--null','--name-only','--get-regexp','^filter\\.'],{windowsHide:true,timeout:15000,maxBuffer:100_000})).stdout; }
+  catch(error:any) { if(error.code!==1)throw new HttpError(400,'Could not inspect Git filters safely.'); }
+  const filters=new Set(filterKeys.split('\0').filter(Boolean).map(key=>key.slice(0,key.lastIndexOf('.'))));
+  if(filters.size>200)throw new HttpError(400,'Too many Git filters to inspect this comparison safely.');
+  for(const name of filters)filterOverrides.push('-c',`${name}.clean=`,'-c',`${name}.process=`,'-c',`${name}.required=false`);
   const git=async(args:string[],maxBuffer=3_000_000)=>{
-    try{return (await execute('git',['--no-optional-locks','-c',`safe.directory=${root}`,'-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-c','core.quotePath=false','-C',root,...args],{windowsHide:true,timeout:15000,maxBuffer})).stdout;}
+    try{return (await execute('git',[...safeArgs,...filterOverrides,'-C',root,...args],{windowsHide:true,timeout:15000,maxBuffer})).stdout;}
     catch{throw new HttpError(400,'Could not read this Git comparison. Check the branch or reduce the diff size.');}
   };
   const scope=path.relative(root,cwd).replaceAll('\\','/')||'.';

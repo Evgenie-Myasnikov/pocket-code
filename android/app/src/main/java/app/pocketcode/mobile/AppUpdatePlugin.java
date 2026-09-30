@@ -15,6 +15,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -88,7 +89,16 @@ public class AppUpdatePlugin extends Plugin {
     }
     @PluginMethod public void install(PluginCall call) {
         try {
-            File file = ready != null ? ready : updateFile(); verify(file);
+            String expected = call.getString("sha256", ""); Long expectedCode = call.getLong("versionCode");
+            if (downloading.get() || !expected.matches("[a-f0-9]{64}") || expectedCode == null || expectedCode < 1) throw new Exception();
+            File file = ready != null ? ready : updateFile();
+            if (version(verify(file)) != expectedCode) throw new Exception();
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = new FileInputStream(file)) {
+                byte[] buffer = new byte[65536]; int count;
+                while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+            }
+            if (!hex(digest.digest()).equals(expected)) throw new Exception();
             if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) { JSObject result = new JSObject(); result.put("needsPermission", true); call.resolve(result); return; }
             Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);

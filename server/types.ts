@@ -2,6 +2,7 @@ export type Block = { type: string; text?: string; name?: string; input?: unknow
 export type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; blocks: Block[] };
 export type Approval = { id: string; tool: string; input: Record<string, unknown>; expiresAt: number };
 export type JobView = {
+  provider?: 'claude' | 'codex';
   id: string; cwd: string; sessionId?: string; status: 'running' | 'done' | 'error' | 'stopped';
   messages: ChatMessage[]; partial: string; approvals: Approval[]; error?: string;
   cost?: number; startedAt: number; revision: number; baseMessageCount: number;

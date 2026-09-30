@@ -8,34 +8,41 @@ import pkg from '../package.json';
 import { Installer } from './native-update';
 export function Updates({ connection, expanded }: {connection:Connection|null;expanded:boolean}) {
   const [auto, setAuto] = useState(() => {try{return localStorage.getItem('pocket-code-auto-updates-v1') !== 'false';}catch{return true;}});
-  const [current, setCurrent] = useState({version:pkg.version,versionCode:10});
+  const [current, setCurrent] = useState({version:pkg.version,versionCode:11});
   const [update, setUpdate] = useState<Update|null>(null), [busy, setBusy] = useState(''), [error,setError] = useState('');
-  const [ready,setReady] = useState(false), [permission,setPermission] = useState(false), [checked,setChecked] = useState(false), [enabled,setEnabled] = useState(true);
-  const generation = useRef(0), checking = useRef(false), attempted = useRef(new Set<string>());
+  const [ready,setReady] = useState<Update|null>(null), [permission,setPermission] = useState(false), [checked,setChecked] = useState(false), [enabled,setEnabled] = useState(true);
+  const generation = useRef(0), checking = useRef(false), downloading = useRef(false), attempted = useRef(new Set<string>());
   useEffect(() => {if(Capacitor.isNativePlatform()) void Installer.info().then(setCurrent).catch(()=>{});},[]);
   async function check() {
-    if(!connection || checking.current) return;
+    if(!connection || checking.current || downloading.current) return;
     const epoch = generation.current; checking.current = true;setBusy('check');setError('');
     try {const result = await request<{enabled:boolean;update?:Update}>(connection,'/updates/latest');
       if(epoch !== generation.current) return;
-      setEnabled(result.enabled);setChecked(true);setUpdate(result.update && result.update.versionCode > current.versionCode ? result.update : null);
+      const next = result.update && result.update.versionCode > current.versionCode ? result.update : null;
+      setEnabled(result.enabled);setChecked(true);setUpdate(next);
+      setReady(previous => previous && next && previous.sha256 === next.sha256 && previous.versionCode === next.versionCode ? previous : null);
     } catch(e) {if(epoch === generation.current) setError((e as Error).message);}
     finally {checking.current=false;if(epoch === generation.current)setBusy('');}
   }
   useEffect(() => {
-    generation.current++;setUpdate(null);setReady(false);setChecked(false);setError('');setBusy('');
+    generation.current++;setUpdate(null);setReady(null);setPermission(false);setChecked(false);setError('');setBusy('');
     if(!connection)return;
     const timer = setTimeout(()=>void check(),3000);
     const interval = setInterval(()=>{if(document.visibilityState==='visible')void check();},6*60*60*1000);
     return ()=>{generation.current++;clearTimeout(timer);clearInterval(interval);};
   },[connection,current.versionCode]);
-  async function install() {try {setPermission((await Installer.install()).needsPermission);}catch(e){setError((e as Error).message);}}
-  async function download() {
-    if(!connection || !update || busy)return;
-    const epoch = generation.current;setBusy('download');setError('');
-    try {await Installer.download({...update,...connection});if(epoch !== generation.current)return;setReady(true);await install();}
+  async function install(target = ready) {
+    if(!target)return;
+    const epoch = generation.current;
+    try {const result = await Installer.install({sha256:target.sha256,versionCode:target.versionCode});if(epoch === generation.current)setPermission(result.needsPermission);}
     catch(e){if(epoch === generation.current)setError((e as Error).message);}
-    finally {if(epoch === generation.current)setBusy('');}
+  }
+  async function download() {
+    if(!connection || !update || busy || downloading.current)return;
+    const epoch = generation.current;downloading.current=true;setReady(null);setPermission(false);setBusy('download');setError('');
+    try {await Installer.download({...update,...connection});if(epoch !== generation.current)return;setReady(update);await install(update);}
+    catch(e){if(epoch === generation.current)setError((e as Error).message);}
+    finally {downloading.current=false;if(epoch === generation.current)setBusy('');}
   }
   useEffect(()=>{
     if(!auto || !update || busy || ready || !connection || !Capacitor.isNativePlatform())return;

@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PairingScannerPlugin.class);
         registerPlugin(JiraLoginPlugin.class);
         registerPlugin(AppUpdatePlugin.class);
+        registerPlugin(NavigationPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

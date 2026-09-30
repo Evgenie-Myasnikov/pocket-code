@@ -28,11 +28,12 @@ export class Jobs {
     const existing = this.jobs.get(input.id);
     if (existing) return this.view(existing);
     for (const [id, j] of this.jobs) if (j.status !== 'running' && Date.now() - j.startedAt > 86400000) this.jobs.delete(id);
+    if (this.jobs.size >= 100) this.trimCompleted();
     if ([...this.jobs.values()].some(j => j.status === 'running' && (j.cwd === input.cwd || (input.sessionId && j.sessionId === input.sessionId))))
       throw new HttpError(409, 'В этом проекте уже работает Claude. Дождитесь ответа или остановите задачу.');
     if ([...this.jobs.values()].filter(j => j.status === 'running').length >= 3 || this.jobs.size >= 100)
       throw new HttpError(429, 'Лимит задач сервера. Завершите текущие задачи; старые записи хранятся 24 часа.');
-    const job: Job = { id: input.id, cwd: input.cwd, sessionId: input.sessionId, status: 'running',
+    const job: Job = { provider: 'claude', id: input.id, cwd: input.cwd, sessionId: input.sessionId, status: 'running',
       messages: [{ id: randomUUID(), role: 'user', blocks: [{ type: 'text', text: input.displayText || input.text }] }],
       partial: '', approvals: [], startedAt: Date.now(), revision: 0, baseMessageCount: input.baseMessageCount || 0, jira: input.jira,
       controller: new AbortController(), pending: new Map() };

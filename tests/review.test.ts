@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,rm,access} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {review} from '../server/review';
@@ -18,5 +18,21 @@ test('review scopes Git diff to the chosen folder, includes untracked files and 
     await assert.rejects(review([folder],folder,'working',undefined,'outside.txt'),/not in the current/);
     await assert.rejects(review([folder],root,'working'),/вне разрешённых/);
     git('add','project/code.txt');assert.equal((await review([folder],folder,'staged')).files.length,1);
+  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('review never executes configured clean or process filters',async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),'pocket-filter-'));
+  const git=(...args:string[])=>execFileSync('git',['-c',`safe.directory=${root}`,'-C',root,...args],{windowsHide:true,stdio:'pipe'});
+  try{
+    git('init');git('config','user.name','Test');git('config','user.email','test@example.invalid');
+    await writeFile(path.join(root,'sample.txt'),'before\n');git('add','.');git('commit','-m','Fixture');
+    await writeFile(path.join(root,'filter.cjs'),"require('fs').writeFileSync('side-effect.txt','executed');process.stdin.pipe(process.stdout)");
+    await writeFile(path.join(root,'.gitattributes'),'sample.txt filter=probe\n');
+    git('config','filter.probe.clean','node filter.cjs');git('config','filter.probe.process','node filter.cjs');git('config','filter.probe.required','true');
+    await writeFile(path.join(root,'sample.txt'),'after\n');
+    const diff=await review([root],root,'working',undefined,'sample.txt');assert.match(diff.patch,/\+after/);
+    await assert.rejects(access(path.join(root,'side-effect.txt')));
+    assert.equal(git('config','filter.probe.clean').toString().trim(),'node filter.cjs');
   }finally{await rm(root,{recursive:true,force:true});}
 });

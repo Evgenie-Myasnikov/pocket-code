@@ -26,3 +26,38 @@
 .document-card {padding:14px;border:1px solid var(--border);border-radius:12px;margin:12px 0;overflow-wrap:anywhere;}
 .document-card pre {white-space:pre-wrap;max-height:400px;overflow:auto;}
 .tool-card.failed {border-color:#aa6655;}
+.workspace-picker{display:flex;align-items:center;gap:10px;color:var(--muted,#8b9b80);margin:0;font-size:calc(11px * var(--ui-scale,1))}.workspace-picker select{min-width:0;color:var(--text,#d4dfca);background:var(--surface,#20271e);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;font-weight:600}.workspace-picker-sidebar{margin:0 0 16px;justify-content:space-between}.workspace-picker-sidebar select{min-width:115px}.workspace-picker-header{display:none}.workspace-picker-header>span{display:none}@media(max-width:760px){.workspace-picker-header{display:flex;flex-shrink:0}.workspace-picker-header select{width:84px;padding:8px 5px;font-size:calc(10px * var(--ui-scale,1))}.chat-header .header-title{min-width:25px}.chat-header .review-button{padding:8px;font-size:calc(10px * var(--ui-scale,1))}.workspace-picker-sidebar{font-size:calc(12px * var(--ui-scale,1))}}
+
+/* Text can be compact without shrinking the area a finger needs to tap. */
+@media (max-width:760px), (pointer:coarse) {
+  button, select, input:not([type=checkbox]):not([type=radio]):not([type=file]), summary {min-height:48px;min-width:48px;}
+  button, select, summary {touch-action:manipulation;}
+  .icon-button, .send-button, .copy-button, .composer-tools .icon-button, .attachment-chip .icon-button {width:48px;height:48px;min-width:48px;min-height:48px;}
+  .workspace-picker select {margin-top:0;}
+  .message-label {min-height:48px;height:auto;}
+  .appearance-settings input[type=range] {height:48px;min-height:48px;}
+  .appearance-settings .compact-toggle, .checkbox-label, .jira-check {min-height:48px;}
+  .palette-options button, .chat-scroll-actions button {min-height:48px;}
+  .tool-card summary, .thinking summary {display:flex;align-items:center;min-height:48px;}
+  .document-card a {display:inline-flex;align-items:center;min-height:48px;}
+  .review-panel button, .review-panel select {min-height:48px;}
+}
+@media (max-width:760px) {
+  .chat-header {height:76px;gap:6px;padding-inline:12px;}
+  .chat-header .header-title {min-width:0;}
+  .chat-header .review-button {min-width:48px;min-height:48px;padding:8px 5px;}
+  .workspace-picker-header select {flex:none;}
+  .composer-tools {gap:6px;}
+  .composer-tools select {width:0;min-width:48px;max-width:none;flex:1 1 0;padding-block:8px;}
+  .composer-spacer {display:none;}
+  .mobile-nav {height:calc(64px + env(safe-area-inset-bottom));}
+  .mobile-nav button {min-height:48px;min-width:48px;}
+  .app {padding-bottom:calc(64px + env(safe-area-inset-bottom));}
+  .chat-scroll-actions {flex-wrap:wrap;}
+  .review-controls {flex-wrap:wrap;}
+}
+@media (prefers-reduced-motion:reduce) {*,*::before,*::after {animation:none!important;}}
+
+.project-picker{display:flex;align-items:center;gap:5px;min-width:0;margin:0}.project-picker select{width:auto;max-width:100%;min-width:0;margin:0;border:0;background:transparent;color:var(--muted);padding:5px 0;font-size:inherit}.status-light.offline{background:#e3a27c}.review-panel{box-shadow:-16px 0 40px #0008}
+
+@media(max-width:760px){.project-picker select{min-width:48px;min-height:48px;flex:1;width:0}.project-picker>svg{display:none}.header-title>strong{line-height:1.15;margin-top:-3px}}

@@ -3,7 +3,10 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
 if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) { throw 'Install Node.js 22 or newer: https://nodejs.org/' }
-if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { throw 'Install Claude Code and sign in on this PC first.' }
+$claudeCommand = Get-Command claude -ErrorAction SilentlyContinue
+$codexCommand = Get-Command codex -ErrorAction SilentlyContinue
+$desktopCodexPath = Join-Path $env:LOCALAPPDATA 'OpenAI/Codex/bin'
+if (-not $claudeCommand -and -not $codexCommand -and -not (Test-Path -LiteralPath $desktopCodexPath)) { throw 'Install Claude Code or Codex and sign in on this PC first.' }
 if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) {
     throw ('Port ' + $Port + ' is already in use. Close the previous Pocket Code server window, then start this launcher again.')
 }
@@ -23,7 +26,7 @@ $env:POCKET_ROOTS = ConvertTo-Json -InputObject $resolvedRoots -Compress
 $env:POCKET_HOST = $BindAddress
 $env:POCKET_PORT = [string]$Port
 $env:POCKET_OPEN_PAIRING = '1'
-$env:POCKET_CLAUDE_EXECUTABLE = (Get-Command claude).Source
+if ($claudeCommand) { $env:POCKET_CLAUDE_EXECUTABLE = $claudeCommand.Source }
 if (-not (Test-Path -LiteralPath 'node_modules')) { & npm.cmd ci; if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' } }
 if (-not (Test-Path -LiteralPath 'dist/index.html')) { & npm.cmd run build; if ($LASTEXITCODE -ne 0) { throw 'Application build failed' } }
 $storagePath = Join-Path $env:USERPROFILE '.pocket-code'

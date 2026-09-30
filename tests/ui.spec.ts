@@ -4,7 +4,7 @@ import { renderPairingPage } from '../server/pairing';
 test('jump to actual beginning and persist appearance on a narrow phone', async ({ page }) => {
   const id = 'd916abbe-dab3-4e21-a92e-eaa7741610dc';
   const messages = Array.from({ length: 150 }, (_, i) => ({ id: `row-${i}`, role: 'assistant', blocks: [{ type: 'text', text: `History message ${i}. Example conversation with several lines of text.` }] }));
-  await page.route('**/api/sessions', route => route.fulfill({ json: [{ sessionId: id, summary: 'Long history', cwd: 'C:\\Test', lastModified: 1 }] }));
+  await page.route('**/api/sessions?*', route => route.fulfill({ json: [{ sessionId: id, summary: 'Long history', cwd: 'C:\\Test', lastModified: 1 }] }));
   await page.route(`**/api/sessions/${id}/messages?*`, route => {
     const url = new URL(route.request().url()), size = Number(url.searchParams.get('window') || 100), head = url.searchParams.get('from') === 'start';
     return route.fulfill({ json: { messages: head ? messages.slice(0, size) : messages.slice(-size), previous: head ? null : Math.max(0, messages.length - size) || null, next: head && size < messages.length ? size : null } });
@@ -49,7 +49,7 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
 test('open history syncs Desktop updates without erasing the draft and marks outside projects read-only', async ({ page }) => {
   let revision = 0;
   const id = 'f12dd715-d9b1-460a-8087-3c3052faed24';
-  await page.route('**/api/sessions', route => route.fulfill({ json: [{ sessionId: id, summary: 'Desktop sync test', cwd: 'C:\\DesktopProject', source: 'desktop', readOnly: false, lastModified: 1 }] }));
+  await page.route('**/api/sessions?*', route => route.fulfill({ json: [{ sessionId: id, summary: 'Desktop sync test', cwd: 'C:\\DesktopProject', source: 'desktop', readOnly: false, lastModified: 1 }] }));
   await page.route(`**/api/sessions/${id}/messages?*`, route => route.fulfill({ json: { messages: [{ id: 'initial', role: 'user', blocks: [{ type: 'text', text: 'Original history' }] }, ...(revision ? [{ id: 'new', role: 'assistant', blocks: [{ type: 'text', text: 'Added on desktop' }] }] : [])], previous: null } }));
   await page.goto('http://127.0.0.1:5173');
   await page.getByLabel('Адрес компьютера').fill('http://127.0.0.1:4319');
@@ -62,7 +62,7 @@ test('open history syncs Desktop updates without erasing the draft and marks out
   await expect(page.getByText('Added on desktop')).toBeVisible({ timeout: 10000 });
   await expect(page.getByLabel('Сообщение Claude')).toHaveValue('My unfinished draft');
   await expect(page.getByText('Added on desktop')).toHaveCount(1);
-  await page.route('**/api/sessions', route => route.fulfill({ json: [{ sessionId: id, summary: 'Desktop sync test', cwd: 'C:\\DesktopProject', source: 'desktop', readOnly: true, lastModified: 2 }] }));
+  await page.route('**/api/sessions?*', route => route.fulfill({ json: [{ sessionId: id, summary: 'Desktop sync test', cwd: 'C:\\DesktopProject', source: 'desktop', readOnly: true, lastModified: 2 }] }));
   await expect(page.getByText(/Только просмотр. Чтобы продолжить чат/)).toBeVisible({ timeout: 10000 });
   await expect(page.getByRole('button', { name: 'Отправить сообщение', exact: true })).toBeDisabled();
 });

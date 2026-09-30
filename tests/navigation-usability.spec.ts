@@ -1,0 +1,38 @@
+import {test,expect} from '@playwright/test';
+test('chat drafts survive navigation and modal Back/Escape restores focus',async({page})=>{
+  const roots=['C:\\Fixture\\first','C:\\Fixture\\second'];
+  await page.setViewportSize({width:390,height:844});
+  await page.addInitScript(()=>sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)})));
+  await page.route('**/api/**',route=>{
+    const endpoint=new URL(route.request().url()).pathname;
+    if(endpoint==='/api/health')return route.fulfill({json:{name:'Fixture',roots,protocol:1,version:'0.10.0'}});
+    if(endpoint==='/api/providers')return route.fulfill({json:[{id:'claude',name:'Claude',available:true}]});
+    if(endpoint==='/api/sessions')return route.fulfill({json:['First','Second'].map((summary,i)=>({sessionId:String(i),summary,cwd:roots[0],lastModified:1}))});
+    if(endpoint.endsWith('/messages'))return route.fulfill({json:{messages:[],previous:null,next:null}});
+    if(endpoint==='/api/jobs')return route.fulfill({json:[]});
+    if(endpoint==='/api/uploads')return route.fulfill({json:{id:'attachment',name:'draft.txt',size:4}});
+    if(endpoint==='/api/review')return route.fulfill({json:{files:[],patch:'',branches:[],base:'HEAD',current:'main',binary:false}});
+    if(endpoint==='/api/updates/latest')return route.fulfill({json:{enabled:false}});
+    return route.fulfill({status:404,json:{error:'Fixture'}});
+  });
+  await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:/^First/}).click();
+  const draft=page.getByLabel('Message Claude');await draft.fill('First unsent message');
+  await page.locator('input[type=file]').setInputFiles({name:'draft.txt',mimeType:'text/plain',buffer:Buffer.from('note')});
+  await expect(page.locator('.attachment-chip')).toContainText('draft.txt');
+  await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
+  await page.getByRole('button',{name:/^Second/}).click();await expect(draft).toHaveValue('');await draft.fill('Second unsent message');
+  await page.keyboard.press('Escape');await page.getByRole('button',{name:/^First/}).click();
+  await expect(draft).toHaveValue('First unsent message');await expect(page.locator('.attachment-chip')).toContainText('draft.txt');
+  await page.getByRole('button',{name:'Review',exact:true}).click();
+  const back=page.getByRole('button',{name:'Back to chat',exact:true});await expect(back).toBeFocused();
+  await expect(page.locator('.chat-header')).toHaveJSProperty('inert',true);
+  await page.keyboard.press('Shift+Tab');await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('button',{name:'Review',exact:true})).toBeFocused();
+  await expect(draft).toHaveValue('First unsent message');
+  await page.getByRole('button',{name:'Send message',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'Continue this chat from your phone?'})).toBeVisible();
+  await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));await expect(page.getByRole('dialog')).toHaveCount(0);await expect(draft).toHaveValue('First unsent message');
+  await page.getByLabel('Project folder',{exact:true}).selectOption(roots[1]);await expect(draft).toHaveValue('');await draft.fill('Second project draft');
+  await page.getByLabel('Project folder',{exact:true}).selectOption(roots[0]);await expect(draft).toHaveValue('');
+  await page.getByLabel('Project folder',{exact:true}).selectOption(roots[1]);await expect(draft).toHaveValue('Second project draft');
+});

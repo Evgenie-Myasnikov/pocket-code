@@ -1,4 +1,5 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useState,useRef} from 'react';
+import {useModal} from './navigation';
 import {request,type Connection} from './api';
 import {t} from './i18n';
 import type {ReviewFile} from '../server/review';
@@ -17,11 +18,12 @@ export function diffRows(patch:string):DiffRow[]{
 }
 type Data={files:ReviewFile[];current:string;base:string;branches:string[];patch:string;binary:boolean};
 export function Review({connection,cwd,onClose}:{connection:Connection;cwd:string;onClose:()=>void}){
+  const panel=useRef<HTMLElement|null>(null);useModal(panel,true,onClose);
   const [mode,setMode]=useState('working'),[base,setBase]=useState(''),[file,setFile]=useState(''),[data,setData]=useState<Data|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
   const [layout,setLayout]=useState(()=>{try{return localStorage.getItem('pocket-code-diff-layout')||'split';}catch{return 'split';}});
   useEffect(()=>{let active=true;setBusy(true);setError('');const query=new URLSearchParams({cwd,mode,...(base?{base}:{}),...(file?{file}:{})});request<Data>(connection,'/review?'+query).then(value=>{if(active){setData(value);if(!file&&value.files.length)setFile(value.files[0].path);}}).catch(e=>{if(active){setError(e.message);setData(null);}}).finally(()=>{if(active)setBusy(false);});return()=>{active=false;};},[connection,cwd,mode,base,file,refresh]);
   const rows=diffRows(data?.patch||'');
-  return <aside className="review-panel" role="dialog" aria-label="Review" aria-modal="true"><header><h2>Review</h2><button className="secondary" onClick={onClose}>{t('Вернуться в чат')}</button></header><div className="review-controls"><select aria-label={t('Сравнение')} value={mode} onChange={e=>{setMode(e.target.value);setFile('');setData(null);}}><option value="working">{t('Все изменения')}</option><option value="staged">Staged</option><option value="branch">Branch</option></select><select aria-label={t('Вид сравнения')} value={layout} onChange={e=>{setLayout(e.target.value);try{localStorage.setItem('pocket-code-diff-layout',e.target.value);}catch{}}}><option value="split">{t('Две колонки')}</option><option value="unified">{t('Одна колонка')}</option></select><button className="secondary" disabled={busy} onClick={()=>{setFile('');setRefresh(n=>n+1);}}>{t('Обновить')}</button></div>
+  return <aside ref={panel} className="review-panel" role="dialog" aria-label="Review" aria-modal="true"><header><h2>Review</h2><button className="secondary" onClick={onClose}>{t('Вернуться в чат')}</button></header><div className="review-controls"><select aria-label={t('Сравнение')} value={mode} onChange={e=>{setMode(e.target.value);setFile('');setData(null);}}><option value="working">{t('Все изменения')}</option><option value="staged">Staged</option><option value="branch">Branch</option></select><select aria-label={t('Вид сравнения')} value={layout} onChange={e=>{setLayout(e.target.value);try{localStorage.setItem('pocket-code-diff-layout',e.target.value);}catch{}}}><option value="split">{t('Две колонки')}</option><option value="unified">{t('Одна колонка')}</option></select><button className="secondary" disabled={busy} onClick={()=>{setFile('');setRefresh(n=>n+1);}}>{t('Обновить')}</button></div>
     {mode==='branch'&&data&&<label className="review-base">{data.current} → <select aria-label={t('Базовая ветка')} value={base||data.base} onChange={e=>{setBase(e.target.value);setFile('');}}>{['HEAD',...data.branches].map(branch=><option key={branch}>{branch}</option>)}</select></label>}
     <p className="muted review-note">{t('Изменения Git в папке проекта, включая правки вне этого чата.')}</p>
     {error&&<p className="error" role="alert">{t(error)}</p>}{busy&&<p role="status">{t('Загружаем изменения…')}</p>}
