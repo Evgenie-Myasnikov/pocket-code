@@ -1,0 +1,25 @@
+:root[data-theme]{--bg:hsl(var(--palette-hue) 12% 7%);--panel:hsl(var(--palette-hue) 12% 10%);--surface:hsl(var(--palette-hue) 15% 14%);--line:hsl(var(--palette-hue) 14% 24%);--muted:hsl(var(--palette-hue) 12% 65%);--text:hsl(var(--palette-hue) 14% 90%);--accent:hsl(var(--palette-hue) 50% 78%);--accent-dark:hsl(var(--palette-hue) 40% 12%);color:var(--text);background:var(--bg);color-scheme:dark}
+:root[data-theme=light]{--bg:hsl(var(--palette-hue) 22% 97%);--panel:hsl(var(--palette-hue) 22% 94%);--surface:hsl(var(--palette-hue) 24% 89%);--line:hsl(var(--palette-hue) 16% 72%);--muted:hsl(var(--palette-hue) 12% 35%);--text:hsl(var(--palette-hue) 20% 13%);--accent:hsl(var(--palette-hue) 46% 30%);--accent-dark:#fff;color-scheme:light}
+:root[data-theme] :is(.sidebar,.workspace,.mobile-nav,.chat-header,.connect-page){background:var(--bg);color:var(--text)}
+:root[data-theme] :is(.host-card,.search,.composer,.message.user,.tool-card,.approval-card,.confirm-modal,.secret-input,.appearance-preview,label>select,label>input,.markdown pre,.secondary,.branch,.suggestions button,.attachment-chip){background:var(--panel);color:var(--text);border-color:var(--line)}
+:root[data-theme] :is(.session-row.selected,.session-row:hover,.icon-button:hover,.secondary:hover,.host-icon){background:var(--surface);border-color:var(--line)}
+:root[data-theme] :is(label,.message,.markdown strong,.tool-card,.session-row,.search input,.thinking,.composer textarea,.header-title strong,.settings-panel h2){color:var(--text)}
+:root[data-theme] :is(.muted,.icon-button,.text-button,.message-label,.session-row small,.header-title>span,.composer-caption,.branch,.host-card span,.eyebrow,.conversation-date,.mobile-nav button,.connect-intro p,.setup-help,.security-note,.thinking p){color:var(--muted)}
+:root[data-theme] :is(.message.assistant .message-label,.desktop-tabs button.active,.mobile-nav button.active,.connect-intro h1 span,.inline-link){color:var(--accent)}
+:root[data-theme] :is(.send-button,.primary,.logo){background:var(--accent);color:var(--accent-dark)}
+:root[data-theme] .markdown code:not(pre code){background:var(--surface);color:var(--text)}
+:root[data-theme] .message{font-size:var(--chat-font-size,14px);line-height:var(--chat-line-height,1.85)}
+:root[data-theme] .message pre{font-size:.88em}
+:root[data-theme] .composer textarea{font-size:var(--chat-font-size,14px)}
+:root[data-theme] .conversation{scrollbar-color:var(--line) transparent;min-height:0}
+.appearance-settings{padding-bottom:30px;margin-bottom:32px;border-bottom:1px solid var(--line)}
+.appearance-settings output{float:right;color:var(--accent)}
+.appearance-settings input[type=range]{accent-color:var(--accent);padding:0;min-height:40px;cursor:pointer;border:0;background:transparent}
+.palette-field{border:0;padding:0;margin:24px 0}.palette-field legend{font-size:13px;margin-bottom:12px;color:var(--muted)}
+.palette-options{display:flex;flex-wrap:wrap;gap:8px}.palette-options button{display:flex;align-items:center;gap:7px;padding:10px 12px;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;min-height:44px}.palette-options button[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.palette-options button>span{width:18px;height:18px;border-radius:50%;flex-shrink:0}.palette-options b{color:var(--accent)}
+.appearance-settings .compact-toggle{display:flex;align-items:center;gap:12px;min-height:44px}.compact-toggle input{width:20px;height:20px;margin:0;accent-color:var(--accent)}
+.appearance-preview{margin-top:22px;border:1px solid var(--line);padding:18px;border-radius:14px}.appearance-preview p{font-size:var(--chat-font-size);line-height:var(--chat-line-height);margin:14px 0}
+.chat-scroll-actions{display:flex;justify-content:center;gap:8px;flex-shrink:0;padding:6px 12px;background:var(--bg);border-top:1px solid var(--line)}
+.chat-scroll-actions button{min-height:40px;padding:8px 14px;border-radius:24px;box-shadow:0 3px 12px #0002}
+:root[data-compact=true] .conversation-inner{padding-top:12px}:root[data-compact=true] .message{margin-bottom:14px}:root[data-compact=true] .message.user{padding:10px 14px}:root[data-compact=true] .session-row{padding-top:8px;padding-bottom:8px}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}

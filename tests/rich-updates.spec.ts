@@ -1,0 +1,18 @@
+import {test,expect} from '@playwright/test';
+test('connected host advertises releases and chat renders image tool results, PDFs and unknown blocks',async({page})=>{
+  const session='12345678-1234-4234-8234-123456789abc';
+  const image='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=';
+  await page.route('**/api/updates/latest',r=>r.fulfill({json:{enabled:true,update:{version:'0.10.0',versionCode:10,sha256:'a'.repeat(64),size:100,apk:'Pocket-Code-0.10.0.apk',releaseId:10,tag:'v0.10.0'}}}));
+  await page.route('**/api/sessions',r=>r.fulfill({json:[{sessionId:session,summary:'Media test',cwd:'C:\\Test',lastModified:1}]}));
+  await page.route(`**/api/sessions/${session}/messages?*`,r=>r.fulfill({json:{messages:[{id:'one',role:'assistant',blocks:[{type:'image',source:{type:'base64',media_type:'image/png',data:image}},{type:'tool_result',is_error:true,content:[{type:'text',text:'Tool failure detail'},{type:'image',data:image,mimeType:'image/png'}]},{type:'document',title:'Example PDF',source:{type:'base64',media_type:'application/pdf',data:'JVBERi0xLjQK'}},{type:'custom_result',value:'Extra data'}]}],previous:null,next:null}}));
+  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
+  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+  await page.getByRole('button',{name:/Media test/}).click();
+  await page.getByRole('button',{name:'Open image',exact:true}).first().click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByText('Tool error',{exact:true}).click();await expect(page.getByText('Tool failure detail')).toBeVisible();
+  await expect(page.getByRole('link',{name:'Download PDF'})).toBeVisible();
+  await page.getByText('Additional data · custom_result').click();await expect(page.getByText(/Extra data/)).toBeVisible();
+  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();
+  await expect(page.getByText('Pocket Code 0.9.0 → 0.10.0')).toBeVisible();
+  await page.screenshot({path:'artifacts/screenshots/update-settings.png',fullPage:true});
+});

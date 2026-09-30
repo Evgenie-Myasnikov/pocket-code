@@ -1,0 +1,10 @@
+import {readFile,writeFile,stat} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+const {version}=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
+const gradle=await readFile(new URL('../android/app/build.gradle',import.meta.url),'utf8');
+const versionCode=Number(gradle.match(/versionCode\s+(\d+)/)?.[1]);
+if(!Number.isSafeInteger(versionCode)||!gradle.includes(`versionName "${version}"`))throw Error('Android and package versions differ');
+const apk=`Pocket-Code-${version}.apk`,file=new URL('../artifacts/'+apk,import.meta.url);
+const manifest={applicationId:'app.pocketcode.mobile',version,versionCode,apk,size:(await stat(file)).size,sha256:createHash('sha256').update(await readFile(file)).digest('hex')};
+await writeFile(new URL('../artifacts/update.json',import.meta.url),JSON.stringify(manifest,null,2)+'\n');
+console.log('Release manifest generated.');

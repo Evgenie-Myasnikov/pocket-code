@@ -1,0 +1,65 @@
+{
+  "name": "pocket-code",
+  "version": "0.9.0",
+  "description": "Private Android companion for local Claude Code via PTY and Agent SDK",
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "dev": "vite",
+    "server": "tsx server/index.ts",
+    "build": "tsc --noEmit && vite build",
+    "android:sync": "npm run build && cap sync android",
+    "test:ui": "playwright test",
+    "android:build": "powershell -NoProfile -File scripts/build-android.ps1"
+  },
+  "license": "UNLICENSED",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.285",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@fontsource/golos-text": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/headless": "^6.0.0",
+    "@xterm/xterm": "^6.0.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^1.49.0",
+    "node-pty": "^1.1.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@babel/generator": "^8.0.6",
+    "@babel/parser": "^8.0.6",
+    "@babel/traverse": "^8.0.6",
+    "@capacitor/cli": "^8.5.2",
+    "@playwright/test": "^1.63.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.3",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  },
+  "private": true,
+  "overrides": {
+    "xcode": {
+      "uuid": "11.1.1"
+    }
+  },
+  "allowScripts": {
+    "node-pty": true,
+    "esbuild": true
+  }
+}
