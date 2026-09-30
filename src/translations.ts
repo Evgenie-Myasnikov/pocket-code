@@ -1,5 +1,22 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+"Обновление сервера ПК":"PC server update",
+"Подключитесь к ПК, чтобы обновить сервер.":"Connect to your PC to update its server.",
+"Android-приложение проверяет обновление сервера при подключении к ПК.":"The Android app checks for a server update when it connects to your PC.",
+"Версия сервера: {0}":"Server version: {0}",
+"Этот сервер пока не поддерживает автоматическое обновление. Обновите его на ПК.":"This server does not support automatic updates yet. Update it on the PC.",
+"ПК пока не отвечает. Проверьте соединение и повторите проверку.":"The PC is not responding yet. Check the connection and try again.",
+"Ожидаем соединения с сервером ПК…":"Waiting to reconnect to the PC server…",
+"Повторить обновление сервера":"Retry server update",
+"Версия сервера не будет новее версии приложения. Текущие задачи завершаются перед перезапуском.":"The server will not update beyond this app version. Running tasks finish before the restart.",
+"Сервер ПК проверен. Подходящего обновления нет.":"PC server checked. No compatible update is needed.",
+"Проверяем обновление сервера ПК…":"Checking for a PC server update…",
+"ПК скачивает обновление…":"The PC is downloading the update…",
+"ПК устанавливает обновление…":"The PC is installing the update…",
+"Обновление начнётся после завершения текущих задач на ПК.":"The update will start after current tasks on the PC finish.",
+"Сервер ПК перезапускается. Соединение восстановится автоматически.":"The PC server is restarting. The connection will recover automatically.",
+"Сервер ПК обновлён.":"PC server updated.",
+"Не удалось обновить сервер ПК.":"The PC server update failed.",
 "О режимах доступа Codex":"About Codex access modes",
 "Codex не смог применить выбранный режим доступа. Проверьте ограничения Codex на ПК.":"Codex could not apply the selected access mode. Check the Codex policy on your PC.",
 "Оформление и язык":"Appearance & language",
@@ -545,5 +562,9 @@ export const english: Record<string, string> = {
   "Результаты": "Results",
   "Проект": "Project",
   "Язык": "Language",
-  "Язык интерфейса": "Interface language"
+  "Язык интерфейса": "Interface language",
+  "Обновление ПК не удалось. По возможности восстановлена предыдущая версия. Повторите попытку в настройках.": "PC update failed. The previous version was restored when possible. Retry from Settings.",
+  "Не удалось обновить ПК. Текущая версия остаётся доступной. Повторите попытку в настройках.": "Could not update the PC. The current version is still available. Retry from Settings.",
+  "ПК перезапускается для завершения обновления. Подождите немного.": "The PC is restarting to finish its update. Please wait.",
+  "Перезапускаем сервер ПК…": "Restarting the PC host…"
 };

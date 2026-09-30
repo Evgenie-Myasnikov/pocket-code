@@ -8,6 +8,7 @@ import type { CodexAccess } from './codex-access.js';
 
 export type QueueItem = { id: string; site: string; key: string; cwd: string; role?: JiraRole; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; status: 'queued' | 'running' | 'done' | 'error' | 'stopped'; jobId?: string; sessionId?: string; error?: string };
 export class JiraQueue {
+  hasWork() { return this.busy || this.items.some(item => item.status === 'running' || !this.paused && item.status === 'queued'); }
   private items: QueueItem[] = [];
   private paused = true;
   private timer?: ReturnType<typeof setInterval>;

@@ -41,8 +41,8 @@ export async function request<T>(connection: Connection, endpoint: string, data?
   } catch (error) {throw new Error(networkFailure(url, error));}
   if (status === 204) return null as T;
   if (typeof body === 'string') {try {body = JSON.parse(body);} catch {body = null;}}
-  if (status >= 500) throw new Error(t("Сервер или интернет-туннель пока недоступен (HTTP {0}). Убедитесь, что окно сервера открыто; повторите подключение или отсканируйте новый QR после перезапуска.", status));
-  if (status < 200 || status >= 300) throw new Error(body?.error || t("Ошибка подключения ({0})", status));
+  if (status >= 500) throw Object.assign(new Error(t("Сервер или интернет-туннель пока недоступен (HTTP {0}). Убедитесь, что окно сервера открыто; повторите подключение или отсканируйте новый QR после перезапуска.", status)),{status});
+  if (status < 200 || status >= 300) throw Object.assign(new Error(body?.error || t("Ошибка подключения ({0})", status)),{status});
   if (body === null || typeof body !== 'object') throw new Error(t("По этому адресу ответил другой сервис. Отсканируйте свежий QR Pocket Code."));
   return body as T;
 }

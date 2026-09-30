@@ -15,12 +15,17 @@ Android companion for Claude Code and Codex running on your own Windows PC. Conn
 - Agent activity cards open a separate read-only context panel, with task, available result and child conversation. Back returns to the parent draft and scroll position. Status is shown only when the provider supplies evidence; saved starts alone do not prove that an agent is still running.
 - Jira Jobs through an existing **claude.ai Atlassian MCP** connection available to native Claude Code. Read assigned issues and manually send selected issues to a sequential AI queue. Jira reads consume Claude usage; no tasks start merely by opening Jobs.
 - GitHub release checks through the connected PC. Android can download and verify a new APK, then open the system installer. Android requires installation permission and user confirmation; silent installation is not available on ordinary devices.
+- After the Android app updates, it requests the matching PC release automatically. The PC verifies and installs it separately, waits for jobs, Jira operations and terminals to finish, then restarts. If the new host cannot start, it attempts to restore the previous version. Status and retry are in Settings → Updates. Requires bridge 0.13.0 or newer and access to GitHub/npm from the PC.
 
 ## Run the PC bridge
 
 Requires Windows and Node.js 22+. Install and sign in to Claude Code and/or Codex on the PC for the workspace you want to use. Install dependencies with `npm ci` and build with `npm run build`.
 
 Run **Start Pocket Code.cmd** for LAN or **Start Pocket Code Internet.cmd** for mobile internet. Choose the project folder that the phone may access. Keep the server running. The internet launcher installs Cloudflare's tunnel client locally and opens a pairing QR in your browser. A restarted temporary tunnel has a new address: scan its new QR.
+
+Automatic host handoffs preserve the running tunnel and pairing address. Closing or restarting the tunnel itself still changes a temporary address. PC updates live under the runtime directory's `host/versions`; project files and credentials are not overwritten. The launcher remembers the last verified host installation.
+
+If an older Android build reports **Invalid update source**, install version 0.13.0 or newer from Releases once. Older builds cannot repair their native installer through an in-app download; subsequent updates use the corrected installer.
 
 Install the APK from this repository's Releases on Android 7 or later. Scan the PC's QR in the app. Keep the pairing key private. Internet mode passes encrypted traffic through Cloudflare; LAN HTTP is intended for a trusted local network. Tailscale is another option for a private connection.
 

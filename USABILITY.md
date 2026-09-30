@@ -2,6 +2,12 @@
 
 This is an expert review supported by interface checks and published guidance. It is not a study with participants, an accessibility certification, or proof that every Android device behaves identically.
 
+## Coordinated updates — 2026-10-01
+
+After an Android upgrade, PC update status stays in Settings → Updates instead of adding another persistent chat panel. The sequence distinguishes downloading, preparing installation, waiting for ongoing work, restarting, success and failure. Temporary network failures during a planned restart use reconnection feedback; stale responses from a different connection are ignored. Failure exposes an explicit retry. Android installation remains a system-confirmed action.
+
+The host stages a separate verified copy, defers restarting while jobs, queues, terminals or mutations are active, verifies the new process and restores the previous version when startup fails. These safeguards preserve the user's work context; they do not substitute for physical-device testing.
+
 ## Focused settings and chat controls — 2026-10-01
 
 The home screen now prioritizes workspace selection, new chat, search and conversations. Connection details, branding and version information moved to dedicated settings pages. Settings presents seven categories, one page at a time, with predictable Back/focus restoration. A red disconnect action stays below the content scroll area without covering controls. Codex access explanations are initially collapsed behind a question-mark button.

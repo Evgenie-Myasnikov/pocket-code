@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { HttpError } from './security.js';
+import { validateHostAsset, type HostAsset } from './host-package.js';
 
 const execute = promisify(execFile);
 export type Update = { version: string; versionCode: number; sha256: string; size: number; apk: string; releaseId: number; tag: string };
@@ -19,6 +20,26 @@ export class ReleaseUpdater {
   private downloads = new Map<string, Promise<string>>();
   constructor(private repo: string | undefined, private directory: string) {
     if (repo && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error('Invalid update repository');
+  }
+  get enabled() { return !!this.repo; }
+  async hostRelease(version: string): Promise<HostAsset> {
+    if (!this.repo || !/^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(version)) throw new Error('PC updates are unavailable.');
+    const release = JSON.parse(await this.gh(['api', `repos/${this.repo}/releases/tags/v${version}`]));
+    const asset = release.assets?.find((a: any) => a.name === 'update.json');
+    if (!asset || !Number.isSafeInteger(asset.id) || asset.size > 10000) throw new Error('Missing PC release manifest.');
+    const manifest = JSON.parse(await this.gh(['api', `repos/${this.repo}/releases/assets/${asset.id}`, '-H', 'Accept: application/octet-stream'], 10000));
+    return validateHostAsset(manifest, release);
+  }
+  async downloadHost(release: HostAsset): Promise<Buffer> {
+    if (!this.repo) throw new Error('PC updates are unavailable.');
+    await mkdir(this.directory, { recursive: true });
+    const temporary = await mkdtemp(path.join(this.directory, 'host-download-'));
+    try {
+      await this.gh(['release', 'download', `v${release.version}`, '--repo', this.repo, '--pattern', release.asset, '--dir', temporary]);
+      const file = path.join(temporary, release.asset);
+      if ((await stat(file)).size !== release.size) throw new Error('Unexpected PC bundle size.');
+      return await readFile(file);
+    } finally { await rm(temporary, { recursive: true, force: true }); }
   }
   private async gh(args: string[], maxBuffer = 2_000_000) {
     const result = await execute('gh', args, { windowsHide: true, timeout: 180000, maxBuffer }); return result.stdout;

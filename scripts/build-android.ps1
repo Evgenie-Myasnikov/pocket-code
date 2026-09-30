@@ -20,5 +20,7 @@ $apkPath = 'artifacts/Pocket-Code-' + $version + '.apk'
 Copy-Item -LiteralPath 'android/app/build/outputs/apk/debug/app-debug.apk' -Destination $apkPath -Force
 Write-Host ('APK: ' + $apkPath)
 
+& node scripts/build-host.mjs
+if ($LASTEXITCODE -ne 0) { throw 'Host bundle failed' }
 & node scripts/release-manifest.mjs
 if ($LASTEXITCODE -ne 0) { throw 'Release manifest failed' }

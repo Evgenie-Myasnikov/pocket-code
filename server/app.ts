@@ -1,5 +1,6 @@
 import express from 'express';
 import packageJson from '../package.json';
+import type { HostUpdater } from './host-update.js';
 import { review, reviewAvailability } from './review.js';
 import { readClaudeUsage } from './claude-usage.js';
 import { projectDocuments, readProjectDocument } from './project-docs.js';
@@ -22,7 +23,7 @@ import type { JiraService } from './jira.js';
 import type { CodexService } from './codex.js';
 import { claudeSubagents, claudeSubagentMessages } from './subagents.js';
 
-export type Config = { codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -60,6 +61,19 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     failures.delete(ip); next();
   });
   app.use(express.json({ limit: '15mb' }));
+  let activeMutations = 0;
+  app.use('/api', (req, res, next) => {
+    if (req.method === 'GET' || req.path.startsWith('/host-update/')) { next(); return; }
+    if (config.hostUpdater?.draining) { res.status(503).json({ error: 'The PC is restarting to finish its update. Please wait.' }); return; }
+    activeMutations++;
+    let released = false; const release = () => { if (!released) { released = true; activeMutations--; } };
+    const end = res.end;
+    res.end = function (this: express.Response, ...args: any[]) { try { return (end as any).apply(this, args); } finally { release(); } } as typeof res.end;
+    res.once('finish', release); next();
+  });
+  app.get('/api/host-update/status', async (_req, res) => res.json(config.hostUpdater ? await config.hostUpdater.status() : { supported: false, currentVersion: packageJson.version, state: 'idle' }));
+  app.post('/api/host-update/check', async (req, res) => { const body = z.object({ appVersion: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/) }).parse(req.body); res.json(config.hostUpdater ? await config.hostUpdater.check(body.appVersion) : { supported: false, currentVersion: packageJson.version, state: 'idle' }); });
+  app.post('/api/host-update/handoff', (req, res) => { const body = z.object({ targetVersion: z.string(), expectedPid: z.number().int().positive() }).parse(req.body); if (!config.hostUpdater) throw new HttpError(404, 'PC updates unavailable.'); config.hostUpdater.handoff(body.targetVersion, body.expectedPid); res.once('finish', () => config.hostUpdater!.finishHandoff()); res.json({ accepted: true }); });
   const jira = () => { if (!config.jira) throw new HttpError(503, 'Обновите и перезапустите сервер для подключения Jira'); return config.jira; };
   app.post('/api/jira/connect-existing', async (_req, res) => { const service = jira(); if (!service.useExisting) throw new HttpError(400, 'Existing Claude connection is unavailable'); res.json(await service.useExisting()); });
   app.get('/api/jira/status', async (_req, res) => res.json(await jira().status()));
@@ -194,7 +208,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/claude/usage', async (_req, res) => res.json(await readClaudeUsage()));
   app.get('/api/updates/latest', async (_req, res) => res.json(config.updater ? await config.updater.latest() : { enabled: false }));
   app.get('/api/updates/download', async (req, res) => { if (!config.updater) throw new HttpError(404, 'Updates are not configured'); const file = await config.updater.download(z.coerce.number().int().positive().parse(req.query.release)); res.type('application/vnd.android.package-archive'); res.sendFile(file, { dotfiles: 'allow' }); });
-  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots, version: packageJson.version, protocol: 1 }));
+  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots, version: packageJson.version, protocol: 1, processId: process.pid }));
   app.get('/api/providers', async (_req, res) => {
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
     res.json([{ id: 'claude', name: 'Claude', available: true, models: [{ id: 'sonnet', name: 'Sonnet' }, { id: 'opus', name: 'Opus' }, { id: 'haiku', name: 'Haiku' }] }, { id: 'codex', name: 'Codex', ...state }]);
@@ -361,5 +375,5 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const status = error instanceof z.ZodError ? 400 : error.status || 500;
     res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message });
   });
-  return { app, jobs, terminals, queue, codexQueue, workflow };
+  return { app, jobs, terminals, queue, codexQueue, workflow, isBusy: () => activeMutations > 0 || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!workflow?.isBusy() };
 }

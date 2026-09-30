@@ -4,7 +4,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createApp } from './app.js';
 import { writePairingPage } from './pairing.js';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { HostUpdater } from './host-update.js';
+import packageJson from '../package.json';
 import { startInternetTunnel } from './tunnel.js';
 import { AtlassianJira } from './jira.js';
 import { ReleaseUpdater } from './updates.js';
@@ -28,13 +30,26 @@ let updateRepo = process.env.POCKET_UPDATE_REPO;
 if (!updateRepo) { try { updateRepo = JSON.parse(await readFile(path.join(local, 'updates.json'), 'utf8')).repository; } catch {} }
 const updater = new ReleaseUpdater(updateRepo, path.join(local, 'updates'));
 const codex = new CodexService(roots, { attachmentRoots: [path.join(local, 'uploads')] });
-const { app, jobs, terminals, queue, codexQueue, workflow } = await createApp({ codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira });
+let internetAddress: string | undefined;
+let runtimeReady = false;
+const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
+const { app, jobs, terminals, queue, codexQueue, workflow, isBusy } = await createApp({ hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira });
+runtimeReady = true;
 const workflowTimer = setInterval(() => void workflow?.sync().catch(() => {}), 2000); workflowTimer.unref();
 let tunnel: Awaited<ReturnType<typeof startInternetTunnel>> | undefined;
 let closing = false;
 async function showPairing() {
   let internetUrl: string | undefined;
-  if (process.env.POCKET_INTERNET === '1') {
+  const inheritedUrl = process.env.POCKET_EXISTING_TUNNEL_URL, inheritedPid = Number(process.env.POCKET_EXISTING_TUNNEL_PID);
+  if (inheritedUrl && /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(inheritedUrl) && Number.isSafeInteger(inheritedPid) && inheritedPid > 0 && process.env.POCKET_TUNNEL_EXE) {
+    process.kill(inheritedPid, 0); internetUrl = inheritedUrl;
+    const executable = process.env.POCKET_TUNNEL_EXE;
+    tunnel = { pid: inheritedPid, executable, ready: Promise.resolve(internetUrl), isStopped: () => false, diagnostics: () => '', close: () => {
+      // Validate the inherited tunnel's executable before ending it; never kill a reused arbitrary PID.
+      const quoted = executable.replace(/'/g, "''");
+      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$p=Get-CimInstance Win32_Process -Filter 'ProcessId=${inheritedPid}'; if($p.ExecutablePath -eq '${quoted}'){$p|Invoke-CimMethod -MethodName Terminate|Out-Null}`], { windowsHide: true }, () => {});
+    } };
+  } else if (process.env.POCKET_INTERNET === '1') {
     if (!process.env.POCKET_TUNNEL_EXE) throw new Error('Запустите сервер через Start Pocket Code Internet.cmd');
     console.log('Открываем HTTPS-туннель. QR появится после подготовки интернет-адреса…');
     tunnel = await startInternetTunnel(process.env.POCKET_TUNNEL_EXE, port, local);
@@ -42,6 +57,7 @@ async function showPairing() {
     internetUrl = await tunnel.ready;
     console.log(`Адрес для мобильного интернета: ${internetUrl}`);
   }
+  internetAddress = internetUrl;
   if (closing) return;
   const file = await writePairingPage(local, token!, host, port, internetUrl);
   console.log(`QR-код подключения: ${file}`);
@@ -56,5 +72,5 @@ const server = app.listen(port, host, () => {
     if (a.family === 'IPv4' && !a.internal) console.log(`Адрес для телефона: http://${a.address}:${port}`);
   void showPairing().catch(error => console.error(error.message || 'Не удалось создать QR-код.'));
 });
-function shutdown() { closing = true; clearInterval(workflowTimer); void workflow?.sync().catch(() => {}); queue?.close(); codexQueue?.close(); codex.close(); void jira.close(); tunnel?.close(); jobs.close(); terminals.close(); server.close(); setTimeout(() => process.exit(0), 2000).unref(); }
-process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
+function shutdown(preserveTunnel = false) { if(closing)return; closing = true; hostUpdater.close(); clearInterval(workflowTimer); void workflow?.sync().catch(() => {}); queue?.close(); codexQueue?.close(); codex.close(); void jira.close(); if(!preserveTunnel)tunnel?.close(); jobs.close(); terminals.close(); server.close(); setTimeout(() => process.exit(0), 2000).unref(); }
+process.on('SIGINT', () => shutdown()); process.on('SIGTERM', () => shutdown());

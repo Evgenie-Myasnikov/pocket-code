@@ -54,7 +54,7 @@ public class AppUpdatePlugin extends Plugin {
     }
     @PluginMethod public void download(PluginCall call) {
         String address = call.getString("url", ""), token = call.getString("token", ""), expected = call.getString("sha256", "");
-        Long release = call.getLong("releaseId"), expectedSize = call.getLong("size"), expectedCode = call.getLong("versionCode");
+        Long release = UpdateNumbers.positiveInteger(call.getData().opt("releaseId")), expectedSize = UpdateNumbers.positiveInteger(call.getData().opt("size")), expectedCode = UpdateNumbers.positiveInteger(call.getData().opt("versionCode"));
         try {
             URL base = new URL(address);
             String host = base.getHost();
@@ -89,7 +89,7 @@ public class AppUpdatePlugin extends Plugin {
     }
     @PluginMethod public void install(PluginCall call) {
         try {
-            String expected = call.getString("sha256", ""); Long expectedCode = call.getLong("versionCode");
+            String expected = call.getString("sha256", ""); Long expectedCode = UpdateNumbers.positiveInteger(call.getData().opt("versionCode"));
             if (downloading.get() || !expected.matches("[a-f0-9]{64}") || expectedCode == null || expectedCode < 1) throw new Exception();
             File file = ready != null ? ready : updateFile();
             if (version(verify(file)) != expectedCode) throw new Exception();

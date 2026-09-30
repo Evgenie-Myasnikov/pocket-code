@@ -23,6 +23,7 @@ type Dependencies = {
   pullRequests?: Pick<JiraPullRequests, 'preview' | 'create'> & Partial<Pick<JiraPullRequests, 'reconcile'>>;
 };
 export class JiraWorkflow {
+  isBusy() { return this.locks.size > 0; }
   private records: Record<string, RecordEntry> = Object.create(null);
   private ready: Promise<void>;
   private writes = Promise.resolve();

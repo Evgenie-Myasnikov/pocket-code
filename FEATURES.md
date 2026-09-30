@@ -1,5 +1,13 @@
 # Feature coverage
 
+## 0.13.0
+
+- Android automatically requests the matching host update after upgrading and connecting; progress and retry stay in Settings → Updates.
+- Verified, separate PC installation with dependency preparation while the current host remains running, idle-only handoff, preserved tunnel, startup verification and rollback.
+- The regular launcher reuses the last verified installation. A phone never triggers a newer host than its own app version.
+- Fixed native APK metadata parsing for ordinary JSON integers, preserving checksum, package identity and signing-certificate checks.
+- Automatic host installation requires Windows, GitHub/npm access and a bridge already running 0.13.0 or newer. Android still confirms APK installation.
+
 ## 0.12.0
 
 - Codex Full access by default; persistent Ask for approval and Approve for me choices for new/continued chats and Jira queues. Plan and Reviewer/QA remain read-only.
