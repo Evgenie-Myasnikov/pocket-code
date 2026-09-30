@@ -99,8 +99,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   }
   app.get('/api/review', async (req, res) => { const query = z.object({cwd:text,mode:z.enum(['working','staged','branch']).default('working'),base:z.string().max(300).optional(),file:z.string().max(4096).optional()}).parse(req.query); res.json(await review(roots,query.cwd,query.mode,query.base,query.file)); });
   app.get('/api/updates/latest', async (_req, res) => res.json(config.updater ? await config.updater.latest() : { enabled: false }));
-  app.get('/api/updates/download', async (req, res) => { if (!config.updater) throw new HttpError(404, 'Updates are not configured'); const file = await config.updater.download(z.coerce.number().int().positive().parse(req.query.release)); res.type('application/vnd.android.package-archive'); res.sendFile(file); });
-  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots, version: '0.9.0', protocol: 1 }));
+  app.get('/api/updates/download', async (req, res) => { if (!config.updater) throw new HttpError(404, 'Updates are not configured'); const file = await config.updater.download(z.coerce.number().int().positive().parse(req.query.release)); res.type('application/vnd.android.package-archive'); res.sendFile(file, { dotfiles: 'allow' }); });
+  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots, version: '0.9.1', protocol: 1 }));
   app.get('/api/sessions', async (_req, res) => res.json(await sessions()));
   app.get('/api/sessions/:id/messages', async (req, res) => {
     const s = await session(req.params.id);

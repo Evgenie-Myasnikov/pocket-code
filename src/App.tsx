@@ -168,7 +168,7 @@ export function App() {
       }
     } catch (e) {setError((e as Error).message);} finally {setUploading(false);if (fileInput.current) fileInput.current.value = '';}
   }
-  function startDemo() {setDemo(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.9.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
+  function startDemo() {setDemo(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.9.1', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
   async function disconnect() {await saveConnection(null);navigation.current++;setConnection(null);setHealth(null);setSaved(null);setDemo(false);setJob(null);setHistory([]);setSessions([]);setJobs([]);setSelected(null);setError('');setNetworkError('');setMobileChat(false);setTab('chats');}
   if (!health) return <Connect initial={saved} onConnect={connect} onDemo={startDemo} busy={busy} error={error} />;
   const visible = sessions.filter((s) => `${s.customTitle || ""} ${s.summary} ${s.cwd}`.toLowerCase().includes(search.toLowerCase()));

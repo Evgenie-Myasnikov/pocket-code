@@ -1,6 +1,6 @@
 {
   "name": "pocket-code",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Private Android companion for local Claude Code via PTY and Agent SDK",
   "scripts": {
     "test": "tsx --test tests/*.test.ts",

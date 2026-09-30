@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-30 - 0.9.1
+- Fixed authenticated APK downloads from the hidden PC runtime cache.
+- Added an HTTP regression test that checks authorization and exact downloaded bytes.
+
 ## 2026-09-30 - 0.9.0
 - Added host-mediated GitHub APK updates with checksum, package and signer verification and Android installation confirmation.
 - Added image previews, nested tool results, PDF opening and structured-block fallbacks.
