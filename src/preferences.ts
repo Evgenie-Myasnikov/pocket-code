@@ -1,11 +1,13 @@
 export type WorkspaceProvider = 'claude' | 'codex';
+export type CodexAccess = 'full' | 'ask' | 'auto';
+function codexAccess(value:unknown):CodexAccess{return value==='ask'||value==='auto'?value:'full';}
 const preferenceKey = (provider: WorkspaceProvider) => `pocket-code-chat-preferences-${provider}`;
 export function preferences(provider: WorkspaceProvider = 'claude') {
   try {
     const value = JSON.parse(localStorage.getItem(preferenceKey(provider)) || (provider === 'claude' ? localStorage.getItem('pocket-code-chat-preferences') : null) || '{}');
     const validModel = typeof value.model === 'string' && value.model.length <= 200 && (provider === 'codex' || ['', 'sonnet', 'opus', 'haiku'].includes(value.model));
-    return { model: validModel ? value.model : '', mode: ['default', 'plan'].includes(value.mode) ? value.mode : 'default', budget: typeof value.budget === 'number' && Number.isFinite(value.budget) && value.budget >= 0.1 && value.budget <= 100 ? value.budget : 5 };
-  } catch { return { model: '', mode: 'default', budget: 5 }; }
+    return { model: validModel ? value.model : '', mode: ['default', 'plan'].includes(value.mode) ? value.mode : 'default', budget: typeof value.budget === 'number' && Number.isFinite(value.budget) && value.budget >= 0.1 && value.budget <= 100 ? value.budget : 5, codexAccess:codexAccess(value.codexAccess) };
+  } catch { return { model: '', mode: 'default', budget: 5, codexAccess:'full' as CodexAccess }; }
 }
 export function savePreferences(provider: WorkspaceProvider, value: ReturnType<typeof preferences>) {
   try { localStorage.setItem(preferenceKey(provider), JSON.stringify(value)); } catch { /* Keep in-memory preferences when storage is unavailable. */ }

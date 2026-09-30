@@ -4,12 +4,27 @@
 :root[data-theme] :is(.host-card,.search,.composer,.message.user,.tool-card,.approval-card,.confirm-modal,.secret-input,.appearance-preview,label>select,label>input,.markdown pre,.secondary,.branch,.suggestions button,.attachment-chip){background:var(--panel);color:var(--text);border-color:var(--line)}
 :root[data-theme] :is(.session-row.selected,.session-row:hover,.icon-button:hover,.secondary:hover,.host-icon){background:var(--surface);border-color:var(--line)}
 :root[data-theme] :is(label,.message,.markdown strong,.tool-card,.session-row,.search input,.thinking,.composer textarea,.header-title strong,.settings-panel h2){color:var(--text)}
+:root[data-theme] .session-row strong{color:var(--text)}
 :root[data-theme] :is(.muted,.icon-button,.text-button,.message-label,.session-row small,.header-title>span,.composer-caption,.branch,.host-card span,.eyebrow,.conversation-date,.mobile-nav button,.connect-intro p,.setup-help,.security-note,.thinking p){color:var(--muted)}
 :root[data-theme] :is(.message.assistant .message-label,.desktop-tabs button.active,.mobile-nav button.active,.connect-intro h1 span,.inline-link){color:var(--accent)}
+:root[data-theme=light] .desktop-tabs button.active{background:var(--surface);color:var(--text);border-color:var(--line)}
 :root[data-theme] :is(.send-button,.primary,.logo){background:var(--accent);color:var(--accent-dark)}
 :root[data-theme] .markdown code:not(pre code){background:var(--surface);color:var(--text)}
 :root[data-theme] .message{font-size:var(--chat-font-size,14px);line-height:var(--chat-line-height,1.85)}
+/* Transcript typography follows the chat size; navigation and tap targets keep their own sizing. */
+:root[data-theme] .message .message-label{font-size:.78em;letter-spacing:.13em;line-height:1.4;height:auto}
+:root[data-theme] .message .claude-mark{font-size:2em}
+:root[data-theme] .message :is(.tool-card,.tool-result-content,.document-card,.subagent-card){font-size:inherit}
+:root[data-theme] .message .tool-card summary{font-size:.9em;min-height:48px;flex-wrap:wrap;overflow-wrap:anywhere}
+:root[data-theme] .message .tool-card summary strong{font-size:1em;min-width:0;overflow-wrap:anywhere}
+:root[data-theme] .message .tool-card summary span{font-size:.9em;min-width:0;overflow-wrap:anywhere}
+:root[data-theme] .message .thinking{font-size:.9em}
+:root[data-theme] .message .thinking summary{min-height:48px}
+:root[data-theme] .message :is(.attachment-chip,.subagent-card small){font-size:.85em}
+:root[data-theme] .message .secondary{font-size:.9em}
+:root[data-theme] .message .markdown table{font-size:.92em;max-width:100%}
 :root[data-theme] .message pre{font-size:.88em}
+:root[data-theme] .message pre code{font-size:inherit}
 :root[data-theme] .composer textarea{font-size:var(--chat-font-size,14px)}
 :root[data-theme] .conversation{scrollbar-color:var(--line) transparent;min-height:0}
 .appearance-settings{padding-bottom:30px;margin-bottom:32px;border-bottom:1px solid var(--line)}

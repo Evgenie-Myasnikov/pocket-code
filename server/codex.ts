@@ -6,14 +6,17 @@ import { codexAgents, validAgentId } from './subagents.js';
 import { codexMessage } from './codex-content.js';
 import { discoverCodex, StdioCodexRpc, CodexRequestError, type CodexRpc, type RpcEnvelope } from './codex-rpc.js';
 import packageJson from '../package.json';
+import { codexPermissions, verifyCodexPermissions, type CodexAccess } from './codex-access.js';
+import { normalizeCodexUsage } from './codex-usage.js';
 
-type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
+type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
 type Pending = { finish: (allow: boolean, answers?: Record<string, string>) => void };
 type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void> };
 export type CodexSession = { sessionId: string; summary: string; cwd: string; lastModified: number; gitBranch?: string; source: 'codex'; provider: 'codex'; readOnly?: boolean };
 export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexRpc>; approvalTimeoutMs?: number; attachmentRoots?: string[] };
 
 export class CodexService {
+  async usage() { return normalizeCodexUsage(await (await this.connect()).request('account/rateLimits/read', {})); }
   private rpc?: CodexRpc;
   private ready?: Promise<CodexRpc>;
   private jobs = new Map<string, CodexJob>();
@@ -189,22 +192,18 @@ export class CodexService {
         if (path.resolve(original.cwd).toLowerCase() !== cwd.toLowerCase()) throw new HttpError(409, 'Select the original project before continuing this Codex chat.');
         if (original.status?.type === 'active') throw new HttpError(409, 'This Codex chat is already active on the PC.');
       }
-      const { config } = await rpc.request('config/read', { cwd, includeLayers: false });
-      const readOnly = input.mode === 'plan' || config?.sandbox_mode === 'read-only';
-      const sandbox = readOnly ? 'read-only' : 'workspace-write';
-      // Never inherit an unrestricted sandbox. Preserve stricter existing approval policies.
-      const policy = config?.approval_policy;
-      const approvalPolicy = policy === 'untrusted' || policy === 'never' || (policy && typeof policy === 'object') ? policy : 'on-request';
-      const startParams = { cwd, ...(input.model ? { model: input.model } : {}), sandbox, approvalPolicy, approvalsReviewer: 'user' };
+      const permissions = codexPermissions(input.codexAccess, input.mode, cwd);
+      const { sandbox, approvalPolicy, approvalsReviewer, sandboxPolicy } = permissions;
+      const startParams = { cwd, ...(input.model ? { model: input.model } : {}), sandbox, approvalPolicy, approvalsReviewer };
       if (job.cancelled) return;
       const session = await rpc.request(input.sessionId ? 'thread/resume' : 'thread/start', input.sessionId ? { ...startParams, threadId: input.sessionId, excludeTurns: true } : startParams);
+      verifyCodexPermissions(session, permissions);
       job.sessionId = session.thread.id; job.cwd = cwd; job.revision++;
       if (job.cancelled) return;
-      if (job.cancelled) return;
       job.acceptingEvents = true;
-      const result = await rpc.request('turn/start', { threadId: job.sessionId, input: turnInput, cwd, approvalPolicy, approvalsReviewer: 'user',
+      const result = await rpc.request('turn/start', { threadId: job.sessionId, input: turnInput, cwd, approvalPolicy, approvalsReviewer,
         ...(input.model ? { model: input.model } : {}), clientUserMessageId: job.messages[0].id,
-        sandboxPolicy: readOnly ? { type: 'readOnly', networkAccess: false } : { type: 'workspaceWrite', writableRoots: [cwd], networkAccess: false, excludeTmpdirEnvVar: true, excludeSlashTmp: true } });
+        sandboxPolicy });
       job.turnId = result.turn.id; job.revision++;
       if (job.cancelled) { await this.interrupt(job, rpc); this.finish(job, 'stopped'); }
       else if (result.turn.status && result.turn.status !== 'inProgress') this.completeTurn(job, result.turn);

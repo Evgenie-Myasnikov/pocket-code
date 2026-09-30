@@ -1,5 +1,7 @@
 import express from 'express';
-import { review } from './review.js';
+import packageJson from '../package.json';
+import { review, reviewAvailability } from './review.js';
+import { readClaudeUsage } from './claude-usage.js';
 import { projectDocuments, readProjectDocument } from './project-docs.js';
 import { projectArtifact } from './project-artifact.js';
 import type { ReleaseUpdater } from './updates.js';
@@ -75,7 +77,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const query = z.object({ site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i) }).parse(req.query);
     res.json(await jira().issue(query.site, query.key));
   });
-  const jiraStartSchema = z.object({ provider: providerSchema, id: uuid, site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i), cwd: text, mode: z.enum(['default', 'plan']).default('default'), maxBudgetUsd: z.number().min(0.1).max(100).default(5) });
+  const codexAccessSchema = z.enum(['full', 'ask', 'auto']).optional();
+  const jiraStartSchema = z.object({ provider: providerSchema, id: uuid, site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i), cwd: text, mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5) });
   async function startJira(body: z.infer<typeof jiraStartSchema>) {
     const cwd = await allowedPath(roots, body.cwd, true);
     const issue = await jira().issue(body.site, body.key);
@@ -186,9 +189,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({ messages });
   });
   app.get('/api/review', async (req, res) => { const query = z.object({cwd:text,mode:z.enum(['working','staged','branch']).default('working'),base:z.string().max(300).optional(),file:z.string().max(4096).optional()}).parse(req.query); res.json(await review(roots,query.cwd,query.mode,query.base,query.file)); });
+  app.get('/api/review/availability', async (req, res) => { const { cwd } = z.object({ cwd: text }).parse(req.query); res.json(await reviewAvailability(roots, cwd)); });
+  app.get('/api/codex/usage', async (_req, res) => res.json(await codex().usage()));
+  app.get('/api/claude/usage', async (_req, res) => res.json(await readClaudeUsage()));
   app.get('/api/updates/latest', async (_req, res) => res.json(config.updater ? await config.updater.latest() : { enabled: false }));
   app.get('/api/updates/download', async (req, res) => { if (!config.updater) throw new HttpError(404, 'Updates are not configured'); const file = await config.updater.download(z.coerce.number().int().positive().parse(req.query.release)); res.type('application/vnd.android.package-archive'); res.sendFile(file, { dotfiles: 'allow' }); });
-  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots, version: '0.11.0', protocol: 1 }));
+  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots, version: packageJson.version, protocol: 1 }));
   app.get('/api/providers', async (_req, res) => {
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
     res.json([{ id: 'claude', name: 'Claude', available: true, models: [{ id: 'sonnet', name: 'Sonnet' }, { id: 'opus', name: 'Opus' }, { id: 'haiku', name: 'Haiku' }] }, { id: 'codex', name: 'Codex', ...state }]);
@@ -264,7 +270,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/jobs', async (req, res) => {
     const body = z.object({ provider: providerSchema, id: uuid, cwd: text, sessionId: uuid.optional(), text: z.string().max(100000),
       attachments: z.array(uuid).max(10).default([]), model: z.string().max(128).regex(/^[a-zA-Z0-9._/-]*$/).default(''),
-      mode: z.enum(['default', 'plan']).default('default'), maxBudgetUsd: z.number().min(0.1).max(100).default(5),
+      mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
       takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
     const cwd = await allowedPath(roots, body.cwd, true);
     const engine = body.provider === 'codex' ? codex() : jobs;

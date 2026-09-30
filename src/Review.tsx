@@ -17,9 +17,9 @@ export function diffRows(patch:string):DiffRow[]{
   }flush();return rows;
 }
 type Data={files:ReviewFile[];current:string;base:string;branches:string[];patch:string;binary:boolean};
-export function Review({connection,cwd,onClose}:{connection:Connection;cwd:string;onClose:()=>void}){
+export function Review({connection,cwd,onClose,initialMode='working'}:{connection:Connection;cwd:string;onClose:()=>void;initialMode?:'working'|'branch'}){
   const panel=useRef<HTMLElement|null>(null);useModal(panel,true,onClose);
-  const [mode,setMode]=useState('working'),[base,setBase]=useState(''),[file,setFile]=useState(''),[data,setData]=useState<Data|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
+  const [mode,setMode]=useState<string>(initialMode),[base,setBase]=useState(''),[file,setFile]=useState(''),[data,setData]=useState<Data|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
   const [layout,setLayout]=useState(()=>{const fallback=window.innerWidth<600?'unified':'split';try{const saved=localStorage.getItem('pocket-code-diff-layout');return saved==='split'||saved==='unified'?saved:fallback;}catch{return fallback;}});
   useEffect(()=>{let active=true;setBusy(true);setError('');const query=new URLSearchParams({cwd,mode,...(base?{base}:{}),...(file?{file}:{})});request<Data>(connection,'/review?'+query).then(value=>{if(active){setData(value);if(!file&&value.files.length)setFile(value.files[0].path);}}).catch(e=>{if(active){setError(e.message);setData(null);}}).finally(()=>{if(active)setBusy(false);});return()=>{active=false;};},[connection,cwd,mode,base,file,refresh]);
   const rows=diffRows(data?.patch||'');

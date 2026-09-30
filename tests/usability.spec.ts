@@ -38,7 +38,7 @@ for(const width of [320,390])for(const scale of [60,100])test(`touch targets sta
   await expect(page.getByLabel('Attach files')).toBeFocused();
   expect(await page.getByLabel('Attach files').evaluate(element=>getComputedStyle(element).outlineStyle)).not.toBe('none');
   if(width===390&&scale===60)await page.screenshot({path:'artifacts/screenshots/mobile-touch-60-percent.png',fullPage:true});
-  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();
+  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Appearance & language',exact:true}).click();
   await checkTargets(page,'.settings-panel button,.settings-panel select,.settings-panel input[type=range]');
   await expect(page.getByLabel('Interface scale',{exact:true})).toHaveValue(String(scale));
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);

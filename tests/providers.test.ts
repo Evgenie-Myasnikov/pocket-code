@@ -13,11 +13,13 @@ test('provider routes isolate history and dispatch jobs, approvals and stop to t
   const pending=async function*({options}:any){await options.canUseTool('Write',{file:'sample.txt'},{signal:options.abortController.signal});};
   const claude=new Jobs(pending as any),engine=new Jobs(pending as any),sid=randomUUID(),token='a'.repeat(43);
   const all=Array.from({length:140},(_,i)=>({id:String(i),role:'user',blocks:[{type:'text',text:`codex message ${i}`}]}));
+  const codexInputs:any[]=[];
   const codex:any={
+    usage:async()=>({checkedAt:1,ordinaryUsageAllowed:true,buckets:[]}),
     status:async()=>({available:true,authenticated:true,models:[{id:'fixture-model',name:'Fixture'}]}),
     sessions:async()=>[{sessionId:sid,summary:'Codex fixture',cwd:root,lastModified:Date.now(),provider:'codex',source:'codex'}],
     messages:async()=>all,
-    start:(input:any)=>{engine.start(input);engine.get(input.id).provider='codex';return engine.view(engine.get(input.id));},
+    start:(input:any)=>{codexInputs.push(input);engine.start(input);engine.get(input.id).provider='codex';return engine.view(engine.get(input.id));},
     list:()=>engine.list(), get:(id:string)=>engine.get(id),view:(job:any)=>engine.view(job),
     stop:(id:string)=>engine.stop(id),approve:(...args:any[])=>(engine.approve as any)(...args),close:()=>engine.close(),
   };
@@ -28,6 +30,9 @@ test('provider routes isolate history and dispatch jobs, approvals and stop to t
   const request=(endpoint:string,body?:unknown)=>fetch(url+endpoint,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
   try{
     assert.equal((await fetch(url+'/providers')).status,401);
+    assert.equal((await fetch(url+'/codex/usage')).status,401);
+    assert.equal((await fetch(url+'/claude/usage')).status,401);
+    assert.deepEqual(await(await request('/codex/usage')).json(),{checkedAt:1,ordinaryUsageAllowed:true,buckets:[]});
     assert.equal((await(await request('/providers')).json())[1].models[0].id,'fixture-model');
     assert.deepEqual(await(await request('/sessions')).json(),[]);
     assert.equal((await(await request('/sessions?provider=codex')).json())[0].sessionId,sid);
@@ -35,8 +40,10 @@ test('provider routes isolate history and dispatch jobs, approvals and stop to t
     assert.equal((await request(`/sessions/${sid}/messages`)).status,404);
     const page=await(await request(`/sessions/${sid}/messages?provider=codex&window=20&from=start`)).json();
     assert.equal(page.messages.length,20);assert.equal(page.next,20);assert.equal(page.messages[0].id,'0');
-    const id=randomUUID(),body={id,provider:'codex',cwd:root,text:'fixture',model:'fixture-model'};
+    const id=randomUUID(),body={id,provider:'codex',cwd:root,text:'fixture',model:'fixture-model',codexAccess:'auto'};
+    assert.equal((await request('/jobs',{...body,codexAccess:'unknown'})).status,400);
     const launched=await request('/jobs',body);assert.equal(launched.status,200);assert.equal((await launched.json()).provider,'codex');
+    assert.equal(codexInputs[0].codexAccess,'auto');
     assert.equal((await(await request('/jobs?provider=codex')).json()).length,1);assert.deepEqual(await(await request('/jobs')).json(),[]);
     assert.equal((await request('/jobs',{...body,provider:'claude',model:''})).status,409);
     assert.equal((await request('/jobs',{...body,id:randomUUID(),provider:'claude',model:''})).status,409);
@@ -55,8 +62,9 @@ test('provider routes isolate history and dispatch jobs, approvals and stop to t
     await request('/jira/queue/control',{action:'resume',provider:'codex'});
     assert.equal((await(await request('/jira/queue')).json()).paused,true);
     const first=claude.list()[0];claude.stop(first.id);await new Promise(resolve=>setTimeout(resolve,10));
-    const codexJira=await request('/jira/start',{id:randomUUID(),provider:'codex',site:'fixture-site',key:'TEST-3',cwd:root});
+    const codexJira=await request('/jira/start',{id:randomUUID(),provider:'codex',site:'fixture-site',key:'TEST-3',cwd:root,codexAccess:'ask'});
     assert.equal(codexJira.status,200);const result=await codexJira.json();assert.equal(result.provider,'codex');assert.equal(result.jira.key,'TEST-3');
+    assert.equal(codexInputs.at(-1).codexAccess,'ask');
   }finally{runtime.queue?.close();runtime.codexQueue?.close();engine.close();claude.close();runtime.terminals.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(temporary,{recursive:true,force:true});}
 });
 

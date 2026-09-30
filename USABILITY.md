@@ -2,6 +2,14 @@
 
 This is an expert review supported by interface checks and published guidance. It is not a study with participants, an accessibility certification, or proof that every Android device behaves identically.
 
+## Focused settings and chat controls — 2026-10-01
+
+The home screen now prioritizes workspace selection, new chat, search and conversations. Connection details, branding and version information moved to dedicated settings pages. Settings presents seven categories, one page at a time, with predictable Back/focus restoration. A red disconnect action stays below the content scroll area without covering controls. Codex access explanations are initially collapsed behind a question-mark button.
+
+Review appears only when the selected project has an available working-tree or branch comparison. Results and reading mode appear only when there is relevant content. Account usage is isolated in its own settings page, with actual window durations, remaining allowance and dated reset information; unavailable values do not become zero usage.
+
+Conversation labels, tool cards, code and file changes follow chat text size, while interactive targets retain their independent minimum size. Light-theme active navigation and selected conversation titles use theme-appropriate contrast. These changes address the user's reported visual clutter and inconsistent scaling; they do not establish participant-tested usability.
+
 ## Phone sizing references — 2026-09-30
 
 Current manufacturer references cover compact, large and folding phones:

@@ -113,15 +113,15 @@ test('Codex request errors expose the operation but never raw config or unrecogn
   }
 });
 
-test('Codex uses constrained sandbox, image attachments and normalized streaming', async t => {
+test('Codex defaults to full access with image attachments and normalized streaming', async t => {
   const { rpc, service, input, root } = await setup(t);
   const image = path.join(root, 'image.png'); await writeFile(image, 'image');
   service.start({ ...input, attachmentPaths: [image] });
   await until(() => Boolean(service.get(input.id).turnId));
   const start = rpc.requests.find(r => r.method === 'thread/start')!.params;
-  assert.equal(start.sandbox, 'workspace-write'); assert.equal(start.approvalPolicy, 'on-request'); assert.equal(start.approvalsReviewer, 'user');
+  assert.equal(start.sandbox, 'danger-full-access'); assert.equal(start.approvalPolicy, 'never'); assert.equal(start.approvalsReviewer, 'user');
   const turn = rpc.requests.find(r => r.method === 'turn/start')!.params;
-  assert.equal(turn.sandboxPolicy.networkAccess, false); assert.deepEqual(turn.sandboxPolicy.writableRoots, [root]);
+  assert.deepEqual(turn.sandboxPolicy, { type: 'dangerFullAccess' }); assert.equal(turn.approvalPolicy, 'never');
   assert.equal(turn.input[1].type, 'localImage');
   rpc.notification('item/agentMessage/delta', { delta: 'Hello' });
   await until(() => service.get(input.id).partial === 'Hello');
@@ -133,11 +133,42 @@ test('Codex uses constrained sandbox, image attachments and normalized streaming
   assert.equal('eventQueue' in view, false); assert.equal('pending' in view, false);
 });
 
-test('Codex preserves stricter configured read-only sandbox and approval policy', async t => {
+test('Codex Plan remains read-only with no escalation despite Full access preference', async t => {
   const { rpc, service, input } = await setup(t); rpc.config = { sandbox_mode: 'read-only', approval_policy: 'untrusted' };
-  service.start(input); await until(() => Boolean(service.get(input.id).turnId));
+  service.start({ ...input, mode: 'plan', codexAccess: 'full' }); await until(() => Boolean(service.get(input.id).turnId));
   const turn = rpc.requests.find(r => r.method === 'turn/start')!.params;
-  assert.equal(turn.sandboxPolicy.type, 'readOnly'); assert.equal(turn.approvalPolicy, 'untrusted');
+  assert.equal(turn.sandboxPolicy.type, 'readOnly'); assert.equal(turn.approvalPolicy, 'never'); assert.equal(turn.approvalsReviewer, 'user');
+});
+
+for (const access of ['ask', 'auto'] as const) test(`Codex ${access} applies to resumed threads and each turn`, async t => {
+  const { rpc, service, input, root } = await setup(t);
+  service.start({ ...input, sessionId: 'session-1', codexAccess: access });
+  await until(() => Boolean(service.get(input.id).turnId));
+  const resume = rpc.requests.find(r => r.method === 'thread/resume')!.params;
+  const turn = rpc.requests.find(r => r.method === 'turn/start')!.params;
+  assert.equal(resume.sandbox, 'workspace-write');
+  for (const params of [resume, turn]) {
+    assert.equal(params.approvalPolicy, 'on-request');
+    assert.equal(params.approvalsReviewer, access === 'auto' ? 'auto_review' : 'user');
+  }
+  assert.equal(turn.sandboxPolicy.networkAccess, false);
+  assert.deepEqual(turn.sandboxPolicy.writableRoots, [root]);
+});
+
+test('Codex stops before a turn when the host applies a different access mode', async t => {
+  const { rpc, service, input } = await setup(t);
+  rpc.handler = method => method === 'thread/start' ? { thread: rpc.thread, approvalPolicy: 'on-request', approvalsReviewer: 'user', sandbox: { type: 'workspaceWrite' } } : undefined;
+  service.start(input); await until(() => service.get(input.id).status === 'error');
+  assert.match(service.get(input.id).error!, /selected access mode/);
+  assert.equal(rpc.requests.some(r => r.method === 'turn/start'), false);
+});
+
+test('Codex forwards managed policy rejection without retrying a less restrictive mode', async t => {
+  const { rpc, service, input } = await setup(t);
+  rpc.handler = method => { if (method === 'thread/start') throw new Error('Managed policy rejects this access mode'); };
+  service.start(input); await until(() => service.get(input.id).status === 'error');
+  assert.equal(rpc.requests.filter(r => r.method === 'thread/start').length, 1);
+  assert.equal(rpc.requests.some(r => r.method === 'turn/start'), false);
 });
 
 test('Codex refuses resume outside allowed roots and mismatched project', async t => {
@@ -201,7 +232,7 @@ test('Codex accepts explicitly configured upload storage without exposing it as 
   t.after(() => service.close());
   const image = path.join(outside, 'uploaded.png'), document = path.join(outside, 'notes.txt');
   await writeFile(image, 'image'); await writeFile(document, 'Notes');
-  service.start({ ...input, attachmentPaths: [image, document] }); await until(() => Boolean(service.get(input.id).turnId));
+  service.start({ ...input, codexAccess: 'ask', attachmentPaths: [image, document] }); await until(() => Boolean(service.get(input.id).turnId));
   const params = rpc.requests.find(r => r.method === 'turn/start')!.params;
   assert.equal(params.input[1].path, image); assert.ok(params.input[2].text.includes(document));
   assert.deepEqual(params.sandboxPolicy.writableRoots, [root]);

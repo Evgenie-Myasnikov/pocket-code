@@ -13,7 +13,7 @@ test('connected host advertises releases and chat renders image tool results, PD
   await page.getByText('Tool error',{exact:true}).click();await expect(page.getByText('Tool failure detail')).toBeVisible();
   await expect(page.getByRole('link',{name:'Download PDF'})).toBeVisible();
   await page.getByText('Additional data · custom_result').click();await expect(page.getByText(/Extra data/)).toBeVisible();
-  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();
+  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Updates',exact:true}).click();
   await expect(page.getByText(`Pocket Code ${pkg.version} → 99.0.0`)).toBeVisible();
   await page.screenshot({path:'artifacts/screenshots/update-settings.png',fullPage:true});
 });

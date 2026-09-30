@@ -13,7 +13,7 @@ test('batch queue is sequential, deduplicates retries, pauses, and restores with
   const queue = new JiraQueue(file, start, id => jobs.get(id)!);
   let restored: JiraQueue | undefined;
   try {
-    const batch = { batchId: 'batch-1', site: 'site', keys: ['A-1', 'A-2', 'A-1'], cwd: dir, mode: 'default' as const, maxBudgetUsd: 1 };
+    const batch = { batchId: 'batch-1', site: 'site', keys: ['A-1', 'A-2', 'A-1'], cwd: dir, mode: 'default' as const, codexAccess: 'ask' as const, maxBudgetUsd: 1 };
     await queue.add(batch); await until(() => started.length === 1);
     await queue.add(batch); assert.equal((await queue.view()).items.length, 2);
     await queue.control('pause'); jobs.values().next().value!.status = 'done'; await queue.tick();
@@ -22,6 +22,7 @@ test('batch queue is sequential, deduplicates retries, pauses, and restores with
     await queue.control('pause'); queue.close();
     restored = new JiraQueue(file, start, id => jobs.get(id)!);
     const snapshot = await restored.view();
+    assert.ok(snapshot.items.every(item => item.codexAccess === 'ask'), 'queued work retains the selected access mode after restart');
     assert.equal(snapshot.paused, true); assert.equal(snapshot.items.find(i => i.key === 'A-2')?.status, 'error');
     await restored.add(batch); await restored.tick(); assert.equal(started.length, 2, 'persisted batch retry must not run completed work again');
     await restored.add({ ...batch, batchId: 'batch-2', keys: ['A-3', 'A-4'] }); await until(() => started.length === 3);

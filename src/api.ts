@@ -24,7 +24,7 @@ export async function saveConnection(connection: Connection | null) {
   } else if (connection) sessionStorage.setItem('connection', JSON.stringify(connection));else sessionStorage.removeItem('connection');
 }
 export async function request<T>(connection: Connection, endpoint: string, data?: unknown): Promise<T> {
-  const timeout = endpoint.startsWith('/jira/workflow') ? 300000 : endpoint.startsWith('/jira/') || endpoint.startsWith('/updates/') || endpoint.startsWith('/providers') || endpoint.includes('provider=codex') ? 95000 : 30000;
+  const timeout = endpoint.startsWith('/jira/workflow') ? 300000 : endpoint.startsWith('/jira/') || endpoint.startsWith('/updates/') || endpoint.startsWith('/providers') || endpoint.endsWith('/usage') || endpoint.includes('provider=codex') ? 95000 : 30000;
   const url = normalizeUrl(connection.url) + '/api' + endpoint;
   const headers = { Authorization: `Bearer ${connection.token}`, 'Content-Type': 'application/json' };
   let status: number, body: any;

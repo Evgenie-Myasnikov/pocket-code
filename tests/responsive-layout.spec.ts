@@ -36,6 +36,7 @@ async function openFixture(page:Page,profile:Profile,scale:number,language:'en'|
     if(path==='/api/sessions')return route.fulfill({json:[{sessionId:'responsive-chat',summary:title,cwd:root,lastModified:1}]});
     if(path.endsWith('/messages'))return route.fulfill({json:{messages:Array.from({length:12},(_,i)=>({id:`message-${i}`,role:i%2?'assistant':'user',blocks:[{type:'text',text:i%2?'Here is the project result.\n\n- One clear action\n- More detail when needed':'Please review the project layout.'}]})),previous:null,next:null}});
     if(path==='/api/jobs')return route.fulfill({json:[]});
+    if(path==='/api/review/availability')return route.fulfill({json:{available:true,mode:'working'}});
     if(path==='/api/updates/latest')return route.fulfill({json:{enabled:true}});
     if(path==='/api/jira/status')return route.fulfill({json:{connected:false,sites:[]}});
     if(path==='/api/review')return route.fulfill({json:{files:[{path:'src/features/a-long-named-example.ts',added:1,removed:1,binary:false,untracked:false}],current:'feature/readable-interface',base:'main',branches:['main'],patch:'@@ -1 +1 @@\n-old value\n+new value\n',binary:false}});
@@ -90,22 +91,27 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-review.png`});
   await page.locator('.review-panel header button').click();
   const settings=language==='en'?'Settings':'Настройки';
-  await (profile.width<=760?page.locator('.mobile-nav').getByRole('button',{name:settings,exact:true}):page.locator('.sidebar-footer button')).click();
-  await expect(page.locator('.settings-panel #settings-updates .update-panel')).toBeVisible();
+  await (profile.width<=760?page.locator('.mobile-nav').getByRole('button',{name:settings,exact:true}):page.locator('.desktop-tabs').getByRole('button',{name:settings,exact:true})).click();
+  await expect(page.locator('.settings-index .settings-category')).toHaveCount(7);
   await expect(page.locator('.chat-header .review-button')).toHaveCount(0);
   await expect(page.locator('.chat-header .project-picker')).toHaveCount(0);
-  const positions=await page.locator('.settings-panel').evaluate(panel=>{
-    const update=panel.querySelector('.update-panel')!.getBoundingClientRect(),appearance=panel.querySelector('.appearance-settings')!.getBoundingClientRect();
-    return {overlap:Math.min(update.bottom,appearance.bottom)-Math.max(update.top,appearance.top),client:panel.clientHeight,scroll:panel.scrollHeight};
-  });
-  expect(positions.overlap).toBeLessThanOrEqual(0);
-  expect(positions.scroll).toBeGreaterThan(positions.client);
-  await withinViewport(page,'.settings-panel button,.settings-panel input,.settings-panel select,.settings-panel h2,.settings-panel h3',profile.width);
-  await page.locator('.appearance-settings').scrollIntoViewIfNeeded();
+  await withinViewport(page,'.settings-panel button',profile.width);
+  await page.getByRole('button',{name:language==='en'?'Appearance & language':'Оформление и язык',exact:true}).click();
   await expect(page.locator('.appearance-settings .palette-options button').first()).toBeVisible();
+  await expect(page.locator('#settings-updates')).toHaveCount(0);
+  await withinViewport(page,'.settings-panel button,.settings-panel input,.settings-panel select,.settings-panel h2,.settings-panel h3',profile.width);
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-settings.png`});
-  await page.locator('#settings-updates').scrollIntoViewIfNeeded();
+  await page.getByRole('button',{name:language==='en'?'All settings':'Все настройки',exact:true}).click();
+  await page.getByRole('button',{name:language==='en'?'Updates':'Обновления',exact:true}).click();
+  await expect(page.locator('.settings-panel #settings-updates .update-panel')).toBeVisible();
+  await expect(page.locator('.appearance-settings')).toHaveCount(0);
+  const bounds=await page.locator('.settings-panel').evaluate(panel=>{
+    const content=panel.querySelector('.settings-content')!.getBoundingClientRect(),footer=panel.querySelector('.settings-exit')!.getBoundingClientRect();
+    return {contentBottom:content.bottom,footerTop:footer.top};
+  });
+  expect(bounds.contentBottom).toBeLessThanOrEqual(bounds.footerTop+1);
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-updates.png`});
+
 }
 for(const profile of portraits)for(const scale of [60,65,100,130])for(const language of ['en','ru'] as const)
   test(`${profile.name} ${scale}% ${language}: chat, review and settings fit`,async({page})=>{await openFixture(page,profile,scale,language);await inspectScreens(page,profile,scale,language);});

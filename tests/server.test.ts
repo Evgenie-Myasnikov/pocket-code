@@ -9,6 +9,7 @@ import { createApp } from '../server/app.js';
 import { Jobs } from '../server/jobs.js';
 import { allowedPath, validToken } from '../server/security.js';
 import { normalizeUrl } from '../src/api.js';
+import packageJson from '../package.json';
 
 test('tokens and transport validation fail closed', () => {
   assert.equal(validToken('', ''), false);
@@ -43,6 +44,7 @@ test('API authenticates, scopes sessions, prevents path escapes and routes attac
   try {
     assert.equal((await request('/health', undefined, 'wrong')).status, 401);
     assert.equal((await request('/health')).status, 200);
+    assert.equal((await (await request('/health')).json()).version, packageJson.version);
     assert.deepEqual((await (await request('/sessions')).json()).map((s: any) => s.sessionId), [id]);
     const page = await (await request(`/sessions/${id}/messages`)).json();
     assert.equal(page.messages.length, 100); assert.equal(page.next, 100);

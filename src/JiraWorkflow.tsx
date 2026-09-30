@@ -7,12 +7,13 @@ import {jiraRoleLabel,type JiraRole} from './jira-preferences';
 import {JiraDescription} from './JiraDescription';
 import type {JiraIssue,JiraTransition,JiraTransitionField} from '../server/jira';
 import type {JobView} from '../server/types';
+import type {CodexAccess} from './preferences';
 
 export type JiraLink={provider:'claude'|'codex';cwd:string;jobId?:string;sessionId?:string;pr?:{url:string;number:number}};
 type Action={id:string;label:string;kind:'start'|'transition'|'pr';transitions:JiraTransition[]};
 type WorkflowView={issue:JiraIssue;stage:string;role:JiraRole;actions:Action[];link?:JiraLink;pending?:{id:string;action:string;phase:string;provider:'claude'|'codex';message:string}};
 type PullRequestPreview={ready:boolean;reason?:string;base:string;head:string;headSha:string;files:unknown[];commits:number|unknown[];existing?:{url:string;number:number}};
-type Props={connection:Connection;site:string;issue:JiraIssue;provider:'claude'|'codex';role:JiraRole;roots:string[];budget:number;jobs:JobView[];onBack():void;onOpen(job:JobView):void;onOpenLinked?(link:JiraLink):void;onChanged(issue:JiraIssue):void};
+type Props={connection:Connection;site:string;issue:JiraIssue;provider:'claude'|'codex';codexAccess?:CodexAccess;role:JiraRole;roots:string[];budget:number;jobs:JobView[];onBack():void;onOpen(job:JobView):void;onOpenLinked?(link:JiraLink):void;onChanged(issue:JiraIssue):void};
 const supported=(field:JiraTransitionField)=>Boolean(field.allowedValues?.length)||['string','number','date','datetime'].includes(field.schema.type);
 const optionLabel=(value:any)=>typeof value==='object'&&value?String(value.name||value.label||value.displayName||value.value||value.id||value.accountId):String(value);
 function optionValue(value:any,field:JiraTransitionField){
@@ -49,7 +50,7 @@ function RequiredFields({transition,values,onChange}:{transition?:JiraTransition
 }
 const describeItem=(item:any)=>typeof item==='string'?item:String(item?.path||item?.subject||item?.message||item?.name||'');
 
-export function JiraWorkflow({connection,site,issue,provider,role,roots,budget,jobs,onBack,onOpen,onOpenLinked,onChanged}:Props){
+export function JiraWorkflow({connection,site,issue,provider,codexAccess='full',role,roots,budget,jobs,onBack,onOpen,onOpenLinked,onChanged}:Props){
   const [view,setView]=useState<WorkflowView|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
   const [fullIssue,setFullIssue]=useState<JiraIssue|null>(null),[descriptionLoading,setDescriptionLoading]=useState(true),[descriptionError,setDescriptionError]=useState('');
   const [action,setAction]=useState<Action|null>(null),[transitionId,setTransitionId]=useState(''),[fields,setFields]=useState<Record<string,string>>({});
@@ -96,7 +97,7 @@ export function JiraWorkflow({connection,site,issue,provider,role,roots,budget,j
   }
   async function submit(){
     if(!action||busy||loading||invalid||action.kind==='start'&&!cwd||action.kind==='pr'&&(!preview?.ready||!title.trim()))return;
-    const payload={site,key:issue.key,provider,role,action:action.id,cwd,mode:role==='developer'?mode:'plan',maxBudgetUsd:budget,...(transitionId?{transitionId}:{}),fields:Object.fromEntries(Object.entries(fields).filter(([id,value])=>value!==''&&transition?.fields[id]).map(([id,value])=>[id,fieldValue(value,transition!.fields[id])])),...(action.kind==='pr'&&preview?{pullRequest:{title:title.trim(),body,base:preview.base,head:preview.head,headSha:preview.headSha}}:{})};
+    const payload={site,key:issue.key,provider,role,action:action.id,cwd,mode:role==='developer'?mode:'plan',maxBudgetUsd:budget,...(provider==='codex'?{codexAccess}:{}),...(transitionId?{transitionId}:{}),fields:Object.fromEntries(Object.entries(fields).filter(([id,value])=>value!==''&&transition?.fields[id]).map(([id,value])=>[id,fieldValue(value,transition!.fields[id])])),...(action.kind==='pr'&&preview?{pullRequest:{title:title.trim(),body,base:preview.base,head:preview.head,headSha:preview.headSha}}:{})};
     const signature=JSON.stringify(payload);if(attempt.current?.signature!==signature)attempt.current={signature,id:crypto.randomUUID()};
     const epoch=generation.current;setBusy(true);setError('');
     try{const result=await request<{job?:JobView;view:WorkflowView}>(connection,'/jira/workflow/action',{...payload,id:attempt.current.id});if(epoch!==generation.current)return;attempt.current=null;setView(result.view);onChanged(result.view.issue);setAction(null);if(result.job)onOpen(result.job);}

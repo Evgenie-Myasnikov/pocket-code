@@ -106,7 +106,8 @@ test('reviewer and QA workflow routes force plan permissions for both agent engi
   assert.equal((await f.request('/jira/workflow/action', reviewer)).status, 200);
   await until(() => f.jobs.get(reviewer.id).status === 'done');
   const qa = f.input({ key: 'TEST-3', role: 'qa', provider: 'codex', action: 'start_qa', mode: 'default', transitionId: '5' });
-  assert.equal((await f.request('/jira/workflow/action', qa)).status, 200);
+  const qaResponse = await f.request('/jira/workflow/action', qa);
+  assert.equal(qaResponse.status, 200, await qaResponse.text());
   await until(() => f.codexJobs.get(qa.id).status === 'done');
   assert.deepEqual(f.runs, [{ provider: 'claude', permissionMode: 'plan', key: 'TEST-2' }, { provider: 'codex', permissionMode: 'plan', key: 'TEST-3' }]);
   assert.deepEqual(f.writes, [{ key: 'TEST-2', transitionId: '3' }, { key: 'TEST-3', transitionId: '5' }]);

@@ -15,7 +15,7 @@ test('English default and persistent Russian selection on the connection screen'
   await page.getByRole('button', {name:'Подключить компьютер'}).click();
   await page.getByRole('button', {name:/Интеграционный тест/}).click();
   await page.getByLabel('Сообщение Claude').fill('My draft — мой текст');
-  await page.locator('.mobile-nav').getByRole('button', {name:'Настройки', exact:true}).click();
+  await page.locator('.mobile-nav').getByRole('button', {name:'Настройки', exact:true}).click();await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();
   await page.getByLabel('Language / Язык').selectOption('en');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.locator('.language-picker')).toContainText('Interface language');

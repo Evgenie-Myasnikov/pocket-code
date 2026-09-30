@@ -59,7 +59,7 @@ test('workspace selection and provider preferences survive reload with Claude le
   await page.addInitScript(()=>{if(!localStorage.getItem('migration-test-seeded')){localStorage.setItem('migration-test-seeded','true');localStorage.setItem('pocket-code-chat-preferences',JSON.stringify({model:'sonnet',mode:'plan',budget:7}));localStorage.setItem('pocket-code-projects',JSON.stringify({'http://127.0.0.1:4319':'C:\\Workspace\\second'}));}});
   await connect(page);await page.locator('.new-chat').click();await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');await expect(page.locator('.header-title')).toContainText('second');
   await switchSidebar(page,'codex');await page.locator('.new-chat').click();await expect(page.locator('.header-title')).toContainText('first');await page.getByLabel('Codex model').selectOption('test-codex-model');
-  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByLabel('Folder for new chats').selectOption(roots[1]);
+  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'AI & workspace',exact:true}).click();await page.getByLabel('Folder for new chats').selectOption(roots[1]);
   await page.reload();await expect(page.locator('.workspace-picker-sidebar select')).toHaveValue('codex');await expect(page.getByLabel('Codex model')).toHaveValue('test-codex-model');await expect(page.locator('.header-title')).toContainText('second');
   await switchSidebar(page,'claude');await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');await expect(page.getByLabel('Mode',{exact:true})).toHaveValue('plan');await expect(page.locator('.header-title')).toContainText('second');
 });
@@ -96,7 +96,7 @@ test('nested project folders stay available across providers and reload without 
   await picker.selectOption(claudeProject);
   await expect(page.getByRole('button', {name:/Codex thread/})).toBeVisible();
   await expect(page.getByRole('button', {name:/Claude thread/})).toHaveCount(0);
-  await page.getByRole('button', {name:'Settings', exact:true}).click();
+  await page.getByRole('button', {name:'Settings', exact:true}).click();await page.getByRole('button',{name:'AI & workspace',exact:true}).click();
   await expect(page.getByLabel('Folder for new chats')).toHaveValue(claudeProject);
   await page.getByLabel('Folder for new chats').selectOption(codexProject);
   await page.reload();

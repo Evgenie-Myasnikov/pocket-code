@@ -10,6 +10,7 @@ test('chat drafts survive navigation and modal Back/Escape restores focus',async
     if(endpoint==='/api/sessions')return route.fulfill({json:['First','Second'].map((summary,i)=>({sessionId:String(i),summary,cwd:roots[0],lastModified:1}))});
     if(endpoint.endsWith('/messages'))return route.fulfill({json:{messages:[],previous:null,next:null}});
     if(endpoint==='/api/jobs')return route.fulfill({json:[]});
+    if(endpoint==='/api/review/availability')return route.fulfill({json:{available:true,mode:'working'}});
     if(endpoint==='/api/uploads')return route.fulfill({json:{id:'attachment',name:'draft.txt',size:4}});
     if(endpoint==='/api/review')return route.fulfill({json:{files:[],patch:'',branches:[],base:'HEAD',current:'main',binary:false}});
     if(endpoint==='/api/updates/latest')return route.fulfill({json:{enabled:false}});

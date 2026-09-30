@@ -26,7 +26,7 @@ export async function review(roots:string[],input:string,mode:'working'|'staged'
   const branches=(await git(['for-each-ref','--format=%(refname:short)','refs/heads','refs/remotes'])).trim().split('\n').filter(Boolean).slice(0,500);
   let current='HEAD';try{current=(await git(['symbolic-ref','--short','HEAD'])).trim();}catch{}
   let hasHead=true;try{await git(['rev-parse','--verify','HEAD']);}catch{hasHead=false;}
-  const comparison=base||branches.find(b=>b==='origin/main')||branches.find(b=>b==='origin/master')||branches.find(b=>b==='main'&&b!==current)||'HEAD';
+  const comparison=base||branches.find(b=>b==='origin/main')||branches.find(b=>b==='origin/master')||branches.find(b=>b==='main'&&b!==current)||branches.find(b=>b==='master'&&b!==current)||'HEAD';
   if(mode==='branch' && comparison!=='HEAD' && !branches.includes(comparison))throw new HttpError(400,'Select an existing base branch.');
   const range=mode==='staged'?['--cached']:mode==='branch'?[`${comparison}...HEAD`]:hasHead?['HEAD']:['--cached'];
   const flags=['--no-ext-diff','--no-textconv','--no-renames'];
@@ -49,4 +49,15 @@ export async function review(roots:string[],input:string,mode:'working'|'staged'
     return {...result,patch:`@@ -0,0 +1,${lines.length} @@\n`+lines.map(line=>'+'+line).join('\n')};
   }
   return {...result,binary:selected.binary,patch:await git(['diff',...flags,'--unified=3',...range,'--',file])};
+}
+
+export async function reviewAvailability(roots:string[],input:string):Promise<{available:boolean;mode:'working'|'branch'}> {
+  // Validate first: an unavailable comparison must not turn an out-of-scope path into success.
+  const cwd=await allowedPath(roots,input,true);
+  try {
+    const working=await review(roots,cwd,'working');
+    if(working.files.length)return {available:true,mode:'working'};
+    if(working.base!=='HEAD' && (await review(roots,cwd,'branch')).files.length)return {available:true,mode:'branch'};
+  } catch { /* Non-repositories and unavailable Git comparisons have no actionable Review panel. */ }
+  return {available:false,mode:'working'};
 }

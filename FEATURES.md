@@ -1,5 +1,14 @@
 # Feature coverage
 
+## 0.12.0
+
+- Codex Full access by default; persistent Ask for approval and Approve for me choices for new/continued chats and Jira queues. Plan and Reviewer/QA remain read-only.
+- Native account usage windows for Claude and Codex, with remaining percentages, reset times and explicit unavailable states.
+- Contextual Review, Results and reading controls; Review detects working and committed branch changes in the selected project.
+- Focused home screen and categorized settings for appearance/language, AI/workspace, usage, Jira, updates, connection and app information.
+- Persistent red disconnect action below settings content, collapsible access explanations, and proportional chat/tool typography with independent touch targets.
+- Shared project discovery across Claude and Codex workspaces and role-aware Jira queue persistence.
+
 ## 0.11.0
 
 | Feature | Claude | Codex |

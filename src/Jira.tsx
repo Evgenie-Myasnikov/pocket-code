@@ -4,6 +4,7 @@ import { RefreshCw, Play, ExternalLink, Link2 } from 'lucide-react';
 import { request, type Connection } from './api';
 import type { JiraIssue, JiraSite } from '../server/jira';
 import type { JobView } from '../server/types';
+import type {CodexAccess} from './preferences';
 import type { QueueItem } from '../server/jira-queue';
 import './jira.css';
 import {useModal} from './navigation';
@@ -59,7 +60,7 @@ export function JiraSettings({ connection }: {connection: Connection | null;}) {
     <label className="jira-role-setting">{t('Роль в Jira')}<select value={role} onChange={event=>setJiraRole(event.target.value as JiraRole)}>{(['developer','reviewer','qa'] as const).map(item=><option key={item} value={item}>{t(jiraRoleLabel(item))}</option>)}</select></label><p className="muted">{t('Роль определяет доступные действия в задачах. Права вашего аккаунта Jira остаются прежними.')}</p>
   </section>;
 }
-export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provider='claude',onOpenLinked}:{provider?:'claude'|'codex';connection:Connection|null;roots:string[];jobs:JobView[];budget:number;onOpen(job:JobView):void;onSettings():void;onOpenLinked?(link:JiraLink):void}){
+export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provider='claude',codexAccess='full',onOpenLinked}:{provider?:'claude'|'codex';codexAccess?:CodexAccess;connection:Connection|null;roots:string[];jobs:JobView[];budget:number;onOpen(job:JobView):void;onSettings():void;onOpenLinked?(link:JiraLink):void}){
   const role=useJiraRole();
   const [status,setStatus]=useState<Status|null>(null),[site,setSite]=useState(''),[issues,setIssues]=useState<JiraIssue[]>([]),[next,setNext]=useState<string|null>(null);
   const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[category,setCategory]=useState(''),[updated,setUpdated]=useState(0);
@@ -118,7 +119,7 @@ export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provide
   async function enqueue(){
     if(!connection||!site||!checked.size||batchBusy||!cwd)return;
     const current=epoch.current;setBatchBusy(true);setError('');
-    const body={provider,role,site,keys:[...checked.keys()].sort(),cwd,mode:role==='developer'?mode:'plan',maxBudgetUsd:budget},signature=JSON.stringify(body);
+    const body={provider,role,site,keys:[...checked.keys()].sort(),cwd,mode:role==='developer'?mode:'plan',maxBudgetUsd:budget,...(provider==='codex'?{codexAccess}:{})},signature=JSON.stringify(body);
     if(batchId.current?.signature!==signature)batchId.current={signature,id:crypto.randomUUID()};
     try{const value=await request<{paused:boolean;items:QueueItem[]}>(connection,'/jira/queue',{...body,batchId:batchId.current.id});if(alive.current&&current===epoch.current){setQueue(value);setQueueOpen(true);setChecked(new Map());setSelecting(false);setBatchOpen(false);batchId.current=null;}}
     catch(e){if(alive.current&&current===epoch.current)setError((e as Error).message);}finally{if(alive.current)setBatchBusy(false);}
@@ -129,7 +130,7 @@ export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provide
   }
   const stages=[['backlog','Backlog'],['open','Ready for development'],['development','In development'],['review','Code review'],['pr_review','PR review'],['waiting_qa','Ready for QA'],['qa','In QA'],['waiting_merge','Ready to merge'],['done','Done'],['closed','Closed']];
   const related=(key:string)=>jobs.filter(job=>job.jira?.site===site&&job.jira.key===key).sort((a,b)=>b.startedAt-a.startedAt)[0];
-  if(connection&&selected)return <section className="jobs-panel"><JiraWorkflow connection={connection} site={site} issue={selected} provider={provider} role={role} roots={roots} budget={budget} jobs={jobs} onBack={()=>setSelected(null)} onOpen={onOpen} onOpenLinked={onOpenLinked} onChanged={issue=>{setSelected(old=>old?.key===issue.key?issue:old);setIssues(old=>old.map(item=>item.key===issue.key?issue:item));}}/></section>;
+  if(connection&&selected)return <section className="jobs-panel"><JiraWorkflow connection={connection} site={site} issue={selected} provider={provider} codexAccess={codexAccess} role={role} roots={roots} budget={budget} jobs={jobs} onBack={()=>setSelected(null)} onOpen={onOpen} onOpenLinked={onOpenLinked} onChanged={issue=>{setSelected(old=>old?.key===issue.key?issue:old);setIssues(old=>old.map(item=>item.key===issue.key?issue:item));}}/></section>;
   return <section className="jobs-panel"><div className="jobs-heading"><p className="eyebrow">{t('Назначено мне')} · {t(jiraRoleLabel(role))}</p><button className="icon-button" aria-label={t('Обновить задачи')} disabled={busy||!site} onClick={()=>void refresh()}><RefreshCw size={20}/></button></div>
     {error&&!batchOpen&&<p className="error" role="alert">{t(error)}</p>}
     {!connection||status?.connected===false?<div className="jira-empty"><h3>{t('Подключите Jira')}</h3><p>{t('Войдите через Connect в настройках, чтобы загрузить назначенные вам задачи.')}</p><button className="primary" onClick={onSettings}>{t('Открыть настройки Jira')}</button></div>:!status?<p className="muted" role="status">{t('Проверяем подключение Jira…')}</p>:<>

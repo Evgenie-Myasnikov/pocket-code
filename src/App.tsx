@@ -1,16 +1,18 @@
 import { Review } from './Review';
 import { Subagents } from './Subagents';
 import { ChatOutputs } from './ChatOutputs';
+import {extractChatOutputs} from './chat-outputs';
 import {useBackAction,useBackNavigation,useModal} from './navigation';
 import { preferences, preferredRoot, savePreferredRoot, savePreferences, selectedWorkspace, saveSelectedWorkspace, type WorkspaceProvider } from './preferences';
 import { useWorkspaceState, useWorkspaceRef } from './workspace-state';
 import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
-import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef } from 'react';
+import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
 import { ArrowUp, ArrowLeft, Plus, Search, MessageSquare, Folder, Settings, Terminal, Wifi, ChevronDown, Paperclip, Square, X, GitBranch, RefreshCw, Laptop, LogOut, ShieldCheck, ClipboardList, Eye, EyeOff, PanelsTopLeft } from 'lucide-react';
 import { Connect } from './Connect';
-import { AppearanceSettings, useAppearance } from './Appearance';
+import { useAppearance } from './Appearance';
+import {SettingsPanel,type SettingsPage} from './SettingsPanel';
 import { Message, ApprovalCard } from './Messages';
 import { JiraJobs, JiraSettings } from './Jira';
 import { ProjectDocs } from './ProjectDocs';
@@ -44,6 +46,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const useStateForWorkspace = <T,>(initial:T | ((provider:WorkspaceProvider)=>T)) => useWorkspaceState(provider, initial);
   const useRefForWorkspace = <T,>(initial:T) => useWorkspaceRef(provider, initial);
   const [reviewOpen,setReviewOpen] = useStateForWorkspace(false);
+  const [reviewAvailability,setReviewAvailability]=useStateForWorkspace<{key:string;mode:'working'|'branch'}|null>(null);
   const [outputsOpen,setOutputsOpen] = useStateForWorkspace(false);
   const [agentPanel,setAgentPanel] = useStateForWorkspace<{initial?:SubagentView}|null>(null);
   const [agentList,setAgentList] = useStateForWorkspace<SubagentView[]>([]);
@@ -59,7 +62,9 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const [projectReady, setProjectReady] = useStateForWorkspace(false);
   const projectChosen = useRefForWorkspace(false);
   const [cwd, setCwd] = useStateForWorkspace(''),[tab, setTab] = useStateForWorkspace<'chats' | 'files' | 'settings' | 'terminal' | 'jobs'>('chats'),[mobileChat, setMobileChat] = useStateForWorkspace(false);
+  const [settingsPage,setSettingsPage]=useStateForWorkspace<SettingsPage>('index');
   const [draft, setDraft] = useStateForWorkspace(''),[search, setSearch] = useStateForWorkspace(''),[model, setModel] = useStateForWorkspace(id=>preferences(id).model),[mode, setMode] = useStateForWorkspace(id=>preferences(id).mode);
+  const [codexAccess,setCodexAccess]=useStateForWorkspace(id=>preferences(id).codexAccess);
   const [error, setError] = useStateForWorkspace(''),[networkError, setNetworkError] = useStateForWorkspace(''),[busy, setBusy] = useStateForWorkspace(false),[loading, setLoading] = useStateForWorkspace(false);
   const [demo, setDemo] = useState(false),[attachments, setAttachments] = useStateForWorkspace<Attachment[]>([]),[uploading, setUploading] = useStateForWorkspace(false);
   const [takeover, setTakeover] = useStateForWorkspace(false),[pendingTakeover, setPendingTakeover] = useStateForWorkspace(false),[budget, setBudget] = useStateForWorkspace(id=>preferences(id).budget);
@@ -67,6 +72,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   useModal(confirmation,pendingTakeover,()=>setPendingTakeover(false));
   useBackAction(()=>{
     if(readingMode&&tab==='chats'){toggleReadingMode(false);return true;}
+    if(tab==='settings'&&settingsPage!=='index'){setSettingsPage('index');return true;}
     if(tab!=='chats'){setTab('chats');setMobileChat(true);return true;}
     if(mobileChat){setMobileChat(false);return true;}
     return false;
@@ -85,7 +91,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const paging=useRefForWorkspace<symbol|null>(null);
   const scrollAnchor=useRefForWorkspace<{height:number;top:number;epoch:number;prepend:boolean;messageId?:string;offset?:number}|null>(null);
   useEffect(()=>saveSelectedWorkspace(provider),[provider]);
-  useEffect(()=>savePreferences(provider,{model,mode,budget}),[provider,model,mode,budget]);
+  useEffect(()=>savePreferences(provider,{model,mode,budget,codexAccess}),[provider,model,mode,budget,codexAccess]);
   useEffect(()=>{
     if (!connection || !health) return;
     if (projects !== null && !projectReady) {
@@ -103,6 +109,23 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const retry = useRefForWorkspace<{signature: string;id: string;} | null>(null);
   const running = job?.status === 'running';
   const parentChatId = job?.sessionId || selected?.sessionId;
+  const outputMessages=useMemo(()=>uniqueMessages([...history,...(job?.errorCode!=='codex_thread_busy'?job?.messages||[]:[])]),[history,job?.messages,job?.errorCode]);
+  const hasOutputs=useMemo(()=>extractChatOutputs(outputMessages).length>0,[outputMessages]);
+  const reviewContext=[connection?.url,provider,cwd,parentChatId].join('|');
+  const availableReview=reviewAvailability?.key===reviewContext?reviewAvailability:null;
+  useEffect(()=>{
+    setReviewAvailability(null);
+    if(!connection||!cwd||demo||selected?.readOnly||networkError||tab!=='chats'||readingMode)return;
+    let cancelled=false,timer:ReturnType<typeof setTimeout>|undefined;
+    const poll=async()=>{
+      if(document.visibilityState!=='hidden'&&document.querySelector('.workspace')?.getClientRects().length)try{
+        const value=await request<{available:boolean;mode:'working'|'branch'}>(connection,`/review/availability?cwd=${encodeURIComponent(cwd)}`);
+        if(!cancelled)setReviewAvailability(value.available&&(value.mode==='working'||value.mode==='branch')?{key:reviewContext,mode:value.mode}:null);
+      }catch{if(!cancelled)setReviewAvailability(null);}
+      if(!cancelled)timer=setTimeout(poll,15000);
+    };
+    void poll();return()=>{cancelled=true;clearTimeout(timer);};
+  },[connection,cwd,provider,parentChatId,tab,mobileChat,readingMode,networkError,demo,selected?.readOnly,job?.status]);
   const agentMap = new Map<string,SubagentView>();
   for(const message of [...history,...(job?.messages || [])]) for(const block of message.blocks) if(block.agent) agentMap.set(block.agent.id,block.agent);
   for(const agent of agentList) {
@@ -342,7 +365,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     if (sessionId && !confirmed) {setPendingTakeover(true);return;}
     sending.current = true;setBusy(true);setError('');
     const epoch = ++navigation.current;
-    const data = { provider, cwd, sessionId, text: draft, attachments: attachments.map((a) => a.id), model, mode, ...(provider==='claude'?{maxBudgetUsd:budget}:{}), takeoverConfirmed: confirmed };
+    const data = { provider, cwd, sessionId, text: draft, attachments: attachments.map((a) => a.id), model, mode, ...(provider==='claude'?{maxBudgetUsd:budget}:{codexAccess}), takeoverConfirmed: confirmed };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {
@@ -375,34 +398,32 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const workspacePicker = (location:'sidebar'|'header') => <label className={`workspace-picker workspace-picker-${location}`}><span>{t("Рабочее пространство")}</span><select aria-label={t("Рабочее пространство")} value={provider} disabled={demo} onChange={event=>setProvider(event.target.value as WorkspaceProvider)}><option value="claude">Claude</option><option value="codex">Codex</option></select></label>;
   return <div className={`app ${mobileChat ? 'show-chat' : ''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={21}/></button>}
-    <aside className="sidebar"><div className="brand"><span className="logo"><Terminal size={21} /></span><strong>Pocket<span>Code</span></strong><span className="version">BETA</span></div>
+    <aside className="sidebar">
       {workspacePicker('sidebar')}
-      <div className="host-card"><div className="host-icon"><Laptop size={20} /></div><div><strong>{health.name}</strong><span><i className={networkError ? 'offline' : ''} />{demo ? t("Демонстрация") : networkError ? t("Нет связи") : t("Компьютер подключён")}</span></div><Wifi size={16} /></div>
       <button className="primary new-chat" disabled={busy || uploading} onClick={() => newChat()}><Plus size={18} />{t("Новый чат")}<span>↗</span></button>
-      {provider==='claude' && <button className="terminal-entry secondary" disabled={busy || uploading} onClick={() => {setTab('terminal');setMobileChat(true);}}><Terminal size={17} />{t("Живой терминал")}<span>CLI</span></button>}<nav className="desktop-tabs"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={17} />Jobs</button><button className={tab === 'chats' ? 'active' : ''} onClick={() => setTab('chats')}><MessageSquare size={17} />{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><Folder size={17} />{t("Проект")}</button></nav>
+      {provider==='claude' && <button className="terminal-entry secondary" disabled={busy || uploading} onClick={() => {setTab('terminal');setMobileChat(true);}}><Terminal size={17} />{t("Живой терминал")}<span>CLI</span></button>}<nav className="desktop-tabs"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={17} />Jobs</button><button className={tab === 'chats' ? 'active' : ''} onClick={() => setTab('chats')}><MessageSquare size={17} />{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><Folder size={17} />{t("Проект")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
       <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти в чатах")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
       <div className="session-list"><div className="list-label">{t("ВАШИ ЧАТЫ ")}<span>{visible.length}</span></div>
         {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><span className="pulse-dot" /><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}</small></div></button>)}
         {visible.map((s) => <button className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} disabled={busy || uploading} key={s.sessionId} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span>·</span>{new Date(s.lastModified).toLocaleDateString(locale(), { day: 'numeric', month: 'short' })}</small></div>{jobs.some((j) => j.sessionId === s.sessionId && j.status === 'running') && <span className="pulse-dot" />}</button>)}
         {!visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : t("Здесь появятся чаты {0} из разрешённых папок.",engineName)}</p></div>}
-      </div><div className="sidebar-footer"><ShieldCheck size={15} /><span>{t("Работа остаётся на вашем ПК")}</span><button aria-label={t("Настройки")} className="icon-button" onClick={() => setTab('settings')}><Settings size={18} /></button></div>
-    </aside>
+      </div></aside>
     <main className="workspace">
-      {reviewOpen && connection && <Review key={provider} connection={connection} cwd={cwd} onClose={()=>setReviewOpen(false)}/>}
+      {reviewOpen && connection && <Review key={provider} connection={connection} cwd={cwd} initialMode={availableReview?.mode} onClose={()=>setReviewOpen(false)}/>}
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
-      {outputsOpen && connection && <ChatOutputs key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={uniqueMessages([...history,...(job?.errorCode!=='codex_thread_busy'?job?.messages||[]:[])])} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
+      {outputsOpen && connection && <ChatOutputs key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       <header className="chat-header" data-section={tab}>
-        <button className="icon-button mobile-back" aria-label={t("К списку чатов")} onClick={() => setMobileChat(false)}><ArrowLeft size={21} /></button>
+        <button className="icon-button mobile-back" aria-label={t("К списку чатов")} onClick={() => {if(tab==='settings'){if(settingsPage!=='index')setSettingsPage('index');else{setTab('chats');setMobileChat(false);}}else setMobileChat(false);}}><ArrowLeft size={21} /></button>
         <div className="header-title">{tab!=='settings'&&tab!=='jobs' && <label className="project-picker"><Folder size={14}/><select aria-label={t("Папка проекта")} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>{const projectView=tab==='files';newChat(event.target.value);if(projectView){setTab('files');setMobileChat(true);}}}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>}<strong>{tab==='jobs'?'Jobs':tab==='settings'?t("Настройки"):tab==='files'?t("Проект"):tab==='terminal'?t("Терминал"):selected?.customTitle||selected?.summary||t("Новый разговор")}</strong></div>
         {workspacePicker('header')}
-        {tab==='chats' && <><span className="branch"><GitBranch size={13} />{selected?.gitBranch||'local'}</span><button className="secondary review-button" aria-label="Review" disabled={!connection||demo||selected?.readOnly} onClick={()=>setReviewOpen(true)}>Review</button><button className="icon-button outputs-entry" disabled={!connection||demo||loading} aria-label={t("Результаты")} title={t("Результаты")} onClick={()=>setOutputsOpen(true)}><PanelsTopLeft size={20}/></button><button className="icon-button reading-entry" disabled={loading||!history.length&&!job} aria-label={t("Режим чтения")} title={t("Режим чтения")} aria-pressed={readingMode} onClick={()=>toggleReadingMode(true)}><Eye size={20}/></button></>}
+        {tab==='chats' && <><span className="branch"><GitBranch size={13} />{selected?.gitBranch||'local'}</span>{availableReview&&<button className="secondary review-button" aria-label="Review" disabled={!connection||demo||selected?.readOnly} onClick={()=>setReviewOpen(true)}>Review</button>}{hasOutputs&&<button className="icon-button outputs-entry" disabled={!connection||demo||loading} aria-label={t("Результаты")} title={t("Результаты")} onClick={()=>setOutputsOpen(true)}><PanelsTopLeft size={20}/></button>}{(outputMessages.length>0||Boolean(job?.partial))&&<button className="icon-button reading-entry" disabled={loading||!history.length&&!job} aria-label={t("Режим чтения")} title={t("Режим чтения")} aria-pressed={readingMode} onClick={()=>toggleReadingMode(true)}><Eye size={20}/></button>}</>}
       </header>
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
       {historyError && tab==='chats' && <div className="network-banner" role="status">{t("История не обновилась: ")}{t(historyError)}</div>}
       {networkError && <div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
       {!canRun && !demo && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить рабочее пространство Codex.")}</div>}
-      <Updates connection={connection} expanded={tab === 'settings'} />
-      {tab === 'jobs' ? <JiraJobs key={provider} provider={provider} connection={connection} roots={projectRoots} jobs={jobs} budget={budget} onSettings={() => setTab('settings')} onOpenLinked={link => {if(link.sessionId)void openSession({sessionId:link.sessionId,cwd:link.cwd,provider:link.provider,summary:t("Задача {0}",engineName),lastModified:Date.now()});}} onOpen={(j) => {void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: j.jira ? `${j.jira.key}: ${j.jira.summary}` : t("Задача {0}",engineName), cwd: j.cwd, lastModified: j.startedAt }, j);}} /> : tab === 'terminal' ? provider === 'codex' ? <div className="center-message">{t("Терминал доступен в рабочем пространстве Claude. С Codex можно работать в чате.")}</div> : connection && !demo && !selected?.readOnly ? <LiveTerminal connection={connection} cwd={cwd} sessionId={selected?.sessionId} /> : <div className="center-message">{t("Живой терминал доступен после подключения к ПК.")}</div> : tab === 'files' ? connection && !demo && !selected?.readOnly ? <ProjectDocs key={`${provider}:${cwd}`} provider={provider} connection={connection} root={cwd} onProject={newChat} /> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <section className="settings-panel"><LanguageSelector /><div id="settings-updates"/><JiraSettings connection={connection} /><AppearanceSettings {...appearanceSettings} /><div className="eyebrow">{t("ВАШ РАБОЧИЙ КОМПЬЮТЕР")}</div><h2>{health.name}</h2><p className="muted">{connection?.url || t("Демонстрационный режим")}</p><label>{t("Папка для новых чатов")}<select value={projectRoots.includes(cwd) ? cwd : ''} onChange={(e) => newChat(e.target.value)}>{!projectRoots.includes(cwd) && <option value="">{cwd}</option>}{projectRoots.map((r) => <option key={r}>{r}</option>)}</select></label>{provider==='claude' && <><label>{t("Лимит стоимости одного запроса, $")}<input type="number" min="0.1" max="100" step="0.1" value={budget} onChange={(e) => setBudget(Number(e.target.value))} /></label><p className="muted">{t("Оценка Agent SDK. Фактическая оплата зависит от способа входа в Claude. Лимит применяется к следующему сообщению.")}</p></>}<div className="info-card"><ShieldCheck size={20} /><p>{t("Для интернета используйте Tailscale на ПК и телефоне или HTTPS. В домашнем Wi-Fi HTTP не шифрует трафик; Tailscale шифрует соединение в обеих сетях.")}</p></div><p className="muted">{t("Чаты продолжаются через {0} на ПК. Перед продолжением старого чата дождитесь завершения ответа на ПК. Действующие задачи не останавливаются при отключении телефона.",engineName)}</p><button className="secondary" onClick={() => void disconnect()}><LogOut size={17} />{t("Отключить и забыть ключ")}</button></section> : <>
+      <Updates connection={connection} expanded={tab === 'settings'&&settingsPage === 'updates'} />
+      {tab === 'jobs' ? <JiraJobs key={provider} provider={provider} codexAccess={codexAccess} connection={connection} roots={projectRoots} jobs={jobs} budget={budget} onSettings={() => {setSettingsPage('jira');setTab('settings');setMobileChat(true);}} onOpenLinked={link => {if(link.sessionId)void openSession({sessionId:link.sessionId,cwd:link.cwd,provider:link.provider,summary:t("Задача {0}",engineName),lastModified:Date.now()});}} onOpen={(j) => {void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: j.jira ? `${j.jira.key}: ${j.jira.summary}` : t("Задача {0}",engineName), cwd: j.cwd, lastModified: j.startedAt }, j);}} /> : tab === 'terminal' ? provider === 'codex' ? <div className="center-message">{t("Терминал доступен в рабочем пространстве Claude. С Codex можно работать в чате.")}</div> : connection && !demo && !selected?.readOnly ? <LiveTerminal connection={connection} cwd={cwd} sessionId={selected?.sessionId} /> : <div className="center-message">{t("Живой терминал доступен после подключения к ПК.")}</div> : tab === 'files' ? connection && !demo && !selected?.readOnly ? <ProjectDocs key={`${provider}:${cwd}`} provider={provider} connection={connection} root={cwd} onProject={newChat} /> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget} onDisconnect={()=>void disconnect()}/> : <>
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!,previous=lastScrollTop.current;nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;if (nearBottom.current && !fromStart) setShowScrollActions(false);else if (el.scrollTop < previous - 2) setShowScrollActions(true);lastScrollTop.current = el.scrollTop;if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}<div className="conversation-date"><span />{demo ? t("ПРИМЕР РАЗГОВОРА") : t("РАБОЧЕЕ ПРОСТРАНСТВО")}<span /></div>
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}
@@ -430,7 +451,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
         </div>
       </>}
     </main>
-    <nav className="mobile-nav"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={20} />Jobs</button>{provider==='claude' && <button className={tab === 'terminal' ? 'active' : ''} onClick={() => {setTab('terminal');setMobileChat(true);}}><Terminal size={20} />{t("Терминал")}</button>}<button className={tab === 'chats' ? 'active' : ''} onClick={() => {setTab('chats');setMobileChat(false);}}><MessageSquare size={20} />{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => {setTab('files');setMobileChat(true);}}><Folder size={20} />{t("Проект")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setTab('settings');setMobileChat(true);}}><Settings size={20} />{t("Настройки")}</button></nav>
+    <nav className="mobile-nav"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={20} />Jobs</button>{provider==='claude' && <button className={tab === 'terminal' ? 'active' : ''} onClick={() => {setTab('terminal');setMobileChat(true);}}><Terminal size={20} />{t("Терминал")}</button>}<button className={tab === 'chats' ? 'active' : ''} onClick={() => {setTab('chats');setMobileChat(false);}}><MessageSquare size={20} />{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => {setTab('files');setMobileChat(true);}}><Folder size={20} />{t("Проект")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={20} />{t("Настройки")}</button></nav>
     {pendingTakeover && <div className="modal-backdrop"><section ref={confirmation} className="confirm-modal" role="dialog" aria-modal="true" aria-label={t("Продолжить чат с телефона?")}><Terminal size={28} /><h2>{t("Продолжить чат с телефона?")}</h2><p>{t("Сначала дождитесь завершения ответа в {0} на ПК. Одновременная работа с одной историей может вызвать конфликт.",engineName)}</p><button className="primary" onClick={() => {setPendingTakeover(false);setTakeover(true);void send(true);}}>{t("На ПК завершено — продолжить")}</button><button className="text-button" onClick={() => setPendingTakeover(false)}>{t("Отмена")}</button></section></div>}
   </div>;
 }

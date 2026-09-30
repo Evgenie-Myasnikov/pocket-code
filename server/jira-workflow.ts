@@ -5,10 +5,11 @@ import { HttpError } from './security.js';
 import type { JiraIssue, JiraService, JiraTransition } from './jira.js';
 import type { JobView } from './types.js';
 import { JiraPullRequests } from './jira-pr.js';
+import type { CodexAccess } from './codex-access.js';
 import { workflowActions, workflowStage, validateTransitionFields, type JiraRole } from './jira-workflow-actions.js';
 
 export type WorkflowLink = { provider: 'claude' | 'codex'; cwd: string; role: JiraRole; jobId?: string; sessionId?: string; pr?: { url: string; number: number } };
-export type WorkflowInput = { id: string; site: string; key: string; provider: 'claude' | 'codex'; role: JiraRole; action: string; cwd: string; mode: 'default' | 'plan'; maxBudgetUsd: number; transitionId?: string; fields?: Record<string, unknown>; pullRequest?: { title: string; body: string; base: string; head: string; headSha: string } };
+export type WorkflowInput = { id: string; site: string; key: string; provider: 'claude' | 'codex'; role: JiraRole; action: string; cwd: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; transitionId?: string; fields?: Record<string, unknown>; pullRequest?: { title: string; body: string; base: string; head: string; headSha: string } };
 type Operation = { id: string; signature: string; action: string; source: string; cwd: string; role: JiraRole; transition?: JiraTransition; phase: 'prepared' | 'pr_pending' | 'pr_done' | 'transition_pending' | 'transition_done' | 'job_pending' | 'done'; jobId?: string; previousSession?: string; aliases?: string[]; pullRequest?: WorkflowInput['pullRequest'] };
 type RecordEntry = { site: string; key: string; provider: 'claude' | 'codex'; link?: WorkflowLink; links?: Partial<Record<JiraRole, WorkflowLink>>; pr?: WorkflowLink['pr']; prCwd?: string; operation?: Operation; completed: string[]; abandoned?: string[] };
 const canonical = (value: any): any => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().filter(key => value[key] !== undefined).map(key => [key, canonical(value[key])])) : value;

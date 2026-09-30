@@ -32,7 +32,7 @@ test('a newer release invalidates a previously downloaded APK and install is bou
   await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');
   await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
   await page.getByRole('button', { name: 'Connect computer', exact: true }).click();
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();await page.getByRole('button',{name:'Updates',exact:true}).click();
   await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
   await page.getByRole('button', { name: 'Download update', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Install update', exact: true })).toBeVisible();

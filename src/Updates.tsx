@@ -9,7 +9,7 @@ import pkg from '../package.json';
 import { Installer } from './native-update';
 export function Updates({ connection, expanded }: {connection:Connection|null;expanded:boolean}) {
   const [auto, setAuto] = useState(() => {try{return localStorage.getItem('pocket-code-auto-updates-v1') !== 'false';}catch{return true;}});
-  const [current, setCurrent] = useState({version:pkg.version,versionCode:13});
+  const [current, setCurrent] = useState({version:pkg.version,versionCode:14});
   const [settingsSlot,setSettingsSlot] = useState<HTMLElement|null>(null);
   const [update, setUpdate] = useState<Update|null>(null), [busy, setBusy] = useState(''), [error,setError] = useState('');
   const [ready,setReady] = useState<Update|null>(null), [permission,setPermission] = useState(false), [checked,setChecked] = useState(false), [enabled,setEnabled] = useState(true);

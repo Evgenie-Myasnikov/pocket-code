@@ -4,8 +4,9 @@ import path from 'node:path';
 import { HttpError } from './security.js';
 import type { JobView } from './types.js';
 import type { JiraRole } from './jira-workflow-actions.js';
+import type { CodexAccess } from './codex-access.js';
 
-export type QueueItem = { id: string; site: string; key: string; cwd: string; role?: JiraRole; mode: 'default' | 'plan'; maxBudgetUsd: number; status: 'queued' | 'running' | 'done' | 'error' | 'stopped'; jobId?: string; sessionId?: string; error?: string };
+export type QueueItem = { id: string; site: string; key: string; cwd: string; role?: JiraRole; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; status: 'queued' | 'running' | 'done' | 'error' | 'stopped'; jobId?: string; sessionId?: string; error?: string };
 export class JiraQueue {
   private items: QueueItem[] = [];
   private paused = true;
@@ -33,13 +34,13 @@ export class JiraQueue {
   }
   private async check() { await this.ready; if (this.restoreError) throw new HttpError(500, 'Не удалось прочитать сохранённую очередь Jira. Проверьте файл очереди на ПК.'); }
   async view() { await this.check(); return { paused: this.paused, items: this.items }; }
-  async add(input: { batchId: string; site: string; keys: string[]; cwd: string; role?: JiraRole; mode: 'default' | 'plan'; maxBudgetUsd: number }) {
+  async add(input: { batchId: string; site: string; keys: string[]; cwd: string; role?: JiraRole; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number }) {
     await this.check();
     if (this.batches.includes(input.batchId)) return this.view();
     const keys = [...new Set(input.keys)].filter(key => !this.items.some(i => i.site === input.site && i.key === key && ['queued', 'running'].includes(i.status)));
     if (this.items.filter(i => ['queued', 'running'].includes(i.status)).length + keys.length > 5000) throw new HttpError(400, 'В очереди может быть до 5000 задач. Дождитесь завершения части очереди.');
     this.items = this.items.filter(i => ['queued', 'running'].includes(i.status)).concat(this.items.filter(i => !['queued', 'running'].includes(i.status)).slice(-200));
-    this.items.push(...keys.map(key => ({ id: randomUUID(), site: input.site, key, cwd: input.cwd, ...(input.role ? { role: input.role } : {}), mode: input.mode, maxBudgetUsd: input.maxBudgetUsd, status: 'queued' as const })));
+    this.items.push(...keys.map(key => ({ id: randomUUID(), site: input.site, key, cwd: input.cwd, ...(input.role ? { role: input.role } : {}), mode: input.mode, codexAccess: input.codexAccess, maxBudgetUsd: input.maxBudgetUsd, status: 'queued' as const })));
     this.batches = [...this.batches, input.batchId].slice(-500);
     await this.save(); this.paused = false; void this.tick().catch(() => { this.paused = true; }); return this.view();
   }

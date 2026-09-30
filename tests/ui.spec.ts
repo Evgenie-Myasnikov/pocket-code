@@ -26,17 +26,17 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await page.getByRole('button', { name: /К новым сообщениям/ }).click();
   await expect(page.getByText('History message 149.', { exact: false })).toBeVisible();
   await page.locator('.mobile-nav').getByRole('button', { name: 'Настройки', exact: true }).click();
-  await page.getByLabel('Тема', { exact: true }).selectOption('light');
+  await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await page.getByLabel('Тема', { exact: true }).selectOption('light');
   await page.getByRole('button', { name: 'Океан', exact: false }).click();
   await page.getByLabel('Размер текста чата', { exact: true }).focus(); await page.keyboard.press('End');
   await page.getByLabel('Масштаб интерфейса', { exact: true }).focus(); await page.keyboard.press('End');
   await page.getByLabel('Компактные отступы').check();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('.settings-panel').evaluate(el => { el.scrollTop = 0; });
+  await page.locator('.settings-content').evaluate(el => { el.scrollTop = 0; });
   await page.screenshot({ path: 'artifacts/screenshots/appearance-mobile.png', fullPage: true });
   await page.reload();
   await page.locator('.mobile-nav').getByRole('button', { name: 'Настройки', exact: true }).click();
-  await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('light');
+  await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('light');
   await expect(page.getByRole('button', { name: /Океан/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByLabel('Размер текста чата', { exact: true })).toHaveValue('22');
   await expect(page.getByLabel('Масштаб интерфейса', { exact: true })).toHaveValue('130');
@@ -81,7 +81,7 @@ test('mobile connection screen and clearly labeled demo', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: 'artifacts/screenshots/chat-mobile.png', fullPage: true });
   await page.locator('.mobile-nav').getByRole('button', { name: 'Настройки', exact: true }).click();
-  await expect(page.getByText('Отключить и забыть ключ')).toBeVisible();
+  await expect(page.getByText('Отключить и забыть')).toBeVisible();
 });
 
 test('desktop demo has readable chat and navigation', async ({ page }) => {
@@ -99,8 +99,8 @@ test('generated PC QR connects phone UI from an image without typing credentials
   await page.goto('http://127.0.0.1:5173');
   await expect(page.getByRole('button', { name: 'Сканировать QR-код', exact: true })).toBeVisible();
   await page.getByLabel('Изображение QR-кода').setInputFiles({ name: 'connection.png', mimeType: 'image/png', buffer: Buffer.from(encoded, 'base64') });
-  await expect(page.getByText('Тестовый ПК', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Интеграционный тест/ })).toBeVisible();
+  await page.locator('.mobile-nav').getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('button',{name:'Подключение к ПК',exact:true}).click();await expect(page.getByText('Тестовый ПК',{exact:true})).toBeVisible();
 });
 
 test('mobile connects, uploads, restores approval after reload and controls a real PTY', async ({ page, request }) => {

@@ -1,6 +1,6 @@
 {
   "name": "pocket-code",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Android companion for local Claude Code and Codex workspaces",
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
