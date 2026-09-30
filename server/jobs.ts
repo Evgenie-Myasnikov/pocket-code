@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { query, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { HttpError } from './security.js';
 import { normalize, type Approval, type JobView } from './types.js';
+import { updateClaudeAgents, updateClaudeAgentResults } from './subagents.js';
 
 type Run = typeof query;
 type Job = JobView & { controller: AbortController; pending: Map<string, (result: PermissionResult) => void> };
@@ -53,12 +54,18 @@ export class Jobs {
         canUseTool: async (tool, toolInput, options) => this.ask(job, tool, toolInput, options.signal),
       } });
       for await (const event of stream) {
+        updateClaudeAgents(job.messages, event);
+        // Forwarded child messages have their own session/deltas/results. They must
+        // neither replace the parent identity nor be appended to its transcript.
+        if ('parent_tool_use_id' in event && event.parent_tool_use_id) { job.revision++; continue; }
         if ('session_id' in event && event.session_id) job.sessionId = event.session_id;
+        updateClaudeAgentResults(job.messages, event);
         const msg = normalize(event);
         // The initial prompt is already visible; tool-result user events are kept.
         if (msg && !(msg.role === 'user' && msg.blocks.every(b => b.type === 'text'))) {
           const index = job.messages.findIndex(m => m.id === msg.id);
           if (index < 0) job.messages.push(msg); else job.messages[index] = msg;
+          for (const block of msg.blocks) if (block.type === 'subagent' && block.agent) block.agent.status = 'running';
           if (msg.role === 'assistant') job.partial = '';
         }
         if (event.type === 'stream_event' && event.event.type === 'content_block_delta' && event.event.delta.type === 'text_delta')
@@ -80,6 +87,8 @@ export class Jobs {
       if (job.status === 'error') job.error = error instanceof Error ? error.message : 'Не удалось запустить Claude';
       job.controller.abort();
     } finally {
+      // A missing completion event is not proof that a historical agent is active.
+      for (const block of job.messages.flatMap(m => m.blocks)) if (block.agent?.status === 'running') block.agent.status = job.status === 'stopped' ? 'stopped' : 'unknown';
       for (const resolve of [...job.pending.values()]) resolve({ behavior: 'deny', message: 'Задача завершена' });
       job.revision++;
     }

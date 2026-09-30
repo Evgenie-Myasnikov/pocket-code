@@ -49,6 +49,16 @@ test('API authenticates, scopes sessions, prevents path escapes and routes attac
     assert.equal((await request(`/sessions/${hidden}/messages`)).status, 404);
     assert.equal((await request('/file?path=' + encodeURIComponent(path.join(outside, 'private.txt')))).status, 403);
     assert.equal((await (await request('/file?path=' + encodeURIComponent(path.join(root, 'hello.txt')))).json()).text, 'Hello');
+    await writeFile(path.join(root,'AGENTS.md'),'# Project rules');
+    const docsQuery='?cwd='+encodeURIComponent(root);
+    assert.equal((await request('/project-docs'+docsQuery,undefined,'wrong')).status,401);
+    assert.equal((await request('/project-docs?cwd='+encodeURIComponent(outside))).status,403);
+    assert.equal((await (await request('/project-docs'+docsQuery)).json()).documents[0].path,'AGENTS.md');
+    assert.equal((await (await request('/project-doc'+docsQuery+'&path=AGENTS.md')).json()).content,'# Project rules');
+    assert.equal((await request('/project-doc'+docsQuery+'&path=../outside/private.txt')).status,400);
+    assert.equal((await request('/project-artifact'+docsQuery+'&path=hello.txt',undefined,'wrong')).status,401);
+    assert.equal((await (await request('/project-artifact'+docsQuery+'&path=hello.txt')).json()).text,'Hello');
+    assert.equal((await request('/project-artifact'+docsQuery+'&path=../outside/private.txt')).status,403);
     await symlink(outside, path.join(root, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
     await assert.rejects(allowedPath([root], path.join(root, 'escape/private.txt')), /разрешённых/);
     const upload = await (await request('/uploads', { cwd: root, name: '../../hello.txt', base64: Buffer.from('upload').toString('base64') })).json();

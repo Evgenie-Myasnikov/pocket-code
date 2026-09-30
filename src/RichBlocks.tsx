@@ -3,7 +3,7 @@ import { useModal } from './navigation';
 import { Capacitor } from '@capacitor/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Block } from '../server/types';
+import type { Block, SubagentView } from '../server/types';
 import { t } from './i18n';
 
 import {Installer as Documents} from './native-update';
@@ -31,14 +31,22 @@ function Document({block}:{block:Block}) {
   const title=block.title || t('Документ');
   return <section className="document-card"><strong>📎 {title}</strong>{source?.text && <pre>{source.text}</pre>}{pdf && (Capacitor.isNativePlatform()?<button className="secondary" onClick={()=>void Documents.openDocument({data:pdf,name:title}).catch(e=>setError(e.message))}>{t('Открыть PDF')}</button>:<a href={`data:application/pdf;base64,${pdf}`} download="document.pdf">{t('Скачать PDF')}</a>)}{safeWebUrl(source?.url) && <a href={safeWebUrl(source?.url)!} target="_blank" rel="noopener noreferrer">{t('Открыть документ')}</a>}{error && <p className="error">{t(error)}</p>}</section>;
 }
-export function RichBlock({block,depth=0}:{block:Block;depth?:number}) {
+function ToolResultContent({block,depth}:{block:Block;depth:number}) {
+  return <>{Array.isArray(block.content)?block.content.map((item:any,i:number)=>item && typeof item==='object' && typeof item.type==='string'?<RichBlock block={item} depth={depth+1} key={i}/>:<pre key={i}>{JSON.stringify(item,null,2)}</pre>):<Markdown text={typeof block.content==='string'?block.content:JSON.stringify(block.content,null,2)||''}/>}</>;
+}
+export function RichBlock({block,depth=0,result,onSubagent}:{block:Block;depth?:number;result?:Block;onSubagent?(agent:SubagentView):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;
   if(block.type==='text')return <Markdown text={block.text || ''}/>;
+  if(block.type==='subagent' && block.agent) {
+    const agent=block.agent,label=t(({running:'Работает',completed:'Завершён',error:'Ошибка',stopped:'Остановлен',unknown:'Статус неизвестен'} as const)[agent.status]);
+    return onSubagent?<button className={`subagent-card subagent-${agent.status}`} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span><span aria-hidden="true">→</span></button>:<details className="tool-card"><summary>{agent.name} · {label}</summary>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</details>;
+  }
   if(block.type==='image'){const src=imageSource(block);return src?<Picture src={src} alt={block.title||t('Изображение')}/>:<span className="attachment-chip">📎 {t('Изображение недоступно в сохранённой истории')}</span>;}
   if(block.type==='document')return <Document block={block}/>;
-  if(block.type==='tool_result')return <details className={`tool-card result ${block.is_error?'failed':''}`}><summary>{block.is_error?t('Ошибка инструмента'):t('Результат инструмента')}</summary>{Array.isArray(block.content)?block.content.map((item:any,i:number)=>item && typeof item==='object' && typeof item.type==='string'?<RichBlock block={item} depth={depth+1} key={i}/>:<pre key={i}>{JSON.stringify(item,null,2)}</pre>):<Markdown text={typeof block.content==='string'?block.content:JSON.stringify(block.content,null,2)||''}/>}</details>;
+  if(block.type==='tool_result')return <details className={`tool-card result ${block.is_error?'failed':''}`}><summary>{block.is_error?t('Ошибка инструмента'):t('Результат инструмента')}</summary><ToolResultContent block={block} depth={depth}/></details>;
+  if(block.type==='tool_use' && result)return <details className={`tool-card combined ${result.is_error?'failed':''}`}><summary><strong>{block.name}</strong><span>{result.is_error?t('Ошибка инструмента'):t('Результат инструмента')}</span></summary><pre>{JSON.stringify(block.input,null,2)}</pre><div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div></details>;
   if(block.type==='tool_use')return <details className="tool-card"><summary><strong>{block.name}</strong> · {t('Вызов инструмента')}</summary><pre>{JSON.stringify(block.input,null,2)}</pre></details>;
   if(block.type==='thinking')return <details className="thinking"><summary>{t('Рассуждения')}</summary><p>{block.thinking}</p></details>;
   if(block.type==='redacted_thinking')return <p className="muted">{t('Этот блок размышлений скрыт провайдером')}</p>;
-  return <details className="tool-card"><summary>{t('Дополнительные данные')} · {block.type}</summary><pre>{JSON.stringify(block,null,2)}</pre></details>;
+  return <details className="tool-card"><summary>{block.type==='codexItem'?t('Подробности действия'):<>{t('Дополнительные данные')} · {block.type}</>}</summary><pre>{JSON.stringify(block,null,2)}</pre></details>;
 }

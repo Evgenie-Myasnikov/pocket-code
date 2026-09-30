@@ -17,7 +17,7 @@ function load(): Appearance {
     const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
     return { palette: palettes.some((p) => p.id === data.palette) ? data.palette : defaults.palette,
       theme: ['dark', 'light', 'system'].includes(data.theme) ? data.theme : defaults.theme,
-      textSize: bounded(data.textSize, 8, 22, 14), scale: bounded(data.scale, 60, 120, 100),
+      textSize: bounded(data.textSize, 8, 22, 14), scale: bounded(data.scale, 60, 130, 100),
       spacing: bounded(data.spacing, 1.1, 2.2, 1.85), compact: data.compact === true };
   } catch {return defaults;}
 }
@@ -45,7 +45,7 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
     <label>{t("Тема")}<select aria-label={t("Тема")} value={appearance.theme} onChange={(e) => setAppearance((p) => ({ ...p, theme: e.target.value as Appearance['theme'] }))}><option value="dark">{t("Тёмная")}</option><option value="light">{t("Светлая")}</option><option value="system">{t("Как на устройстве")}</option></select></label>
     <fieldset className="palette-field"><legend>{t("Цветовая палитра")}</legend><div className="palette-options">{palettes.map((p) => <button type="button" key={p.id} aria-pressed={appearance.palette === p.id} onClick={() => setAppearance((old) => ({ ...old, palette: p.id }))}><span style={{ background: p.color }} />{t(p.name)}{appearance.palette === p.id && <b aria-hidden="true">✓</b>}</button>)}</div></fieldset>
     <label>{t("Размер текста чата ")}<output>{appearance.textSize} px</output><input aria-label={t("Размер текста чата")} type="range" min="8" max="22" step="1" value={appearance.textSize} onChange={(e) => setAppearance((p) => ({ ...p, textSize: Number(e.target.value) }))} /></label>
-    <label>{t("Масштаб интерфейса ")}<output>{appearance.scale}%</output><input aria-label={t("Масштаб интерфейса")} type="range" min="60" max="120" step="5" value={appearance.scale} onChange={(e) => setAppearance((p) => ({ ...p, scale: Number(e.target.value) }))} /></label>
+    <label>{t("Масштаб интерфейса ")}<output>{appearance.scale}%</output><input aria-label={t("Масштаб интерфейса")} type="range" min="60" max="130" step="5" value={appearance.scale} onChange={(e) => setAppearance((p) => ({ ...p, scale: Number(e.target.value) }))} /></label>
     <label>{t("Межстрочный интервал ")}<output>{appearance.spacing.toFixed(2)}</output><input aria-label={t("Межстрочный интервал")} type="range" min="1.1" max="2.2" step="0.05" value={appearance.spacing} onChange={(e) => setAppearance((p) => ({ ...p, spacing: Number(e.target.value) }))} /></label>
     <label className="compact-toggle"><input type="checkbox" checked={appearance.compact} onChange={(e) => setAppearance((p) => ({ ...p, compact: e.target.checked }))} />{t("Компактные отступы")}</label>
     <div className="appearance-preview"><span className="eyebrow">{t("ПРИМЕР СООБЩЕНИЯ")}</span><p>{t("Так будет выглядеть ваш чат с Claude.")}</p><button type="button" className="primary" onClick={() => setAppearance({ ...defaults })}>{t("Сбросить оформление")}</button></div>

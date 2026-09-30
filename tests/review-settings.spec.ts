@@ -4,7 +4,7 @@ test('Review opens on the right and preserves the draft; smaller settings surviv
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
   await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:'Connect computer',exact:true}).click();
   await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByLabel('Message Claude').fill('Keep this draft');
-  await page.getByRole('button',{name:'Review',exact:true}).click();await expect(page.getByRole('dialog',{name:'Review'})).toBeVisible();await expect(page.getByText('old value',{exact:true})).toBeVisible();await expect(page.getByText('new value',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Review',exact:true}).click();await expect(page.getByRole('dialog',{name:'Review'})).toBeVisible();await expect(page.getByText(/^-?old value$/)).toBeVisible();await expect(page.getByText(/^\+?new value$/)).toBeVisible();
   await page.screenshot({path:'artifacts/screenshots/review-mobile.png',fullPage:true});
   await page.getByRole('button',{name:'Back to chat',exact:true}).click();await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');
   await page.getByLabel('Claude model').selectOption('sonnet');

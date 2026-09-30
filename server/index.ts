@@ -28,7 +28,8 @@ let updateRepo = process.env.POCKET_UPDATE_REPO;
 if (!updateRepo) { try { updateRepo = JSON.parse(await readFile(path.join(local, 'updates.json'), 'utf8')).repository; } catch {} }
 const updater = new ReleaseUpdater(updateRepo, path.join(local, 'updates'));
 const codex = new CodexService(roots, { attachmentRoots: [path.join(local, 'uploads')] });
-const { app, jobs, terminals, queue, codexQueue } = await createApp({ codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira });
+const { app, jobs, terminals, queue, codexQueue, workflow } = await createApp({ codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira });
+const workflowTimer = setInterval(() => void workflow?.sync().catch(() => {}), 2000); workflowTimer.unref();
 let tunnel: Awaited<ReturnType<typeof startInternetTunnel>> | undefined;
 let closing = false;
 async function showPairing() {
@@ -55,5 +56,5 @@ const server = app.listen(port, host, () => {
     if (a.family === 'IPv4' && !a.internal) console.log(`Адрес для телефона: http://${a.address}:${port}`);
   void showPairing().catch(error => console.error(error.message || 'Не удалось создать QR-код.'));
 });
-function shutdown() { closing = true; queue?.close(); codexQueue?.close(); codex.close(); void jira.close(); tunnel?.close(); jobs.close(); terminals.close(); server.close(); setTimeout(() => process.exit(0), 2000).unref(); }
+function shutdown() { closing = true; clearInterval(workflowTimer); void workflow?.sync().catch(() => {}); queue?.close(); codexQueue?.close(); codex.close(); void jira.close(); tunnel?.close(); jobs.close(); terminals.close(); server.close(); setTimeout(() => process.exit(0), 2000).unref(); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);

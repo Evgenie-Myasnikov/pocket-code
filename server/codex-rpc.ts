@@ -4,6 +4,19 @@ import { EventEmitter } from 'node:events';
 import path from 'node:path';
 
 export type RpcEnvelope = { id?: string | number; method?: string; params?: any; result?: any; error?: { code?: number; message?: string } };
+export const CODEX_THREAD_BUSY = 'This chat is open in Codex on the PC. Its history is available here, but Codex must release the chat before you can send a message. Finish the task and close Codex on the PC, then try again.';
+export class CodexRequestError extends Error {
+  readonly errorCode?: 'codex_thread_busy';
+  readonly code?: number;
+  constructor(readonly method: string, error: NonNullable<RpcEnvelope['error']>) {
+    const busy = method === 'thread/resume' && error.code === -32600 && /^thread [a-zA-Z0-9_-]{1,128} already has an active writer\.?$/.test(error.message?.trim() || '');
+    // Only a recognized protocol condition may become a public explanation. Raw
+    // error messages can contain local paths, account data or private config.
+    super(busy ? CODEX_THREAD_BUSY : `Codex rejected ${method} (${error.code ?? 'unknown'}).`);
+    this.name = 'CodexRequestError'; this.code = error.code;
+    if (busy) this.errorCode = 'codex_thread_busy';
+  }
+}
 export interface CodexRpc {
   request(method: string, params: unknown): Promise<any>;
   notify(method: string, params?: unknown): void;
@@ -45,7 +58,7 @@ export class StdioCodexRpc extends EventEmitter implements CodexRpc {
   private buffer = '';
   private sequence = 0;
   private ended = false;
-  private pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
+  private pending = new Map<number, { method: string; resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
   constructor(executable: string, private timeoutMs = 45000) {
     super();
     this.child = spawn(executable, ['app-server', '--listen', 'stdio://'], { windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -77,8 +90,7 @@ export class StdioCodexRpc extends EventEmitter implements CodexRpc {
       const pending = this.pending.get(message.id);
       if (!pending) continue;
       clearTimeout(pending.timer); this.pending.delete(message.id);
-      // Error bodies may contain private config. Deliberately expose only protocol error codes.
-      if (message.error) pending.reject(Object.assign(new Error(`Codex rejected the request (${message.error.code ?? 'unknown'}).`), { code: message.error.code }));
+      if (message.error) pending.reject(new CodexRequestError(pending.method, message.error));
       else pending.resolve(message.result);
     }
   }
@@ -89,7 +101,7 @@ export class StdioCodexRpc extends EventEmitter implements CodexRpc {
         // A timed-out mutation might still execute. Close the transport so it cannot run unobserved.
         this.disconnect(new Error(`Codex did not respond to ${method} in time.`)); this.child.kill();
       }, this.timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { method, resolve, reject, timer });
       try { this.send({ id, method, params }); } catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
     });
   }

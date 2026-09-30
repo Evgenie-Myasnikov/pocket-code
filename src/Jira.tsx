@@ -6,6 +6,9 @@ import type { JiraIssue, JiraSite } from '../server/jira';
 import type { JobView } from '../server/types';
 import type { QueueItem } from '../server/jira-queue';
 import './jira.css';
+import {useModal} from './navigation';
+import {JiraWorkflow,type JiraLink} from './JiraWorkflow';
+import {useJiraRole,setJiraRole,jiraRoleLabel,jiraStartLabel,type JiraRole} from './jira-preferences';
 
 const Login = registerPlugin<{
   prepare(): Promise<{redirectUrl: string;}>;
@@ -14,6 +17,7 @@ const Login = registerPlugin<{
 }>('JiraLogin');
 type Status = {error?: string;source?: 'claude';connected: boolean;sites: JiraSite[];};
 export function JiraSettings({ connection }: {connection: Connection | null;}) {
+  const role=useJiraRole();
   const [status, setStatus] = useState<Status | null>(null),[busy, setBusy] = useState(false),[error, setError] = useState('');
   const attempt = useRef(0);
   useEffect(() => {
@@ -52,111 +56,93 @@ export function JiraSettings({ connection }: {connection: Connection | null;}) {
     {!status?.connected && !busy && <button className="primary" disabled={!connection} onClick={() => void connect()}><Link2 size={16} />{status?.source === "claude" ? t("Использовать подключение Claude") : "Connect"}</button>}
     {(status?.connected || busy || error) && <button className="secondary" onClick={() => void disconnect()}>{busy ? t("Отменить вход") : status?.connected ? t("Отключить Jira") : t("Сбросить вход")}</button>}
     <p className="muted">{status?.source === "claude" ? t("Чтение задач использует Claude на ПК и его лимиты. Отключение здесь не отключает коннектор в Claude.") : t("Доступ хранится на ПК в защищённом хранилище Windows. Отключение удаляет его из Pocket Code; разрешение Atlassian можно отозвать в настройках аккаунта.")}</p>
+    <label className="jira-role-setting">{t('Роль в Jira')}<select value={role} onChange={event=>setJiraRole(event.target.value as JiraRole)}>{(['developer','reviewer','qa'] as const).map(item=><option key={item} value={item}>{t(jiraRoleLabel(item))}</option>)}</select></label><p className="muted">{t('Роль определяет доступные действия в задачах. Права вашего аккаунта Jira остаются прежними.')}</p>
   </section>;
 }
-const stateLabels = { running: 'Claude работает', done: 'Работа завершена', error: 'Ошибка выполнения', stopped: 'Остановлено' };
-export function JiraJobs({ connection, roots, jobs, budget, onOpen, onSettings, provider = 'claude' }: {provider?: 'claude' | 'codex';connection: Connection | null;roots: string[];jobs: JobView[];budget: number;onOpen(job: JobView): void;onSettings(): void;}) {
-  const [status, setStatus] = useState<Status | null>(null),[site, setSite] = useState(''),[issues, setIssues] = useState<JiraIssue[]>([]);
-  const [next, setNext] = useState<string | null>(null),[error, setError] = useState(''),[busy, setBusy] = useState(false),[starting, setStarting] = useState('');
-  const [checked, setChecked] = useState<Set<string>>(new Set()),[batchBusy, setBatchBusy] = useState(false);
-  const batchId = useRef<{signature: string;id: string;} | null>(null);
-  const [queue, setQueue] = useState<{paused: boolean;items: QueueItem[];} | null>(null);
-  const [cwd, setCwd] = useState(roots[0] || ''),[mode, setMode] = useState<'default' | 'plan'>('default'),[updated, setUpdated] = useState(0),[selected, setSelected] = useState<JiraIssue | null>(null);
-  const epoch = useRef(0),loading = useRef(false),alive = useRef(true),startId = useRef<{signature: string;id: string;} | null>(null);
-  const refreshRef = useRef<() => Promise<void>>(async () => {});
-  useEffect(() => {alive.current = true;return () => {alive.current = false;epoch.current++;};}, []);
-  useEffect(() => {
-    if (!connection) return;
-    let cancelled = false,timer: ReturnType<typeof setTimeout>;
-    async function poll() {try {const data = await request<{paused: boolean;items: QueueItem[];}>(connection!, '/jira/queue' + (provider === 'codex' ? '?provider=codex' : ''));if (!cancelled) setQueue(data);} catch {}if (!cancelled) timer = setTimeout(poll, 2000);}
-    void poll();return () => {cancelled = true;clearTimeout(timer);};
-  }, [connection, provider]);
-  useEffect(() => {
-    if (!connection) return;
-    let cancelled = false;
-    request<Status>(connection, '/jira/status').then((s) => {if (!cancelled) {setStatus(s);setError(s.error || '');setSite(s.sites[0]?.id || '');}}).catch((e) => {if (!cancelled) setError(e.message);});
-    return () => {cancelled = true;};
-  }, [connection]);
-  async function refresh(cursor?: string) {
-    if (!connection || !site || loading.current) return;
-    loading.current = true;setBusy(true);const current = epoch.current;
-    try {
-      const data = await request<{issues: JiraIssue[];next: string | null;}>(connection, `/jira/issues?site=${encodeURIComponent(site)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
-      if (!alive.current || current !== epoch.current) return;
-      setIssues((old) => cursor ? [...new Map([...old, ...data.issues].map((i) => [i.key, i])).values()] : data.issues);
-      setNext(data.next);setError('');setUpdated(Date.now());
-      setSelected((old) => old ? data.issues.find((i) => i.key === old.key) || old : null);
-    } catch (e) {if (alive.current && current === epoch.current) setError((e as Error).message);} finally
-    {loading.current = false;if (alive.current) {setBusy(false);if (current !== epoch.current) void refreshRef.current();}}
+export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provider='claude',onOpenLinked}:{provider?:'claude'|'codex';connection:Connection|null;roots:string[];jobs:JobView[];budget:number;onOpen(job:JobView):void;onSettings():void;onOpenLinked?(link:JiraLink):void}){
+  const role=useJiraRole();
+  const [status,setStatus]=useState<Status|null>(null),[site,setSite]=useState(''),[issues,setIssues]=useState<JiraIssue[]>([]),[next,setNext]=useState<string|null>(null);
+  const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[category,setCategory]=useState(''),[updated,setUpdated]=useState(0);
+  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[batchBusy,setBatchBusy]=useState(false),[controlBusy,setControlBusy]=useState(false);
+  const [checked,setChecked]=useState<Map<string,JiraIssue>>(new Map()),[selecting,setSelecting]=useState(false),[selected,setSelected]=useState<JiraIssue|null>(null);
+  const [queue,setQueue]=useState<{paused:boolean;items:QueueItem[]}|null>(null),[queueOpen,setQueueOpen]=useState(false),[batchOpen,setBatchOpen]=useState(false);
+  const [cwd,setCwd]=useState(roots[0]||''),[mode,setMode]=useState<'default'|'plan'>('default');
+  const epoch=useRef(0),loading=useRef<symbol|null>(null),alive=useRef(true),batchId=useRef<{signature:string;id:string}|null>(null),refreshRef=useRef<()=>Promise<void>>(async()=>{}),dialog=useRef<HTMLElement|null>(null);
+  useModal(dialog,batchOpen,()=>{if(!batchBusy)setBatchOpen(false);});
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;epoch.current++;};},[]);
+  useEffect(()=>{const timer=setTimeout(()=>setQuery(search.trim()),400);return()=>clearTimeout(timer);},[search]);
+  useEffect(()=>{
+    setStatus(null);setSite('');setChecked(new Map());setSelected(null);setQueue(null);setBatchOpen(false);setSelecting(false);epoch.current++;
+    if(!connection)return;let cancelled=false;
+    request<Status>(connection,'/jira/status').then(value=>{if(!cancelled){setStatus(value);setSite(value.sites[0]?.id||'');setError(value.error||'');}}).catch(e=>{if(!cancelled)setError(e.message);});
+    return()=>{cancelled=true;};
+  },[connection]);
+  useEffect(()=>{setChecked(new Map());setSelected(null);setBatchOpen(false);batchId.current=null;},[site]);
+  useEffect(()=>{
+    if(!connection)return;let cancelled=false,timer:ReturnType<typeof setTimeout>;
+    async function poll(){try{const value=await request<{paused:boolean;items:QueueItem[]}>(connection!,'/jira/queue'+(provider==='codex'?'?provider=codex':''));if(!cancelled)setQueue(value);}catch{/* Queue refresh must not block browsing issues. */}if(!cancelled)timer=setTimeout(poll,3000);}
+    void poll();return()=>{cancelled=true;clearTimeout(timer);};
+  },[connection,provider]);
+  const issueUrl=(cursor?:string)=>{const params=new URLSearchParams({site});if(query)params.set('search',query);if(category){const [filter,value]=category.split(':');params.set(filter,value);}if(cursor)params.set('cursor',cursor);return '/jira/issues?'+params;};
+  async function refresh(cursor?:string){
+    if(!connection||!site||loading.current)return;
+    const current=epoch.current,requestId=Symbol();loading.current=requestId;setBusy(true);
+    try{
+      let pageCursor=cursor,data:{issues:JiraIssue[];next:string|null},pages=0;const seen=new Set<string>();
+      do{
+        data=await request(connection,issueUrl(pageCursor));if(!alive.current||current!==epoch.current)return;
+        if(data.next&&seen.has(data.next))throw new Error(t('Jira повторила страницу. Попробуйте обновить список.'));
+        if(data.next)seen.add(data.next);pageCursor=data.next||undefined;pages++;
+      }while(!data.issues.length&&data.next&&pages<20);
+      setIssues(old=>[...new Map([...(cursor?old:[]),...data.issues].map(issue=>[issue.key,issue])).values()]);setNext(data.next);setUpdated(Date.now());setError('');
+    }catch(e){if(alive.current&&current===epoch.current)setError((e as Error).message);}
+    finally{if(loading.current===requestId){loading.current=null;if(alive.current)setBusy(false);}}
   }
-  refreshRef.current = () => refresh();
-  useEffect(() => {
-    ++epoch.current;setIssues([]);setNext(null);setSelected(null);setChecked(new Set());
-    void refreshRef.current();const timer = setInterval(() => void refreshRef.current(), 60000);
-    return () => {clearInterval(timer);epoch.current++;};
-  }, [site]);
-  async function selectAll() {
-    if (!connection || !site || batchBusy || busy) return;
-    const current = epoch.current;setBatchBusy(true);setError('');
-    try {
-      let cursor: string | null = null;const all = new Map<string, JiraIssue>(),cursors = new Set<string>();
-      do {
-        const data: {issues: JiraIssue[];next: string | null;} = await request(connection, `/jira/issues?site=${encodeURIComponent(site)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
-        if (!alive.current || current !== epoch.current) return;
-        for (const issue of data.issues) all.set(issue.key, issue);
-        if (all.size > 5000) throw new Error(t("Найдено более 5000 задач. Выберите меньшую пачку."));
-        cursor = data.next;
-        if (cursor && cursors.has(cursor)) throw new Error(t("Jira повторила страницу. Попробуйте обновить список."));
-        if (cursor) cursors.add(cursor);
-      } while (cursor);
-      setIssues([...all.values()]);setNext(null);setChecked(new Set(all.keys()));setUpdated(Date.now());
-    } catch (e) {if (alive.current) setError((e as Error).message);} finally
-    {if (alive.current) setBatchBusy(false);}
+  refreshRef.current=()=>refresh();
+  useEffect(()=>{
+    epoch.current++;loading.current=null;setIssues([]);setNext(null);void refreshRef.current();
+    const timer=setInterval(()=>void refreshRef.current(),60000);return()=>{clearInterval(timer);epoch.current++;};
+  },[connection,site,query,category]);
+  async function selectAll(){
+    if(!connection||!site||busy||batchBusy||search.trim()!==query)return;
+    const current=epoch.current;setBatchBusy(true);setError('');
+    try{
+      let cursor:string|undefined;const all=new Map<string,JiraIssue>(),seen=new Set<string>();
+      do{const data:{issues:JiraIssue[];next:string|null}=await request(connection,issueUrl(cursor));if(!alive.current||current!==epoch.current)return;
+        data.issues.forEach(issue=>all.set(issue.key,issue));if(all.size>5000)throw new Error(t('Найдено более 5000 задач. Выберите меньшую пачку.'));
+        cursor=data.next||undefined;if(cursor&&seen.has(cursor))throw new Error(t('Jira повторила страницу. Попробуйте обновить список.'));if(cursor)seen.add(cursor);
+      }while(cursor);
+      setIssues([...all.values()]);setNext(null);setChecked(old=>new Map([...old,...all]));setUpdated(Date.now());
+    }catch(e){if(alive.current&&current===epoch.current)setError((e as Error).message);}finally{if(alive.current)setBatchBusy(false);}
   }
-  async function enqueue() {
-    if (!connection || !checked.size || batchBusy || !cwd) return;
-    setBatchBusy(true);setError('');
-    const body = { provider, site, keys: [...checked].sort(), cwd, mode, maxBudgetUsd: budget },signature = JSON.stringify(body);
-    if (batchId.current?.signature !== signature) batchId.current = { signature, id: crypto.randomUUID() };
-    try {const data = await request<{paused: boolean;items: QueueItem[];}>(connection, '/jira/queue', { ...body, batchId: batchId.current.id });if (alive.current) {setQueue(data);setChecked(new Set());batchId.current = null;}}
-    catch (e) {if (alive.current) setError((e as Error).message);} finally
-    {if (alive.current) setBatchBusy(false);}
+  async function enqueue(){
+    if(!connection||!site||!checked.size||batchBusy||!cwd)return;
+    const current=epoch.current;setBatchBusy(true);setError('');
+    const body={provider,role,site,keys:[...checked.keys()].sort(),cwd,mode:role==='developer'?mode:'plan',maxBudgetUsd:budget},signature=JSON.stringify(body);
+    if(batchId.current?.signature!==signature)batchId.current={signature,id:crypto.randomUUID()};
+    try{const value=await request<{paused:boolean;items:QueueItem[]}>(connection,'/jira/queue',{...body,batchId:batchId.current.id});if(alive.current&&current===epoch.current){setQueue(value);setQueueOpen(true);setChecked(new Map());setSelecting(false);setBatchOpen(false);batchId.current=null;}}
+    catch(e){if(alive.current&&current===epoch.current)setError((e as Error).message);}finally{if(alive.current)setBatchBusy(false);}
   }
-  async function control(action: 'pause' | 'resume' | 'clear') {
-    if (!connection) return;
-    try {setQueue(await request(connection, '/jira/queue/control', { action, provider }));} catch (e) {setError((e as Error).message);}
+  async function control(action:'pause'|'resume'|'clear'){
+    if(!connection||controlBusy)return;setControlBusy(true);
+    try{setQueue(await request(connection,'/jira/queue/control',{action,provider}));}catch(e){setError((e as Error).message);}finally{if(alive.current)setControlBusy(false);}
   }
-  async function start(issue: JiraIssue) {
-    if (!connection || starting || !cwd) return;
-    setStarting(issue.key);setError('');
-    const signature = JSON.stringify({ provider, site, key: issue.key, cwd, mode });
-    if (startId.current?.signature !== signature) startId.current = { signature, id: crypto.randomUUID() };
-    try {
-      const job = await request<JobView>(connection, '/jira/start', { provider, id: startId.current.id, site, key: issue.key, cwd, mode, maxBudgetUsd: budget });
-      startId.current = null;if (alive.current) onOpen(job);
-    } catch (e) {if (alive.current) setError((e as Error).message);} finally
-    {if (alive.current) setStarting('');}
-  }
-  const related = (key: string) => jobs.filter((j) => j.jira?.site === site && j.jira.key === key).sort((a, b) => b.startedAt - a.startedAt)[0];
-  return <section className="jobs-panel"><div className="jobs-heading"><div><div className="eyebrow">JIRA → {provider.toUpperCase()}</div><h2>Jobs</h2></div><button className="secondary" disabled={busy || !site} onClick={() => void refresh()}><RefreshCw size={16} />{t("Обновить")}</button></div>
-    {error && <p role="alert" className="error">{t(error)}</p>}
-    {!connection || status?.connected === false ? <div className="jira-empty"><h3>{t("Подключите Jira")}</h3><p>{t("Войдите через Connect в настройках, чтобы загрузить назначенные вам задачи.")}</p><button className="primary" onClick={onSettings}>{t("Открыть настройки Jira")}</button></div> : !status ? <p className="muted">{t("Проверяем подключение Jira…")}</p> : <>
-      {!status.sites.length && <p className="muted">{t("У аккаунта нет доступных сайтов Jira. Проверьте доступ Atlassian MCP и подключитесь повторно в настройках.")}</p>}
-      {status.sites.length > 1 && <label>{t("Сайт Jira")}<select value={site} onChange={(e) => setSite(e.target.value)}>{status.sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
-      <p className="muted">{t("Все задачи, назначенные на вас · ")}{updated ? t("обновлено {0}", new Date(updated).toLocaleTimeString(locale())) : t("загрузка…")}</p>
-      <div className="jobs-run-options"><label>{t("Папка проекта для {0}", provider === "codex" ? "Codex" : "Claude")}<select aria-label={t("Папка проекта для {0}", provider === "codex" ? "Codex" : "Claude")} value={cwd} disabled={!!starting} onChange={(e) => setCwd(e.target.value)}>{roots.map((r) => <option key={r}>{r}</option>)}</select></label><label>{t("Действие")}<select value={mode} onChange={(e) => setMode(e.target.value as 'default' | 'plan')}><option value="default">{t("Выполнить задачу")}</option><option value="plan">{t("Сначала составить план")}</option></select></label></div>
-      <div className="jira-batch"><button className="secondary" disabled={busy || batchBusy || !site} onClick={() => void selectAll()}>{batchBusy ? t("Подождите…") : t("Выбрать все задачи")}</button><button className="text-button" disabled={!checked.size || batchBusy} onClick={() => setChecked(new Set())}>{t("Снять выбор")}</button><button className="primary" disabled={!checked.size || batchBusy || !cwd} onClick={() => void enqueue()}>{t("Отправить выбранные (")}{checked.size})</button></div>
-      {queue && queue.items.length > 0 && <section className="jira-queue" aria-label={t("Очередь задач")}><h3>{t("Очередь · ")}{queue.paused ? t("на паузе") : t("в работе")}</h3><p>{queue.items.filter((i) => i.status === 'queued').length}{t(" ожидают · ")}{queue.items.filter((i) => i.status === 'running').length}{t(" выполняется · ")}{queue.items.filter((i) => i.status === 'done').length}{t(" завершено")}</p><div className="jira-batch"><button className="secondary" onClick={() => void control(queue.paused ? 'resume' : 'pause')}>{queue.paused ? t("Продолжить очередь") : t("Пауза очереди")}</button><button className="text-button" onClick={() => void control('clear')}>{t("Убрать ожидающие")}</button></div><p className="muted">{t("Пауза действует после текущей задачи. После перезапуска сервера продолжение нужно включить вручную.")}</p>{queue.items.filter((i) => i.status === 'running' || i.status === 'error').slice(-10).map((i) => <p key={i.id}>{i.key} · {i.status === 'running' ? t("{0} работает", provider === "codex" ? "Codex" : "Claude") : t(i.error || "Ошибка")}{i.jobId && jobs.some((j) => j.id === i.jobId) && <button className="text-button" onClick={() => onOpen(jobs.find((j) => j.id === i.jobId)!)}>{t("Открыть чат")}</button>}</p>)}</section>}
-      <div className="jira-issues">{issues.map((issue) => {
-          const job = related(issue.key);
-          return <article className="jira-issue" key={issue.key}><div className="jira-issue-meta"><label className="jira-check"><input type="checkbox" aria-label={t("Выбрать {0}", issue.key)} checked={checked.has(issue.key)} disabled={batchBusy} onChange={(e) => setChecked((old) => {const next = new Set(old);e.target.checked ? next.add(issue.key) : next.delete(issue.key);return next;})} />{issue.key}</label><span>{issue.status}</span><span>{issue.priority}</span></div><button className="jira-issue-title" onClick={() => setSelected(selected?.key === issue.key ? null : issue)}>{issue.summary}</button>
-          {selected?.key === issue.key && <div className="jira-description"><p>{issue.description || t("Без описания")}</p><a href={issue.url} target="_blank" rel="noreferrer">{t("Открыть в Jira ")}<ExternalLink size={13} /></a></div>}
-          <div className="jira-issue-actions">{job && <button className="secondary" onClick={() => onOpen(job)}>{job.status === "running" ? t("{0} работает", provider === "codex" ? "Codex" : "Claude") : t(stateLabels[job.status])}{t(" · Открыть")}</button>}<button className="primary" disabled={!!starting || !cwd || job?.status === 'running'} onClick={() => void start(issue)}><Play size={14} />{starting === issue.key ? t("Запускаем…") : job ? t("Запустить ещё раз") : t("Взять в работу")}</button></div>
-        </article>;
-        })}</div>
-      {!busy && site && !issues.length && <p className="muted">{t("Назначенных вам задач не найдено.")}</p>}
-      {busy && <p role="status">{t("Загружаем задачи…")}</p>}{next && <button className="secondary" disabled={busy} onClick={() => void refresh(next)}>{t("Загрузить ещё задачи")}</button>}
-      <p className="muted">{t("«Взять в работу» запускает Claude в выбранной папке. Его ответ и запросы разрешений откроются в чате. Статус Jira автоматически не меняется.")}</p>
+  const stages=[['backlog','Backlog'],['open','Ready for development'],['development','In development'],['review','Code review'],['pr_review','PR review'],['waiting_qa','Ready for QA'],['qa','In QA'],['waiting_merge','Ready to merge'],['done','Done'],['closed','Closed']];
+  const related=(key:string)=>jobs.filter(job=>job.jira?.site===site&&job.jira.key===key).sort((a,b)=>b.startedAt-a.startedAt)[0];
+  if(connection&&selected)return <section className="jobs-panel"><JiraWorkflow connection={connection} site={site} issue={selected} provider={provider} role={role} roots={roots} budget={budget} jobs={jobs} onBack={()=>setSelected(null)} onOpen={onOpen} onOpenLinked={onOpenLinked} onChanged={issue=>{setSelected(old=>old?.key===issue.key?issue:old);setIssues(old=>old.map(item=>item.key===issue.key?issue:item));}}/></section>;
+  return <section className="jobs-panel"><div className="jobs-heading"><p className="eyebrow">{t('Назначено мне')} · {t(jiraRoleLabel(role))}</p><button className="icon-button" aria-label={t('Обновить задачи')} disabled={busy||!site} onClick={()=>void refresh()}><RefreshCw size={20}/></button></div>
+    {error&&!batchOpen&&<p className="error" role="alert">{t(error)}</p>}
+    {!connection||status?.connected===false?<div className="jira-empty"><h3>{t('Подключите Jira')}</h3><p>{t('Войдите через Connect в настройках, чтобы загрузить назначенные вам задачи.')}</p><button className="primary" onClick={onSettings}>{t('Открыть настройки Jira')}</button></div>:!status?<p className="muted" role="status">{t('Проверяем подключение Jira…')}</p>:<>
+      {!status.sites.length&&<p className="muted">{t('У аккаунта нет доступных сайтов Jira. Проверьте доступ Atlassian MCP и подключитесь повторно в настройках.')}</p>}
+      {status.sites.length>1&&<details className="jira-site-picker"><summary>{t('Сайт Jira')}: {status.sites.find(item=>item.id===site)?.name}</summary><label>{t('Сайт Jira')}<select aria-label={t('Сайт Jira')} value={site} disabled={batchBusy} onChange={event=>setSite(event.target.value)}>{status.sites.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label></details>}
+      <div className="jira-filters"><label>{t('Поиск задач')}<input type="search" value={search} disabled={batchBusy} placeholder={t('Ключ или название задачи')} onChange={event=>setSearch(event.target.value)}/></label><label>{t('Категория')}<select value={category} disabled={batchBusy} onChange={event=>setCategory(event.target.value)}><option value="">{t('Все назначенные')}</option><optgroup label={t('Тип задачи')}>{['Bug','Task','Story'].map(type=><option key={type} value={`type:${type}`}>{t(type)}</option>)}</optgroup><optgroup label={t('Этап работы')}>{stages.map(([id,label])=><option key={id} value={`stage:${id}`}>{t(label)}</option>)}</optgroup></select></label></div>
+      <div className="jira-list-toolbar"><p className="muted">{busy?t('Загружаем задачи…'):t('Найдено: {0}',issues.length)}{updated&&!busy?` · ${t('обновлено {0}',new Date(updated).toLocaleTimeString(locale()))}`:''}</p>{!selecting?<button className="text-button" disabled={!site||busy} onClick={()=>setSelecting(true)}>{t('Выбрать задачи')}</button>:<button className="text-button" disabled={batchBusy} onClick={()=>{setSelecting(false);setChecked(new Map());}}>{t('Отменить выбор')}</button>}</div>
+      {selecting&&<div className="jira-selection-controls"><button className="secondary" disabled={busy||batchBusy||!site||search.trim()!==query} onClick={()=>void selectAll()}>{batchBusy?t('Подождите…'):t('Выбрать все найденные')}</button><button className="text-button" disabled={!checked.size||batchBusy} onClick={()=>setChecked(new Map())}>{t('Снять выбор')}</button></div>}
+      {queue&&queue.items.length>0&&<details className="jira-queue" open={queueOpen} onToggle={event=>setQueueOpen(event.currentTarget.open)}><summary>{t('Очередь задач')} · {queue.items.filter(item=>item.status==='queued').length} {t('ожидают')} · {queue.paused?t('на паузе'):t('в работе')}</summary><p className="muted">{t('Пауза действует после текущей задачи. После перезапуска сервера продолжение нужно включить вручную.')}</p><div className="jira-batch"><button className="secondary" disabled={controlBusy} onClick={()=>void control(queue.paused?'resume':'pause')}>{queue.paused?t('Продолжить очередь'):t('Пауза очереди')}</button><button className="text-button" disabled={controlBusy} onClick={()=>void control('clear')}>{t('Убрать ожидающие')}</button></div>{queue.items.slice(-20).map(item=>{const linked=jobs.find(job=>job.id===item.jobId);return <div className="jira-queue-item" key={item.id}><span>{item.key} · {t(item.status==='queued'?'В очереди':item.status==='running'?'Выполняется':item.status==='done'?'Завершено':item.status==='stopped'?'Остановлено':'Ошибка')}</span>{item.error&&<p className="error">{t(item.error)}</p>}{(linked||item.sessionId&&onOpenLinked)&&<button className="text-button" onClick={()=>linked?onOpen(linked):onOpenLinked?.({provider,cwd:item.cwd,jobId:item.jobId,sessionId:item.sessionId})}>{t('Открыть чат')}</button>}</div>;})}</details>}
+      <div className="jira-issues">{issues.map(issue=>{const job=related(issue.key);return <article className="jira-issue" key={issue.key}><div className="jira-issue-meta">{selecting?<label className="jira-check"><input type="checkbox" aria-label={t('Выбрать {0}',issue.key)} checked={checked.has(issue.key)} disabled={batchBusy} onChange={event=>setChecked(old=>{const value=new Map(old);event.target.checked?value.set(issue.key,issue):value.delete(issue.key);return value;})}/>{issue.key}</label>:<span>{issue.key}</span>}<span>{issue.issueType}</span><span>{issue.status}</span></div><button className="jira-issue-title" onClick={()=>setSelected(issue)}>{issue.summary}</button>{job?.status==='running'&&<p className="muted">{t('{0} работает',provider==='codex'?'Codex':'Claude')}</p>}</article>;})}</div>
+      {busy&&<p role="status" className="muted">{t('Загружаем задачи…')}</p>}{!busy&&site&&!issues.length&&!next&&<p className="jira-empty">{t('По этому запросу задач не найдено.')}</p>}{next&&<button className="secondary jira-load-more" disabled={busy||batchBusy} onClick={()=>void refresh(next)}>{t('Загрузить ещё задачи')}</button>}
+      {selecting&&checked.size>0&&<div className="jira-selection-bar"><span>{t('Выбрано: {0}',checked.size)}</span><button className="primary" disabled={batchBusy} onClick={()=>{setBatchOpen(true);setError('');}}>{t('Продолжить')}</button></div>}
     </>}
+    {batchOpen&&<div className="modal-backdrop"><section ref={dialog} className="confirm-modal jira-batch-dialog" role="dialog" aria-modal="true" aria-label={t('Запустить выбранные задачи')}><h2>{t('Запустить задачи ({0})?',checked.size)}</h2><p>{t('Роль')}: <strong>{t(jiraRoleLabel(role))}</strong> · {t(jiraStartLabel(role))}</p><details><summary>{t('Выбранные задачи')}</summary><ul>{[...checked.values()].map(issue=><li key={issue.key}>{issue.key}: {issue.summary}</li>)}</ul></details><label>{t('Папка проекта для {0}',provider==='codex'?'Codex':'Claude')}<select aria-label={t('Папка проекта для {0}',provider==='codex'?'Codex':'Claude')} value={cwd} disabled={batchBusy} onChange={event=>setCwd(event.target.value)}>{roots.map(root=><option key={root}>{root}</option>)}</select></label>{role==='developer'?<label>{t('Действие')}<select value={mode} disabled={batchBusy} onChange={event=>setMode(event.target.value as 'default'|'plan')}><option value="default">{t('Выполнить задачу')}</option><option value="plan">{t('Сначала составить план')}</option></select></label>:<p className="muted">{t('Ревью и QA выполняются в режиме чтения. Агент анализирует проект без изменения файлов.')}</p>}<p className="muted">{t('Статус каждой задачи проверяется перед запуском. Недоступный шаг приостановит очередь. Одобрение ревью, QA и создание PR подтверждаются отдельно.')}</p>{error&&<p className="error" role="alert">{t(error)}</p>}<div className="jira-form-actions"><button className="text-button" disabled={batchBusy} onClick={()=>setBatchOpen(false)}>{t('Отмена')}</button><button className="primary" disabled={batchBusy||!cwd||!checked.size} onClick={()=>void enqueue()}>{batchBusy?t('Подождите…'):t('Запустить выбранные ({0})',checked.size)}</button></div></section></div>}
   </section>;
 }

@@ -39,7 +39,7 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('light');
   await expect(page.getByRole('button', { name: /Океан/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByLabel('Размер текста чата', { exact: true })).toHaveValue('22');
-  await expect(page.getByLabel('Масштаб интерфейса', { exact: true })).toHaveValue('120');
+  await expect(page.getByLabel('Масштаб интерфейса', { exact: true })).toHaveValue('130');
   await expect(page.getByLabel('Компактные отступы')).toBeChecked();
   await page.getByRole('button', { name: 'Сбросить оформление' }).click();
   await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('dark');

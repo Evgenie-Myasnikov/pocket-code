@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { allowedPath } from './security.js';
 import type { Block, ChatMessage } from './types.js';
+import { codexAgents } from './subagents.js';
 
 const imageTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
 function inlineImage(value: unknown): Block | null {
@@ -38,10 +39,14 @@ function outputBlocks(content: unknown): Block[] {
   });
 }
 /** Only the model's public reasoning summary is displayed, never internal reasoning content. */
-export async function codexMessage(item: any, roots: string[]): Promise<ChatMessage | null> {
+export async function codexMessage(item: any, roots: string[], live = false): Promise<ChatMessage | null> {
   if (!item || typeof item.id !== 'string') return null;
   let blocks: Block[] = [], role: ChatMessage['role'] = 'assistant';
   switch (item.type) {
+    case 'collabAgentToolCall': case 'subAgentActivity':
+      blocks = codexAgents(item, live).map(agent => ({ type: 'subagent', agent }));
+      if (!blocks.length) return null;
+      break;
     case 'userMessage':
       role = 'user';
       for (const part of item.content || []) {

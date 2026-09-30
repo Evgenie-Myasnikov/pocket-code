@@ -7,16 +7,85 @@ import { HttpError, validToken } from './security.js';
 import type { JiraStore } from './jira-vault.js';
 
 const endpoint = 'https://mcp.atlassian.com/v1/mcp';
-export type JiraIssue = { key: string; summary: string; description: string; status: string; priority: string; url: string; updated: string };
+export type JiraIssue = { key: string; summary: string; description: string; descriptionFormat?: 'markdown' | 'html' | 'text'; status: string; priority: string; url: string; updated: string; statusId?: string; issueType?: string; projectKey?: string; assigneeId?: string };
 export type JiraSite = { id: string; name: string; url: string };
+export type JiraIssueQuery = { search?: string; type?: string; stage?: string };
+export type JiraTransitionField = { name: string; required: boolean; schema: { type: string; items?: string; system?: string; custom?: string }; allowedValues?: any[]; hasDefaultValue?: boolean };
+export type JiraTransition = { id: string; name: string; to: { id?: string; name: string }; fields: Record<string, JiraTransitionField> };
+export const jiraIssueFields = ['summary', 'description', 'status', 'priority', 'updated', 'issuetype', 'project', 'assignee'];
+export const jiraStageAliases: Record<string, string[]> = {
+  backlog: ['Backlog', 'Бэклог', 'Беклог'],
+  open: ['Open', 'To Do', 'Открыта', 'Открыто', 'К выполнению'],
+  development: ['In Progress', 'In Development', 'В работе', 'В разработке'],
+  review: ['Review', 'Code Review', 'На ревью', 'Ревью'],
+  pr_review: ['PR Review', 'На ревью PR', 'PR Ревью'],
+  waiting_qa: ['Waiting for Check', 'Waiting for QA', 'Ready for QA', 'Ожидает проверки', 'Готова к проверке', 'Ждет проверки', 'Ждёт проверки'],
+  qa: ['On Check', 'In QA', 'In Testing', 'На проверке', 'Тестирование'],
+  waiting_merge: ['Waiting for Merge', 'Awaiting Merge', 'Ожидает слияния', 'Ожидает влитие'],
+  done: ['Done', 'Resolved', 'Готово', 'Решена', 'Выполнено'],
+  closed: ['Closed', 'Закрыта', 'Закрыто', 'Закрыто без решения'],
+};
+function queryText(value: string | undefined, max: number) {
+  if (value === undefined) return '';
+  if (typeof value !== 'string' || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) throw new HttpError(400, 'Invalid Jira filter.');
+  return value.trim();
+}
+const jqlString = (value: string) => '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+export function jiraIssuesJql(query: JiraIssueQuery = {}) {
+  const search = queryText(query.search, 200), type = queryText(query.type, 100), stage = queryText(query.stage, 30);
+  const clauses = ['assignee = currentUser()'];
+  if (search) clauses.push(/^[A-Z][A-Z0-9_]*-\d+$/i.test(search) ? `key = ${jqlString(search.toUpperCase())}` : `text ~ ${jqlString(search)}`);
+  if (type) clauses.push(`issuetype = ${jqlString(type)}`);
+  if (stage) {
+    if (!Object.hasOwn(jiraStageAliases, stage)) throw new HttpError(400, 'Unknown Jira workflow stage.');
+    // Jira rejects unknown status names. Aliases from other languages/workflows
+    // must be matched against returned statuses, not sent as JQL operands.
+  }
+  return clauses.join(' AND ') + ' ORDER BY updated DESC';
+}
+export function jiraMatchesStage(issue: JiraIssue, stage?: string) {
+  if (!stage) return true;
+  const aliases = Object.hasOwn(jiraStageAliases, stage) ? jiraStageAliases[stage] : undefined;
+  if (!aliases) throw new HttpError(400, 'Unknown Jira workflow stage.');
+  const normalize = (value: string) => value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase().replace(/ё/g, 'е');
+  return aliases.some(alias => normalize(alias) === normalize(issue.status));
+}
+export function jiraTransitions(raw: any): JiraTransition[] {
+  const data = raw?.data ?? raw;
+  const list = Array.isArray(data) ? data : data?.transitions;
+  if (!Array.isArray(list)) throw new HttpError(502, 'Jira returned an unexpected transition list.');
+  return list.filter((value: any) => value?.isAvailable !== false).map((value: any) => {
+    if (!value || !/^\d+$/.test(String(value.id)) || !value.to || (value.to.id !== undefined && !/^\d+$/.test(String(value.to.id))) || typeof value.name !== 'string' || typeof value.to.name !== 'string') throw new HttpError(502, 'Jira returned an invalid transition.');
+    const fields: Record<string, JiraTransitionField> = Object.create(null);
+    for (const [key, field] of Object.entries(value.fields || {}) as [string, any][]) {
+      if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key) || !field || typeof field !== 'object') continue;
+      fields[key] = { name: typeof field.name === 'string' ? field.name : key, required: field.required === true,
+        schema: { type: typeof field.schema?.type === 'string' ? field.schema.type : 'unknown',
+          ...Object.fromEntries(['items', 'system', 'custom'].filter(k => typeof field.schema?.[k] === 'string').map(k => [k, field.schema[k]])) },
+        ...(Array.isArray(field.allowedValues) ? { allowedValues: field.allowedValues } : {}),
+        ...(typeof field.hasDefaultValue === 'boolean' ? { hasDefaultValue: field.hasDefaultValue } : {}) };
+    }
+    // The existing Rovo connector returns destination names/category but omits
+    // destination IDs. Preserve that absence; only transition.id is executable.
+    return { id: String(value.id), name: value.name, to: { ...(value.to.id !== undefined ? { id: String(value.to.id) } : {}), name: value.to.name }, fields };
+  });
+}
+export function jiraTransitionArgs(site: string, key: string, transitionId: string, fields?: Record<string, unknown>) {
+  if (!/^[A-Z][A-Z0-9_]*-\d+$/i.test(key) || !/^\d{1,30}$/.test(transitionId)) throw new HttpError(400, 'Invalid Jira transition.');
+  if (fields !== undefined && (!fields || typeof fields !== 'object' || Array.isArray(fields) || Object.keys(fields).some(key => !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) || JSON.stringify(fields).length > 30000)) throw new HttpError(400, 'Invalid Jira transition fields.');
+  return { cloudId: site, issueIdOrKey: key, transitionId, ...(fields && Object.keys(fields).length ? { fields } : {}) };
+}
+export const jiraTransitionUncertain = 'Jira did not confirm the transition. Its status may already have changed. Refresh the issue and check it before trying again.';
 export interface JiraService {
   useExisting?(): Promise<{ connected: boolean; sites: JiraSite[] }>;
   status(): Promise<{ connected: boolean; sites: JiraSite[] }>;
   connect(redirect: string): Promise<{ authorizationUrl: string; state: string }>;
   finish(code: string, state: string, issuer?: string): Promise<void>;
   disconnect(): Promise<void>;
-  issues(site: string, cursor?: string): Promise<{ issues: JiraIssue[]; next: string | null }>;
+  issues(site: string, cursor?: string, query?: JiraIssueQuery): Promise<{ issues: JiraIssue[]; next: string | null }>;
   issue(site: string, key: string): Promise<JiraIssue>;
+  transitions?(site: string, key: string): Promise<JiraTransition[]>;
+  transition?(site: string, key: string, id: string, fields?: Record<string, unknown>): Promise<void>;
 }
 export function jiraText(value: any, depth = 0): string {
   if (depth > 30) return '';
@@ -30,7 +99,11 @@ export function jiraText(value: any, depth = 0): string {
 export function jiraIssue(raw: any, site: JiraSite): JiraIssue {
   if (!/^[A-Z][A-Z0-9_]*-\d+$/i.test(raw?.key || '')) throw new HttpError(502, 'Jira вернула неверную задачу');
   const f = raw.fields || raw;
-  return { key: raw.key, summary: String(f.summary || '').slice(0, 1000), description: jiraText(f.description), status: String(f.status?.name || ''), priority: String(f.priority?.name || ''), updated: String(f.updated || ''), url: `${site.url}/browse/${raw.key}` };
+  return { key: raw.key, summary: String(f.summary || '').slice(0, 1000), description: jiraText(f.description), descriptionFormat: raw.appliedContentFormat === 'html' ? 'html' : typeof f.description === 'string' ? 'markdown' : 'text', status: String(f.status?.name || (typeof f.status === 'string' ? f.status : '')), priority: String(f.priority?.name || (typeof f.priority === 'string' ? f.priority : '')), updated: String(f.updated || ''), url: `${site.url}/browse/${raw.key}`,
+    ...(f.status?.id !== undefined ? { statusId: String(f.status.id) } : {}),
+    ...(f.issuetype?.name ? { issueType: String(f.issuetype.name) } : {}),
+    ...(f.project?.key ? { projectKey: String(f.project.key) } : {}),
+    ...(f.assignee?.accountId ? { assigneeId: String(f.assignee.accountId) } : {}) };
 }
 export class AtlassianJira implements JiraService, OAuthClientProvider {
   private data: { client?: OAuthClientInformationMixed; tokens?: OAuthTokens; redirect?: string; sites?: JiraSite[] } = {};
@@ -101,7 +174,7 @@ export class AtlassianJira implements JiraService, OAuthClientProvider {
     })();
     return this.connected;
   }
-  private async call(name: string, args: Record<string, unknown>): Promise<any> {
+  private async call(name: string, args: Record<string, unknown>, mutation = false): Promise<any> {
     const client = await this.connection();
     try {
       const result = await client.callTool({ name, arguments: args }, undefined, { timeout: 25000 });
@@ -109,19 +182,29 @@ export class AtlassianJira implements JiraService, OAuthClientProvider {
       if (result.structuredContent) return result.structuredContent;
       const text = (result.content as any[])?.filter(c => c.type === 'text').map(c => c.text).join('\n');
       return JSON.parse(text || '{}');
-    } catch { throw new HttpError(502, 'Jira не вернула задачи. Проверьте права доступа и повторите обновление.'); }
+    } catch { throw new HttpError(502, mutation ? jiraTransitionUncertain : 'Jira не вернула задачи. Проверьте права доступа и повторите обновление.'); }
   }
   private site(id: string) { const site = this.data.sites?.find(s => s.id === id); if (!site) throw new HttpError(400, 'Выберите сайт Jira'); return site; }
-  async issues(id: string, cursor?: string) {
+  async issues(id: string, cursor?: string, query?: JiraIssueQuery) {
     await this.ready; const site = this.site(id);
-    const raw = await this.call('searchJiraIssuesUsingJql', { cloudId: id, jql: 'assignee = currentUser() ORDER BY updated DESC', maxResults: 50, fields: ['summary', 'description', 'status', 'priority', 'updated'], ...(cursor ? { nextPageToken: cursor } : {}) });
+    const raw = await this.call('searchJiraIssuesUsingJql', { cloudId: id, jql: jiraIssuesJql(query), maxResults: 50, fields: jiraIssueFields, ...(cursor ? { nextPageToken: cursor } : {}) });
     const result = raw.data || raw;
     if (!Array.isArray(result.issues)) throw new HttpError(502, 'Неизвестный формат списка Jira');
-    return { issues: result.issues.map((r: any) => jiraIssue(r, site)), next: result.nextPageToken || null };
+    return { issues: result.issues.map((r: any) => jiraIssue(r, site)).filter((issue: JiraIssue) => jiraMatchesStage(issue, query?.stage)), next: result.nextPageToken || null };
   }
   async issue(id: string, key: string) {
     await this.ready; const site = this.site(id);
-    const raw = await this.call('getJiraIssue', { cloudId: id, issueIdOrKey: key, fields: ['summary', 'description', 'status', 'priority', 'updated'] });
+    const raw = await this.call('getJiraIssue', { cloudId: id, issueIdOrKey: key, fields: jiraIssueFields, view: 'full', responseContentFormat: 'markdown' });
     return jiraIssue(raw.data || raw, site);
+  }
+  async transitions(id: string, key: string) {
+    await this.ready; this.site(id);
+    if (!/^[A-Z][A-Z0-9_]*-\d+$/i.test(key)) throw new HttpError(400, 'Invalid Jira issue.');
+    return jiraTransitions(await this.call('executeRead', { cloudId: id, name: 'listJiraIssueTransitions', inputs: { issueIdOrKey: key, expand: 'transitions.fields' } }));
+  }
+  async transition(id: string, key: string, transitionId: string, fields?: Record<string, unknown>) {
+    await this.ready; this.site(id);
+    const raw = await this.call('transitionJiraIssue', jiraTransitionArgs(id, key, transitionId, fields), true);
+    if (raw?.isError || raw?.success === false || raw?.data?.success === false || raw?.error || raw?.data?.error) throw new HttpError(502, jiraTransitionUncertain);
   }
 }

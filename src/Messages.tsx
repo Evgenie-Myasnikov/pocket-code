@@ -1,17 +1,24 @@
 import { RichBlock } from './RichBlocks';
 import { t } from "./i18n";import { useState } from 'react';
 import { Copy, Check, Terminal, ShieldCheck, X, ChevronDown } from 'lucide-react';
-import type { ChatMessage, Approval } from '../server/types';
+import type { ChatMessage, Approval, SubagentView } from '../server/types';
 function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
 }
-export function Message({ message, provider = 'claude' }: {message: ChatMessage;provider?: 'claude' | 'codex';}) {
+export function Message({ message, provider = 'claude', onSubagent, agents }: {message: ChatMessage;provider?: 'claude' | 'codex';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>}) {
   const plain = message.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
   const toolOnly = message.blocks.every((b) => b.type === 'tool_result');
-  return <article className={`message ${message.role} ${toolOnly ? 'tool-result' : ''}`}>
+  return <article data-message-id={message.id} className={`message ${message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {!toolOnly && <div className="message-label">{message.role === 'assistant' ? <><span className="claude-mark">{provider === 'codex' ? '⌘' : '✳'}</span> {provider.toUpperCase()}</> : message.role === 'user' ? t("ВЫ") : t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
-    {message.blocks.map((block,i) => <RichBlock key={i} block={block}/>)}
+    {message.blocks.map((block,i) => {
+      const previous=message.blocks[i-1],next=message.blocks[i+1];
+      // Keep a call and its adjacent matching result in one disclosure. Unknown
+      // or separate results remain visible; no content is discarded or reordered.
+      if(block.type==='tool_result' && previous?.type==='tool_use' && previous.id && previous.id===block.tool_use_id)return null;
+      const result=block.type==='tool_use' && block.id && next?.type==='tool_result' && next.tool_use_id===block.id?next:undefined;
+      return <RichBlock key={i} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
+    })}
   </article>;
 }
 export function ApprovalCard({ approval, decide, provider = 'claude' }: {approval: Approval;provider?: 'claude' | 'codex';decide: (allow: boolean, answers?: Record<string, string>) => Promise<void>;}) {

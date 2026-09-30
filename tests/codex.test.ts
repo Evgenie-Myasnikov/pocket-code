@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { CodexService } from '../server/codex.js';
 import { codexMessage } from '../server/codex-content.js';
-import type { CodexRpc } from '../server/codex-rpc.js';
+import { CODEX_THREAD_BUSY, CodexRequestError, type CodexRpc } from '../server/codex-rpc.js';
 
 class FakeRpc extends EventEmitter implements CodexRpc {
   requests: { method: string; params: any }[] = [];
@@ -76,6 +76,41 @@ test('Codex paginated history preserves rich content and excludes private reason
   assert.equal(messages.length, 4); assert.ok(!JSON.stringify(messages).includes('PRIVATE_REASONING'));
   assert.equal(messages[2].blocks[1].type, 'tool_result'); assert.equal((messages[2].blocks[1].content as any[])[1].type, 'image');
   assert.equal(messages[3].blocks[0].text, 'Done');
+});
+
+test('Codex permits history reads while another client owns the writer, and retries only explicitly after release', async t => {
+  const { rpc, service, input } = await setup(t);
+  rpc.thread.historyMode = 'paginated';
+  let locked = true;
+  rpc.handler = method => {
+    if (method === 'thread/items/list') return { data: [{ item: { id: 'saved', type: 'agentMessage', text: 'Saved history' } }], nextCursor: null };
+    if (method === 'thread/resume' && locked) throw new CodexRequestError(method, { code: -32600, message: 'thread session-1 already has an active writer' });
+  };
+  assert.equal((await service.messages('session-1'))[0].blocks[0].text, 'Saved history');
+  service.start({ ...input, sessionId: 'session-1' });
+  await until(() => service.get(input.id).status === 'error');
+  const rejected = service.view(service.get(input.id));
+  assert.equal(rejected.errorCode, 'codex_thread_busy'); assert.equal(rejected.error, CODEX_THREAD_BUSY);
+  assert.equal(rejected.messages[0].blocks[0].text, input.text);
+  assert.equal(rpc.requests.some(request => request.method === 'turn/start'), false);
+  assert.equal((await service.messages('session-1')).length, 1);
+  locked = false;
+  assert.equal(service.get(input.id).status, 'error');
+  service.start({ ...input, id: 'explicit-retry', sessionId: 'session-1' });
+  await until(() => Boolean(service.get('explicit-retry').turnId));
+  assert.equal(rpc.requests.filter(request => request.method === 'turn/start').length, 1);
+});
+
+test('Codex request errors expose the operation but never raw config or unrecognized error bodies', () => {
+  const secret = 'private-config-secret';
+  for (const error of [
+    new CodexRequestError('thread/read', { code: -32600, message: secret }),
+    new CodexRequestError('thread/resume', { code: -32600, message: `thread ${secret} already has an active writer\n${secret}` }),
+    new CodexRequestError('thread/resume', { code: -1, message: 'thread synthetic already has an active writer' }),
+  ]) {
+    assert.equal(error.errorCode, undefined); assert.ok(!error.message.includes(secret));
+    assert.ok(!JSON.stringify(error).includes(secret)); assert.ok(error.message.includes(error.method));
+  }
 });
 
 test('Codex uses constrained sandbox, image attachments and normalized streaming', async t => {

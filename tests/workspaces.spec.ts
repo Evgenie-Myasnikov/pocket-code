@@ -51,7 +51,7 @@ test('a send completing after workspace switch cannot clear or overwrite the oth
   send.resolve();await expect(page.getByLabel('Message Codex')).toHaveValue('Run Codex task');await expect(page.getByText('claude completed reply')).toHaveCount(0);
   await switchSidebar(page,'claude');await expect(page.getByText('claude completed reply')).toBeVisible();await expect(page.getByLabel('Message Claude')).toHaveValue('');
   await switchSidebar(page,'codex');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect(page.getByText('codex completed reply')).toBeVisible();expect(sent.map(body=>body.provider)).toEqual(['claude','codex']);
-  await page.getByRole('button',{name:'Live terminal'}).click();await expect(page.getByText('The live terminal is available in the Claude workspace. Use chat to work with Codex.')).toBeVisible();await expect(page.locator('.terminal-viewport')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Live terminal'})).toHaveCount(0);await expect(page.locator('.terminal-viewport')).toHaveCount(0);
 });
 
 test('workspace selection and provider preferences survive reload with Claude legacy migration',async({page})=>{

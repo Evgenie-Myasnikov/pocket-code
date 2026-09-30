@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { allowedPath, HttpError } from './security.js';
-import type { Approval, ChatMessage, JobView } from './types.js';
+import type { Approval, ChatMessage, JobView, SubagentView } from './types.js';
+import { codexAgents, validAgentId } from './subagents.js';
 import { codexMessage } from './codex-content.js';
-import { discoverCodex, StdioCodexRpc, type CodexRpc, type RpcEnvelope } from './codex-rpc.js';
+import { discoverCodex, StdioCodexRpc, CodexRequestError, type CodexRpc, type RpcEnvelope } from './codex-rpc.js';
 import packageJson from '../package.json';
 
 type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
@@ -81,7 +82,7 @@ export class CodexService {
     }
     return sessions.sort((a, b) => b.lastModified - a.lastModified);
   }
-  async messages(id: string): Promise<ChatMessage[]> {
+  private async threadItems(id: string) {
     const metadata = await this.readThread(id), rpc = await this.connect();
     let items: any[] = [];
     if (metadata.historyMode === 'paginated') {
@@ -89,6 +90,7 @@ export class CodexService {
       for (let page = 0; page < 100; page++) {
         const result = await rpc.request('thread/items/list', { threadId: id, cursor, limit: 100, sortDirection: 'asc' });
         items.push(...(result.data || []).map((entry: any) => entry.item));
+        if (JSON.stringify(items).length > 16_000_000) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
         if (!result.nextCursor) break;
         if (result.nextCursor === cursor || page === 99) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
         cursor = result.nextCursor;
@@ -97,12 +99,57 @@ export class CodexService {
       const thread = await this.readThread(id, true);
       items = (thread.turns || []).flatMap((turn: any) => turn.items || []);
     }
+    if (JSON.stringify(items).length > 16_000_000) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
+    return { metadata, items };
+  }
+  async messages(id: string): Promise<ChatMessage[]> {
+    const { items } = await this.threadItems(id);
     const messages: ChatMessage[] = []; let size = 0;
     for (const item of items) {
       const message = await codexMessage(item, [...this.roots, ...(this.options.attachmentRoots || [])]);
       if (message) { size += JSON.stringify(message).length; if (size > 16_000_000) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.'); messages.push(message); }
     }
     return messages;
+  }
+  private async childThread(parent: string, child: string, items: any[]) {
+    if (!validAgentId(child) || child === parent) throw new HttpError(404, 'Agent does not belong to this conversation.');
+    // A send/wait receiver can be a peer or ancestor: it is not sufficient proof.
+    const spawned = items.some(item => item.type === 'collabAgentToolCall' && item.tool === 'spawnAgent'
+      && item.senderThreadId === parent && item.receiverThreadIds?.includes(child));
+    const mentioned = spawned || items.some(item => (item.type === 'subAgentActivity' && item.agentThreadId === child)
+      || (item.type === 'collabAgentToolCall' && item.receiverThreadIds?.includes(child)));
+    if (!mentioned) throw new HttpError(404, 'Agent does not belong to this conversation.');
+    const metadata = await this.readThread(child);
+    const source = metadata.source?.subAgent?.thread_spawn;
+    if (source ? source.parent_thread_id !== parent : !spawned) throw new HttpError(404, 'Agent does not belong to this conversation.');
+    return metadata;
+  }
+  async subagents(parent: string): Promise<SubagentView[]> {
+    const { items } = await this.threadItems(parent), found = new Map<string, SubagentView>();
+    for (const item of items) for (const agent of codexAgents(item)) {
+      const previous = found.get(agent.id);
+      found.set(agent.id, { ...previous, ...agent, prompt: agent.prompt || previous?.prompt, result: agent.result || previous?.result });
+    }
+    if (found.size > 100) throw new HttpError(413, 'Too many agents to load at once.');
+    const agents: SubagentView[] = [];
+    for (const agent of found.values()) {
+      try {
+        const thread = await this.childThread(parent, agent.id, items), source = thread.source?.subAgent?.thread_spawn;
+        agent.name = source?.agent_nickname || source?.agent_path || thread.agentNickname || thread.name || agent.name;
+        if (thread.status?.type === 'active') agent.status = 'running';
+        if (thread.status?.type === 'systemError') agent.status = 'error';
+        agents.push(agent);
+      } catch (error) {
+        // Out-of-scope/deleted child contexts are excluded, transport failures remain visible.
+        if (!(error instanceof HttpError && [403, 404].includes(error.status))) throw error;
+      }
+    }
+    return agents;
+  }
+  async subagentMessages(parent: string, child: string): Promise<ChatMessage[]> {
+    const { items } = await this.threadItems(parent);
+    await this.childThread(parent, child, items);
+    return this.messages(child);
   }
   view(job: CodexJob): JobView {
     const { pending, turnId, acceptingEvents, cancelled, eventQueue, ...view } = job; return view;
@@ -161,7 +208,10 @@ export class CodexService {
       job.turnId = result.turn.id; job.revision++;
       if (job.cancelled) { await this.interrupt(job, rpc); this.finish(job, 'stopped'); }
       else if (result.turn.status && result.turn.status !== 'inProgress') this.completeTurn(job, result.turn);
-    } catch (error) { this.finish(job, job.cancelled ? 'stopped' : 'error', error instanceof Error ? error.message : 'Could not start Codex.'); }
+    } catch (error) {
+      if (!job.cancelled && error instanceof CodexRequestError && error.errorCode) job.errorCode = error.errorCode;
+      this.finish(job, job.cancelled ? 'stopped' : 'error', error instanceof Error ? error.message : 'Could not start Codex.');
+    }
   }
   private notification(message: RpcEnvelope) {
     const p = message.params;
@@ -175,7 +225,7 @@ export class CodexService {
         case 'item/agentMessage/delta': job.partial += p.delta || ''; break;
         case 'item/started': case 'item/completed': {
           if (p.item?.type === 'userMessage') break; // Initial user input already appears immediately.
-          const item = await codexMessage(p.item, [...this.roots, ...(this.options.attachmentRoots || [])]);
+          const item = await codexMessage(p.item, [...this.roots, ...(this.options.attachmentRoots || [])], true);
           if (item) { const index = job.messages.findIndex(m => m.id === item.id); if (index < 0) job.messages.push(item); else job.messages[index] = item; }
           if (p.item?.type === 'agentMessage') job.partial = '';
           break;

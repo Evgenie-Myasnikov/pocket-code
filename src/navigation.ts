@@ -9,7 +9,7 @@ export function useBackAction(handle:()=>boolean,priority=0,enabled=true){
 }
 export function useBackNavigation(){
   useEffect(()=>{
-    const back=()=>[...handlers.values()].sort((a,b)=>b.priority-a.priority).some(item=>item.handle());
+    const back=()=>[...handlers.values()].reverse().sort((a,b)=>b.priority-a.priority).some(item=>item.handle());
     const keyboard=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!event.defaultPrevented&&back()){event.preventDefault();event.stopPropagation();}};
     const android=()=>{if(!back()&&Capacitor.getPlatform()==='android')void NativeNavigation.minimize().catch(()=>{});};
     document.addEventListener('keydown',keyboard);window.addEventListener('pocket-code-back',android);

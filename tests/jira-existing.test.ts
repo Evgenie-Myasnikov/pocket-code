@@ -14,7 +14,7 @@ test('existing connector reads assigned issues, caches lists, refreshes individu
     if (name === 'getAccessibleAtlassianResources') return { data: { resources: [{ cloudId: 'site', url: 'https://example.atlassian.net', products: [{ id: 'jira' }] }] } };
     const issue = { key: 'TEST-1', fields: { summary: 'Original issue', description: 'Unmodified text' } };
     if (name === 'searchJiraIssuesUsingJql') { assert.equal(args.jql, 'assignee = currentUser() ORDER BY updated DESC'); return { data: { issues: [issue], nextPageToken: 'next' } }; }
-    assert.equal(name, 'getJiraIssue'); return issue;
+    assert.equal(name, 'getJiraIssue'); assert.equal(args.view, 'full'); assert.equal(args.responseContentFormat, 'markdown'); return issue;
   };
   try {
     const file = path.join(dir, 'preference.json'), jira = new ExistingClaudeJira(file, call);
