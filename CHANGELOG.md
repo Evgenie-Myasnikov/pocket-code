@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - QR-only connection screen (0.20.6)
+- Changed: Removed manual address/key fields and their divider from app entry. Camera scanning and QR image import connect immediately; a saved or scanned connection can be retried without displaying credentials.
+- Changed: Updated connection-error recovery text and illustrated pairing guides. Migrated browser test setup to synthetic QR image decoding.
+- Files: src/Connect.tsx, pairing.css, connection-errors.ts, translations.ts; QR browser helper and connection scenarios; user guides and connection screenshot.
+- Validation: 22 distinct connection/workspace/settings/host-update browser scenarios and six pairing unit tests passed, with the connection scenarios repeated after final text changes. Narrow English/Russian layouts and synthetic screenshot checked. TypeScript/Vite and Android build passed.
+- Follow-up: Native camera behavior was not tested on a physical Android device. Production host was not restarted.
+
+
 ## 2026-10-01 - Expand bilingual product documentation
 - Changed: Added documentation indexes plus English/Russian guides for providers and accounts, everyday workflows, and troubleshooting. Covered project discovery, concurrent chats, attachments, subagents, diff scaling, Jira workflows, notifications, persistence and update boundaries.
 - Changed: Replaced the obsolete feature matrix with current three-provider coverage; corrected shared Jira account selection, removed terminal navigation claims and linked the guides from both home pages.

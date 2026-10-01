@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import {test,expect} from '@playwright/test';
 
 for(const layout of ['unified','split'])test(`large ${layout} diff keeps a bounded DOM and reaches the final line`,async({page})=>{
@@ -7,8 +8,7 @@ for(const layout of ['unified','split'])test(`large ${layout} diff keeps a bound
   await page.route('**/api/review/availability?*',route=>route.fulfill({json:{available:true,mode:'working'}}));
   await page.route('**/api/review?*',route=>route.fulfill({json:{files:[{path:'src/large.ts',added:10000,removed:10000,binary:false,untracked:false}],current:'feature',base:'main',branches:['main'],patch,binary:false}}));
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
-  await page.getByRole('button',{name:'Connect computer',exact:true}).click();await page.getByRole('button',{name:/Интеграционный тест/}).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Интеграционный тест/}).click();
   await page.getByRole('button',{name:'Review',exact:true}).click();
   const panel=page.getByRole('dialog',{name:'Review',exact:true}),content=panel.locator('.diff-content');
   await expect(content).toContainText('new 0');
@@ -59,8 +59,7 @@ for(const layout of ['unified','split'])test(`${layout} fallback emoji and CJK g
   await page.route('**/api/review/availability?*',route=>route.fulfill({json:{available:true,mode:'working'}}));
   await page.route('**/api/review?*',route=>{const file=new URL(route.request().url()).searchParams.get('file');return route.fulfill({json:{files:files.map(path=>({path,added:500,removed:500})),current:'feature',base:'main',branches:['main'],patch:file?patch(file):'',binary:false}});});
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
-  await page.getByRole('button',{name:'Connect computer',exact:true}).click();await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
   const panel=page.getByRole('dialog',{name:'Review',exact:true}),content=panel.locator('.diff-content');
   const overflow=()=>panel.locator('.diff-table pre').evaluateAll(elements=>Math.max(0,...elements.map(element=>{
     const range=document.createRange();range.selectNodeContents(element);

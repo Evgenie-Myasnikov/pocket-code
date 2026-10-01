@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import { test, expect } from '@playwright/test';
 
 test('a newer release invalidates a previously downloaded APK and install is bound to its checksum', async ({ page }) => {
@@ -29,9 +30,7 @@ test('a newer release invalidates a previously downloaded APK and install is bou
   });
   await page.route('**/api/updates/latest', route => route.fulfill({ json: { enabled: true, update: release } }));
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');
-  await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
-  await page.getByRole('button', { name: 'Connect computer', exact: true }).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();await page.getByRole('button',{name:'Updates',exact:true}).click();
   await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
   await page.getByRole('button', { name: 'Download update', exact: true }).click();

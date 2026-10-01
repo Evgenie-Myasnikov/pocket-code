@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 
 const root='C:\\Workspace\\jira-demo';
@@ -32,7 +33,7 @@ async function fixture(page:Page,custom:Partial<State>={}){
   return state;
 }
 async function connect(page:Page,language='en'){
-  await page.goto('http://127.0.0.1:5173');await page.getByLabel(language==='ru'?'Адрес компьютера':'Computer address').fill('http://127.0.0.1:4319');await page.getByLabel(language==='ru'?'Ключ подключения':'Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:language==='ru'?'Подключить компьютер':'Connect computer',exact:true}).click();
+  await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.locator('.mobile-nav').getByRole('button',{name:language==='ru'?'Задачи':'Tasks',exact:true}).click();await expect(page.getByRole('button',{name:'Task 1',exact:true})).toBeVisible();
 }
 test.beforeEach(async({page})=>{await page.setViewportSize({width:390,height:844});});

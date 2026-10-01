@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import { test, expect } from '@playwright/test';
 
 test('matching tool call and result use one disclosure without hiding errors or unrelated results', async ({page}) => {
@@ -10,9 +11,7 @@ test('matching tool call and result use one disclosure without hiding errors or 
     {type:'codexItem',content:{type:'futureActivity',text:'Preserved extra activity'}},
   ]}],previous:null,next:null}}));
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');
-  await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
-  await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.getByRole('button',{name:/Tool activity/}).click();
   const paired=page.locator('.tool-card.combined');
   await expect(page.locator('[data-message-id=activity] .message-label')).toHaveCount(0);await expect(paired).toHaveCount(1);await expect(paired).toHaveClass(/failed/);

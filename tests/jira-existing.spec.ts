@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import { test, expect } from '@playwright/test';
 test('existing Claude connection reconnects without Android browser login', async ({ page }) => {
   let connected = true;
@@ -10,9 +11,7 @@ test('existing Claude connection reconnects without Android browser login', asyn
   });
   await page.setViewportSize({width:390,height:844});
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');
-  await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
-  await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Jira',exact:true}).click();
   await expect(page.getByText(/Jira uses the existing Atlassian MCP/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Connect',exact:true})).toHaveCount(0);

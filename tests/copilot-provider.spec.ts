@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import {test,expect} from '@playwright/test';
 test('Copilot is a separate workspace, sends auto model and offers detected GitHub sign-in',async({page})=>{
  let sent:any;const root='C:\\Projects\\sample';
@@ -15,7 +16,7 @@ test('Copilot is a separate workspace, sends auto model and offers detected GitH
   if(endpoint==='/updates/latest')return route.fulfill({json:{enabled:false}});
   return route.fulfill({status:404,json:{error:'Not available in fixture'}});
  });
- await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('fixture-'.repeat(6));await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+ await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','fixture-'.repeat(6));
  await page.getByLabel('Workspace',{exact:true}).first().selectOption('copilot');await page.getByRole('button',{name:/Copilot example/}).click();await page.getByLabel('Message Copilot').fill('Hello');await page.getByRole('button',{name:'Send message',exact:true}).click();
  await page.getByRole('button',{name:'Finished on PC — continue',exact:true}).click();
  await expect.poll(()=>sent?.provider).toBe('copilot');expect(sent.model).toBe('auto');expect(sent.reasoningEffort).toBeUndefined();await expect(page.getByText('Copilot response',{exact:true})).toBeVisible();

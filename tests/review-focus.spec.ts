@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 
 const otherRoot='C:\\Workspace\\other-project',chatRoot='C:\\Workspace\\chat-project';
@@ -34,9 +35,7 @@ async function connect(page:Page,language='en',scale=100){
     localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({scale,textSize:14}));
   },{language,scale});
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel(language==='ru'?'Адрес компьютера':'Computer address').fill('http://127.0.0.1:4319');
-  await page.getByLabel(language==='ru'?'Ключ подключения':'Connection key').fill('test-only-'.repeat(5));
-  await page.getByRole('button',{name:language==='ru'?'Подключить компьютер':'Connect computer',exact:true}).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.getByRole('button',{name:/Chat repository test/}).click();
   await page.getByRole('button',{name:'Review',exact:true}).click();
   await expect(review(page).locator('.diff-content')).toContainText('src/first.ts new 0');

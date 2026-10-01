@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import {test,expect} from '@playwright/test';
 test('review scrolls through collapsible files and filters detected extensions',async({page})=>{
  await page.setViewportSize({width:390,height:844});
@@ -13,7 +14,7 @@ test('review scrolls through collapsible files and filters detected extensions',
   if(p==='/api/review'){const file=url.searchParams.get('file');if(file)calls.push(file);return route.fulfill({json:{files:files.map(path=>({path,added:2,removed:1,binary:path.endsWith('.png')})),current:'main',base:'main',branches:['main'],binary:file?.endsWith('.png'),patch:file?'@@ -1 +1,2 @@\n-old\n+'+file+' updated\n+done':''}});}
   return route.fulfill({status:404,json:{error:'Fixture endpoint'}});
  });
- await page.goto('http://127.0.0.1:5173');await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:'Connect computer',exact:true}).click();await page.getByRole('button',{name:/Review fixture/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Review fixture/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
  const panel=page.getByRole('dialog',{name:'Review',exact:true});await expect(panel.locator('.review-file')).toHaveCount(3);await expect(panel).toContainText('src/second.ts updated');
  await expect(panel.locator('.review-filebar select')).toHaveCount(0);
  const first=panel.locator('.review-file').first();await first.getByRole('button').click();await expect(first.getByRole('button')).toHaveAttribute('aria-expanded','false');await expect(first.locator('.diff-table')).toHaveCount(0);

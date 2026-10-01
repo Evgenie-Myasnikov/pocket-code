@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import { test, expect } from '@playwright/test';
 
 test('Jira Connect lives in Settings; Jobs selects all pages and sends a batch with the chosen folder', async ({ page }) => {
@@ -15,7 +16,7 @@ test('Jira Connect lives in Settings; Jobs selects all pages and sends a batch w
     return route.fulfill({ status: 400, json: { error: 'Unexpected test request' } });
   });
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Адрес компьютера').fill('http://127.0.0.1:4319'); await page.getByLabel('Ключ подключения').fill('test-only-'.repeat(5)); await page.getByRole('button', { name: 'Подключить компьютер' }).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.locator('.mobile-nav').getByRole('button', { name: 'Задачи', exact: true }).click();
   await page.getByRole('button', { name: 'Открыть настройки Jira' }).click();
   await expect(page.getByRole('button', { name: 'Connect', exact: true })).toBeVisible();

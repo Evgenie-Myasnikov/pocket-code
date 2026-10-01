@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import { test, expect, type Page } from '@playwright/test';
 
 const roots = ['C:\\Workspace\\first', 'C:\\Workspace\\second'];
@@ -23,8 +24,7 @@ async function mockHost(page:Page, options:{upload?:ReturnType<typeof gate>;send
 }
 async function connect(page:Page) {
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill(connection.url);await page.getByLabel('Connection key').fill(connection.token);
-  await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+  await connectByQr(page,connection.url,connection.token);
   await expect(page.locator('.workspace-picker-sidebar select')).toBeVisible();
 }
 const switchSidebar=(page:Page,provider:string)=>page.locator('.workspace-picker-sidebar select').selectOption(provider);

@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import { test, expect } from '@playwright/test';
 import { renderPairingPage } from '../server/pairing';
 
@@ -11,9 +12,7 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Адрес компьютера').fill('http://127.0.0.1:4319');
-  await page.getByLabel('Ключ подключения').fill('test-only-'.repeat(5));
-  await page.getByRole('button', { name: 'Подключить компьютер' }).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.getByRole('button', { name: /Long history/ }).click();
   await expect(page.getByText('History message 149.', { exact: false })).toBeVisible();
   await page.getByLabel('Сообщение Claude').fill('Keep this draft');
@@ -52,9 +51,7 @@ test('open history syncs Desktop updates without erasing the draft and marks out
   await page.route('**/api/sessions?*', route => route.fulfill({ json: [{ sessionId: id, summary: 'Desktop sync test', cwd: 'C:\\DesktopProject', source: 'desktop', readOnly: false, lastModified: 1 }] }));
   await page.route(`**/api/sessions/${id}/messages?*`, route => route.fulfill({ json: { messages: [{ id: 'initial', role: 'user', blocks: [{ type: 'text', text: 'Original history' }] }, ...(revision ? [{ id: 'new', role: 'assistant', blocks: [{ type: 'text', text: 'Added on desktop' }] }] : [])], previous: null } }));
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Адрес компьютера').fill('http://127.0.0.1:4319');
-  await page.getByLabel('Ключ подключения').fill('test-only-'.repeat(5));
-  await page.getByRole('button', { name: 'Подключить компьютер' }).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.getByRole('button', { name: /Desktop sync test/ }).click();
   await expect(page.getByText('Original history')).toBeVisible();
   await page.getByLabel('Сообщение Claude').fill('My unfinished draft');
@@ -71,7 +68,7 @@ test('mobile connection screen and clearly labeled demo', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173');
   await expect(page.getByRole('heading', { name: 'Большие идеи. Маленький экран.' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Подключить компьютер' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Сканировать QR-код' })).toBeVisible();
   await page.screenshot({ path: 'artifacts/screenshots/connect-mobile.png', fullPage: true });
   await page.getByRole('button', { name: 'Посмотреть интерфейс без подключения' }).click();
   await page.getByRole('button', { name: /Новый взгляд на главную страницу/ }).click();
@@ -106,9 +103,7 @@ test('generated PC QR connects phone UI from an image without typing credentials
 test('mobile connects, uploads, restores approval after reload and controls a real PTY', async ({ page, request }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Адрес компьютера').fill('http://127.0.0.1:4319');
-  await page.getByLabel('Ключ подключения').fill('test-only-'.repeat(5));
-  await page.getByRole('button', { name: 'Подключить компьютер' }).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.getByRole('button', { name: /Интеграционный тест/ }).click();
   await expect(page.getByText('Синтетическая история для проверки')).toBeVisible();
   await page.locator('input[type=file]').setInputFiles({ name: 'example.txt', mimeType: 'text/plain', buffer: Buffer.from('Synthetic attachment') });

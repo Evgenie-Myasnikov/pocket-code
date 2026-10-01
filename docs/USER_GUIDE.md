@@ -11,7 +11,7 @@ Screenshots use the real interface with fictional data. Never publish your pairi
 <a id="qr"></a>
 ## Connect by QR
 
-<img src="images/connect.png" width="320" alt="Connection screen with camera, QR image and manual entry options">
+<img src="images/connect.png" width="320" alt="Connection screen with QR scanning and QR image options">
 
 1. Extract the source package on your PC and run **Setup Pocket Code.cmd**. Install Claude Code or Codex and sign in on the PC first.
 2. Choose **Internet / mobile data** for access from another network, or **Same trusted Wi-Fi** for your local network.
@@ -19,7 +19,7 @@ Screenshots use the real interface with fictional data. Never publish your pairi
 4. Install the APK from the [latest release](https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest) on Android. Tap **Scan QR code**, allow camera access, and scan the PC screen.
 5. The app fills in the connection details and connects automatically.
 
-If the camera is unavailable, choose **QR from image**. Manual entry needs the computer address and Pocket Code connection key followed by **Connect computer**. These are not AI account credentials.
+If the camera is unavailable, choose **QR from image**. The QR supplies the address and pairing key automatically; there are no manual credential fields. If a scanned or saved connection fails, **Reconnect** retries it. Scan a new QR when the PC's address changes.
 
 Keep the PC awake and the host running. Closing the QR browser tab does not stop the host; closing the host launcher window ends its processes. Restarting a temporary internet tunnel changes its address: scan the new QR. A local Wi-Fi address normally cannot be reached over mobile data.
 

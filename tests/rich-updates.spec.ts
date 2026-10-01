@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import pkg from '../package.json' with { type: 'json' };
 import {test,expect} from '@playwright/test';
 test('connected host advertises releases and chat renders image tool results, PDFs and unknown blocks',async({page})=>{
@@ -7,7 +8,7 @@ test('connected host advertises releases and chat renders image tool results, PD
   await page.route('**/api/sessions?*',r=>r.fulfill({json:[{sessionId:session,summary:'Media test',cwd:'C:\\Test',lastModified:1}]}));
   await page.route(`**/api/sessions/${session}/messages?*`,r=>r.fulfill({json:{messages:[{id:'one',role:'assistant',blocks:[{type:'image',source:{type:'base64',media_type:'image/png',data:image}},{type:'tool_result',is_error:true,content:[{type:'text',text:'Tool failure detail'},{type:'image',data:image,mimeType:'image/png'}]},{type:'document',title:'Example PDF',source:{type:'base64',media_type:'application/pdf',data:'JVBERi0xLjQK'}},{type:'custom_result',value:'Extra data'}]}],previous:null,next:null}}));
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.getByRole('button',{name:/Media test/}).click();
   await page.getByRole('button',{name:'Open image',exact:true}).first().click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'Close',exact:true}).click();
   await page.getByText('Tool error',{exact:true}).click();await expect(page.getByText('Tool failure detail')).toBeVisible();

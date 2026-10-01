@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 const snapshot=(name:string,value:number)=>({checkedAt:Date.now(),ordinaryUsageAllowed:null,buckets:[{id:'quota',name,windows:[{id:'primary',remainingPercent:value,usedPercent:100-value,windowDurationMins:300,resetsAt:null},{id:'secondary',remainingPercent:90,usedPercent:10,windowDurationMins:10080,resetsAt:null}]}]});
 async function open(page:Page){
@@ -5,7 +6,7 @@ async function open(page:Page){
   await page.route('**/api/jobs?*',route=>route.fulfill({json:[]}));
   await page.route('**/api/sessions?*',route=>route.fulfill({json:[{sessionId:'quota-chat',summary:'Quota example',cwd:'C:\\Test',lastModified:1}]}));
   await page.route('**/api/sessions/quota-chat/messages?*',route=>route.fulfill({json:{messages:[{id:'answer',role:'assistant',blocks:[{type:'text',text:'Example response'}]}],previous:null,next:null}}));
-  await page.goto('http://127.0.0.1:5173');await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:'Connect computer',exact:true}).click();await page.getByRole('button',{name:'Quota example',exact:false}).click();
+  await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:'Quota example',exact:false}).click();
 }
 test('right-side ring shows remaining allowance and opens details without losing the chat draft',async({page})=>{
   await page.setViewportSize({width:320,height:640});

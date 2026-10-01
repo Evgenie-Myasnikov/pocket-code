@@ -118,7 +118,7 @@ test('disconnect clears planned restart state and ignores a late response',async
   await expect.poll(()=>Boolean(statusRoute),{timeout:8000}).toBe(true);
   await page.getByRole('button',{name:'All settings',exact:true}).click();
   await page.getByRole('button',{name:'Disconnect and forget',exact:true}).click();
-  await expect(page.getByRole('button',{name:'Connect computer',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Scan QR code',exact:true})).toBeVisible();
   await statusRoute!.fulfill({json:status('updated')});
   expect(await page.evaluate(()=>(window as any).hostRestartEvents.at(-1))).toBe(false);
   await expect(page.locator('.host-update-card')).toHaveCount(0);

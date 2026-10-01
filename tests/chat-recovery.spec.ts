@@ -1,3 +1,4 @@
+import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 
 const root='C:\\Workspace\\chat-recovery';
@@ -19,8 +20,7 @@ async function host(page:Page){
 }
 async function connect(page:Page,provider='codex'){
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
-  await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.locator('.workspace-picker-sidebar select').selectOption(provider);
   await page.getByRole('button',{name:`Saved ${provider} chat`}).click();
   await expect(page.getByText('History message 1',{exact:true})).toHaveCount(1);
@@ -84,7 +84,7 @@ test('scrolling to history edges loads automatically once and preserves the visi
     if(window===200)messages.push(message(201)); // Repeated server item must not duplicate a bubble.
     return route.fulfill({json:{messages,previous:!fromStart&&window===100?100:null,next:fromStart&&window===100?100:null}});
   });
-  await page.goto('http://127.0.0.1:5173');await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:'Connect computer',exact:true}).click();await page.getByRole('button',{name:'Saved claude chat'}).click();
+  await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:'Saved claude chat'}).click();
   await expect(page.locator('.message')).toHaveCount(100);
   await expect(page.getByRole('button',{name:/Load earlier messages|Load next messages/})).toHaveCount(0);
   const scroller=page.locator('.conversation');
@@ -121,7 +121,7 @@ test('a failed edge load waits for another user scroll before retrying',async({p
 test('reading mode hides controls and preserves the chat, draft and scroll on exit and Back',async({page})=>{
   await host(page);await page.setViewportSize({width:390,height:844});
   await page.route('**/api/sessions/saved-chat/messages?*',route=>route.fulfill({json:{messages:Array.from({length:100},(_,i)=>message(i+1)),previous:null,next:null}}));
-  await page.goto('http://127.0.0.1:5173');await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:'Connect computer',exact:true}).click();await page.getByRole('button',{name:'Saved claude chat'}).click();
+  await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:'Saved claude chat'}).click();
   await page.getByLabel('Message Claude').fill('Draft kept during reading');
   const anchor=page.getByText('History message 40',{exact:true});await anchor.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
   const offset=()=>anchor.evaluate(el=>el.getBoundingClientRect().top-document.querySelector('.conversation')!.getBoundingClientRect().top);
@@ -175,8 +175,7 @@ test('Codex byte-limited history advances by returned offsets in both directions
     return route.fulfill({json:{messages:Array.from({length:30},(_,i)=>message(start+i)),previous:start===31?30:null,next:beginning?30:null}});
   });
   await page.goto('http://127.0.0.1:5173');
-  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
-  await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.locator('.workspace-picker-sidebar select').selectOption('codex');await page.getByRole('button',{name:'Saved codex chat'}).click();
   await expect(page.locator('.message')).toHaveCount(30);
   const scroller=page.locator('.conversation');await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
