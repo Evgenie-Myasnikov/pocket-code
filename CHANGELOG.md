@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - Public repository privacy skill and publication guards
+- Changed: Added a repository privacy skill referenced by AGENTS.md and CLAUDE.md. Public examples must be synthetic; source, screenshots, archives and release notes require review without copying private values to logs or external tools.
+- Changed: Local commit/push hooks scan Git blobs and outgoing commit trees, including commit metadata. The scanner blocks common credentials, private file names and exact local denylist values, fails closed and refuses unrelated parent repositories. CI checks the public tree; the release script requires a clean checkout and a passing source scan.
+- Files: .agents/skills/protect-public-data, AGENTS.md, CLAUDE.md, .githooks, .github/workflows/privacy.yml, scripts/privacy-guard.mjs, scripts/publish-release.ps1 and privacy tests.
+- Validation: Skill validator and four privacy tests passed, including staged-versus-working content, historical commits and malformed denylist rejection.
+- Limits: Hooks are locally installed and bypassable; CI is after upload. Pattern scanning does not identify arbitrary business data or read image pixels/unpack archives. Final visual and artifact audits remain required.
+
 ## 2026-10-01 - Complete chat results and durable reading positions (0.20.1)
 - Changed: Results scans every available history page gradually, independently of the chat's 5,000-message viewport. All results and source attachments are initially visible; categories, progressive rendering, scan progress and retry remain available. File contents still load on demand.
 - Changed: Chat positions are stored per host, provider and session, with message anchors and history-window restoration across navigation and reload. Jump controls depend on distance from the latest message instead of scroll direction. The history edge states whether older messages exist, are loading, or the beginning has been reached.
