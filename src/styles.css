@@ -164,3 +164,11 @@
 :root[data-theme] .chat-header :is(.workspace-picker-header,.project-picker) select{background:transparent;border:0;box-shadow:none}:root[data-theme] .message .tool-card{background:transparent;border:0;box-shadow:none}
 
 .chat-header:not([data-section=chats]):not([data-section=terminal]){min-height:60px;padding:8px 16px;align-items:center}.chat-header:not([data-section=chats]):not([data-section=terminal]) .header-title{display:block}.workspace-picker-settings{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin-bottom:16px}.workspace-picker-settings select{min-height:48px}
+/* Keep the AI selector beside the action it affects, without a separate form row. */
+.chat-list-actions{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;margin:0 0 14px;flex-shrink:0}
+.chat-list-actions .workspace-picker-sidebar{margin:0;max-width:none;font-size:clamp(11px,calc(13px * var(--ui-scale,1)),17px)}
+.chat-list-actions .workspace-picker-sidebar select{flex:none;width:clamp(90px,calc(100px * var(--ui-scale,1)),108px);min-width:0;max-width:none;min-height:48px;padding:8px 6px;font:inherit;font-weight:600;border:0;border-radius:6px}
+:root[data-theme] .chat-list-actions .workspace-picker-sidebar select{background:transparent;border:0;box-shadow:none}
+.chat-list-actions .workspace-picker-sidebar select:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.chat-list-actions .new-chat{width:100%;min-width:0;min-height:48px;margin:0;padding:8px 10px;justify-content:center;gap:7px;font-size:clamp(11px,calc(13px * var(--ui-scale,1)),17px);white-space:nowrap}
+.chat-list-actions .new-chat svg{flex-shrink:0}

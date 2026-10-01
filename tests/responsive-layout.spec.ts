@@ -89,7 +89,7 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   await withinViewport(page,'.review-panel button,.review-panel select,.review-panel h2',profile.width,profile.height);
   expect((await page.locator('.diff-content').boundingBox())!.height).toBeGreaterThan(70);
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-review.png`});
-  await page.locator('.review-panel header button').click();
+  await page.locator('.review-panel').getByRole('button',{name:language==='en'?'Back to chat':'Вернуться в чат',exact:true}).click();
   const settings=language==='en'?'Settings':'Настройки';
   await (profile.width<=760?page.locator('.mobile-nav').getByRole('button',{name:settings,exact:true}):page.locator('.desktop-tabs').getByRole('button',{name:settings,exact:true})).click();
   await expect(page.locator('.settings-index .settings-category')).toHaveCount(7);
