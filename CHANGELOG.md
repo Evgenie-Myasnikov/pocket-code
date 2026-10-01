@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-01 - Image gallery and touch zoom (0.19.2)
+- Changed: Results shows image thumbnails, with a shared full-screen image viewer for Results and chat images. Pinch/pan, zoom buttons, Fit to screen, Back and focus restoration keep the surrounding conversation/gallery intact.
+- Performance: Only nearby thumbnails load, with at most two authenticated reads/decodes at a time. Off-screen previews release object URLs. External images still require an explicit load; the existing local endpoint transfers the original file before downsampling.
+- Fixed: The Codex access help button stays beside its heading, clear of the activity drawer handle. Diff columns account for Unicode glyph widths and preserve space for short patches.
+- Files: src/ImageViewer.tsx, OutputImage.tsx, image-thumbnails.ts, ChatOutputs.tsx, RichBlocks.tsx, related styles/tests and user guides.
+- Validation: Full browser suite passed 230/230, including touch pinch/pan, bounded thumbnail reads, URL cleanup, focus restoration and narrow English/Russian layouts. TypeScript/Vite/Android build passed (versionCode 34). Synthetic gallery/viewer screenshots were inspected.
+- Follow-up: Pinch and pan are tested through browser touch input; physical Android validation remains unavailable.
+
+## 2026-10-01 - Chat and diff performance audit (0.19.2)
+- Changed: Memoized chat lists/messages/Markdown, reused unchanged poll snapshots, rendered collapsed tool bodies on demand, and skipped unchanged cache writes. UI polls pause when hidden and resume without overlap; host execution remains independent.
+- Changed: Virtualized fixed-height diff rows with stable split columns, preserved scroll/reading controls, and cleaned up observers/listeners. Large patches retain their data but only visible rows plus overscan are mounted.
+- Server: Coalesced in-flight read requests without retaining completed session/history results. Codex history size accounting is linear. Git availability uses safe existence checks and reuses metadata; independent Git reads run concurrently.
+- Measurements: Synthetic production Chrome at 390x844/4x CPU, 500 rich messages: eight-character input 14.12s to 0.29s. Matched 20,000-line diff open 22.74s to 0.52s; mounted rows 20,001 to 49, JS heap 70.21MB to 13.78MB. Single stress runs, not physical Android timings.
+- Files: Chat snapshot/poll/render helpers, src/DiffTable.tsx and diff-rows.ts, server read/review paths, scripts/benchmark-ui.mjs, regression tests and docs/PERFORMANCE.md with synthetic results.
+- Validation: 192 server/state tests and all 230 browser scenarios passed. TypeScript/Vite/Android build passed. Large unified/split diffs, small patches, Unicode widths, reading mode and size changes are covered.
+- Follow-up: Initial mounting/returning to 500 rich messages still costs around 1.7-2.2s; Codex history still scans all pages and changed job snapshots carry accumulated messages. Physical Android battery/thermal/network tests remain unperformed.
+
 ## 2026-10-01 - Readable live review and illustrated user guides (0.19.1)
 - Changed: Review options open in an overlaid sheet instead of reducing the diff viewport. Code follows chat size with a 14 px minimum by default and offers a saved 10-24 px override.
 - Added: Visible comparison mode/file count and immediate refresh. Open review refreshes every five seconds while visible and on resume, preserving selection and scroll. Missing selected files recover through a fresh list; background failures retain content with an error.

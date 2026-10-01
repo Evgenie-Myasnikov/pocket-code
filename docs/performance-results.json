@@ -1,0 +1,458 @@
+{
+  "date": "2026-10-01",
+  "baseline": "0.19.1",
+  "after": "0.19.2",
+  "browser": "154.0.8037.59",
+  "viewport": "390x844 CSS px",
+  "cpuSlowdown": 4,
+  "messageCount": 500,
+  "changedLineCount": 20000,
+  "physicalAndroid": false,
+  "runsPerScenario": 1,
+  "chat": {
+    "before": {
+      "chatOpen": {
+        "elapsedMs": 3614.60000000149,
+        "longTasks": 3,
+        "longTaskTotalMs": 3385,
+        "longestTaskMs": 1908,
+        "domElements": 12827,
+        "messagesMounted": 500,
+        "LayoutCount": 12,
+        "RecalcStyleCount": 20,
+        "JSHeapUsedSize": 15795192,
+        "JSHeapTotalSize": 17268736,
+        "documents": 1,
+        "nodes": 24971,
+        "jsEventListeners": 696
+      },
+      "typing": {
+        "elapsedMs": 14119.199999999255,
+        "longTasks": 12,
+        "longTaskTotalMs": 13816,
+        "longestTaskMs": 1599,
+        "domElements": 12827,
+        "characters": 8
+      },
+      "chatScroll": {
+        "p50FrameMs": 20.80000000000291,
+        "p95FrameMs": 1485.0999999999985,
+        "maxFrameMs": 1485.0999999999985,
+        "frames": 11,
+        "scrollHeight": 181561,
+        "requestedDurationMs": 2000,
+        "elapsedMs": 4621.39999999851,
+        "longTasks": 4,
+        "longTaskTotalMs": 2928,
+        "longestTaskMs": 1380,
+        "domElements": 12827
+      },
+      "streaming": {
+        "elapsedMs": 33349.300000000745,
+        "longTasks": 43,
+        "longTaskTotalMs": 32821,
+        "longestTaskMs": 1656,
+        "domElements": 12915,
+        "updates": 9,
+        "LayoutCount": 86,
+        "RecalcStyleCount": 158,
+        "JSHeapUsedSize": 17040044,
+        "JSHeapTotalSize": 19951616,
+        "documents": 1,
+        "nodes": 26636,
+        "jsEventListeners": 1070
+      }
+    },
+    "after": {
+      "chatOpen": {
+        "elapsedMs": 1679.300000000745,
+        "longTasks": 2,
+        "longTaskTotalMs": 1568,
+        "longestTaskMs": 1482,
+        "domElements": 11831,
+        "messagesMounted": 500,
+        "LayoutCount": 11,
+        "RecalcStyleCount": 20,
+        "JSHeapUsedSize": 11268336,
+        "JSHeapTotalSize": 12283904,
+        "documents": 1,
+        "nodes": 23477,
+        "jsEventListeners": 701
+      },
+      "typing": {
+        "elapsedMs": 292.0999999977648,
+        "longTasks": 0,
+        "longTaskTotalMs": 0,
+        "longestTaskMs": 0,
+        "domElements": 11831,
+        "characters": 8
+      },
+      "chatScroll": {
+        "p50FrameMs": 13.899999999999636,
+        "p95FrameMs": 20.799999999999727,
+        "maxFrameMs": 27.800000000000182,
+        "frames": 120,
+        "scrollHeight": 181561,
+        "requestedDurationMs": 2000,
+        "elapsedMs": 1583.699999999255,
+        "longTasks": 0,
+        "longTaskTotalMs": 0,
+        "longestTaskMs": 0,
+        "domElements": 11831
+      },
+      "streaming": {
+        "elapsedMs": 6912.39999999851,
+        "longTasks": 1,
+        "longTaskTotalMs": 431,
+        "longestTaskMs": 431,
+        "domElements": 11919,
+        "updates": 8,
+        "LayoutCount": 43,
+        "RecalcStyleCount": 980,
+        "JSHeapUsedSize": 12232876,
+        "JSHeapTotalSize": 13131776,
+        "documents": 1,
+        "nodes": 23774,
+        "jsEventListeners": 717
+      }
+    }
+  },
+  "diff": {
+    "before": {
+      "iteration": 1,
+      "chatOpen": {
+        "elapsedMs": 3633,
+        "longTasks": 3,
+        "longTaskTotalMs": 3405,
+        "longestTaskMs": 1895,
+        "domElements": 12827,
+        "messagesMounted": 500,
+        "LayoutCount": 12,
+        "RecalcStyleCount": 21,
+        "JSHeapUsedSize": 15796528,
+        "JSHeapTotalSize": 17530880,
+        "documents": 1,
+        "nodes": 24971,
+        "jsEventListeners": 696
+      },
+      "typing": null,
+      "chatScroll": null,
+      "streaming": null,
+      "diffOpen": {
+        "elapsedMs": 22738.79999999702,
+        "longTasks": 16,
+        "longTaskTotalMs": 22053,
+        "longestTaskMs": 4340,
+        "domElements": 112914,
+        "mountedRows": 20001,
+        "LayoutCount": 30,
+        "RecalcStyleCount": 49,
+        "JSHeapUsedSize": 70205192,
+        "JSHeapTotalSize": 76640256,
+        "documents": 1,
+        "nodes": 185866,
+        "jsEventListeners": 725
+      },
+      "diffScroll": {
+        "p50FrameMs": 273.41599999999744,
+        "p95FrameMs": 1791.0999999999985,
+        "maxFrameMs": 1791.0999999999985,
+        "frames": 4,
+        "scrollHeight": 487834,
+        "requestedDurationMs": 2000,
+        "elapsedMs": 11423.699999999255,
+        "longTasks": 10,
+        "longTaskTotalMs": 10703,
+        "longestTaskMs": 1762,
+        "domElements": 112914
+      },
+      "diffIdle": {
+        "elapsedMs": 12859.300000000745,
+        "longTasks": 11,
+        "longTaskTotalMs": 12208,
+        "longestTaskMs": 1731,
+        "domElements": 112914,
+        "reviewRequests": 9
+      },
+      "afterClose": {
+        "LayoutCount": 55,
+        "RecalcStyleCount": 84,
+        "JSHeapUsedSize": 17682120,
+        "JSHeapTotalSize": 20738048,
+        "documents": 1,
+        "nodes": 24973,
+        "jsEventListeners": 709
+      },
+      "reviewCycles": [],
+      "navigation": [
+        {
+          "tab": "Project",
+          "elapsedMs": 4706.400000002235,
+          "longTasks": 4,
+          "longTaskTotalMs": 4332,
+          "longestTaskMs": 1550,
+          "domElements": 126
+        },
+        {
+          "tab": "Settings",
+          "elapsedMs": 59.5,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "domElements": 182
+        },
+        {
+          "tab": "Tasks",
+          "elapsedMs": 61.899999998509884,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "domElements": 99
+        },
+        {
+          "tab": "Chats",
+          "elapsedMs": 7834.89999999851,
+          "longTasks": 8,
+          "longTaskTotalMs": 7620,
+          "longestTaskMs": 1936,
+          "domElements": 12827
+        }
+      ],
+      "errors": []
+    },
+    "after": {
+      "iteration": 1,
+      "chatOpen": {
+        "elapsedMs": 1668.300000000745,
+        "longTasks": 2,
+        "longTaskTotalMs": 1562,
+        "longestTaskMs": 1469,
+        "domElements": 11831,
+        "messagesMounted": 500,
+        "LayoutCount": 11,
+        "RecalcStyleCount": 19,
+        "JSHeapUsedSize": 11274456,
+        "JSHeapTotalSize": 12283904,
+        "documents": 1,
+        "nodes": 23477,
+        "jsEventListeners": 701
+      },
+      "typing": null,
+      "chatScroll": null,
+      "streaming": null,
+      "diffOpen": {
+        "elapsedMs": 516.5,
+        "longTasks": 2,
+        "longTaskTotalMs": 296,
+        "longestTaskMs": 187,
+        "domElements": 12159,
+        "mountedRows": 49,
+        "LayoutCount": 21,
+        "RecalcStyleCount": 39,
+        "JSHeapUsedSize": 13778652,
+        "JSHeapTotalSize": 14475264,
+        "documents": 1,
+        "nodes": 24087,
+        "jsEventListeners": 731
+      },
+      "diffScroll": {
+        "p50FrameMs": 20.800000000000182,
+        "p95FrameMs": 27.800000000000182,
+        "maxFrameMs": 41.59999999999991,
+        "frames": 105,
+        "scrollHeight": 488025,
+        "requestedDurationMs": 2000,
+        "elapsedMs": 2075.39999999851,
+        "longTasks": 0,
+        "longTaskTotalMs": 0,
+        "longestTaskMs": 0,
+        "domElements": 12269
+      },
+      "diffIdle": {
+        "elapsedMs": 10517.300000000745,
+        "longTasks": 0,
+        "longTaskTotalMs": 0,
+        "longestTaskMs": 0,
+        "domElements": 12162,
+        "reviewRequests": 4
+      },
+      "afterClose": {
+        "LayoutCount": 128,
+        "RecalcStyleCount": 157,
+        "JSHeapUsedSize": 12261532,
+        "JSHeapTotalSize": 13393920,
+        "documents": 1,
+        "nodes": 23479,
+        "jsEventListeners": 714
+      },
+      "reviewCycles": [],
+      "navigation": [
+        {
+          "tab": "Project",
+          "elapsedMs": 216.69999999925494,
+          "longTasks": 1,
+          "longTaskTotalMs": 132,
+          "longestTaskMs": 132,
+          "domElements": 126
+        },
+        {
+          "tab": "Settings",
+          "elapsedMs": 82.69999999925494,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "domElements": 182
+        },
+        {
+          "tab": "Tasks",
+          "elapsedMs": 70.10000000149012,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "domElements": 99
+        },
+        {
+          "tab": "Chats",
+          "elapsedMs": 1919.699999999255,
+          "longTasks": 1,
+          "longTaskTotalMs": 1781,
+          "longestTaskMs": 1781,
+          "domElements": 11831
+        }
+      ],
+      "errors": []
+    },
+    "earlierAfter": {
+      "iteration": 1,
+      "chatOpen": {
+        "elapsedMs": 1779.6000000014901,
+        "longTasks": 2,
+        "longTaskTotalMs": 1665,
+        "longestTaskMs": 1554,
+        "domElements": 11831,
+        "messagesMounted": 500,
+        "LayoutCount": 11,
+        "RecalcStyleCount": 19,
+        "JSHeapUsedSize": 11268616,
+        "JSHeapTotalSize": 12283904,
+        "documents": 1,
+        "nodes": 23477,
+        "jsEventListeners": 701
+      },
+      "typing": null,
+      "chatScroll": null,
+      "streaming": null,
+      "diffOpen": {
+        "elapsedMs": 518.1999999992549,
+        "longTasks": 2,
+        "longTaskTotalMs": 276,
+        "longestTaskMs": 207,
+        "domElements": 12159,
+        "mountedRows": 49,
+        "LayoutCount": 21,
+        "RecalcStyleCount": 38,
+        "JSHeapUsedSize": 13751732,
+        "JSHeapTotalSize": 14737408,
+        "documents": 1,
+        "nodes": 24086,
+        "jsEventListeners": 731
+      },
+      "diffScroll": {
+        "p50FrameMs": 20.800000000000182,
+        "p95FrameMs": 27.800000000000182,
+        "maxFrameMs": 41.59999999999991,
+        "frames": 96,
+        "scrollHeight": 488025,
+        "requestedDurationMs": 2000,
+        "elapsedMs": 2072,
+        "longTasks": 0,
+        "longTaskTotalMs": 0,
+        "longestTaskMs": 0,
+        "domElements": 12269
+      },
+      "diffIdle": {
+        "elapsedMs": 10524.5,
+        "longTasks": 0,
+        "longTaskTotalMs": 0,
+        "longestTaskMs": 0,
+        "domElements": 12162,
+        "reviewRequests": 4
+      },
+      "afterClose": {
+        "LayoutCount": 119,
+        "RecalcStyleCount": 145,
+        "JSHeapUsedSize": 12257100,
+        "JSHeapTotalSize": 13393920,
+        "documents": 1,
+        "nodes": 23479,
+        "jsEventListeners": 714
+      },
+      "reviewCycles": [],
+      "navigation": [
+        {
+          "tab": "Project",
+          "elapsedMs": 162.80000000074506,
+          "longTasks": 1,
+          "longTaskTotalMs": 96,
+          "longestTaskMs": 96,
+          "domElements": 126
+        },
+        {
+          "tab": "Settings",
+          "elapsedMs": 68.19999999925494,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "domElements": 182
+        },
+        {
+          "tab": "Tasks",
+          "elapsedMs": 61.400000002235174,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "domElements": 99
+        },
+        {
+          "tab": "Chats",
+          "elapsedMs": 1724.4000000022352,
+          "longTasks": 1,
+          "longTaskTotalMs": 1621,
+          "longestTaskMs": 1621,
+          "domElements": 11831
+        }
+      ],
+      "errors": []
+    }
+  },
+  "reviewCloseCycles": [
+    {
+      "LayoutCount": 187,
+      "RecalcStyleCount": 1181,
+      "JSHeapUsedSize": 12659832,
+      "JSHeapTotalSize": 13918208,
+      "documents": 1,
+      "nodes": 23774,
+      "jsEventListeners": 715
+    },
+    {
+      "LayoutCount": 198,
+      "RecalcStyleCount": 1215,
+      "JSHeapUsedSize": 12666824,
+      "JSHeapTotalSize": 13918208,
+      "documents": 1,
+      "nodes": 23774,
+      "jsEventListeners": 715
+    },
+    {
+      "LayoutCount": 209,
+      "RecalcStyleCount": 1247,
+      "JSHeapUsedSize": 12683452,
+      "JSHeapTotalSize": 13918208,
+      "documents": 1,
+      "nodes": 23774,
+      "jsEventListeners": 715
+    }
+  ],
+  "finalBuildRecheck": true
+}

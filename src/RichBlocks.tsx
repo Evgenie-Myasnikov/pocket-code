@@ -1,12 +1,13 @@
-import { useState, useRef } from 'react';
+import { memo, useState, useRef, type ReactNode } from 'react';
 import { useModal } from './navigation';
 import { Capacitor } from '@capacitor/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Block, SubagentView } from '../server/types';
-import { t } from './i18n';
+import { t, useLanguage } from './i18n';
 import {Terminal, Pencil, ChevronRight, Wrench} from 'lucide-react';
 import {toolActivity} from './tool-activity';
+import {ImageViewer} from './ImageViewer';
 
 import {Installer as Documents} from './native-update';
 export function safeWebUrl(value?: string) {
@@ -19,13 +20,19 @@ export function imageSource(block: Block): string | null {
 }
 function Picture({src,alt}:{src:string;alt:string}) {
   const [loaded,setLoaded]=useState(src.startsWith('data:')), [expanded,setExpanded]=useState(false), [failed,setFailed]=useState(false);
-  const overlay=useRef<HTMLDivElement|null>(null);useModal(overlay,expanded,()=>setExpanded(false));
   if(failed)return <p className="attachment-chip">{t('Не удалось показать изображение')}</p>;
   if(!loaded)return <button className="secondary" onClick={()=>setLoaded(true)}>{t('Загрузить внешнее изображение')} · {alt}</button>;
-  return <><button className="image-preview" aria-label={t('Открыть изображение')} onClick={()=>setExpanded(true)}><img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></button>{expanded && <div ref={overlay} className="image-overlay" role="dialog" aria-label={t('Изображение')} aria-modal="true"><button className="secondary" onClick={()=>setExpanded(false)}>{t('Закрыть')}</button><div><img src={src} alt={alt} referrerPolicy="no-referrer"/></div></div>}</>;
+  return <><button className="image-preview" aria-label={t('Открыть изображение')} onClick={()=>setExpanded(true)}><img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></button>{expanded&&<ImageViewer src={src} title={alt} onClose={()=>setExpanded(false)}/>}</>;
 }
-export function Markdown({text}:{text:string}) {
+export const Markdown=memo(function Markdown({text}:{text:string}) {
+  useLanguage();
   return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<Picture src={safeWebUrl(src as string)!} alt={alt||t('Изображение')}/>:<span>📎 {alt||t('Изображение')}</span>}}>{text}</ReactMarkdown></div>;
+});
+// Native <details> hides content visually but still mounts/parses all of it.
+// Long command output is materialized only while the user asks to inspect it.
+function Disclosure({className,summary,children}:{className:string;summary:ReactNode;children:()=>ReactNode}){
+  const [open,setOpen]=useState(false);
+  return <details className={className} onToggle={event=>setOpen(event.currentTarget.open)}><summary>{summary}</summary>{open&&children()}</details>;
 }
 function Document({block}:{block:Block}) {
   const [error,setError]=useState(''); const source=block.source;
@@ -41,16 +48,16 @@ export function RichBlock({block,depth=0,result,onSubagent,running=false}:{block
   if(block.type==='text')return <Markdown text={block.text || ''}/>;
   if(block.type==='subagent' && block.agent) {
     const agent=block.agent,label=t(({running:'Работает',completed:'Завершён',error:'Ошибка',stopped:'Остановлен',unknown:'Статус неизвестен'} as const)[agent.status]);
-    return onSubagent?<button className={`subagent-card subagent-${agent.status}`} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span><ChevronRight className="subagent-chevron" size={16} aria-hidden="true"/></button>:<details className="tool-card"><summary>{agent.name} · {label}</summary>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</details>;
+    return onSubagent?<button className={`subagent-card subagent-${agent.status}`} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span><ChevronRight className="subagent-chevron" size={16} aria-hidden="true"/></button>:<Disclosure className="tool-card" summary={<>{agent.name} · {label}</>}>{()=> <>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</>}</Disclosure>;
   }
   if(block.type==='image'){const src=imageSource(block);return src?<Picture src={src} alt={block.title||t('Изображение')}/>:<span className="attachment-chip">📎 {t('Изображение недоступно в сохранённой истории')}</span>;}
   if(block.type==='document')return <Document block={block}/>;
-  if(block.type==='tool_result')return <details className={`tool-card result ${block.is_error?'failed':''}`}><summary>{block.is_error?t('Ошибка инструмента'):t('Результат инструмента')}</summary><ToolResultContent block={block} depth={depth}/></details>;
+  if(block.type==='tool_result')return <Disclosure className={`tool-card result ${block.is_error?'failed':''}`} summary={block.is_error?t('Ошибка инструмента'):t('Результат инструмента')}>{()=> <ToolResultContent block={block} depth={depth}/>}</Disclosure>;
   if(block.type==='tool_use'){
     const activity=toolActivity(block,result,running),Icon=activity.kind==='command'?Terminal:activity.kind==='edit'?Pencil:Wrench;
-    return <details className={`tool-card activity-row ${result?'combined':''} ${activity.failed?'failed':''}`}><summary><Icon size={16}/><span>{t(activity.label)}{activity.kind==='tool'&&block.name?` · ${block.name}`:''}</span><ChevronRight className="activity-chevron" size={14}/></summary><div className="activity-details"><strong>{block.name}</strong><pre>{JSON.stringify(block.input,null,2)}</pre>{result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}</div></details>;
+    return <Disclosure className={`tool-card activity-row ${result?'combined':''} ${activity.failed?'failed':''}`} summary={<><Icon size={16}/><span>{t(activity.label)}{activity.kind==='tool'&&block.name?` · ${block.name}`:''}</span><ChevronRight className="activity-chevron" size={14}/></>}>{()=> <div className="activity-details"><strong>{block.name}</strong><pre>{JSON.stringify(block.input,null,2)}</pre>{result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}</div>}</Disclosure>;
   }
-  if(block.type==='thinking')return <details className="thinking"><summary>{t('Рассуждения')}</summary><p>{block.thinking}</p></details>;
+  if(block.type==='thinking')return <Disclosure className="thinking" summary={t('Рассуждения')}>{()=> <p>{block.thinking}</p>}</Disclosure>;
   if(block.type==='redacted_thinking')return <p className="muted">{t('Этот блок размышлений скрыт провайдером')}</p>;
-  return <details className="tool-card"><summary>{block.type==='codexItem'?t('Подробности действия'):<>{t('Дополнительные данные')} · {block.type}</>}</summary><pre>{JSON.stringify(block,null,2)}</pre></details>;
+  return <Disclosure className="tool-card" summary={block.type==='codexItem'?t('Подробности действия'):<>{t('Дополнительные данные')} · {block.type}</>}>{()=> <pre>{JSON.stringify(block,null,2)}</pre>}</Disclosure>;
 }

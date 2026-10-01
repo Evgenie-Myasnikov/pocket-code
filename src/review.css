@@ -27,3 +27,5 @@
 .review-options .review-font-size{margin-top:12px}
 .review-options label{margin-bottom:0}
 .review-summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 16px;color:var(--muted);font-size:.85em;flex-shrink:0;border-bottom:1px solid var(--line)}
+.diff-table .diff-line td{width:auto;line-height:inherit;white-space:pre}
+.diff-table .diff-spacer td{min-width:0;line-height:0;font-size:0}

@@ -116,6 +116,7 @@ test('disconnect clears planned restart state and ignores a late response',async
   await setup(page,async route=>{if(route.request().method()==='POST')return route.fulfill({json:status('restarting')});statusRoute=route;});
   await openUpdates(page);await expect(page.locator('.host-update-card')).toContainText('restarting');
   await expect.poll(()=>Boolean(statusRoute),{timeout:8000}).toBe(true);
+  await page.getByRole('button',{name:'All settings',exact:true}).click();
   await page.getByRole('button',{name:'Disconnect and forget',exact:true}).click();
   await expect(page.getByRole('button',{name:'Connect computer',exact:true})).toBeVisible();
   await statusRoute!.fulfill({json:status('updated')});

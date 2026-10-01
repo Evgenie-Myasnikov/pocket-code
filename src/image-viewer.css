@@ -1,0 +1,13 @@
+.image-overlay.image-viewer{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);gap:0;background:var(--bg);color:var(--text);font-size:clamp(12px,calc(14px * var(--ui-scale,1)),18px)}
+.image-viewer-toolbar{display:flex;align-items:center;gap:12px;flex-shrink:0;padding:4px 12px;border-bottom:1px solid var(--line)}
+.image-viewer-toolbar strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1em;font-weight:500}
+.image-viewer .icon-button{width:48px;height:48px;min-width:48px;min-height:48px;flex-shrink:0;padding:12px;background:transparent;border:0;color:inherit}
+.image-overlay.image-viewer>.image-viewer-stage{position:relative;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;overflow:hidden;touch-action:none;user-select:none;overscroll-behavior:contain}
+.image-viewer-stage>p,.image-viewer-stage>.image-viewer-message{max-width:85%;overflow-wrap:anywhere;text-align:center;line-height:1.6}
+.image-viewer-message button{min-height:48px;max-width:100%;white-space:normal}
+.image-overlay.image-viewer .image-viewer-image{position:absolute;left:50%;top:50%;max-width:none;min-width:0;object-fit:contain;transform-origin:center;will-change:transform;user-select:none;-webkit-user-drag:none}
+.image-viewer-controls{display:flex;justify-content:center;align-items:center;gap:6px;min-width:0;padding:4px 8px;border-top:1px solid var(--line);flex-shrink:0}
+.image-viewer-controls output{min-width:3em;text-align:center;font-variant-numeric:tabular-nums}
+.image-viewer-fit{display:flex;align-items:center;gap:6px;min-height:48px;padding:8px;border:0;background:transparent;color:inherit;font:inherit;font-size:.85em}
+.image-viewer button:disabled{opacity:.4}
+@media(max-height:480px){.image-viewer-toolbar,.image-viewer-controls{padding-block:0}}

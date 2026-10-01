@@ -26,6 +26,7 @@ import { codexEffortPattern } from './codex-models.js';
 import { activityItem, recentActivityJobs } from './activity.js';
 import { claudeSubagents, claudeSubagentMessages } from './subagents.js';
 import { EngineUpdates, pocketSource } from './engine-updates.js';
+import { coalesceReads } from './read-coalescer.js';
 
 export type Config = { jiraForProvider?(provider:'claude'|'codex'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
@@ -200,7 +201,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json(await queueFor(body.provider).add({ ...body, cwd }));
   });
   app.post('/api/jira/queue/control', async (req, res) => { const body = z.object({ provider: providerSchema, action: z.enum(['pause', 'resume', 'clear']) }).parse(req.body); res.json(await queueFor(body.provider).control(body.action)); });
-  const sessions = async (provider: 'claude' | 'codex' = 'claude') => {
+  const loadSessions = async (provider: 'claude' | 'codex' = 'claude') => {
     if (provider === 'codex') return codex().sessions();
     const [all, desktop] = await Promise.all([sdk.listSessions(), readDesktopSessions(indexes)]);
     const merged = new Map(all.map(s => [s.sessionId, { ...s, source: 'cli' as string, archived: false }]));
@@ -216,10 +217,16 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     }
     return permitted.sort((a, b) => b.lastModified - a.lastModified);
   };
+  // Concurrent list/project/history requests share metadata only while loading.
+  // Every later request sees Desktop renames, project removal and provider loss.
+  const sessionReads = coalesceReads<'claude' | 'codex', Awaited<ReturnType<typeof loadSessions>>>(0, 2);
+  const sessions = (provider: 'claude' | 'codex' = 'claude') => sessionReads(provider, () => loadSessions(provider));
+  const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' = 'claude') {
     uuid.parse(id);
     const found = (await sessions(provider)).find(s => s.sessionId === id);
     if (!found) throw new HttpError(404, 'Чат не найден в разрешённых папках');
+    if (found.cwd && !found.readOnly) await allowedPath(roots, found.cwd, true);
     return found;
   }
   app.get('/api/sessions/:id/subagents', async (req, res) => {
@@ -281,7 +288,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if (req.query.window !== undefined) {
       const size = z.coerce.number().int().min(1).max(5000).parse(req.query.window);
       const end = req.query.end === undefined ? undefined : z.coerce.number().int().min(0).parse(req.query.end);
-      const all = await sdk.getSessionMessages(s.sessionId, { dir: s.cwd });
+      const all = await historyReads(JSON.stringify([provider, s.sessionId, s.cwd]), () => sdk.getSessionMessages(s.sessionId, { dir: s.cwd }));
       const available = Math.min(end ?? all.length, all.length);
       const fromStart = req.query.from === 'start';
       const stop = fromStart ? Math.min(size, available) : available, start = fromStart ? 0 : Math.max(0, stop - size);

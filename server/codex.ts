@@ -10,6 +10,7 @@ import {Followups,type FollowupInput} from './followups.js';
 import { codexPermissions, verifyCodexPermissions, type CodexAccess } from './codex-access.js';
 import { normalizeCodexUsage } from './codex-usage.js';
 import { codexModels } from './codex-models.js';
+import { coalesceReads } from './read-coalescer.js';
 
 type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; reasoningEffort?: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
 type Pending = { finish: (allow: boolean, answers?: Record<string, string>) => void };
@@ -23,6 +24,9 @@ export class CodexService {
   private ready?: Promise<CodexRpc>;
   private jobs = new Map<string, CodexJob>();
   private closed = false;
+  private sessionReads = coalesceReads<string, CodexSession[]>(0, 1);
+  private itemReads = coalesceReads<string, { metadata: any; items: any[] }>(0, 8);
+  private messageReads = coalesceReads<string, ChatMessage[]>(0, 8);
   constructor(private roots: string[], private options: CodexServiceOptions = {}) {}
   private connect(): Promise<CodexRpc> {
     if (this.closed) return Promise.reject(new Error('Codex service is closed.'));
@@ -68,6 +72,9 @@ export class CodexService {
     return result.thread;
   }
   async sessions(): Promise<CodexSession[]> {
+    return this.sessionReads('sessions', () => this.loadSessions());
+  }
+  private async loadSessions(): Promise<CodexSession[]> {
     const rpc = await this.connect(), sessions: CodexSession[] = [], seen = new Set<string>();
     let cursor: string | null = null;
     // A bounded scan prevents an unbounded import on PCs with very large archives.
@@ -88,14 +95,22 @@ export class CodexService {
     return sessions.sort((a, b) => b.lastModified - a.lastModified);
   }
   private async threadItems(id: string) {
+    return this.itemReads(id, () => this.loadThreadItems(id));
+  }
+  private async loadThreadItems(id: string) {
     const metadata = await this.readThread(id), rpc = await this.connect();
-    let items: any[] = [];
+    let items: any[] = [], serializedSize = 2;
     if (metadata.historyMode === 'paginated') {
       let cursor: string | null = null;
       for (let page = 0; page < 100; page++) {
         const result = await rpc.request('thread/items/list', { threadId: id, cursor, limit: 100, sortDirection: 'asc' });
-        items.push(...(result.data || []).map((entry: any) => entry.item));
-        if (JSON.stringify(items).length > 16_000_000) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
+        for (const entry of result.data || []) {
+          // Account for each item once; serializing the growing array each page
+          // made large conversation reads quadratic in their history length.
+          serializedSize += (JSON.stringify(entry.item) ?? 'null').length + (items.length ? 1 : 0);
+          if (serializedSize > 16_000_000) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
+          items.push(entry.item);
+        }
         if (!result.nextCursor) break;
         if (result.nextCursor === cursor || page === 99) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
         cursor = result.nextCursor;
@@ -104,10 +119,13 @@ export class CodexService {
       const thread = await this.readThread(id, true);
       items = (thread.turns || []).flatMap((turn: any) => turn.items || []);
     }
-    if (JSON.stringify(items).length > 16_000_000) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
+    if (metadata.historyMode !== 'paginated' && JSON.stringify(items).length > 16_000_000) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
     return { metadata, items };
   }
   async messages(id: string): Promise<ChatMessage[]> {
+    return this.messageReads(id, () => this.loadMessages(id));
+  }
+  private async loadMessages(id: string): Promise<ChatMessage[]> {
     const { items } = await this.threadItems(id);
     const messages: ChatMessage[] = []; let size = 0;
     for (const item of items) {

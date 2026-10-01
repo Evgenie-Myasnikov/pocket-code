@@ -21,6 +21,14 @@ If the camera is unavailable, choose **QR from image**. Manual entry needs the c
 
 Keep the PC awake and the host running. Closing the QR browser tab does not stop the host; closing the host launcher window ends its processes. Restarting a temporary internet tunnel changes its address: scan the new QR. A local Wi-Fi address normally cannot be reached over mobile data.
 
+## View images from a conversation
+
+<table><tr><td><img src="images/results-images.png" width="280" alt="Results gallery with image thumbnails"></td><td><img src="images/image-viewer.png" width="280" alt="Full-screen image with zoom and Fit to screen controls"></td></tr></table>
+
+Open **Results → Images** to browse thumbnails from the loaded messages. Switch between **Assistant results** and **Your sources** to see generated images or your attachments. Tap a thumbnail to open it, pinch or use **+ / −** to zoom, and drag to inspect details. **Fit to screen** resets the view. Close or press Back to return to the same gallery position.
+
+External images have a **Load external image** button. Local images use the connected computer; a missing file can no longer be previewed. Load older messages to include earlier images.
+
 <a id="diff"></a>
 ## Review code changes
 

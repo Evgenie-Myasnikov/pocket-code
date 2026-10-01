@@ -1,3 +1,5 @@
+import {shareMessages,shareSnapshot} from './chat-snapshot';
+import {startVisiblePoll} from './visible-poll';
 import {chatCacheScope,readChatCache,writeChatCache,clearChatCache} from './chat-cache';
 import {TaskNotificationBell,TaskNotificationInbox,useTaskNotifications} from './TaskNotifications';
 import type {JiraIssue} from '../server/jira';
@@ -18,12 +20,12 @@ import { useWorkspaceState, useWorkspaceRef } from './workspace-state';
 import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
-import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
+import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { ArrowUp, ArrowLeft, Plus, Search, MessageSquare, Folder, Settings, Terminal, Wifi, ChevronDown, Paperclip, Square, X, GitBranch, RefreshCw, Laptop, LogOut, ShieldCheck, ClipboardList, Eye, EyeOff, PanelsTopLeft } from 'lucide-react';
 import { Connect } from './Connect';
 import { useAppearance } from './Appearance';
 import {SettingsPanel,type SettingsPage} from './SettingsPanel';
-import { Message, ApprovalCard } from './Messages';
+import { Message, MessageList, ApprovalCard } from './Messages';
 import { JiraJobs, JiraSettings } from './Jira';
 import { ProjectDocs } from './ProjectDocs';
 import { LiveTerminal } from './LiveTerminal';
@@ -177,8 +179,9 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   useEffect(()=>{const visible=()=>{if(document.visibilityState!=='hidden')requestAnimationFrame(()=>acknowledgeActivity.current());};document.addEventListener('visibilitychange',visible);return()=>document.removeEventListener('visibilitychange',visible);},[]);
   const parentChatId = job?.sessionId || selected?.sessionId;
   const outputMessages=useMemo(()=>uniqueMessages([...history,...(job?.errorCode!=='codex_thread_busy'?job?.messages||[]:[])]),[history,job?.messages,job?.errorCode]);
+  const runningMessages=useMemo(()=>job?.status==='running'?new Set(job.messages):null,[job?.messages,job?.status]);
   const toolResults=useMemo(()=>{const blocks=outputMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b]));},[outputMessages]);
-  const hasOutputs=useMemo(()=>extractChatOutputs(outputMessages).length>0,[outputMessages]);
+  const hasOutputs=useMemo(()=>extractChatOutputs(outputMessages,1).length>0,[outputMessages]);
   // Review follows the open conversation, never a remembered folder from another screen.
   const reviewCwd=selected?selected.cwd:job?.cwd||cwd;
   const reviewContext=[connection?.url,provider,reviewCwd,parentChatId].join('|');
@@ -197,6 +200,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     };
     void poll();return()=>{cancelled=true;clearTimeout(timer);};
   },[connection,reviewCwd,provider,parentChatId,tab,mobileChat,readingMode,networkError,demo,selected?.readOnly,job?.status]);
+  const agentMap=useMemo(()=>{
   const agentMap = new Map<string,SubagentView>();
   for(const message of [...history,...(job?.messages || [])]) for(const block of message.blocks) if(block.agent) agentMap.set(block.agent.id,block.agent);
   for(const agent of agentList) {
@@ -204,16 +208,18 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     agentMap.set(agent.id,{...existing,...agent,name:existing && /^(Claude|Codex) agent$/.test(agent.name)?existing.name:agent.name,
       status:agent.status==='unknown'&&existing?.status && (existing.status!=='running'||running)?existing.status:agent.status});
   }
+  return agentMap;
+  },[history,job?.messages,agentList,running]);
+  const openSubagent=useCallback((agent:SubagentView)=>setAgentPanel({initial:agent}),[setAgentPanel]);
   useEffect(()=>{
     setAgentPanel(null);setAgentList([]);setOutputsOpen(false);
     if(!connection||demo||tab!=='chats'||!parentChatId||parentChatId.startsWith('pending-'))return;
-    let cancelled=false,timer:ReturnType<typeof setTimeout>;
+    let cancelled=false;
     async function pollAgents(){
-      try{const data=await request<{agents:SubagentView[]}>(connection!,`/sessions/${encodeURIComponent(parentChatId!)}/subagents?provider=${provider}`);if(!cancelled)setAgentList(Array.isArray(data.agents)?data.agents.filter(agent=>agent&&typeof agent.id==='string'&&typeof agent.name==='string'):[]);}
+      try{const data=await request<{agents:SubagentView[]}>(connection!,`/sessions/${encodeURIComponent(parentChatId!)}/subagents?provider=${provider}`);if(!cancelled)setAgentList(old=>shareSnapshot(old,Array.isArray(data.agents)?data.agents.filter(agent=>agent&&typeof agent.id==='string'&&typeof agent.name==='string'):[]));}
       catch{/* Main chat remains usable if an older bridge or provider cannot expose child histories. */}
-      if(!cancelled)timer=setTimeout(pollAgents,6000);
     }
-    void pollAgents();return()=>{cancelled=true;clearTimeout(timer);};
+    const stop=startVisiblePoll(pollAgents,6000);return()=>{cancelled=true;stop();};
   },[connection,provider,parentChatId,tab,demo]);
   const api = <T,>(endpoint: string, data?: unknown) => request<T>(connection!, endpoint, data);
   useEffect(()=>{
@@ -258,28 +264,27 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     async function refreshProviders() {
       try {
         const list = await request<ProviderInfo[]>(connection!, '/providers');
-        if (!cancelled && Array.isArray(list)) setProviders(list.filter(item => item.id === 'claude' || item.id === 'codex'));
+        if (!cancelled && Array.isArray(list)) setProviders(old=>shareSnapshot(old,list.filter(item => item.id === 'claude' || item.id === 'codex')));
       } catch { /* Older bridge versions support the existing Claude workspace. */ }
     }
-    void refreshProviders();const timer = setInterval(() => void refreshProviders(),30000);
-    return () => {cancelled=true;clearInterval(timer);};
+    const stop=startVisiblePoll(refreshProviders,30000);
+    return () => {cancelled=true;stop();};
   },[connection,demo]);
   useEffect(() => {
     if (!connection || !health || demo) return;
-    let cancelled = false, timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
     async function refreshProjects() {
       try {
         const list = await request<string[]>(connection!, '/projects');
         if (!Array.isArray(list) || !list.every(root => typeof root === 'string')) throw new Error('Invalid project list');
-        if (!cancelled) setProjects([...new Set([...health!.roots, ...list])]);
+        if (!cancelled) setProjects(old=>shareSnapshot(old,[...new Set([...health!.roots, ...list])]));
       } catch {
         // Older bridges still expose their configured roots through /health.
         if (!cancelled) setProjects(previous => previous || health!.roots);
       }
-      if (!cancelled) timer = setTimeout(refreshProjects, 15000);
     }
-    void refreshProjects();
-    return () => { cancelled = true; clearTimeout(timer); };
+    const stop=startVisiblePoll(refreshProjects,15000);
+    return () => { cancelled = true;stop(); };
   }, [connection, health, demo]);
   useEffect(()=>{if(provider==='codex' && model && providerInfo?.models?.length && !providerInfo.models.some(item=>item.id===model))setModel('');},[provider,providerInfo?.models,model]);
   useEffect(()=>{
@@ -291,50 +296,51 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     if(!cacheScope||demo||!selected||loading||fromStart||!outputMessages.length)return;
     const timer=setTimeout(()=>writeChatCache(cacheScope,provider,'chat:'+selected.sessionId,outputMessages.slice(-100)),400);
     return()=>clearTimeout(timer);
-  },[cacheScope,provider,demo,selected?.sessionId,history,loading,fromStart,job]);
+  },[cacheScope,provider,demo,selected?.sessionId,outputMessages,loading,fromStart]);
   useEffect(() => {
     if (!connection || demo || !providerInfo) return;
-    let cancelled = false,timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+    let cachedSessions:Session[]|null=null;
     async function refresh() {
       try {
         const [s, j] = await Promise.all([request<Session[]>(connection!, `/sessions?provider=${provider}`), request<JobView[]>(connection!, `/jobs?provider=${provider}`)]);
         if (!cancelled) {
           const scopedSessions=s.filter(item=>!item.provider || item.provider===provider),scopedJobs=j.filter(item=>!item.provider || item.provider===provider);
-          if(cacheScope)writeChatCache(cacheScope,provider,'sessions',scopedSessions.slice(0,300));
-          setSessions(scopedSessions);setJobs(scopedJobs);setSelected(old=>old?scopedSessions.find(item=>item.sessionId===old.sessionId)||old:null);setNetworkError('');
+          const cacheSnapshot=shareSnapshot(cachedSessions,scopedSessions.slice(0,300));
+          if(cacheScope&&cacheSnapshot!==cachedSessions)writeChatCache(cacheScope,provider,'sessions',cacheSnapshot);
+          cachedSessions=cacheSnapshot;
+          setSessions(old=>shareSnapshot(old,scopedSessions));setJobs(old=>shareSnapshot(old,scopedJobs));setSelected(old=>old?shareSnapshot(old,scopedSessions.find(item=>item.sessionId===old.sessionId)||old):null);setNetworkError('');
         }
       } catch (e) {if (!cancelled) setNetworkError((e as Error).message);}
-      if (!cancelled) timer = setTimeout(refresh, 5000);
     }
-    void refresh();return () => {cancelled = true;clearTimeout(timer);};
+    const stop=startVisiblePoll(refresh,5000);return () => {cancelled = true;stop();};
   }, [connection, demo, provider, Boolean(providerInfo),cacheScope]);
   useEffect(() => {
     if (!connection || !job || demo || job.status !== 'running') return;
-    let cancelled = false,timer: ReturnType<typeof setTimeout>,revision = -1;
+    let cancelled = false,revision = -1;
     async function poll() {
       let finished = false;
       try {
         const updated = await request<JobView | null>(connection!, `/jobs/${job!.id}?revision=${revision}`);
-        if (!cancelled) {setNetworkError('');if (updated) {revision = updated.revision;setJob(updated);finished = updated.status !== 'running';}}
+        if (!cancelled) {setNetworkError('');if (updated) {revision = updated.revision;setJob(old=>shareSnapshot(old,updated));finished = updated.status !== 'running';}}
       } catch (e) {if (!cancelled) setNetworkError((e as Error).message);}
-      if (!cancelled && !finished) timer = setTimeout(poll, 900);
+      return !finished;
     }
-    void poll();return () => {cancelled = true;clearTimeout(timer);};
+    const stop=startVisiblePoll(poll,900);return () => {cancelled = true;stop();};
   }, [connection, job?.id, job?.status, demo, provider]);
   useEffect(() => {
     if (!connection || !selected || job && job.errorCode !== 'codex_thread_busy' || demo || loading || loadingOlder || busy || tab !== 'chats') return;
-    let cancelled = false,timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
     const epoch = navigation.current;
     async function sync() {
       try {
         const window=historyWindow.current;
         const data = await request<{messages: ChatMessage[];previous: number | null;next: number | null;}>(connection!, `/sessions/${encodeURIComponent(selected!.sessionId)}/messages?provider=${provider}&window=${window}${fromStart ? '&from=start' : ''}`);
-        if (!cancelled && epoch === navigation.current && !sending.current && !paging.current && window===historyWindow.current) {setHistory(uniqueMessages(data.messages));setHasMore(fromStart ? data.next : data.previous);setHistoryError('');}
+        if (!cancelled && epoch === navigation.current && !sending.current && !paging.current && window===historyWindow.current) {setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(fromStart ? data.next : data.previous);setHistoryError('');}
       } catch (e) {if (!cancelled) setHistoryError((e as Error).message);}
-      if (!cancelled) timer = setTimeout(sync, 3000);
     }
-    timer = setTimeout(sync, 3000);
-    return () => {cancelled = true;clearTimeout(timer);};
+    const stop=startVisiblePoll(sync,3000,false);
+    return () => {cancelled = true;stop();};
   }, [connection, selected?.sessionId, job?.id, job?.errorCode, demo, loading, loadingOlder, busy, tab, fromStart, provider]);
   useEffect(() => {
     // Keep the live answer until the host has flushed it to session history.
@@ -343,21 +349,20 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     const completed = job, lastAnswer = [...completed.messages].reverse().find(message => message.role === 'assistant');
     if (!lastAnswer) return;
     const epoch = navigation.current;
-    let cancelled = false, timer:ReturnType<typeof setTimeout>;
+    let cancelled = false;
     async function syncCompleted() {
       try {
         const window=historyWindow.current;
         const data = await request<{messages:ChatMessage[];previous:number|null}>(connection!, `/sessions/${encodeURIComponent(completed.sessionId!)}/messages?provider=${provider}&window=${window}`);
         if (cancelled || epoch !== navigation.current || sending.current || paging.current || window!==historyWindow.current) return;
         if (data.messages.some(message => message.id === lastAnswer!.id)) {
-          setHistory(uniqueMessages(data.messages));setHasMore(data.previous);setHistoryError('');setJob(null);
+          setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(data.previous);setHistoryError('');setJob(null);
           setSelected(old => old?.sessionId === completed.sessionId ? old : sessions.find(session => session.sessionId === completed.sessionId) || {sessionId:completed.sessionId!,provider,cwd:completed.cwd,summary:t("Текущая задача"),lastModified:completed.startedAt});
-          return;
+          return false;
         }
       } catch (error) {if (!cancelled && epoch === navigation.current) setHistoryError((error as Error).message);}
-      if (!cancelled && epoch === navigation.current) timer = setTimeout(syncCompleted,3000);
     }
-    void syncCompleted();return () => {cancelled=true;clearTimeout(timer);};
+    const stop=startVisiblePoll(syncCompleted,3000);return () => {cancelled=true;stop();};
   },[connection,provider,job?.id,job?.status,demo,busy,loading,loadingOlder,fromStart,tab]);
   useEffect(()=>{if(scroll.current)scroll.current.scrollTop=lastScrollTop.current;},[provider,tab]);
   useLayoutEffect(()=>{
@@ -390,7 +395,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
       if(epoch!==navigation.current||paging.current!==requestId)return;
       captureScrollAnchor(!fromStart);
       nearBottom.current=false;historyWindow.current=nextWindow;
-      setHistory(uniqueMessages(data.messages));
+      setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));
       setHasMore(fromStart?data.next:data.previous);setHistoryError('');
     } catch(e) {if(epoch===navigation.current)setHistoryError((e as Error).message);}
     finally {if(paging.current===requestId){paging.current=null;setLoadingOlder(false);}}
@@ -400,7 +405,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     if(active?.errorCode==='codex_thread_busy')active=null;
     const data = await api<{messages: ChatMessage[];previous: number | null;next: number | null;}>(`/sessions/${encodeURIComponent(s.sessionId)}/messages?provider=${provider}&window=${historyWindow.current}${beginning ? '&from=start' : ''}${active ? `&end=${active.baseMessageCount}` : ''}`);
     if (epoch !== navigation.current) return;
-    setHistory(uniqueMessages(data.messages));setHasMore(beginning ? data.next : data.previous);setHistoryError('');
+    setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(beginning ? data.next : data.previous);setHistoryError('');
   }
   async function jumpHistory(beginning: boolean) {
     if (loading || busy) return;
@@ -536,9 +541,9 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}
             {!loading && !history.length && !job && !selected && <div className="welcome"><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={15} /></button>)}</div></div>}
             {!loading && selected && !history.length && !job && <p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>}
-            {history.map((m, i) => <Message key={`${provider}-${m.id}-${i}`} provider={provider} message={m} toolResults={toolResults} running={job?.status==='running'&&Boolean(job?.messages.includes(m))} agents={agentMap} onSubagent={connection&&parentChatId ? agent=>setAgentPanel({initial:agent}) : undefined} />)}
+            <MessageList key={`${provider}-history`} provider={provider} messages={history} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined}/>
             {hasMore !== null && historyWindow.current >= 5000 && <p className="muted" role="status">{t("Достигнут предел окна: 5000 сообщений")}</p>}
-            {job?.errorCode!=='codex_thread_busy' && job?.messages.map((m, i) => <Message key={`${provider}-${job.id}-${m.id}-${i}`} provider={provider} message={m} toolResults={toolResults} running={job?.status==='running'&&Boolean(job?.messages.includes(m))} agents={agentMap} onSubagent={connection&&parentChatId ? agent=>setAgentPanel({initial:agent}) : undefined} />)}
+            {job&&job.errorCode!=='codex_thread_busy' && <MessageList key={`${provider}-${job.id}`} provider={provider} messages={job.messages} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined}/>}
             {agentMap.size>0 && connection && parentChatId && <div className="subagent-activity"><button className="secondary" onClick={()=>setAgentPanel({})}>{t('Субагенты · {0}',agentMap.size)}{[...agentMap.values()].some(agent=>agent.status==='running')?' · '+t('Работают: {0}',[...agentMap.values()].filter(agent=>agent.status==='running').length):''}</button></div>}
             {job?.partial && <Message key={provider} provider={provider} message={{ id: 'partial', role: 'assistant', blocks: [{ type: 'text', text: job.partial }] }} />}
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} decide={async (allow, answers) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers });}} />)}

@@ -1,5 +1,5 @@
 import { RichBlock } from './RichBlocks';
-import { t } from "./i18n";import { useState } from 'react';
+import { t, useLanguage } from "./i18n";import { memo, useState } from 'react';
 import { Copy, Check, ShieldCheck, X } from 'lucide-react';
 import type { ChatMessage, Approval, SubagentView, Block } from '../server/types';
 import './messages.css';
@@ -7,7 +7,12 @@ function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
 }
-export function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false }: {message: ChatMessage;provider?: 'claude' | 'codex';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean}) {
+type MessageProps={message: ChatMessage;provider?: 'claude' | 'codex';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean};
+export const MessageList=memo(function MessageList({messages,runningMessages,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];runningMessages?:Set<ChatMessage>|null}){
+  return messages.map(message=><Message key={message.id} message={message} running={runningMessages?.has(message)||false} {...shared}/>);
+});
+export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false }: MessageProps) {
+  useLanguage();
   const plain = message.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
   if(message.blocks.length&&message.blocks.every(b=>b.type==='tool_result'&&b.tool_use_id&&toolResults?.has(b.tool_use_id)))return null;
   const isUser = message.role === 'user';
@@ -27,7 +32,15 @@ export function Message({ message, provider = 'claude', onSubagent, agents,toolR
       {content}
     </>}
   </article>;
-}
+},(before,after)=>{
+  if(before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.onSubagent!==after.onSubagent)return false;
+  // A result or agent update affects only the messages that refer to it.
+  return after.message.blocks.every(block=>{
+    if(block.agent&&before.agents?.get(block.agent.id)!==after.agents?.get(block.agent.id))return false;
+    const id=block.type==='tool_use'?block.id:block.type==='tool_result'?block.tool_use_id:undefined;
+    return !id||before.toolResults?.get(id)===after.toolResults?.get(id);
+  });
+});
 export function ApprovalCard({ approval, decide, provider = 'claude' }: {approval: Approval;provider?: 'claude' | 'codex';decide: (allow: boolean, answers?: Record<string, string>) => Promise<void>;}) {
   const [answers, setAnswers] = useState<Record<string, string>>({}),[busy, setBusy] = useState(false),[error, setError] = useState('');
   const questions = approval.tool === 'AskUserQuestion' && Array.isArray(approval.input.questions) ? approval.input.questions as Array<{question: string;options?: {label: string;description?: string;}[];}> : [];

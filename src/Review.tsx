@@ -5,18 +5,9 @@ import {request,type Connection} from './api';
 import {t,getLanguage} from './i18n';
 import type {ReviewFile} from '../server/review';
 import './review.css';
-export type DiffRow={left?:string;right?:string;old?:number;next?:number;kind:'context'|'change'|'hunk'};
-export function diffRows(patch:string):DiffRow[]{
-  const rows:DiffRow[]=[];let old=0,next=0,removed:{text:string;line:number}[]=[],added:{text:string;line:number}[]=[];
-  const flush=()=>{for(let i=0;i<Math.max(removed.length,added.length);i++)rows.push({kind:'change',left:removed[i]?.text,old:removed[i]?.line,right:added[i]?.text,next:added[i]?.line});removed=[];added=[];};
-  for(const line of patch.split('\n')){
-    if(line.startsWith('@@')){flush();const match=line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);if(match){old=Number(match[1]);next=Number(match[2]);rows.push({kind:'hunk',left:line});}continue;}
-    if(!old&&!next)continue;
-    if(line.startsWith('-'))removed.push({text:line.slice(1),line:old++});
-    else if(line.startsWith('+'))added.push({text:line.slice(1),line:next++});
-    else if(line.startsWith(' ')){flush();rows.push({kind:'context',left:line.slice(1),right:line.slice(1),old:old++,next:next++});}
-  }flush();return rows;
-}
+export {diffRows} from './diff-rows';
+import {DiffTable} from './DiffTable';
+
 type Data={files:ReviewFile[];current:string;base:string;branches:string[];patch:string;binary:boolean;repositoryRoot?:string;projectPath?:string;scope?:string};
 export function Review({connection,cwd,onClose,initialMode='working'}:{connection:Connection;cwd:string;onClose:()=>void;initialMode?:'working'|'branch'}){
   const panel=useRef<HTMLElement|null>(null),diff=useRef<HTMLElement|null>(null),eye=useRef<HTMLButtonElement|null>(null),restore=useRef<HTMLButtonElement|null>(null),optionsButton=useRef<HTMLButtonElement|null>(null);
@@ -53,7 +44,6 @@ export function Review({connection,cwd,onClose,initialMode='working'}:{connectio
     return()=>{active=false;clearInterval(timer);document.removeEventListener('visibilitychange',resume);window.removeEventListener('focus',resume);};
   },[connection,cwd,mode,base,file,refresh]);
   useEffect(()=>{if(diff.current){diff.current.scrollTop=0;diff.current.scrollLeft=0;}},[file,mode,base]);
-  const rows=diffRows(data?.patch||'');
   const repository=data?.repositoryRoot||cwd,repoName=repository.split(/[\\/]/).filter(Boolean).at(-1)||repository;
   const selectedFile=data?.files.find(item=>item.path===file);
   return <aside ref={panel} className={'review-panel'+(reading?' review-reading':'')} role="dialog" aria-label="Review" aria-modal="true">
@@ -78,7 +68,6 @@ export function Review({connection,cwd,onClose,initialMode='working'}:{connectio
     <div className="review-summary" hidden={reading}><span>{t(mode==='branch'?'Изменения ветки':mode==='staged'?'Подготовленные изменения':'Все изменения')} {'\u00b7'} {data?.files.length??0} {getLanguage()==='ru'?'файл.':'files'}</span><button className="icon-button" disabled={busy} aria-label={t('Обновить')} title={updated?new Date(updated).toLocaleTimeString():''} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={16}/></button></div>
     {reading&&<button ref={restore} className="icon-button review-restore" aria-label={t('Показать управление ревью')} title={t('Показать управление ревью')} onClick={()=>toggleReading(false)}><EyeOff size={20}/></button>}
     {error&&<p className="error" role="alert">{t(error)}</p>}{busy&&<p role="status">{t('Загружаем изменения…')}</p>}
-    <div className="review-body"><section ref={diff} className="diff-content" aria-label={file||t('Изменённые файлы')} tabIndex={0}>{data?.files.length===0&&!busy&&<p>{t('Нет изменений')}</p>}{data?.binary?<p>{t('Двоичный или слишком большой файл')}</p>:<table className={'diff-table '+layout} style={{fontSize:fontSize?`${fontSize}px`:'max(14px, var(--chat-font-size,14px))'}}><tbody>{rows.map((row,i)=>row.kind==='hunk'?<tr key={i} className="hunk"><td colSpan={layout==='split'?4:3}>{row.left}</td></tr>:layout==='split'?<tr key={i}><td className={row.kind==='change'&&row.left!==undefined?'removed':''}>{row.old}</td><td className={row.kind==='change'&&row.left!==undefined?'removed':''}><pre>{row.left}</pre></td><td className={row.kind==='change'&&row.right!==undefined?'added':''}>{row.next}</td><td className={row.kind==='change'&&row.right!==undefined?'added':''}><pre>{row.right}</pre></td></tr>:row.kind==='context'?<tr key={i}><td>{row.old}</td><td>{row.next}</td><td><pre> {row.left}</pre></td></tr>:<ReviewChange key={i} row={row}/>)}</tbody></table>}</section></div>
+    <div className="review-body"><section ref={diff} className="diff-content" aria-label={file||t('Изменённые файлы')} tabIndex={0}>{data?.files.length===0&&!busy&&<p>{t('Нет изменений')}</p>}{data?.binary?<p>{t('Двоичный или слишком большой файл')}</p>:<DiffTable patch={data?.patch||''} layout={layout} fontSize={fontSize} viewport={diff}/>}</section></div>
   </aside>;
 }
-function ReviewChange({row}:{row:DiffRow}){return <>{row.left!==undefined&&<tr className="removed"><td>{row.old}</td><td/><td><pre>-{row.left}</pre></td></tr>}{row.right!==undefined&&<tr className="added"><td/><td>{row.next}</td><td><pre>+{row.right}</pre></td></tr>}</>;}

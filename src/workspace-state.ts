@@ -9,7 +9,10 @@ export function useWorkspaceState<T>(provider: WorkspaceProvider, initial: T | (
     return { claude: create('claude'), codex: create('codex') };
   });
   const setValue = useCallback<Dispatch<SetStateAction<T>>>((next) => {
-    setValues(previous => ({ ...previous, [provider]: typeof next === 'function' ? (next as (value: T) => T)(previous[provider]) : next }));
+    setValues(previous => {
+      const value=typeof next === 'function' ? (next as (value: T) => T)(previous[provider]) : next;
+      return Object.is(value,previous[provider])?previous:{...previous,[provider]:value};
+    });
   }, [provider]);
   return [values[provider], setValue];
 }

@@ -100,7 +100,7 @@ Never publish pairing QR codes, keys, credentials, private chats or the **.pocke
 
 ## For contributors
 
-[Technical reference](docs/REFERENCE.md) · [Feature coverage](FEATURES.md) · [Usability notes](USABILITY.md) · [Changelog](CHANGELOG.md)
+[Technical reference](docs/REFERENCE.md) · [Performance audit](docs/PERFORMANCE.md) · [Feature coverage](FEATURES.md) · [Usability notes](USABILITY.md) · [Changelog](CHANGELOG.md)
 
 ```sh
 npm ci

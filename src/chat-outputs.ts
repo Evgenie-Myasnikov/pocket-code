@@ -38,15 +38,17 @@ function name(reference:{path?:string;href?:string}){
 }
 
 /** Read-only index of the loaded transcript. It never fetches URLs or searches the PC filesystem. */
-export function extractChatOutputs(messages:ChatMessage[]):ChatOutput[]{
+export function extractChatOutputs(messages:ChatMessage[],limit=OUTPUT_LIMIT):ChatOutput[]{
+  limit=Math.max(1,Math.min(OUTPUT_LIMIT,limit));
   const output:ChatOutput[]=[],seen=new Set<string>();let visited=0;
   const tools=new Map<string,Block>();
   for(const message of messages)for(const block of message.blocks)if(block.type==='tool_use'&&block.id)tools.set(block.id,block);
   for(const message of [...messages].reverse()){
+    if(output.length>=limit)break;
     const baseSource:OutputSource=message.role==='user'?'sources':'results';
     if(message.role==='system')continue;
     const add=(value:Omit<ChatOutput,'id'|'messageId'>,location:string)=>{
-      if(output.length>=OUTPUT_LIMIT)return;
+      if(output.length>=limit)return;
       const key=[value.source,value.category,value.path||value.href||`${message.id}:${location}`].join('|');
       if(seen.has(key))return;seen.add(key);output.push({...value,id:`${message.id}:${location}`,messageId:message.id});
     };
@@ -54,6 +56,7 @@ export function extractChatOutputs(messages:ChatMessage[]):ChatOutput[]{
       const ref=outputReference(url);if(ref)add({...ref,source,category:forceImage?'images':category(ref,mime),title:title?.trim()||name(ref)},location);
     };
     const markdown=(text:string,source:OutputSource,location:string)=>{
+      if(output.length>=limit)return;
       let sequence=0;
       const prose=text.slice(0,2_000_000).replace(/^(`{3,}|~{3,})([^\n]*)\n([\s\S]*?)^\1\s*$/gm,(_match,fence:string,info:string,code:string)=>{
         const language=info.trim().split(/\s/)[0].slice(0,40);add({source,category:'code',title:language?`${language} code`:'Code',language,text:code.replace(/\n$/,'')},`${location}-code-${sequence++}`);return '';
@@ -70,7 +73,7 @@ export function extractChatOutputs(messages:ChatMessage[]):ChatOutput[]{
       }
     };
     const walk=(raw:unknown,source:OutputSource,location:string,depth=0)=>{
-      if(depth>6||++visited>15000||output.length>=OUTPUT_LIMIT)return;
+      if(depth>6||++visited>15000||output.length>=limit)return;
       const block=record(raw);if(!block)return;const type=string(block.type),payload=record(block.source);
       if(type==='text'){markdown(string(block.text)||'',source,location);return;}
       if(type==='image'||type==='document'){

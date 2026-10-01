@@ -76,6 +76,8 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
       await page.setViewportSize({ width: 320, height: 740 });
       await page.screenshot({ path: 'artifacts/settings-typography-320.png', fullPage: true, animations: 'disabled' });
       await page.locator('.mobile-nav').getByRole('button', { name: 'Chats', exact: true }).click();
+      await expect(page.locator('[data-message-id="typography-message"]')).toBeVisible();
+      await page.getByRole('button', { name: 'Back to chats', exact: true }).click();
       await expect(page.locator('.sidebar')).toBeVisible();
       await page.screenshot({ path: 'artifacts/home-typography-320.png', fullPage: true, animations: 'disabled' });
     }
