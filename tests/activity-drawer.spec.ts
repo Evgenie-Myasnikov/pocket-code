@@ -43,7 +43,7 @@ async function open(page:Page,scale=100){
 test('activity groups work across providers and closes without losing a draft',async({page})=>{
   await host(page);await page.setViewportSize({width:390,height:844});await open(page);await page.getByLabel('Message Claude').fill('Keep this draft');await openDrawer(page);
   await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toBeVisible();await expect(drawer(page).getByRole('button',{name:'claude question',exact:true})).toBeVisible();await expect(drawer(page).getByRole('button',{name:'codex working',exact:true})).toBeVisible();
-  await expect(drawer(page).locator('.activity-group')).toHaveCount(3);await page.keyboard.press('Escape');await expect(drawer(page)).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');await expect(page.locator('.chat-header .activity-entry')).toBeFocused();
+  await expect(drawer(page).locator('.activity-group')).toHaveCount(3);await page.keyboard.press('Escape');await expect(drawer(page)).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');await expect(page.locator('.app-header .activity-entry')).toBeFocused();
   await openDrawer(page);await drawer(page).getByRole('button',{name:'All chats',exact:true}).click();await expect(drawer(page)).toHaveCount(0);await expect(page.getByRole('button',{name:'New chat',exact:false})).toBeVisible();
 });
 
@@ -120,4 +120,15 @@ for(const scale of [60,130])test(`activity fits a narrow phone at ${scale}% scal
   const state=await host(page);state.items[0].title='A long task title that wraps naturally without covering the status or controls';await page.setViewportSize({width:320,height:700});await open(page,scale);await openDrawer(page);await expect(drawer(page).locator('.activity-task-row')).toHaveCount(3);
   const layout=await drawer(page).evaluate(element=>{const box=element.getBoundingClientRect(),buttons=Array.from(element.querySelectorAll('button')).map(item=>item.getBoundingClientRect());return{width:box.width<=innerWidth,buttons:buttons.every(item=>item.x>=0&&item.right<=innerWidth+1&&item.height>=40&&item.width>=40),pageFits:document.documentElement.scrollWidth<=innerWidth};});expect(layout).toEqual({width:true,buttons:true,pageFits:true});
   await page.screenshot({path:`artifacts/screenshots/activity-${scale}-320.png`,fullPage:true});
+});
+
+test('global activity header remains available in every main section',async({page})=>{
+ await host(page);await page.setViewportSize({width:390,height:844});await open(page);
+ for(const name of ['Tasks','Chats','Project','Settings']){
+  await page.locator('.mobile-nav').getByRole('button',{name,exact:true}).click();
+  await expect(page.locator('.app-header')).toBeVisible();
+  await expect(page.locator('.activity-entry:visible')).toHaveCount(1);
+  await openDrawer(page);await page.keyboard.press('Escape');
+  await expect(page.locator('.app-header .activity-entry')).toBeFocused();
+ }
 });

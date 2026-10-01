@@ -44,8 +44,8 @@ function label(value:string){
 }
 export function EffortPicker({value,options,defaultValue,onChange,disabled=false}:ReturnType<typeof useCodexEffort>&{disabled?:boolean}){
   if(!options.length)return null;
-  return <select className="effort-picker" aria-label={t('Глубина рассуждений Codex')} title={defaultValue?t('По умолчанию: {0}',label(defaultValue)):t('Глубина рассуждений Codex')} value={value} disabled={disabled} onChange={event=>onChange(event.target.value)}>
-    <option value="">{defaultValue?t('По умолчанию ({0})',label(defaultValue)):t('По умолчанию')}</option>
+  return <select className="effort-picker" aria-label={t('Глубина рассуждений Codex')} title={t('Глубина рассуждений Codex')} value={value||defaultValue||''} disabled={disabled} onChange={event=>onChange(event.target.value)}>
+    {!defaultValue&&<option value="">—</option>}
     {options.map(option=><option key={option} value={option}>{label(option)}</option>)}
   </select>;
 }

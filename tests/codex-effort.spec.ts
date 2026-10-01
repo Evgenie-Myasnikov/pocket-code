@@ -36,16 +36,16 @@ const effort=(page:Page)=>page.getByLabel('Codex reasoning effort',{exact:true})
 
 test('Codex effort uses advertised options and sends the selected model and effort',async({page})=>{
   const state=await host(page);await open(page);
-  await expect(effort(page).locator('option')).toHaveText(['Default (Low)','Low','Medium','High','Extra high','Maximum','Ultra']);
+  await expect(page.getByLabel('Codex model').locator('option:checked')).toHaveText('Standard');await expect(effort(page)).toHaveValue('low');await expect(effort(page).locator('option')).toHaveText(['Low','Medium','High','Extra high','Maximum','Ultra']);
   await effort(page).selectOption('ultra');await page.getByLabel('Message Codex').fill('Inspect the example');await page.getByRole('button',{name:'Send message',exact:true}).click();
   await expect.poll(()=>state.sent.length).toBe(1);expect(state.sent[0]).toMatchObject({provider:'codex',model:standard.id,reasoningEffort:'ultra'});
-  await effort(page).selectOption('');await page.getByLabel('Message Codex').fill('Use the displayed default');await page.getByRole('button',{name:'Send message',exact:true}).click();
+  await effort(page).selectOption('low');await page.getByLabel('Message Codex').fill('Use the displayed default');await page.getByRole('button',{name:'Send message',exact:true}).click();
   await expect.poll(()=>state.sent.length).toBe(2);expect(state.sent[1]).toMatchObject({model:standard.id,reasoningEffort:'low'});
 });
 
 test('Codex effort is remembered per model across reload and remains absent from Claude',async({page})=>{
   await host(page);await open(page);await effort(page).selectOption('ultra');
-  await page.getByLabel('Codex model').selectOption(small.id);await expect(effort(page).locator('option')).toHaveText(['Default (Low)','Low','High']);await expect(effort(page)).toHaveValue('');
+  await page.getByLabel('Codex model').selectOption(small.id);await expect(effort(page).locator('option')).toHaveText(['Low','High']);await expect(effort(page)).toHaveValue('low');
   await effort(page).selectOption('high');await page.getByLabel('Codex model').selectOption(standard.id);await expect(effort(page)).toHaveValue('ultra');
   await page.reload();await page.getByRole('button',{name:'New chat',exact:false}).click();await expect(effort(page)).toHaveValue('ultra');
   await page.getByLabel('Codex model').selectOption(small.id);await expect(effort(page)).toHaveValue('high');
@@ -55,7 +55,7 @@ test('Codex effort is remembered per model across reload and remains absent from
 
 test('an effort removed by a model update falls back to its advertised default',async({page})=>{
   const state=await host(page);state.models=[{...standard,reasoningEfforts:['low','high']}];
-  await open(page,{choices:{[standard.id]:'ultra'}});await expect(effort(page)).toHaveValue('');await expect(effort(page).locator('option')).toHaveText(['Default (Low)','Low','High']);
+  await open(page,{choices:{[standard.id]:'ultra'}});await expect(effort(page)).toHaveValue('low');await expect(effort(page).locator('option')).toHaveText(['Low','High']);
   await page.getByLabel('Message Codex').fill('Use a supported effort');await page.getByRole('button',{name:'Send message',exact:true}).click();
   await expect.poll(()=>state.sent.length).toBe(1);expect(state.sent[0].reasoningEffort).toBe('low');
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('pocket-code-codex-effort-v1')||'{}'))).toEqual({});
