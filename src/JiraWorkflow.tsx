@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,ExternalLink,GitPullRequest,Play,RefreshCw} from 'lucide-react';
-import {request,type Connection} from './api';
+import {providerRequest,type Connection} from './api';
 import {t} from './i18n';
 import {useBackAction} from './navigation';
 import {jiraRoleLabel,type JiraRole} from './jira-preferences';
@@ -51,6 +51,7 @@ function RequiredFields({transition,values,onChange}:{transition?:JiraTransition
 const describeItem=(item:any)=>typeof item==='string'?item:String(item?.path||item?.subject||item?.message||item?.name||'');
 
 export function JiraWorkflow({connection,site,issue,provider,codexAccess='full',role,roots,budget,jobs,onBack,onOpen,onOpenLinked,onChanged}:Props){
+  const request=providerRequest(provider);
   const [view,setView]=useState<WorkflowView|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
   const [fullIssue,setFullIssue]=useState<JiraIssue|null>(null),[descriptionLoading,setDescriptionLoading]=useState(true),[descriptionError,setDescriptionError]=useState('');
   const [action,setAction]=useState<Action|null>(null),[transitionId,setTransitionId]=useState(''),[fields,setFields]=useState<Record<string,string>>({});

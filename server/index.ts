@@ -10,6 +10,7 @@ import packageJson from '../package.json';
 import { startInternetTunnel } from './tunnel.js';
 import { AtlassianJira } from './jira.js';
 import { ReleaseUpdater } from './updates.js';
+import { CodexJiraTools } from './jira-codex.js';
 import { ExistingClaudeJira } from './jira-existing.js';
 import { WindowsJiraStore } from './jira-vault.js';
 import { EngineUpdates } from './engine-updates.js';
@@ -30,11 +31,13 @@ const jira = process.env.POCKET_JIRA_MODE === 'oauth' ? new AtlassianJira(new Wi
 let updateRepo = process.env.POCKET_UPDATE_REPO;
 if (!updateRepo) { try { updateRepo = JSON.parse(await readFile(path.join(local, 'updates.json'), 'utf8')).repository; } catch {} }
 const updater = new ReleaseUpdater(updateRepo, path.join(local, 'updates'));
+const codexJiraTools = new CodexJiraTools(roots[0]);
+const codexJira = process.env.POCKET_JIRA_MODE === 'oauth' ? jira : new ExistingClaudeJira(path.join(local, 'jira-existing-codex.json'), codexJiraTools.call, codexJiraTools.call, 'codex');
 const codex = new CodexService(roots, { attachmentRoots: [path.join(local, 'uploads')] });
 let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
-const { app, jobs, terminals, queue, codexQueue, workflow, isBusy, maintainEngines } = await createApp({ engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira });
+const { app, jobs, terminals, queue, codexQueue, workflow, isBusy, maintainEngines } = await createApp({ engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira, jiraForProvider: provider => provider === 'codex' ? codexJira : jira });
 runtimeReady = true;
 const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
 void maintainEngines().catch(()=>{});
@@ -82,7 +85,7 @@ function shutdown(preserveTunnel = false): Promise<void> {
   closing = true; runtimeReady = false; hostUpdater.close(); clearInterval(workflowTimer); clearInterval(engineTimer);
   const stopped = new Promise<void>(resolve => server.close(() => resolve()));
   const queues = [queue?.close(), codexQueue?.close()];
-  codex.close(); jobs.close(); terminals.close();
+  codexJiraTools.close(); codex.close(); jobs.close(); terminals.close();
   // Keep shutdown bounded if a network client fails to finish closing, but let
   // local workflow writes and owned tunnel termination settle before exit.
   const fallback = setTimeout(() => { server.closeAllConnections(); process.exit(0); }, 10000); fallback.unref();

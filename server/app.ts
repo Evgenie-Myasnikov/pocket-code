@@ -27,7 +27,7 @@ import { activityItem, recentActivityJobs } from './activity.js';
 import { claudeSubagents, claudeSubagentMessages } from './subagents.js';
 import { EngineUpdates, pocketSource } from './engine-updates.js';
 
-export type Config = { engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { jiraForProvider?(provider:'claude'|'codex'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -103,31 +103,33 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/host-update/status', async (_req, res) => res.json(config.hostUpdater ? await config.hostUpdater.status() : { supported: false, currentVersion: packageJson.version, state: 'idle' }));
   app.post('/api/host-update/check', async (req, res) => { const body = z.object({ appVersion: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/) }).parse(req.body); res.json(config.hostUpdater ? await config.hostUpdater.check(body.appVersion) : { supported: false, currentVersion: packageJson.version, state: 'idle' }); });
   app.post('/api/host-update/handoff', (req, res) => { const body = z.object({ targetVersion: z.string(), expectedPid: z.number().int().positive() }).parse(req.body); if (!config.hostUpdater) throw new HttpError(404, 'PC updates unavailable.'); config.hostUpdater.handoff(body.targetVersion, body.expectedPid); res.once('finish', () => config.hostUpdater!.finishHandoff()); res.json({ accepted: true }); });
-  const jira = () => { if (!config.jira) throw new HttpError(503, 'Обновите и перезапустите сервер для подключения Jira'); return config.jira; };
-  const taskNotifications=new TaskNotifications(path.join(path.dirname(config.uploads),'task-notifications.json'),config.jira?[jiraNotifications(config.jira)]:[]);
-  app.get('/api/task-notifications',async(_req,res)=>res.json(await taskNotifications.view()));
-  app.post('/api/task-notifications/read',async(req,res)=>{const {ids}=z.object({ids:z.array(z.string().min(1).max(100)).max(300)}).parse(req.body);await taskNotifications.read(ids);res.json({ok:true});});
-  app.post('/api/jira/connect-existing', async (_req, res) => { const service = jira(); if (!service.useExisting) throw new HttpError(400, 'Existing Claude connection is unavailable'); await taskNotifications.clear('jira');res.json(await service.useExisting()); });
-  app.get('/api/jira/status', async (_req, res) => res.json(await jira().status()));
-  app.post('/api/jira/connect', async (req, res) => { const body = z.object({ redirectUrl: z.string().max(200) }).parse(req.body); res.json(await jira().connect(body.redirectUrl)); });
+  const jira = (provider:'claude'|'codex'='claude') => { if(config.jiraForProvider)return config.jiraForProvider(provider); if (!config.jira) throw new HttpError(503, 'Обновите и перезапустите сервер для подключения Jira'); return config.jira; };
+  const notificationFeeds=Object.fromEntries((['claude','codex'] as const).map(provider=>[provider,new TaskNotifications(path.join(path.dirname(config.uploads),provider==='claude'?'task-notifications.json':'task-notifications-codex.json'),config.jira?[jiraNotifications(jira(provider))]:[])]));
+  const requestProvider=(req:express.Request)=>providerSchema.parse(req.body?.provider??req.query.provider);
+  const taskNotifications=(req:express.Request)=>notificationFeeds[requestProvider(req)];
+  app.get('/api/task-notifications',async(req,res)=>res.json(await taskNotifications(req).view()));
+  app.post('/api/task-notifications/read',async(req,res)=>{const {ids}=z.object({ids:z.array(z.string().min(1).max(100)).max(300)}).parse(req.body);await taskNotifications(req).read(ids);res.json({ok:true});});
+  app.post('/api/jira/connect-existing', async (req, res) => { const service = jira(requestProvider(req)); if (!service.useExisting) throw new HttpError(400, 'Existing provider connection is unavailable'); await taskNotifications(req).clear('jira');res.json(await service.useExisting()); });
+  app.get('/api/jira/status', async (req, res) => res.json(await jira(requestProvider(req)).status()));
+  app.post('/api/jira/connect', async (req, res) => { const body = z.object({ redirectUrl: z.string().max(200) }).parse(req.body); res.json(await jira(requestProvider(req)).connect(body.redirectUrl)); });
   app.post('/api/jira/finish', async (req, res) => {
     const body = z.object({ code: z.string().min(1).max(8192), state: z.string().min(32).max(128), issuer: z.string().max(200).nullish() }).parse(req.body);
-    await jira().finish(body.code, body.state, body.issuer || undefined); await taskNotifications.clear('jira'); res.json({ ok: true });
+    await jira(requestProvider(req)).finish(body.code, body.state, body.issuer || undefined); await taskNotifications(req).clear('jira'); res.json({ ok: true });
   });
-  app.post('/api/jira/disconnect', async (_req, res) => { await jira().disconnect(); await taskNotifications.clear('jira'); res.json({ ok: true }); });
+  app.post('/api/jira/disconnect', async (req, res) => { await jira(requestProvider(req)).disconnect(); await taskNotifications(req).clear('jira'); res.json({ ok: true }); });
   app.get('/api/jira/issues', async (req, res) => {
     const query = z.object({ site: z.string().min(1).max(100), cursor: z.string().max(4000).optional(), search: z.string().max(200).optional(), type: z.string().max(100).optional(), stage: z.string().max(30).optional(),statusCategory:z.enum(['new','indeterminate','done']).optional(),status:z.string().max(100).optional(),project:z.string().max(100).optional() }).parse(req.query);
-    res.json(await jira().issues(query.site, query.cursor, { search: query.search, type: query.type, stage: query.stage,...(query.statusCategory?{statusCategory:query.statusCategory}:{}),...(query.status?{status:query.status}:{}),...(query.project?{project:query.project}:{}) }));
+    res.json(await jira(requestProvider(req)).issues(query.site, query.cursor, { search: query.search, type: query.type, stage: query.stage,...(query.statusCategory?{statusCategory:query.statusCategory}:{}),...(query.status?{status:query.status}:{}),...(query.project?{project:query.project}:{}) }));
   });
   app.get('/api/jira/issue', async (req, res) => {
     const query = z.object({ site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i) }).parse(req.query);
-    res.json(await jira().issue(query.site, query.key));
+    res.json(await jira(requestProvider(req)).issue(query.site, query.key));
   });
   const codexAccessSchema = z.enum(['full', 'ask', 'auto']).optional();
   const jiraStartSchema = z.object({ provider: providerSchema, id: uuid, site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i), cwd: text, mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5) });
   async function startJira(body: z.infer<typeof jiraStartSchema>) {
     const cwd = await allowedPath(roots, body.cwd, true);
-    const issue = await jira().issue(body.site, body.key);
+    const issue = await jira(body.provider).issue(body.site, body.key);
     const engine = body.provider === 'codex' ? codex() : jobs;
     const existing = allJobs().find(j => j.id === body.id || (j.status === 'running' && j.jira?.site === body.site && j.jira.key === body.key));
     if (existing) { if ((existing.provider || 'claude') !== body.provider) throw new HttpError(409, 'This task is already assigned to another workspace.'); return jobView(existing.id); }
@@ -139,7 +141,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/jira/start', async (req, res) => res.json(await startJira(jiraStartSchema.parse(req.body))));
   const roleSchema = z.enum(['developer', 'reviewer', 'qa']);
   const workflow = config.jira ? new JiraWorkflow(path.join(path.dirname(config.uploads), 'jira-workflow.json'), {
-    jira: config.jira,
+    jira: config.jira, jiraForProvider: jira,
     job: id => { try { return jobView(id); } catch { return undefined; } },
     validate: async input => { const cwd = await allowedPath(roots, input.cwd, true); if (input.provider === 'codex') codex(); guardProject(cwd, input.id); return cwd; },
     start: async (input, issue, sessionId) => {

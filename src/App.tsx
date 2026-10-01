@@ -86,10 +86,10 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   useEffect(()=>{const handle=(event:Event)=>setHostRestarting(!!(event as CustomEvent).detail?.active);window.addEventListener('pocket-code-host-update-restarting',handle);return()=>window.removeEventListener('pocket-code-host-update-restarting',handle);},[]);
   const [demo, setDemo] = useState(false),[attachments, setAttachments] = useStateForWorkspace<Attachment[]>([]),[uploading, setUploading] = useStateForWorkspace(false);
   const activity=useActivity(demo?null:connection);
-  const taskFeed=useTaskNotifications(demo?null:connection);
+  const taskFeed=useTaskNotifications(demo?null:connection,provider);
   const taskOpenGeneration=useRef(0);
   const [taskInboxOpen,setTaskInboxOpen]=useState(false),[taskTarget,setTaskTarget]=useState<{id:string;site:string;issue:JiraIssue}|null>(null);
-  useEffect(()=>{taskOpenGeneration.current++;setTaskInboxOpen(false);setTaskTarget(null);},[connection]);
+  useEffect(()=>{taskOpenGeneration.current++;setTaskInboxOpen(false);setTaskTarget(null);},[connection,provider]);
   useEffect(()=>{if(!taskInboxOpen)taskOpenGeneration.current++;},[taskInboxOpen,connection]);
   const activitySurface=useRef<HTMLDivElement|null>(null),activityDistance=useRef(0);
   const [activityDragging,setActivityDragging]=useState(false);
@@ -500,7 +500,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const chatStatusLabel=chatStatus?t(({needs_input:'Waiting for input',error:'Error',running:'Running',done:'Completed'} as const)[chatStatus]):'';
   const chatStatusDot=chatStatus?<span className={'chat-tab-status chat-tab-status-'+chatStatus} aria-hidden="true"/>:null;
   return <div className={`app ${mobileChat ? 'show-chat' : ''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
-    {taskInboxOpen&&connection&&<TaskNotificationInbox feed={taskFeed} onClose={()=>setTaskInboxOpen(false)} onOpen={async item=>{const generation=taskOpenGeneration.current;if(item.provider!=='jira')throw Error('Task provider unavailable');const issue=await request<JiraIssue>(connection,'/jira/issue?'+new URLSearchParams({site:item.scope,key:item.key}));if(generation!==taskOpenGeneration.current)throw Error('Task navigation cancelled');setTaskTarget({id:item.id,site:item.scope,issue});setTab('jobs');setMobileChat(true);}}/>}
+    {taskInboxOpen&&connection&&<TaskNotificationInbox feed={taskFeed} onClose={()=>setTaskInboxOpen(false)} onOpen={async item=>{const generation=taskOpenGeneration.current;if(item.provider!=='jira')throw Error('Task provider unavailable');const issue=await request<JiraIssue>(connection,'/jira/issue?'+new URLSearchParams({site:item.scope,key:item.key,provider}));if(generation!==taskOpenGeneration.current)throw Error('Task navigation cancelled');setTaskTarget({id:item.id,site:item.scope,issue});setTab('jobs');setMobileChat(true);}}/>}
     {(activityOpen||activityDragging)&&<ActivityDrawer surfaceRef={activitySurface} dragging={activityDragging} reveal={activityDistance.current} items={activity.items} loading={activity.loading} error={activity.error} busy={busy||uploading||Boolean(activityTarget)} onRetry={activity.refresh} onOpen={openActivity} onClose={()=>setActivityOpen(false)}/>}
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={21}/></button>}
     <ActivityHandle count={activity.count} disabled={demo} onOpen={()=>setActivityOpen(true)} onDrag={distance=>{activityDistance.current=distance;setActivityDragging(true);activitySurface.current?.style.setProperty('--activity-reveal',`${distance}px`);}} onDragEnd={open=>{setActivityDragging(false);setActivityOpen(open);}}/>

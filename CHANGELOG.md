@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - Workspace-aware Jira and direct Codex tools (0.19.0)
+- Changed: Jira settings, reads, workflow actions, sequential queues and task notification/read state follow the selected Claude or Codex workspace. No automatic cross-provider fallback is performed; legacy requests without a provider keep Claude behavior.
+- Added: Codex app-server MCP adapter discovers one Jira tool catalog and calls exact tools in an ephemeral thread without starting a model turn. It rejects missing/ambiguous connectors and unrelated tools; uncertain writes are never retried automatically. Native authorization remains in Codex.
+- Optimized: Existing Claude connector coalesces issue and transition reads for five seconds; mutations invalidate the cache. Claude CLI inference remains necessary for that connection path. Explicit direct OAuth mode remains supported.
+- Files: server/jira-codex.ts, Jira adapters/routes/workflow, provider-scoped frontend requests and notification feed; documentation and routing tests.
+- Validation: 182 server/state tests passed, then seven focused tests after transport cleanup. 26 Jira/notification UI tests passed; two connection tests passed including new provider switching coverage. TypeScript/Vite/Android build passed (versionCode 32).
+- Follow-up: Live Codex discovery found an unauthenticated Jira connector; authenticated account-backed tool execution was not verified. Synthetic tests verify exact direct calls, no model turns, provider isolation and single-attempt mutations. Physical Android testing remains unavailable.
+
 ## 2026-10-01 - Public onboarding documentation and setup launcher
 - Changed: Replaced the dense landing README with a user-oriented overview, screenshot gallery, quick start, privacy notes and troubleshooting. Added a Russian guide and retained advanced material in docs/REFERENCE.md with corrected update/drawer descriptions.
 - Added: Setup Pocket Code.cmd checks Node.js 22+, offers winget installation when needed, opens the APK release page and starts the existing Wi-Fi/internet launcher. Native AI sign-in and Android installation confirmation remain manual.

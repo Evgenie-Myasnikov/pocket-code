@@ -77,13 +77,13 @@ export class ExistingClaudeJira implements JiraService {
   private cache = new Map<string, { expires: number; value: any }>();
   private pending = new Map<string, Promise<any>>();
   private cacheEpoch = 0;
-  constructor(private preferenceFile: string, private call: ReadCall = readWithClaude, private writeCall: ReadCall = writeWithClaude) {
+  constructor(private preferenceFile: string, private call: ReadCall = readWithClaude, private writeCall: ReadCall = writeWithClaude, private source: 'claude'|'codex' = 'claude') {
     this.ready = readFile(preferenceFile, 'utf8').then(text => { this.enabled = JSON.parse(text).enabled !== false; }).catch((error) => { if (error.code !== 'ENOENT') throw error; });
   }
   async close() {}
   private async read(name: string, args: Record<string, unknown>, ttl = 0) {
     await this.ready;
-    if (!this.enabled) throw new HttpError(401, 'Enable the existing Claude connection in Settings → Jira.');
+    if (!this.enabled) throw new HttpError(401, 'Enable the selected workspace connection in Settings → Jira.');
     const epoch = this.cacheEpoch, key = JSON.stringify([epoch, name, args]), cached = this.cache.get(key);
     if (cached && cached.expires > Date.now()) return cached.value;
     const existing = this.pending.get(key); if (existing) return existing;
@@ -92,20 +92,20 @@ export class ExistingClaudeJira implements JiraService {
   }
   async status() {
     await this.ready;
-    if (!this.enabled) return { connected: false, sites: [], source: 'claude' as const };
+    if (!this.enabled) return { connected: false, sites: [], source: this.source };
     let raw: any;
     try { raw = await this.read('getAccessibleAtlassianResources', {}, 600000); }
-    catch { return { connected: false, sites: [], source: 'claude' as const, error: 'Claude Code could not read Jira. Check its existing Atlassian MCP connection and retry using Use Claude connection.' }; }
-    if (!this.enabled) return { connected: false, sites: [], source: 'claude' as const };
+    catch { return { connected: false, sites: [], source: this.source, error: this.source === 'codex' ? 'Codex could not read Jira. Enable one authorized Atlassian MCP connector in Codex on the PC, then retry. Update Codex if direct MCP tools are unavailable.' : 'Claude Code could not read Jira. Check its existing Atlassian MCP connection and retry.' }; }
+    if (!this.enabled) return { connected: false, sites: [], source: this.source };
     const resources = raw.data?.resources || raw.resources || (Array.isArray(raw) ? raw : []);
     this.sites = resources.filter((r: any) => r.products?.some((p: any) => p.id === 'jira') && /^https:\/\/[a-z0-9-]+\.atlassian\.net\/?$/i.test(r.url)).map((r: any) => ({ id: r.cloudId || r.id, name: r.name || new URL(r.url).hostname, url: r.url.replace(/\/$/, '') }));
-    return { connected: true, sites: this.sites!, source: 'claude' as const };
+    return { connected: true, sites: this.sites!, source: this.source };
   }
   async useExisting() { await this.ready; await writeFile(this.preferenceFile, JSON.stringify({ enabled: true })); this.enabled = true; this.cacheEpoch++; this.cache.clear(); return this.status(); }
-  async connect(_redirect: string): Promise<{ authorizationUrl: string; state: string }> { throw new HttpError(409, 'Use the existing Claude connection. Update Pocket Code to show this option.'); }
-  async finish() { throw new HttpError(409, 'Jira uses the existing Claude connection; browser sign-in is not required.'); }
+  async connect(_redirect: string): Promise<{ authorizationUrl: string; state: string }> { throw new HttpError(409, 'Use the selected workspace connection. Update Pocket Code to show this option.'); }
+  async finish() { throw new HttpError(409, 'Jira uses the selected workspace connection; browser sign-in is handled by that provider.'); }
   async disconnect() { await this.ready; await writeFile(this.preferenceFile, JSON.stringify({ enabled: false })); this.enabled = false; this.sites = undefined; this.cacheEpoch++; this.cache.clear(); }
-  private async site(id: string) { await this.ready; if (!this.enabled) throw new HttpError(401, "Enable the existing Claude connection in Settings → Jira."); if (!this.sites) await this.status(); const site = this.sites?.find(s => s.id === id); if (!site) throw new HttpError(400, 'Select an available Jira site.'); return site; }
+  private async site(id: string) { await this.ready; if (!this.enabled) throw new HttpError(401, "Enable the selected workspace connection in Settings → Jira."); if (!this.sites) await this.status(); const site = this.sites?.find(s => s.id === id); if (!site) throw new HttpError(400, 'Select an available Jira site.'); return site; }
   async issues(id: string, cursor?: string, query?: JiraIssueQuery) {
     const site = await this.site(id);
     const raw = await this.read('searchJiraIssuesUsingJql', { cloudId: id, jql: jiraIssuesJql(query), maxResults: 50, fields: query?.notifications ? ['summary','status','updated','comment'] : jiraIssueFields, ...(cursor ? { nextPageToken: cursor } : {}) }, 60000);
@@ -115,13 +115,13 @@ export class ExistingClaudeJira implements JiraService {
   }
   async issue(id: string, key: string) {
     const site = await this.site(id);
-    const raw = await this.read('getJiraIssue', { cloudId: id, issueIdOrKey: key, fields: jiraIssueFields, view: 'full', responseContentFormat: 'markdown' });
+    const raw = await this.read('getJiraIssue', { cloudId: id, issueIdOrKey: key, fields: jiraIssueFields, view: 'full', responseContentFormat: 'markdown' }, 5000);
     return jiraIssue(raw.data || raw, site);
   }
   async transitions(id: string, key: string) {
     await this.site(id);
     if (!/^[A-Z][A-Z0-9_]*-\d+$/i.test(key)) throw new HttpError(400, 'Invalid Jira issue.');
-    return jiraTransitions(await this.read('executeRead', { cloudId: id, name: 'listJiraIssueTransitions', inputs: { issueIdOrKey: key, expand: 'transitions.fields' } }));
+    return jiraTransitions(await this.read('executeRead', { cloudId: id, name: 'listJiraIssueTransitions', inputs: { issueIdOrKey: key, expand: 'transitions.fields' } }, 5000));
   }
   async transition(id: string, key: string, transitionId: string, fields?: Record<string, unknown>) {
     await this.site(id);

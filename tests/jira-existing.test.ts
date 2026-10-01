@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ExistingClaudeJira, JiraToolResult } from '../server/jira-existing';
 
-test('existing connector reads assigned issues, caches lists, refreshes individual issues and keeps disconnect local', async () => {
+test('existing connector reads assigned issues, caches lists, coalesces recent issue reads and keeps disconnect local', async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'pocket-existing-'));
   const calls: string[] = [];
   const call = async (name: string, args: any) => {
@@ -22,7 +22,7 @@ test('existing connector reads assigned issues, caches lists, refreshes individu
     assert.equal((await jira.issues('site')).next, 'next');
     await jira.issues('site'); assert.equal(calls.filter(x => x === 'searchJiraIssuesUsingJql').length, 1);
     await jira.issue('site', 'TEST-1'); await jira.issue('site', 'TEST-1');
-    assert.equal(calls.filter(x => x === 'getJiraIssue').length, 2);
+    assert.equal(calls.filter(x => x === 'getJiraIssue').length, 1);
     await assert.rejects(jira.issues('foreign'), /available Jira site/);
     await jira.disconnect();
     assert.equal((await new ExistingClaudeJira(file, call).status()).connected, false);

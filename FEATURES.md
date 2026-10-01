@@ -29,8 +29,8 @@
 | Individual approvals and clarification questions | Yes | Supported app-server command/file approvals and questions; unsupported requests are rejected |
 | Attach files and images | Yes | Yes |
 | Live terminal | Yes | Not yet; use structured chat |
-| Jira selected issues / batch queue | Yes | Yes; Jira reading still uses the existing Claude connector |
-| Jira search, task categories and role-aware workflow | Shared existing connector, live transitions and required fields | Same; execution uses Codex |
+| Jira selected issues / batch queue | Yes | Yes; direct Jira MCP tools through the selected Codex connector |
+| Jira search, task categories and role-aware workflow | Existing Claude connector, live transitions and required fields | Own Codex connector; no model turn for Jira tools |
 | PR preview, creation and task/chat links | Shared GitHub CLI on the PC | Shared GitHub CLI on the PC |
 | Automatic earlier history and content-only reading | Yes | Yes |
 | Agent activity and child context | SDK-listed child transcripts within the parent project | Verified child threads within allowed projects |

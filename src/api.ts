@@ -1,6 +1,13 @@
 import { t } from "./i18n";import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { networkFailure } from './connection-errors';
 export type Connection = {url: string;token: string;};
+export function providerRequest(provider:'claude'|'codex'){
+  return <T,>(connection:Connection,endpoint:string,data?:unknown):Promise<T>=>{
+    const [pathname,search]=endpoint.split('?');const params=new URLSearchParams(search);
+    if(!params.has('provider'))params.set('provider',provider);
+    return request<T>(connection,pathname+'?'+params,data&&typeof data==='object'?{provider,...data}:data);
+  };
+}
 const Vault = registerPlugin<{load(): Promise<{value?: string;}>;save(options: {value: string;}): Promise<void>;clear(): Promise<void>;}>('ConnectionVault');
 export function normalizeUrl(value: string) {
   const url = new URL(value.trim());

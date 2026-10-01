@@ -17,6 +17,7 @@ const sameFolder = (a: string, b: string) => process.platform === 'win32' ? path
 const atDestination = (issue: JiraIssue, transition: JiraTransition) => issue.statusId && transition.to.id ? issue.statusId === transition.to.id : issue.status.normalize('NFKC').trim().toLowerCase() === transition.to.name.normalize('NFKC').trim().toLowerCase();
 type Dependencies = {
   jira: JiraService;
+  jiraForProvider?(provider:'claude'|'codex'):JiraService;
   validate(input: WorkflowInput): Promise<string>;
   start(input: WorkflowInput, issue: JiraIssue, sessionId?: string): Promise<JobView>;
   job(id: string): JobView | undefined;
@@ -58,6 +59,7 @@ export class JiraWorkflow {
     });
     return this.writes;
   }
+  private jira(provider:'claude'|'codex'){return this.deps.jiraForProvider?.(provider)||this.deps.jira;}
   private recordKey(site: string, key: string, provider: string) { return JSON.stringify([site, key.toUpperCase(), provider]); }
   private issueKey(site: string, key: string) { return JSON.stringify([site, key.toUpperCase()]); }
   private issueRecords(site: string, key: string) { return Object.values(this.records).filter(record => record.site === site && record.key.toUpperCase() === key.toUpperCase()); }
@@ -84,15 +86,15 @@ export class JiraWorkflow {
   async view(site: string, key: string, provider: 'claude' | 'codex', role: JiraRole) {
     await this.ready;
     const record = this.records[this.recordKey(site, key, provider)]; await this.syncLink(record);
-    const issue = await this.deps.jira.issue(site, key);
-    const transitions = this.deps.jira.transitions ? await this.deps.jira.transitions(site, key) : [];
+    const issue = await this.jira(provider).issue(site, key);
+    const transitions = this.jira(provider).transitions ? await this.jira(provider).transitions!(site, key) : [];
     const related = this.issueRecords(site, key), prRecord = related.find(entry => entry.pr || entry.link?.pr);
     const pr = prRecord?.pr || prRecord?.link?.pr, selected = this.roleLink(record, role);
     const link = selected ? { ...selected, ...(pr ? { pr } : {}) } : pr ? { provider, role, cwd: prRecord?.prCwd || prRecord?.link?.cwd || '', pr } : undefined;
     const pendingRecord = related.find(entry => entry.operation && entry.operation.phase !== 'done'), operation = pendingRecord?.operation;
     const pending = operation ? { id: operation.id, action: operation.action, phase: operation.phase, provider: pendingRecord!.provider,
       message: operation.phase === 'prepared' ? 'This action was prepared but has not changed Jira or GitHub. You can clear it and choose another action.' : 'This action is incomplete. Check Jira, pull requests and existing chats before clearing it. Existing changes will not be undone.' } : undefined;
-    return { issue, stage: workflowStage(issue.status), role, actions: this.deps.jira.transition ? workflowActions(issue, role, transitions) : [], link, ...(pending ? { pending } : {}) };
+    return { issue, stage: workflowStage(issue.status), role, actions: this.jira(provider).transition ? workflowActions(issue, role, transitions) : [], link, ...(pending ? { pending } : {}) };
   }
   async recover(site: string, key: string, provider: 'claude' | 'codex', operationId: string): Promise<void> {
     await this.ready;
@@ -104,7 +106,7 @@ export class JiraWorkflow {
       if (!record || !operation || operation.id !== operationId || operation.phase === 'done') throw new HttpError(409, 'The pending action changed. Refresh the task.');
       const related = this.issueRecords(site, key);
       if (related.some(entry => this.hasActiveJob(entry))) throw new HttpError(409, 'The agent is still working on this task. Wait for it to finish or stop it.');
-      await this.deps.jira.issue(site, key);
+      await this.jira(provider).issue(site, key);
       for (const entry of related) await this.syncLink(entry);
       if (operation.phase === 'pr_pending') {
         if (!operation.cwd || !operation.pullRequest) throw new HttpError(409, 'The original pull request details are unavailable. Check the saved workflow on the PC before clearing this action.');
@@ -175,7 +177,7 @@ export class JiraWorkflow {
           previousSession: previous?.cwd && sameFolder(previous.cwd, cwd) && input.action === 'continue_development' ? previous.sessionId : undefined };
         record.operation = operation; await this.save();
       }
-      let issue = await this.deps.jira.issue(input.site, input.key);
+      let issue = await this.jira(input.provider).issue(input.site, input.key);
       const currentStatus = () => issue.statusId || issue.status;
       if (operation.phase === 'prepared' || operation.phase === 'pr_pending') {
         if (currentStatus() !== operation.source) throw new HttpError(409, 'The Jira status changed while this action was being prepared. Check Jira before retrying.');
@@ -188,23 +190,23 @@ export class JiraWorkflow {
         }
       }
       if (['prepared', 'pr_done', 'transition_pending'].includes(operation.phase)) {
-        issue = await this.deps.jira.issue(input.site, input.key);
+        issue = await this.jira(input.provider).issue(input.site, input.key);
         const transition = operation.transition;
         if (transition) {
           if (!atDestination(issue, transition)) {
             if (currentStatus() !== operation.source) throw new HttpError(409, 'The Jira status changed. Check the task before retrying this action.');
-            const available = await this.deps.jira.transitions!(input.site, input.key);
+            const available = await this.jira(input.provider).transitions!(input.site, input.key);
             const fresh = available.find(t => t.id === transition.id && t.to.name === transition.to.name && (!t.to.id || !transition.to.id || t.to.id === transition.to.id));
             if (!fresh) throw new HttpError(409, 'This Jira transition is no longer available.');
             validateTransitionFields(fresh, input.fields);
             operation.phase = 'transition_pending'; await this.save();
-            try { await this.deps.jira.transition!(input.site, input.key, fresh.id, input.fields); }
+            try { await this.jira(input.provider).transition!(input.site, input.key, fresh.id, input.fields); }
             catch {
               // Never issue another write here: reconcile the remote result first.
-              issue = await this.deps.jira.issue(input.site, input.key);
+              issue = await this.jira(input.provider).issue(input.site, input.key);
               if (!atDestination(issue, fresh)) throw new HttpError(409, 'Jira did not confirm the status change. Check the task in Jira, then retry the same action. Any created pull request is saved.');
             }
-            issue = await this.deps.jira.issue(input.site, input.key);
+            issue = await this.jira(input.provider).issue(input.site, input.key);
             if (!atDestination(issue, fresh)) throw new HttpError(409, 'Jira has not reached the selected status. Refresh the task and check its workflow before continuing.');
           }
         }
@@ -216,7 +218,7 @@ export class JiraWorkflow {
           job = this.deps.job(operation.jobId!);
           if (!job) throw new HttpError(409, 'The PC restarted during chat creation. Check existing chats before starting this task again; it will not be launched twice automatically.');
         } else if (operation.phase === 'transition_done') {
-          issue = await this.deps.jira.issue(input.site, input.key);
+          issue = await this.jira(input.provider).issue(input.site, input.key);
           if (!(operation.transition ? atDestination(issue, operation.transition) : (issue.statusId || issue.status) === operation.source)) throw new HttpError(409, 'The Jira status changed before chat creation. Check and clear the pending action before starting another one.');
           operation.phase = 'job_pending'; operation.jobId = operation.id;
           await this.save();

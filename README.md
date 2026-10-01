@@ -71,7 +71,7 @@ Install Node.js 22+ yourself if Windows Package Manager is unavailable. Use **St
 
 - **Permissions:** Codex defaults to Full access. Choose your access level in **Settings → AI & workspace**. Full access allows commands and file changes without approval prompts.
 - **Desktop chats:** supported local histories can be opened. A chat owned by Codex Desktop may remain read-only until Desktop releases it. Cloud-only chats and every desktop artifact are not supported.
-- **Jira is optional:** it needs an existing Atlassian MCP connection available to Claude Code. A website login alone is insufficient. Organization permissions apply; reads can consume Claude usage.
+- **Jira is optional:** it uses the selected workspace's Atlassian MCP connection. Codex calls supported Jira tools directly without a model turn; Claude uses its existing connector through the native CLI and can consume Claude usage. A website login alone is insufficient. No silent fallback between accounts/providers occurs.
 - **Task notifications:** the bell shows periodically detected changes, not Jira's complete inbox or Android push notifications.
 - **Updates:** use **Settings → Updates**. Android asks for installation confirmation. Compatible hosts can apply the matching PC update when idle.
 - **Saved history:** reopening is faster, but the initial connection still needs the host. This is not fully offline mode.

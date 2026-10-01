@@ -1,7 +1,7 @@
 import { t, locale, getLanguage } from "./i18n";import { useEffect, useRef, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { RefreshCw, Play, ExternalLink, Link2 } from 'lucide-react';
-import { request, type Connection } from './api';
+import { providerRequest, type Connection } from './api';
 import type { JiraIssue, JiraSite } from '../server/jira';
 import type { JobView } from '../server/types';
 import type {CodexAccess} from './preferences';
@@ -16,8 +16,9 @@ const Login = registerPlugin<{
   open(options: {url: string;state: string;language: string;}): Promise<{code: string;state: string;issuer?: string;}>;
   cancel(): Promise<void>;
 }>('JiraLogin');
-type Status = {error?: string;source?: 'claude';connected: boolean;sites: JiraSite[];};
-export function JiraSettings({ connection }: {connection: Connection | null;}) {
+type Status = {error?: string;source?: 'claude'|'codex';connected: boolean;sites: JiraSite[];};
+export function JiraSettings({ connection,provider='claude' }: {connection: Connection | null;provider?:'claude'|'codex'}) {
+  const request=providerRequest(provider);
   const role=useJiraRole();
   const [status, setStatus] = useState<Status | null>(null),[busy, setBusy] = useState(false),[error, setError] = useState('');
   const attempt = useRef(0);
@@ -25,10 +26,10 @@ export function JiraSettings({ connection }: {connection: Connection | null;}) {
     let cancelled = false;
     if (connection) request<Status>(connection, '/jira/status').then((s) => {if (!cancelled) {setStatus(s);setError(s.error || "");}}).catch((e) => {if (!cancelled) setError(e.message);});
     return () => {cancelled = true;attempt.current++;void Login.cancel().catch(() => {});};
-  }, [connection]);
+  }, [connection,provider]);
   async function connect() {
     if (!connection || busy) return;
-    if (status?.source === 'claude') {setBusy(true);setError('');try {const next = await request<Status>(connection, '/jira/connect-existing', {});setStatus(next);setError(next.error || "");} catch(e) {setError((e as Error).message);} finally {setBusy(false);}return;}
+    if (Boolean(status?.source)) {setBusy(true);setError('');try {const next = await request<Status>(connection, '/jira/connect-existing', {});setStatus(next);setError(next.error || "");} catch(e) {setError((e as Error).message);} finally {setBusy(false);}return;}
     if (!Capacitor.isNativePlatform()) {setError(t("Вход Jira доступен в Android-приложении. Откройте на телефоне Настройки → Jira → Connect."));return;}
     const current = ++attempt.current;setBusy(true);setError('');
     try {
@@ -50,17 +51,18 @@ export function JiraSettings({ connection }: {connection: Connection | null;}) {
     {setBusy(false);}
   }
   return <section className="jira-settings" aria-label={t("Подключение Jira")}><div className="eyebrow">{t("ИНТЕГРАЦИИ")}</div><h2>Jira</h2>
-    <p className="muted">{status?.source === "claude" ? t("Jira подключена через существующий Atlassian MCP в Claude на ПК. Отдельный вход не нужен.") : t("Войдите в Atlassian на телефоне. В Jobs появятся все задачи, назначенные на вас, включая завершённые.")}</p>
+    <p className="muted">{status?.source === 'codex' ? (getLanguage()==='ru'?'Jira использует Atlassian MCP выбранного Codex на ПК. Запросы выполняются напрямую, без обращения к модели.':'Jira uses Atlassian MCP from Codex on your PC. Tools run directly, without a model turn.') : status?.source === "claude" ? t("Jira подключена через существующий Atlassian MCP в Claude на ПК. Отдельный вход не нужен.") : t("Войдите в Atlassian на телефоне. В Jobs появятся все задачи, назначенные на вас, включая завершённые.")}</p>
     {status?.connected && <p className="jira-connected">{t("Подключено · ")}{status.sites.map((s) => s.name).join(', ') || t("Нет доступных сайтов Jira")}</p>}
-    {busy && <p role="status">{status?.source === "claude" ? t("Читаем Jira через Claude на ПК…") : t("Завершите вход в браузере и вернитесь в Pocket Code. Ожидаем до 5 минут.")}</p>}
+    {busy && <p role="status">{status?.source === 'codex' ? (getLanguage()==='ru'?'Подключаем инструменты Jira в Codex…':'Connecting Jira tools in Codex…') : status?.source === "claude" ? t("Читаем Jira через Claude на ПК…") : t("Завершите вход в браузере и вернитесь в Pocket Code. Ожидаем до 5 минут.")}</p>}
     {error && <p className="error" role="alert">{t(error)}</p>}
-    {!status?.connected && !busy && <button className="primary" disabled={!connection} onClick={() => void connect()}><Link2 size={16} />{status?.source === "claude" ? t("Использовать подключение Claude") : "Connect"}</button>}
+    {!status?.connected && !busy && <button className="primary" disabled={!connection||!status} onClick={() => void connect()}><Link2 size={16} />{status?.source === 'codex' ? (getLanguage()==='ru'?'Использовать подключение Codex':'Use Codex connection') : status?.source === "claude" ? t("Использовать подключение Claude") : "Connect"}</button>}
     {(status?.connected || busy || error) && <button className="secondary" onClick={() => void disconnect()}>{busy ? t("Отменить вход") : status?.connected ? t("Отключить Jira") : t("Сбросить вход")}</button>}
-    <p className="muted">{status?.source === "claude" ? t("Чтение задач использует Claude на ПК и его лимиты. Отключение здесь не отключает коннектор в Claude.") : t("Доступ хранится на ПК в защищённом хранилище Windows. Отключение удаляет его из Pocket Code; разрешение Atlassian можно отозвать в настройках аккаунта.")}</p>
+    <p className="muted">{status?.source === 'codex' ? (getLanguage()==='ru'?'Отключение здесь не удаляет коннектор из Codex. При отсутствии доступа автоматического переключения на Claude нет.':'Disconnecting here does not remove the Codex connector. Unavailable access never silently falls back to Claude.') : status?.source === "claude" ? t("Чтение задач использует Claude на ПК и его лимиты. Отключение здесь не отключает коннектор в Claude.") : t("Доступ хранится на ПК в защищённом хранилище Windows. Отключение удаляет его из Pocket Code; разрешение Atlassian можно отозвать в настройках аккаунта.")}</p>
     <label className="jira-role-setting">{t('Роль в Jira')}<select value={role} onChange={event=>setJiraRole(event.target.value as JiraRole)}>{(['developer','reviewer','qa'] as const).map(item=><option key={item} value={item}>{t(jiraRoleLabel(item))}</option>)}</select></label><p className="muted">{t('Роль определяет доступные действия в задачах. Права вашего аккаунта Jira остаются прежними.')}</p>
   </section>;
 }
 export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provider='claude',codexAccess='full',onOpenLinked,notificationTarget,onNotificationOpened}:{notificationTarget?:{id:string;site:string;issue:JiraIssue}|null;onNotificationOpened?:()=>void;provider?:'claude'|'codex';codexAccess?:CodexAccess;connection:Connection|null;roots:string[];jobs:JobView[];budget:number;onOpen(job:JobView):void;onSettings():void;onOpenLinked?(link:JiraLink):void}){
+ const request=providerRequest(provider);
   const role=useJiraRole();
   const [status,setStatus]=useState<Status|null>(null),[site,setSite]=useState(''),[issues,setIssues]=useState<JiraIssue[]>([]),[next,setNext]=useState<string|null>(null);
   const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[category,setCategory]=useState(''),[updated,setUpdated]=useState(0);
@@ -79,7 +81,7 @@ export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provide
     if(!connection)return;let cancelled=false;
     request<Status>(connection,'/jira/status').then(value=>{if(!cancelled){setStatus(value);setSite(value.sites[0]?.id||'');setError(value.error||'');}}).catch(e=>{if(!cancelled)setError(e.message);});
     return()=>{cancelled=true;};
-  },[connection]);
+  },[connection,provider]);
   useEffect(()=>{setChecked(new Map());setSelected(null);setBatchOpen(false);batchId.current=null;setSuggestions({project:[],status:[],type:[]});setFilters({project:'',status:'',type:''});setFilterDraft({project:'',status:'',type:''});},[site]);
   useEffect(()=>{if(!notificationTarget||!status)return;if(site!==notificationTarget.site){setSite(notificationTarget.site);return;}setSelected(notificationTarget.issue);onNotificationOpened?.();},[notificationTarget,status,site]);
   useEffect(()=>{

@@ -1,13 +1,14 @@
 ﻿import {useCallback,useEffect,useRef,useState} from 'react';
 import {Bell,CheckCheck,ChevronRight,RefreshCw,X} from 'lucide-react';
-import {request,type Connection} from './api';
+import {providerRequest,type Connection} from './api';
 import type {TaskNotification} from '../server/task-notifications';
 import {useLanguage,locale} from './i18n';
 import {useModal} from './navigation';
 import './task-notifications.css';
 type Inbox={items:TaskNotification[];unread:number;loading:boolean;checkedAt:number;error?:string;sources?:{id:string;name:string}[]};
 const empty:Inbox={items:[],unread:0,loading:false,checkedAt:0};
-export function useTaskNotifications(connection:Connection|null){
+export function useTaskNotifications(connection:Connection|null,provider:'claude'|'codex'='claude'){
+ const request=providerRequest(provider);
  const [inbox,setInbox]=useState<Inbox>(empty),generation=useRef(0),pending=useRef(false),refreshRef=useRef<()=>Promise<void>>(async()=>{});
  useEffect(()=>{const current=++generation.current;setInbox(empty);pending.current=false;if(!connection)return;
   let stopped=false,timer:ReturnType<typeof setTimeout>;
@@ -18,8 +19,8 @@ export function useTaskNotifications(connection:Connection|null){
   };
   refreshRef.current=refresh;const visible=()=>{if(document.visibilityState==='visible')void refresh();};document.addEventListener('visibilitychange',visible);void refresh();
   return()=>{stopped=true;clearTimeout(timer);document.removeEventListener('visibilitychange',visible);if(generation.current===current)refreshRef.current=async()=>{};};
- },[connection]);
- const markRead=useCallback(async(ids:string[])=>{if(!connection||!ids.length)return;const current=generation.current;await request(connection,'/task-notifications/read',{ids});if(generation.current===current)setInbox(old=>{const items=old.items.map(i=>ids.includes(i.id)?{...i,readAt:Date.now()}:i);return{...old,items,unread:items.filter(i=>!i.readAt).length};});},[connection]);
+ },[connection,provider]);
+ const markRead=useCallback(async(ids:string[])=>{if(!connection||!ids.length)return;const current=generation.current;await request(connection,'/task-notifications/read',{ids});if(generation.current===current)setInbox(old=>{const items=old.items.map(i=>ids.includes(i.id)?{...i,readAt:Date.now()}:i);return{...old,items,unread:items.filter(i=>!i.readAt).length};});},[connection,provider]);
  return{inbox,markRead,refresh:()=>refreshRef.current()};
 }
 const words={title:['Task notifications','Уведомления задач'],close:['Close notifications','Закрыть уведомления'],refresh:['Refresh notifications','Обновить уведомления'],read:['Mark all as read','Прочитать все'],unread:['Unread only','Только непрочитанные'],empty:['No task updates yet','Пока нет обновлений задач'],none:['No unread notifications','Нет непрочитанных уведомлений'],error:['Notifications could not be refreshed. Check the PC connection and update the server if needed.','Не удалось обновить уведомления. Проверьте связь с ПК и при необходимости обновите сервер.'],opening:['Opening task…','Открываем задачу…'],failed:['Could not open this task. The notification stays unread.','Не удалось открыть задачу. Уведомление останется непрочитанным.'],readError:['Could not save the read status. Try again.','Не удалось сохранить статус прочтения. Попробуйте ещё раз.'],note:['Changes to your assigned tasks. Updates are checked periodically while the app is open.','Изменения назначенных вам задач. Обновления проверяются периодически, пока приложение открыто.'],baseline:['The first sync sets a starting point; existing tasks do not create notifications.','Первая синхронизация задаёт точку отсчёта — старые задачи не создают уведомлений.'],updated:['Task updated','Задача обновлена'],status:['Status changed','Изменён статус'],comment:['New comments','Новые комментарии']} as const;
