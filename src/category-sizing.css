@@ -1,0 +1,2 @@
+:root{--category-title-size:clamp(13px,calc(14px * var(--ui-scale,1)),18px);--category-detail-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px);--category-heading-size:clamp(19px,calc(22px * var(--ui-scale,1)),28px);--category-padding:12px 14px;--category-min-height:68px;--category-icon-size:20px;}
+@media(max-width:760px){:root{--category-padding:11px 12px;}}

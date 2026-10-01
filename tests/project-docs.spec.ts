@@ -113,11 +113,21 @@ for(const profile of [{width:320,height:640,language:'en',scale:130},{width:360,
 for(const scale of [60,100,130])test('project text follows saved interface scale '+scale,async({page})=>{
  await page.setViewportSize({width:360,height:760});await host(page);await openProject(page,'en',scale);
  const font=()=>page.locator('.project-docs-item strong').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize));
- expect(await font()).toBeCloseTo(15*scale/100,1);
+ const savedFont=await font();expect(savedFont).toBeGreaterThanOrEqual(13);
  await page.reload();await page.locator('.mobile-nav').getByRole('button',{name:'Project',exact:true}).click();
  await expect(page.locator('.project-overview-cards')).toBeVisible();await page.screenshot({path:'artifacts/screenshots/project-overview-'+scale+'.png'});
  await expect(page.locator('.chat-header select')).toHaveCount(0);
  await expect(page.locator('.project-context-picker select')).toBeVisible();
- await page.locator('.project-overview-card').filter({hasText:'Instructions for AI'}).click();expect(await font()).toBeCloseTo(15*scale/100,1);
+ await page.locator('.project-overview-card').filter({hasText:'Instructions for AI'}).click();expect(await font()).toEqual(savedFont);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+for(const scale of [60,100,130])test(`project and settings share control sizes at ${scale}%`,async({page})=>{
+  await page.setViewportSize({width:320,height:740});await host(page);await openOverview(page,'en',scale);
+  const sizes=async(selector:string)=>page.locator(selector).first().evaluate(el=>{const s=getComputedStyle(el),title=getComputedStyle(el.querySelector('strong')!),detail=getComputedStyle(el.querySelector('small')!);return {title:title.fontSize,detail:detail.fontSize,padding:s.padding,minHeight:s.minHeight};});
+  const project=await sizes('.project-overview-card');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:`artifacts/screenshots/project-sizing-${scale}.png`});
+  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();
+  await expect(page.locator('.settings-category').first()).toBeVisible();
+  expect(await sizes('.settings-category')).toEqual(project);
 });

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - Consistent Project control sizing (0.17.1)
+- Changed: Project overview cards, document lists, folder selector and labels share Settings typography and category control sizing, including readable minimum sizes at reduced interface scale.
+- Why: Project used rem and unconstrained scale formulas while Settings used bounded font sizes, producing inconsistent proportions.
+- Files: src/category-sizing.css, src/project-docs.css, src/settings.css; tests/project-docs.spec.ts.
+- Validation: 20 Project/Settings UI scenarios passed, including matching computed card sizes at 60%, 100% and 130%, persistence after reload and narrow layouts. Inspected 320px/130% screenshot; TypeScript, Vite and Android build passed.
+- Follow-up: Physical Android visual verification was not available. Document Markdown retains the independently configured reading font size.
+
 ## 2026-10-01 - Running-chat clarifications and compact task heading (0.17.0)
 - Changed: Tasks shows the selected Jira role in the main heading; removed the Assigned to me row and placed refresh beside search.
 - Added: A send button remains available beside Stop during an active Pocket Code run, including uploaded attachments. Codex uses turn/steer with the exact active turn; Claude queues follow-ups in the same streaming-input process, delivering the next prompt after each result. Pending/unprocessed Claude input is visible.
