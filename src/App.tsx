@@ -1,4 +1,6 @@
 import { Review } from './Review';
+import {ActivityDrawer} from './ActivityDrawer';
+import {useActivity} from './useActivity';
 import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
 import { Subagents } from './Subagents';
 import { ChatOutputs } from './ChatOutputs';
@@ -10,7 +12,7 @@ import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
 import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
-import { ArrowUp, ArrowLeft, Plus, Search, MessageSquare, Folder, Settings, Terminal, Wifi, ChevronDown, Paperclip, Square, X, GitBranch, RefreshCw, Laptop, LogOut, ShieldCheck, ClipboardList, Eye, EyeOff, PanelsTopLeft } from 'lucide-react';
+import { ArrowUp, ArrowLeft, Plus, Search, MessageSquare, Folder, Settings, Terminal, Wifi, ChevronDown, Paperclip, Square, X, GitBranch, RefreshCw, Laptop, LogOut, ShieldCheck, ClipboardList, Eye, EyeOff, PanelsTopLeft,PanelLeft } from 'lucide-react';
 import { Connect } from './Connect';
 import { useAppearance } from './Appearance';
 import {SettingsPanel,type SettingsPage} from './SettingsPanel';
@@ -20,7 +22,7 @@ import { ProjectDocs } from './ProjectDocs';
 import { LiveTerminal } from './LiveTerminal';
 import { fileBase64, loadConnection, request, saveConnection, type Connection } from './api';
 import { demoMessages, demoSessions } from './demo';
-import type { ChatMessage, JobView, SubagentView } from '../server/types';
+import type { ChatMessage, JobView, SubagentView,ActivityItem } from '../server/types';
 
 type Session = {sessionId: string;summary: string;customTitle?: string;cwd?: string;lastModified: number;gitBranch?: string;source?: string;readOnly?: boolean;archived?: boolean;provider?: WorkspaceProvider;};
 type Health = {name: string;roots: string[];version: string;protocol: number;};
@@ -71,10 +73,14 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const [hostRestarting,setHostRestarting] = useState(false);
   useEffect(()=>{const handle=(event:Event)=>setHostRestarting(!!(event as CustomEvent).detail?.active);window.addEventListener('pocket-code-host-update-restarting',handle);return()=>window.removeEventListener('pocket-code-host-update-restarting',handle);},[]);
   const [demo, setDemo] = useState(false),[attachments, setAttachments] = useStateForWorkspace<Attachment[]>([]),[uploading, setUploading] = useStateForWorkspace(false);
+  const activity=useActivity(demo?null:connection);
+  const [activityOpen,setActivityOpen]=useState(false),[activityTarget,setActivityTarget]=useState<{item:ActivityItem;connection:Connection}|null>(null);
+  useEffect(()=>{setActivityOpen(false);setActivityTarget(null);},[connection]);
   const [takeover, setTakeover] = useStateForWorkspace(false),[pendingTakeover, setPendingTakeover] = useStateForWorkspace(false),[budget, setBudget] = useStateForWorkspace(id=>preferences(id).budget);
   const confirmation=useRef<HTMLElement|null>(null);
   useModal(confirmation,pendingTakeover,()=>setPendingTakeover(false));
   useBackAction(()=>{
+    if(activityTarget){setActivityTarget(null);return true;}
     if(readingMode&&tab==='chats'){toggleReadingMode(false);return true;}
     if(tab==='settings'&&settingsPage!=='index'){setSettingsPage('index');return true;}
     if(tab!=='chats'){setTab('chats');setMobileChat(true);return true;}
@@ -90,6 +96,19 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const rejectedDraft=rejectedDrafts[currentDraftKey()];
   const rememberDraft=()=>{drafts.current!.set(currentDraftKey(),{text:draft,attachments});};
   const restoreDraft=(key:string)=>{const value=drafts.current!.get(key);setDraft(value?.text||'');setAttachments(value?.attachments||[]);};
+  function openActivity(item:ActivityItem){
+    if(!connection||busy||uploading)return;
+    rememberDraft();setActivityOpen(false);setActivityTarget({item,connection});setProvider(item.provider);
+  }
+  useEffect(()=>{
+    if(!activityTarget||activityTarget.item.provider!==provider)return;
+    const target=activityTarget;setActivityTarget(null);
+    if(target.connection!==connection)return;
+    // Never queue navigation behind another workspace's upload/send.
+    if(busy||uploading){setActivityOpen(true);return;}
+    const item=target.item;
+    void openSession({sessionId:item.sessionId||`pending-${item.id}`,cwd:item.cwd,summary:item.title,provider:item.provider,lastModified:item.startedAt},{id:item.id,sessionId:item.sessionId});
+  },[activityTarget,provider,busy,uploading,connection]);
   const [hasMore, setHasMore] = useStateForWorkspace<number | null>(null);
   const [loadingOlder,setLoadingOlder]=useStateForWorkspace(false);
   const paging=useRefForWorkspace<symbol|null>(null);
@@ -112,6 +131,20 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const navigation = useRefForWorkspace(0),sending = useRefForWorkspace(false),nearBottom = useRefForWorkspace(true);
   const retry = useRefForWorkspace<{signature: string;id: string;} | null>(null);
   const running = job?.status === 'running';
+  function acknowledgeVisibleActivity(){
+    const element=scroll.current;
+    if(!element||!element.getClientRects().length||element.closest('[inert]')||document.visibilityState==='hidden'||tab!=='chats'||loading||loadingOlder||error||historyError||activityOpen||activityTarget||reviewOpen||agentPanel||outputsOpen||pendingTakeover)return;
+    if(element.scrollHeight-element.scrollTop-element.clientHeight>80)return;
+    for(const item of activity.items){
+      if(item.provider!==provider||item.status==='running'||item.status==='needs_input')continue;
+      const viewedJob=job?.id===item.id&&job.status===item.status;
+      const viewedHistory=item.status==='done'&&item.sessionId===selected?.sessionId&&item.resultMessageId&&history.some(message=>message.id===item.resultMessageId);
+      if(viewedJob||viewedHistory)activity.markViewed(item);
+    }
+  }
+  const acknowledgeActivity=useRef(acknowledgeVisibleActivity);acknowledgeActivity.current=acknowledgeVisibleActivity;
+  useEffect(()=>{acknowledgeActivity.current();},[activity.items,job?.revision,loading,loadingOlder,history,provider,tab,mobileChat,activityOpen,activityTarget,reviewOpen,agentPanel,outputsOpen,pendingTakeover,error,historyError]);
+  useEffect(()=>{const visible=()=>{if(document.visibilityState!=='hidden')requestAnimationFrame(()=>acknowledgeActivity.current());};document.addEventListener('visibilitychange',visible);return()=>document.removeEventListener('visibilitychange',visible);},[]);
   const parentChatId = job?.sessionId || selected?.sessionId;
   const outputMessages=useMemo(()=>uniqueMessages([...history,...(job?.errorCode!=='codex_thread_busy'?job?.messages||[]:[])]),[history,job?.messages,job?.errorCode]);
   const toolResults=useMemo(()=>{const blocks=outputMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b]));},[outputMessages]);
@@ -345,7 +378,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     } catch (e) {setError((e as Error).message);} finally
     {if (epoch === navigation.current) setLoading(false);}
   }
-  async function openSession(s: Session, activeJob?: JobView) {
+  async function openSession(s: Session, activeJob?: Pick<JobView,'id'|'sessionId'>) {
     if (busy || uploading) return;
     rememberDraft();setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
@@ -357,8 +390,11 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
       const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
       const full = active ? await api<JobView>(`/jobs/${active.id}`) : null;
       if (epoch !== navigation.current) return;
+      if(full&&(full.provider||'claude')!==provider)throw new Error(t('Чат относится к другому рабочему пространству.'));
       setJob(full);setTakeover(Boolean(full));
-      if (!s.sessionId.startsWith('pending-')) await loadHistory(s, full, epoch, false, false);
+      const resolved=full?.sessionId?{...s,sessionId:full.sessionId,cwd:full.cwd}:s;
+      if(resolved.sessionId!==s.sessionId)setSelected(resolved);
+      if (!resolved.sessionId.startsWith('pending-')) await loadHistory(resolved, full, epoch, false, false);
     } catch (e) {if (epoch === navigation.current) setError((e as Error).message);} finally {if (epoch === navigation.current) setLoading(false);}
   }
   function newChat(project = cwd) {
@@ -404,14 +440,16 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   if (!health) return <Connect initial={saved} onConnect={connect} onDemo={startDemo} busy={busy} error={error} />;
   const visible = sessions.filter((s) => `${s.customTitle || ""} ${s.summary} ${s.cwd}`.toLowerCase().includes(search.toLowerCase()));
   const workspacePicker = (location:'sidebar'|'header'|'settings') => <label className={`workspace-picker workspace-picker-${location}`}>{location==='settings'&&<span>{t("Рабочее пространство")}</span>}<select aria-label={t("Рабочее пространство")} value={provider} disabled={demo} onChange={event=>setProvider(event.target.value as WorkspaceProvider)}><option value="claude">Claude</option><option value="codex">Codex</option></select></label>;
+  const activityEntry=(header=false)=><button className={`icon-button activity-entry${header?' mobile-back':''}`} aria-label={t('Активность чатов')} aria-description={t('Чатов в активности: {0}',activity.count)} aria-haspopup="dialog" title={t('Активность чатов')} disabled={demo} onClick={()=>setActivityOpen(true)}><PanelLeft size={21}/>{activity.count>0&&<span className="activity-badge" aria-hidden="true">{activity.count>99?'99+':activity.count}</span>}</button>;
   return <div className={`app ${mobileChat ? 'show-chat' : ''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
+    {activityOpen&&<ActivityDrawer items={activity.items} loading={activity.loading} error={activity.error} busy={busy||uploading||Boolean(activityTarget)} onRetry={activity.refresh} onOpen={openActivity} onClose={()=>setActivityOpen(false)} onAllChats={()=>{setActivityOpen(false);setTab('chats');setMobileChat(false);}}/>}
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={21}/></button>}
     <aside className="sidebar">
       <div className="chat-list-actions">{workspacePicker('sidebar')}
       <button className="primary new-chat" disabled={busy || uploading} onClick={() => newChat()}><Plus size={18} />{t("Новый чат")}</button></div>
       {provider==='claude' && <button className="terminal-entry secondary" disabled={busy || uploading} onClick={() => {setTab('terminal');setMobileChat(true);}}><Terminal size={17} />{t("Живой терминал")}<span>CLI</span></button>}<nav className="desktop-tabs"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={17} />{t("Задачи")}</button><button className={tab === 'chats' ? 'active' : ''} onClick={() => setTab('chats')}><MessageSquare size={17} />{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><Folder size={17} />{t("Проект")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
       <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти в чатах")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-      <div className="session-list"><div className="list-label">{t("ВАШИ ЧАТЫ ")}<span>{visible.length}</span></div>
+      <div className="session-list"><div className="list-label">{t("ВАШИ ЧАТЫ ")}<span>{visible.length}</span>{activityEntry()}</div>
         {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><span className="pulse-dot" /><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}</small></div></button>)}
         {visible.map((s) => <button className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} disabled={busy || uploading} key={s.sessionId} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span>·</span>{new Date(s.lastModified).toLocaleDateString(locale(), { day: 'numeric', month: 'short' })}</small></div>{jobs.some((j) => j.sessionId === s.sessionId && j.status === 'running') && <span className="pulse-dot" />}</button>)}
         {!visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : t("Здесь появятся чаты {0} из разрешённых папок.",engineName)}</p></div>}
@@ -421,7 +459,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       <header className="chat-header" data-section={tab}>
-        {(tab==='chats'||tab==='terminal')&&<button className="icon-button mobile-back" aria-label={t("К списку чатов")} onClick={() => setMobileChat(false)}><ArrowLeft size={21} /></button>}
+        {tab==='chats'?activityEntry(true):tab==='terminal'&&<button className="icon-button mobile-back" aria-label={t("К списку чатов")} onClick={() => setMobileChat(false)}><ArrowLeft size={21} /></button>}
         <div className="header-title">{(tab==='chats'||tab==='terminal') && <label className="project-picker"><Folder size={14}/><select aria-label={t("Папка проекта")} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>}<strong>{tab==='jobs'?t("Задачи"):tab==='settings'?t("Настройки"):tab==='files'?t("Проект"):tab==='terminal'?t("Терминал"):selected?.customTitle||selected?.summary||t("Новый разговор")}</strong></div>
         {(tab==='chats'||tab==='terminal')&&workspacePicker('header')}
         {tab==='chats' && <><span className="branch"><GitBranch size={13} />{selected?.gitBranch||'local'}</span>{availableReview&&<button className="secondary review-button" aria-label="Review" disabled={!connection||demo||selected?.readOnly} onClick={()=>setReviewOpen(true)}>Review</button>}{hasOutputs&&<button className="icon-button outputs-entry" disabled={!connection||demo||loading} aria-label={t("Результаты")} title={t("Результаты")} onClick={()=>setOutputsOpen(true)}><PanelsTopLeft size={20}/></button>}{(outputMessages.length>0||Boolean(job?.partial))&&<button className="icon-button reading-entry" disabled={loading||!history.length&&!job} aria-label={t("Режим чтения")} title={t("Режим чтения")} aria-pressed={readingMode} onClick={()=>toggleReadingMode(true)}><Eye size={20}/></button>}</>}
@@ -432,7 +470,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
       {!canRun && !demo && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить рабочее пространство Codex.")}</div>}
       <Updates connection={connection} expanded={tab === 'settings'&&settingsPage === 'updates'} />
       {tab === 'jobs' ? <JiraJobs key={provider} provider={provider} codexAccess={codexAccess} connection={connection} roots={projectRoots} jobs={jobs} budget={budget} onSettings={() => {setSettingsPage('jira');setTab('settings');setMobileChat(true);}} onOpenLinked={link => {if(link.sessionId)void openSession({sessionId:link.sessionId,cwd:link.cwd,provider:link.provider,summary:t("Задача {0}",engineName),lastModified:Date.now()});}} onOpen={(j) => {void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: j.jira ? `${j.jira.key}: ${j.jira.summary}` : t("Задача {0}",engineName), cwd: j.cwd, lastModified: j.startedAt }, j);}} /> : tab === 'terminal' ? provider === 'codex' ? <div className="center-message">{t("Терминал доступен в рабочем пространстве Claude. С Codex можно работать в чате.")}</div> : connection && !demo && !selected?.readOnly ? <LiveTerminal connection={connection} cwd={cwd} sessionId={selected?.sessionId} /> : <div className="center-message">{t("Живой терминал доступен после подключения к ПК.")}</div> : tab === 'files' ? connection && !demo && !selected?.readOnly ? <ProjectDocs key={`${provider}:${cwd}`} provider={provider} connection={connection} root={cwd} roots={projectRoots} onSelectProject={root=>{newChat(root);setTab('files');setMobileChat(true);}} onProject={newChat} /> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget} onDisconnect={()=>void disconnect()}/> : <>
-        <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!,previous=lastScrollTop.current;nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;if (nearBottom.current && !fromStart) setShowScrollActions(false);else if (el.scrollTop < previous - 2) setShowScrollActions(true);lastScrollTop.current = el.scrollTop;if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
+        <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!,previous=lastScrollTop.current;nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;if (nearBottom.current && !fromStart) setShowScrollActions(false);else if (el.scrollTop < previous - 2) setShowScrollActions(true);lastScrollTop.current = el.scrollTop;acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}<div className="conversation-date"><span />{demo ? t("ПРИМЕР РАЗГОВОРА") : t("РАБОЧЕЕ ПРОСТРАНСТВО")}<span /></div>
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}
             {!loading && !history.length && !job && !selected && <div className="welcome"><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={15} /></button>)}</div></div>}

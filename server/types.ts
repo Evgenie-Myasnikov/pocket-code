@@ -2,6 +2,12 @@ export type SubagentView = { id: string; name: string; status: 'running' | 'comp
 export type Block = { type: string; agent?: SubagentView; text?: string; name?: string; input?: unknown; content?: unknown; id?: string; tool_use_id?: string; thinking?: string; is_error?: boolean; title?: string; source?: { type?: string; media_type?: string; data?: string; url?: string; text?: string }; data?: string; mimeType?: string };
 export type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; blocks: Block[] };
 export type Approval = { id: string; tool: string; input: Record<string, unknown>; expiresAt: number };
+export type ActivityItem = {
+  id: string; provider: 'claude' | 'codex'; cwd: string; sessionId?: string; title: string;
+  status: 'running' | 'needs_input' | 'done' | 'error' | 'stopped'; startedAt: number; version: string;
+  /** For completed jobs only: the latest assistant message that must actually be viewed before acknowledging from history. */
+  resultMessageId?: string;
+};
 export type JobView = {
   provider?: 'claude' | 'codex';
   id: string; cwd: string; sessionId?: string; status: 'running' | 'done' | 'error' | 'stopped';

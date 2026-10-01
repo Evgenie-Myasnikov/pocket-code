@@ -22,6 +22,7 @@ import { JiraWorkflow } from './jira-workflow.js';
 import type { JiraService } from './jira.js';
 import type { CodexService } from './codex.js';
 import { codexEffortPattern } from './codex-models.js';
+import { activityItem, recentActivityJobs } from './activity.js';
 import { claudeSubagents, claudeSubagentMessages } from './subagents.js';
 import { EngineUpdates, pocketSource } from './engine-updates.js';
 
@@ -301,6 +302,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const file = path.join(dir, name); await writeFile(file, buffer, { flag: 'wx' });
     uploads.set(id, { path: file, name, cwd, expires: Date.now() + 86400000 });
     res.json({ id, name, size: buffer.length });
+  });
+  app.get('/api/activity', (_req, res) => {
+    // In-memory jobs started by this bridge only. Reading activity must never
+    // initialize a provider, inspect desktop history or request model output.
+    const recent = recentActivityJobs(allJobs());
+    res.json(recent.map(job => activityItem(job.provider === 'codex' && config.codex ? config.codex.view(config.codex.get(job.id)) : jobs.view(jobs.get(job.id)))));
   });
   app.get('/api/jobs', (req, res) => res.json(providerSchema.parse(req.query.provider) === 'codex' ? codex().list() : jobs.list()));
   app.get('/api/jobs/:id', (req, res) => {

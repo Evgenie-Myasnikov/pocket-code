@@ -27,7 +27,7 @@ test('chat drafts survive navigation and modal Back/Escape restores focus',async
   await page.getByRole('button',{name:'Review',exact:true}).click();
   const back=page.getByRole('button',{name:'Back to chat',exact:true});await expect(back).toBeFocused();
   await expect(page.locator('.chat-header')).toHaveJSProperty('inert',true);
-  await page.keyboard.press('Shift+Tab');await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeFocused();
+  await page.keyboard.press('Shift+Tab');await expect(page.locator('.review-panel .diff-content')).toBeFocused();
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('button',{name:'Review',exact:true})).toBeFocused();
   await expect(draft).toHaveValue('First unsent message');
   await page.getByRole('button',{name:'Send message',exact:true}).click();
