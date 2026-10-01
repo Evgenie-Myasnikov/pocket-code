@@ -15,6 +15,8 @@ import { ExistingClaudeJira } from './jira-existing.js';
 import { WindowsJiraStore } from './jira-vault.js';
 import { EngineUpdates } from './engine-updates.js';
 import { CodexService } from './codex.js';
+import {JiraConnection} from './jira-connection.js';
+import {JiraLogin} from './jira-login.js';
 
 const local = path.resolve(process.env.POCKET_DATA_DIR || path.join(homedir(), '.pocket-code'));
 await mkdir(local, { recursive: true });
@@ -33,11 +35,15 @@ if (!updateRepo) { try { updateRepo = JSON.parse(await readFile(path.join(local,
 const updater = new ReleaseUpdater(updateRepo, path.join(local, 'updates'));
 const codexJiraTools = new CodexJiraTools(roots[0]);
 const codexJira = process.env.POCKET_JIRA_MODE === 'oauth' ? jira : new ExistingClaudeJira(path.join(local, 'jira-existing-codex.json'), codexJiraTools.call, codexJiraTools.call, 'codex');
+const jiraConnection=new JiraConnection(path.join(local,'jira-connection.json'),{claude:jira,codex:codexJira});
+await jiraConnection.ready;
+const jiraSetupKey=randomBytes(32).toString('base64url');
+const jiraLogin=new JiraLogin(async()=>Boolean((await jiraConnection.verify('codex')).connected));
 const codex = new CodexService(roots, { attachmentRoots: [path.join(local, 'uploads')] });
 let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
-const { app, jobs, terminals, queue, codexQueue, workflow, isBusy, maintainEngines } = await createApp({ engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira, jiraForProvider: provider => provider === 'codex' ? codexJira : jira });
+const { app, jobs, terminals, queue, codexQueue, workflow, isBusy, maintainEngines } = await createApp({ pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
 runtimeReady = true;
 const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
 void maintainEngines().catch(()=>{});
@@ -66,7 +72,7 @@ async function showPairing() {
   }
   internetAddress = internetUrl;
   if (closing) return;
-  const file = await writePairingPage(local, token!, host, port, internetUrl);
+  const file = await writePairingPage(local, token!, host, port, internetUrl,jiraSetupKey);
   console.log(`QR-код подключения: ${file}`);
   if (process.env.POCKET_OPEN_PAIRING === '1' && process.platform === 'win32') {
     const child = spawn('explorer.exe', [file], { windowsHide: true, detached: true, stdio: 'ignore' });
@@ -85,7 +91,7 @@ function shutdown(preserveTunnel = false): Promise<void> {
   closing = true; runtimeReady = false; hostUpdater.close(); clearInterval(workflowTimer); clearInterval(engineTimer);
   const stopped = new Promise<void>(resolve => server.close(() => resolve()));
   const queues = [queue?.close(), codexQueue?.close()];
-  codexJiraTools.close(); codex.close(); jobs.close(); terminals.close();
+  jiraLogin.close(); codexJiraTools.close(); codex.close(); jobs.close(); terminals.close();
   // Keep shutdown bounded if a network client fails to finish closing, but let
   // local workflow writes and owned tunnel termination settle before exit.
   const fallback = setTimeout(() => { server.closeAllConnections(); process.exit(0); }, 10000); fallback.unref();

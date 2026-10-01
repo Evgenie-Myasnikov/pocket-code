@@ -1,3 +1,6 @@
 :root[data-theme] .composer-tools .send-button{position:relative;isolation:isolate;background:transparent}
 .composer-tools .send-button::before{content:"";position:absolute;z-index:-1;top:50%;left:50%;transform:translate(-50%,-50%);width:clamp(28px,calc(32px * var(--ui-scale,1)),36px);height:clamp(28px,calc(32px * var(--ui-scale,1)),36px);border-radius:8px;background:var(--accent)}
 .composer-tools .send-button svg{width:clamp(16px,calc(18px * var(--ui-scale,1)),20px);height:clamp(16px,calc(18px * var(--ui-scale,1)),20px)}
+:root[data-theme] .composer-tools .stop-button{position:relative;isolation:isolate;background:transparent;min-width:48px;min-height:48px}
+.composer-tools .stop-button::before{content:"";position:absolute;z-index:-1;top:50%;left:50%;transform:translate(-50%,-50%);width:clamp(28px,calc(32px * var(--ui-scale,1)),36px);height:clamp(28px,calc(32px * var(--ui-scale,1)),36px);border-radius:8px;background:#d3baa2}
+.composer-tools .stop-button svg{width:clamp(12px,calc(14px * var(--ui-scale,1)),16px);height:clamp(12px,calc(14px * var(--ui-scale,1)),16px)}

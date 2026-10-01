@@ -116,3 +116,8 @@ Settings group appearance/language, provider access, integrations, updates, and 
 **Disconnect and forget** is at the end of the main settings list. It clears this phone's saved pairing and cached conversations. It does not stop the PC host or delete your project. Use the PC stop launcher to stop the host; active work can prevent a graceful stop.
 
 For troubleshooting, include app and host versions and reproduction steps in an [issue](https://github.com/Evgenie-Myasnikov/pocket-code/issues), with private data removed.
+# Shared Jira connection on the PC
+
+In the PC QR window, open **Jira · Connect / Settings**. Choose the existing Claude connection, or **Sign in to Atlassian** for direct MCP through Codex, then select that connection. Jira access is shared by Claude and Codex tasks; choosing a task AI does not change your Jira account.
+
+The Claude connection uses Claude's allowance. Direct MCP does not start a model turn, but requires its own Atlassian authorization. A site administrator may need to approve it. Signing into Claude does not authorize Codex. Complete login in the PC browser and refresh Tasks on the phone. Finish active tasks before changing the connection.

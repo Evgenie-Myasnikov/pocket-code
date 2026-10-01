@@ -6,6 +6,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { HttpError } from './security.js';
+import { JiraConnectionError } from './jira-connection-error.js';
 import { jiraIssue, jiraIssueFields, jiraIssuesJql, jiraMatchesStage, jiraTransitions, jiraTransitionArgs, jiraTransitionUncertain, type JiraIssueQuery, type JiraService, type JiraSite } from './jira.js';
 
 const prefix = 'mcp__claude_ai_Atlassian_MCP__';
@@ -95,7 +96,7 @@ export class ExistingClaudeJira implements JiraService {
     if (!this.enabled) return { connected: false, sites: [], source: this.source };
     let raw: any;
     try { raw = await this.read('getAccessibleAtlassianResources', {}, 600000); }
-    catch { return { connected: false, sites: [], source: this.source, error: this.source === 'codex' ? 'Codex could not read Jira. Enable one authorized Atlassian MCP connector in Codex on the PC, then retry. Update Codex if direct MCP tools are unavailable.' : 'Claude Code could not read Jira. Check its existing Atlassian MCP connection and retry.' }; }
+    catch (error) { return { connected: false, sites: [], source: this.source, error: error instanceof JiraConnectionError ? error.message : this.source === 'codex' ? 'Codex could not read Jira. Enable one authorized Atlassian MCP connector in Codex on the PC, then retry. Update Codex if direct MCP tools are unavailable.' : 'Claude Code could not read Jira. Check its existing Atlassian MCP connection and retry.' }; }
     if (!this.enabled) return { connected: false, sites: [], source: this.source };
     const resources = raw.data?.resources || raw.resources || (Array.isArray(raw) ? raw : []);
     this.sites = resources.filter((r: any) => r.products?.some((p: any) => p.id === 'jira') && /^https:\/\/[a-z0-9-]+\.atlassian\.net\/?$/i.test(r.url)).map((r: any) => ({ id: r.cloudId || r.id, name: r.name || new URL(r.url).hostname, url: r.url.replace(/\/$/, '') }));

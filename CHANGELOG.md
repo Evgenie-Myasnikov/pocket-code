@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-01 - Shared PC Jira connection and compact stop control (0.19.4)
+- Changed: The PC QR page links to a common Jira setup screen. Select the existing Claude connector or sign in to direct MCP through Codex; the saved Jira connection serves both task AI providers.
+- Fixed: Codex reports configured-but-not-signed-in Jira explicitly instead of suggesting an unrelated runtime update. A live read-only discovery confirmed this condition; no Jira content or credentials were exported.
+- Lifecycle: OAuth starts only on a button press, has a five-minute timeout and is terminated with the host. Setup uses a separate, ephemeral, local-only key. Connection changes are rejected while tasks or other mutations are active.
+- UI: Stop now has the same 28-36 px visible face as Send, with a 48 px touch target retained.
+- Files: server/jira-connection.ts, jira-login.ts, jira-codex.ts, jira-existing.ts, app.ts, index.ts, pairing.ts; src/Jira.tsx, composer-controls.css and focused tests.
+- Validation: 18 focused server tests and three browser scenarios passed. TypeScript/Vite/Android build passed (versionCode 36); setup screenshot inspected. Full 200-test runs each encountered one transient Windows EPERM rename failure in different suites; both affected suites passed separately. Source/APK/host privacy audits passed.
+- Follow-up: Real Atlassian authorization requires user interaction and any required site-admin approval. Existing Claude access can be used independently of the selected task AI.
+
+
 ## 2026-10-01 - Compact chat allowance indicator (0.19.3)
 - Changed: Added a small right-aligned ring and remaining percentage inside the composer. Tapping opens the existing usage details; returning to chat preserves its draft and selected conversation.
 - Semantics: Uses the lowest reported remaining percentage across shared and explicitly matched model windows for the selected provider. Missing, expired, stale or failed data shows a neutral dash; unrelated model quotas are excluded.

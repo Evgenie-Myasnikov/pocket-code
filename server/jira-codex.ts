@@ -1,6 +1,7 @@
 import {discoverCodex,StdioCodexRpc,type CodexRpc} from './codex-rpc.js';
 import {HttpError} from './security.js';
 import type {ReadCall} from './jira-existing.js';
+import {JiraConnectionError,JIRA_CODEX_LOGIN_REQUIRED} from './jira-connection-error.js';
 
 const allowed=new Set(['getAccessibleAtlassianResources','searchJiraIssuesUsingJql','getJiraIssue','executeRead','transitionJiraIssue']);
 const matches=(actual:string,wanted:string)=>actual===wanted||actual.endsWith('__'+wanted)||actual.endsWith('_'+wanted);
@@ -27,10 +28,12 @@ export class CodexJiraTools {
     const started=await rpc.request('thread/start',{cwd:this.cwd,ephemeral:true,approvalPolicy:'never',sandbox:'read-only'});
     const threadId=started.thread?.id;if(typeof threadId!=='string')throw Error('Codex did not initialize Jira tools.');
     const candidates:{server:string;tools:Record<string,string>}[]=[];
+    let jiraLoginRequired=false;
     let cursor:string|undefined;
     for(let page=0;page<20;page++){
       const result=await rpc.request('mcpServerStatus/list',{threadId,detail:'toolsAndAuthOnly',limit:100,...(cursor?{cursor}:{})});
       for(const server of result.data||[]){
+        if(server.name==='jira'&&server.authStatus==='notLoggedIn')jiraLoginRequired=true;
         const tools:Record<string,string>={};
         for(const [key,value] of Object.entries(server.tools||{})){
           const name=(value as any)?.name||key;
@@ -43,6 +46,7 @@ export class CodexJiraTools {
       cursor=result.nextCursor;
       if(page===19)throw Error('Codex tool discovery exceeded its page limit.');
     }
+    if(!candidates.length&&jiraLoginRequired)throw new JiraConnectionError(JIRA_CODEX_LOGIN_REQUIRED);
     if(candidates.length!==1)throw new HttpError(409,candidates.length?'Multiple Jira connectors are enabled in Codex. Keep one enabled for Pocket Code.':'Connect Atlassian MCP in Codex on the PC, then retry. This Codex runtime must expose Jira tools through app-server.');
     return {rpc,threadId,...candidates[0]};
   }

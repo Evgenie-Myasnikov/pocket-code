@@ -1,5 +1,6 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+"Jira MCP настроен в Codex, но вход не выполнен. На ПК выполните codex mcp login jira, завершите вход в Atlassian и повторите подключение. Вход Claude действует отдельно.":"Jira MCP is configured in Codex but is not signed in. On the PC, run codex mcp login jira and complete Atlassian sign-in, then retry. Claude sign-in is separate.",
 "Уточнений в очереди: {0}":"Queued follow-ups: {0}",
 "Необработанных уточнений: {0}":"Unprocessed follow-ups: {0}",
 "Активный ход завершён. Черновик сохранён.":"The active turn has ended. Your draft is preserved.",

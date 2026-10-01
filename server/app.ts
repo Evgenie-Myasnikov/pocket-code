@@ -27,8 +27,10 @@ import { activityItem, recentActivityJobs } from './activity.js';
 import { claudeSubagents, claudeSubagentMessages } from './subagents.js';
 import { EngineUpdates, pocketSource } from './engine-updates.js';
 import { coalesceReads } from './read-coalescer.js';
+import {jiraLoginPage,type JiraLogin} from './jira-login.js';
+import type {JiraConnection} from './jira-connection.js';
 
-export type Config = { jiraForProvider?(provider:'claude'|'codex'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -48,12 +50,17 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const indexes = config.desktopSessionIndexes ?? await desktopIndexes();
   const app = express();
   app.disable('x-powered-by');
+  const localSetup=(req:express.Request,res:express.Response,next:express.NextFunction)=>{
+    if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')||!['127.0.0.1','localhost','[::1]'].includes(req.hostname)){res.sendStatus(403);return;}next();
+  };
+  app.get('/setup/jira',localSetup,(_req,res)=>{res.setHeader('Cache-Control','no-store');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'");res.type('html').send(jiraLoginPage);});
   app.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
   const origins = new Set(['http://localhost', 'https://localhost', 'capacitor://localhost', 'http://127.0.0.1:5173', 'http://localhost:5173']);
   app.use(cors({ origin(origin, callback) { callback(null, !origin || origins.has(origin)); } }));
   const failures = new Map<string, { count: number; reset: number }>();
   app.use('/api', (req, res, next) => {
     const ip = req.socket.remoteAddress || 'unknown', now = Date.now();
+    if(config.pcJira&&['/jira/pc-login','/jira/pc-source'].includes(req.path)&&validToken((req.headers.authorization||'').replace(/^Bearer /,''),config.pcJira.key)){next();return;}
     // A noisy public tunnel peer must not lock out a client with the valid key.
     if (validToken((req.headers.authorization || '').replace(/^Bearer /, ''), config.token)) { next(); return; }
     if (failures.size > 1000) for (const [key, v] of failures) if (v.reset < now) failures.delete(key);
@@ -66,10 +73,11 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     failures.delete(ip); next();
   });
   app.use(express.json({ limit: '15mb' }));
-  let activeMutations = 0, runtimeStopping = false;
+  let activeMutations = 0, runtimeStopping = false, jiraChanging=false;
   const isBusy = () => activeMutations > 0 || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!workflow?.isBusy();
   app.use('/api', (req, res, next) => {
     if (req.method === 'GET' || req.path === '/runtime/stop') { next(); return; }
+    if(jiraChanging){res.status(409).json({error:'The Jira connection is changing. Please retry shortly.'});return;}
     if (runtimeStopping) { res.status(503).json({ error: 'The PC server is stopping.' }); return; }
     if (req.path.startsWith('/host-update/')) { next(); return; }
     if (config.hostUpdater?.draining) { res.status(503).json({ error: 'The PC is restarting to finish its update. Please wait.' }); return; }
@@ -108,6 +116,21 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const notificationFeeds=Object.fromEntries((['claude','codex'] as const).map(provider=>[provider,new TaskNotifications(path.join(path.dirname(config.uploads),provider==='claude'?'task-notifications.json':'task-notifications-codex.json'),config.jira?[jiraNotifications(jira(provider))]:[])]));
   const requestProvider=(req:express.Request)=>providerSchema.parse(req.body?.provider??req.query.provider);
   const taskNotifications=(req:express.Request)=>notificationFeeds[requestProvider(req)];
+  app.get('/api/jira/pc-login',localSetup,async(_req,res)=>{if(!config.pcJira)throw new HttpError(404,'PC Jira setup unavailable');res.json({...config.pcJira.login.status(),source:config.pcJira.connection.selected()});});
+  app.post('/api/jira/pc-login',localSetup,async(_req,res)=>{if(!config.pcJira)throw new HttpError(404,'PC Jira setup unavailable');res.json(await config.pcJira.login.start());});
+  app.post('/api/jira/pc-source',localSetup,async(req,res)=>{
+    if(!config.pcJira)throw new HttpError(404,'PC Jira setup unavailable');
+    if(activeMutations>1||queue?.hasWork()||codexQueue?.hasWork()||workflow?.isBusy()||allJobs().some(job=>job.status==='running'))throw new HttpError(409,'Finish active tasks before changing the Jira connection.');
+    const source=z.enum(['claude','codex']).parse(req.body.source);
+    jiraChanging=true;
+    try{
+    const status=await config.pcJira.connection.verify(source);
+    if(!status.connected){res.status(409).json({error:(status as any).error||'Jira access is unavailable.'});return;}
+    await config.pcJira.connection.select(source);
+    await Promise.all(Object.values(notificationFeeds).map(feed=>feed.clear('jira')));
+    res.json({connected:true,source});
+    }finally{jiraChanging=false;}
+  });
   app.get('/api/task-notifications',async(req,res)=>res.json(await taskNotifications(req).view()));
   app.post('/api/task-notifications/read',async(req,res)=>{const {ids}=z.object({ids:z.array(z.string().min(1).max(100)).max(300)}).parse(req.body);await taskNotifications(req).read(ids);res.json({ok:true});});
   app.post('/api/jira/connect-existing', async (req, res) => { const service = jira(requestProvider(req)); if (!service.useExisting) throw new HttpError(400, 'Existing provider connection is unavailable'); await taskNotifications(req).clear('jira');res.json(await service.useExisting()); });

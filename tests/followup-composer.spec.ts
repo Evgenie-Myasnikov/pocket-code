@@ -26,6 +26,10 @@ for(const provider of ['claude','codex'])test(`${provider} accepts clarification
   const draft=page.getByRole('textbox',{name:provider==='codex'?'Message Codex':'Message Claude'}),send=page.getByRole('button',{name:'Send message',exact:true});
   await draft.fill('Start work');await send.click();
   await expect(page.getByRole('button',{name:provider==='codex'?'Stop Codex':'Stop Claude',exact:true})).toBeVisible();
+  const stop=page.locator('.stop-button');
+  expect((await stop.boundingBox())!.width).toBeGreaterThanOrEqual(48);
+  expect(await stop.evaluate(el=>parseFloat(getComputedStyle(el,'::before').width))).toBeLessThanOrEqual(36);
+  expect(await stop.evaluate(el=>getComputedStyle(el,'::before').width)).toBe(await send.evaluate(el=>getComputedStyle(el,'::before').width));
   await draft.fill('Focus on tests');await expect(send).toBeEnabled();await send.click();await expect(draft).toHaveValue('');
   expect(sent[0].text).toBe('Focus on tests');await expect(page.locator('.conversation')).toContainText('Focus on tests');
   const fits=await page.locator('.composer-tools').evaluate(el=>Array.from(el.querySelectorAll('button,select')).every(child=>{const r=child.getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.width>=40;}));expect(fits).toBe(true);
