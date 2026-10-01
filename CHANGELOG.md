@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-01 - Direct manipulation of the activity drawer (0.17.2)
+- Changed: Larger, higher-contrast right-edge handle (8x72px with a 56x88px touch target). The drawer follows left opening drags and right closing drags before release, then settles in 120ms; tap, Back and keyboard access remain available.
+- Reliability: Pointer movement updates composited transforms without rerendering the chat; suppresses post-drag clicks, handles cancelled gestures and respects reduced motion. The scroll container explicitly permits vertical panning so browsers do not cancel horizontal touch drags.
+- Files: src/ActivityHandle.tsx, src/ActivityDrawer.tsx, src/App.tsx, src/styles.css, src/activity-drawer.css; tests/activity-drawer.spec.ts.
+- Validation: All 16 activity UI tests passed, including real browser touch events, partial dragging, reversal, cancellation, focus, all main sections and 60%/130% scales. Inspected partial-drag and handle screenshots. TypeScript/Vite/Android build passed.
+- Follow-up: Physical Android device testing was not available.
+
+## 2026-10-01 - Interface-wide scale consistency audit (0.17.2)
+- Changed: Shared bounded typography for Tasks cards/filters/actions, file rows, Review controls, result/subagent/activity panels, Settings labels and terminal controls. Message, Markdown and diff reading sizes remain independent.
+- Why: Several controls used unbounded rem/calc values or fixed px sizes, producing tiny text or failing to respond consistently to interface scale.
+- Files: src/interface-sizing.css, src/main.tsx; tests/jira-workflow.spec.ts and tests/project-docs.spec.ts.
+- Validation: The 84-case responsive/Project/Settings matrix passed with one fixture-loading timeout passing on isolated retry; 35 final Jira/Project scenarios passed, including computed cross-section font equality at 60%, 100% and 130%, reload persistence and file rows. Inspected narrow layouts.
+
 ## 2026-10-01 - Consistent Project control sizing (0.17.1)
 - Changed: Project overview cards, document lists, folder selector and labels share Settings typography and category control sizing, including readable minimum sizes at reduced interface scale.
 - Why: Project used rem and unconstrained scale formulas while Settings used bounded font sizes, producing inconsistent proportions.

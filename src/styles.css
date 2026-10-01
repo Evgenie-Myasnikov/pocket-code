@@ -175,8 +175,8 @@
 
 /* Activity is reachable from every section without a header row. */
 .app>.sidebar,.app>.workspace{min-height:0}
-.app>.activity-entry{position:fixed;right:env(safe-area-inset-right,0px);top:45%;z-index:40;display:block;width:48px;min-width:48px;height:64px;min-height:64px;padding:0;border:0;border-radius:12px 0 0 12px;background:transparent;box-shadow:none;touch-action:pan-y;user-select:none;-webkit-tap-highlight-color:transparent}
-.activity-handle-line{position:absolute;right:4px;top:10px;width:4px;height:44px;border-radius:4px;background:var(--muted);opacity:.55;pointer-events:none}
+.app>.activity-entry{position:fixed;right:env(safe-area-inset-right,0px);top:45%;z-index:40;display:block;width:56px;min-width:56px;height:88px;min-height:88px;padding:0;border:0;border-radius:12px 0 0 12px;background:transparent;box-shadow:none;touch-action:pan-y;user-select:none;-webkit-tap-highlight-color:transparent}
+.activity-handle-line{position:absolute;right:4px;top:8px;width:8px;height:72px;border-radius:8px;background:var(--accent);opacity:.85;box-shadow:0 0 0 1px var(--bg),0 1px 6px #0004;pointer-events:none}
 .activity-entry:is(:hover,:focus-visible,:active) .activity-handle-line{opacity:1;background:var(--accent)}
 .activity-entry:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
 .activity-entry:disabled .activity-handle-line{opacity:.2}

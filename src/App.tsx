@@ -81,6 +81,8 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   useEffect(()=>{const handle=(event:Event)=>setHostRestarting(!!(event as CustomEvent).detail?.active);window.addEventListener('pocket-code-host-update-restarting',handle);return()=>window.removeEventListener('pocket-code-host-update-restarting',handle);},[]);
   const [demo, setDemo] = useState(false),[attachments, setAttachments] = useStateForWorkspace<Attachment[]>([]),[uploading, setUploading] = useStateForWorkspace(false);
   const activity=useActivity(demo?null:connection);
+  const activitySurface=useRef<HTMLDivElement|null>(null),activityDistance=useRef(0);
+  const [activityDragging,setActivityDragging]=useState(false);
   const [activityOpen,setActivityOpen]=useState(false),[activityTarget,setActivityTarget]=useState<{item:ActivityItem;connection:Connection}|null>(null);
   const [notificationTarget,setNotificationTarget]=useState<WatchedChat|null>(null);
   useChatNotifications(connection,demo?null:tab==='chats'?(mobileChat&&(selected||job)?{provider,sessionId:job?.sessionId||selected?.sessionId,jobId:job?.id,cwd,title:selected?.customTitle||selected?.summary||engineName}:null):undefined,locale().startsWith('ru')?'ru':'en',chat=>{
@@ -93,7 +95,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     if(busy||uploading)return;
     void openSession({sessionId:target.sessionId||`pending-${target.jobId}`,cwd:target.cwd,summary:target.title,provider,lastModified:Date.now()},target.jobId?{id:target.jobId,sessionId:target.sessionId}:undefined);
   },[notificationTarget,provider,connection,busy,uploading]);
-  useEffect(()=>{setActivityOpen(false);setActivityTarget(null);},[connection]);
+  useEffect(()=>{setActivityOpen(false);setActivityDragging(false);setActivityTarget(null);},[connection]);
   const [takeover, setTakeover] = useStateForWorkspace(false),[pendingTakeover, setPendingTakeover] = useStateForWorkspace(false),[budget, setBudget] = useStateForWorkspace(id=>preferences(id).budget);
   const confirmation=useRef<HTMLElement|null>(null);
   useModal(confirmation,pendingTakeover,()=>setPendingTakeover(false));
@@ -474,9 +476,9 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const chatStatusLabel=chatStatus?t(({needs_input:'Waiting for input',error:'Error',running:'Running',done:'Completed'} as const)[chatStatus]):'';
   const chatStatusDot=chatStatus?<span className={'chat-tab-status chat-tab-status-'+chatStatus} aria-hidden="true"/>:null;
   return <div className={`app ${mobileChat ? 'show-chat' : ''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
-    {activityOpen&&<ActivityDrawer items={activity.items} loading={activity.loading} error={activity.error} busy={busy||uploading||Boolean(activityTarget)} onRetry={activity.refresh} onOpen={openActivity} onClose={()=>setActivityOpen(false)}/>}
+    {(activityOpen||activityDragging)&&<ActivityDrawer surfaceRef={activitySurface} dragging={activityDragging} reveal={activityDistance.current} items={activity.items} loading={activity.loading} error={activity.error} busy={busy||uploading||Boolean(activityTarget)} onRetry={activity.refresh} onOpen={openActivity} onClose={()=>setActivityOpen(false)}/>}
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={21}/></button>}
-    <ActivityHandle count={activity.count} disabled={demo} onOpen={()=>setActivityOpen(true)}/>
+    <ActivityHandle count={activity.count} disabled={demo} onOpen={()=>setActivityOpen(true)} onDrag={distance=>{activityDistance.current=distance;setActivityDragging(true);activitySurface.current?.style.setProperty('--activity-reveal',`${distance}px`);}} onDragEnd={open=>{setActivityDragging(false);setActivityOpen(open);}}/>
     <aside className="sidebar">
       <div className="chat-list-actions">{workspacePicker('sidebar')}
       <button className="primary new-chat" disabled={busy || uploading} onClick={() => newChat()}><Plus size={18} />{t("Новый чат")}</button></div>

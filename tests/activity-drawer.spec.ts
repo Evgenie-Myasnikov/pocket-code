@@ -148,10 +148,47 @@ test('edge handle supports taps, keyboard and left swipes without opening on ver
  await host(page);await page.setViewportSize({width:390,height:844});await open(page);
  const handle=page.locator('.activity-entry'),box=(await handle.boundingBox())!;
  await expect(handle.locator('svg,.activity-badge')).toHaveCount(0);
- expect(await handle.locator('.activity-handle-line').evaluate(el=>{const r=el.getBoundingClientRect();return [r.width,r.height];})).toEqual([4,44]);
+ expect(await handle.locator('.activity-handle-line').evaluate(el=>{const r=el.getBoundingClientRect();return [r.width,r.height];})).toEqual([8,72]);
  await page.screenshot({path:'artifacts/screenshots/activity-edge-handle.png',fullPage:true});
  await page.mouse.move(box.x+30,box.y+30);await page.mouse.down();await page.mouse.move(box.x+30,box.y+110,{steps:6});await page.mouse.up();await expect(drawer(page)).toHaveCount(0);
  await page.mouse.move(box.x+30,box.y+30);await page.mouse.down();await page.mouse.move(box.x-45,box.y+31,{steps:6});await page.mouse.up();await expect(drawer(page)).toBeVisible();
  await page.keyboard.press('Escape');await expect(handle).toBeFocused();await page.keyboard.press('Enter');await expect(drawer(page)).toBeVisible();
  await page.keyboard.press('Escape');await openDrawer(page);
+});
+test('drawer follows the finger before release and supports closing and cancelling drags',async({page})=>{
+ await host(page);await page.setViewportSize({width:390,height:844});await open(page);
+ const handle=page.locator('.activity-entry'),h=(await handle.boundingBox())!;
+ await page.mouse.move(h.x+30,h.y+30);await page.mouse.down();
+ await page.mouse.move(h.x-70,h.y+30,{steps:4});
+ await expect(drawer(page)).toBeVisible();const partial=(await drawer(page).boundingBox())!;
+ expect(partial.x).toBeGreaterThan(200);expect(partial.x).toBeLessThan(340);
+ await page.mouse.move(h.x-170,h.y+30,{steps:4});const pulled=(await drawer(page).boundingBox())!;
+ expect(pulled.x).toBeLessThan(partial.x-80);
+ await page.screenshot({path:'artifacts/screenshots/activity-drag-partial.png'});
+ await page.mouse.up();await expect.poll(async()=>Math.round((await drawer(page).boundingBox())!.x)).toBe(39);
+ const pane=(await drawer(page).boundingBox())!;
+ await page.mouse.move(pane.x+35,120);await page.mouse.down();await page.mouse.move(pane.x+145,120,{steps:5});
+ expect((await drawer(page).boundingBox())!.x).toBeGreaterThan(pane.x+90);
+ await page.mouse.up();await expect(drawer(page)).toHaveCount(0);
+ // Reversing an opening drag fully must not turn the synthesized click into a tap.
+ await page.mouse.move(h.x+30,h.y+30);await page.mouse.down();await page.mouse.move(h.x-50,h.y+30,{steps:4});
+ await page.mouse.move(h.x+30,h.y+30,{steps:4});await page.mouse.up();await expect(drawer(page)).toHaveCount(0);
+ await handle.click();await expect(drawer(page)).toBeVisible();
+ await page.locator('.activity-drawer').evaluate(async el=>{await Promise.all(el.getAnimations().map(a=>a.finished));});
+ await page.mouse.move(80,120);await page.mouse.down();await page.mouse.move(115,120,{steps:3});
+ await page.locator('.activity-drawer').dispatchEvent('pointercancel',{pointerId:1});await page.mouse.up();
+ await expect.poll(async()=>Math.round((await drawer(page).boundingBox())!.x)).toBe(39);
+});
+test('touch drag reveals and dismisses the drawer without waiting for release',async({page})=>{
+ await host(page);await page.setViewportSize({width:390,height:844});await open(page);
+ const cdp=await page.context().newCDPSession(page);
+ const touch=async(type:'touchStart'|'touchMove'|'touchEnd',x=0,y=0)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:type==='touchEnd'?[]:[{x,y,id:1}]});
+ const box=(await page.locator('.activity-entry').boundingBox())!,y=box.y+40;
+ await touch('touchStart',375,y);await touch('touchMove',330,y);await touch('touchMove',270,y);
+ expect((await drawer(page).boundingBox())!.x).toBeGreaterThan(200);
+ await touch('touchMove',170,y);await touch('touchEnd');
+ await expect.poll(async()=>Math.round((await drawer(page).boundingBox())!.x)).toBe(39);
+ await touch('touchStart',85,130);await touch('touchMove',140,130);await touch('touchMove',220,130);
+ await expect.poll(async()=>(await drawer(page).boundingBox())!.x).toBeGreaterThan(130);
+ await touch('touchEnd');await expect(drawer(page)).toHaveCount(0);await cdp.detach();
 });

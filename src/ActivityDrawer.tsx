@@ -1,4 +1,4 @@
-import {useId,useRef} from 'react';
+import {useEffect,useId,useRef,useState,type CSSProperties,type RefObject} from 'react';
 import {Check,ChevronRight,LoaderCircle,MessageCircle,RefreshCw,Square,TriangleAlert,X} from 'lucide-react';
 import type {ActivityItem} from '../server/types';
 import {t,useLanguage} from './i18n';
@@ -6,6 +6,9 @@ import {useModal} from './navigation';
 import './activity-drawer.css';
 
 export type ActivityDrawerProps={
+  surfaceRef?:RefObject<HTMLDivElement|null>;
+  dragging?:boolean;
+  reveal?:number;
   items:ActivityItem[];
   loading:boolean;
   error?:string;
@@ -30,17 +33,35 @@ function state(item:ActivityItem){
 }
 
 /** Unmount to close. Viewing/acknowledging results belongs to the parent navigator. */
-export function ActivityDrawer({items,loading,error,busy=false,onRetry,onOpen,onClose}:ActivityDrawerProps){
+export function ActivityDrawer({items,loading,error,busy=false,onRetry,onOpen,onClose,surfaceRef,dragging=false,reveal=0}:ActivityDrawerProps){
   useLanguage();
-  const backdrop=useRef<HTMLDivElement|null>(null),id=useId();
+  const localBackdrop=useRef<HTMLDivElement|null>(null),backdrop=surfaceRef||localBackdrop,id=useId();
+  const [closing,setClosing]=useState(false);
+  const closeTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const swipe=useRef<{id:number;x:number;y:number;started:number;active:boolean}|null>(null);
+  const suppressClick=useRef(false);
+  useEffect(()=>()=>{if(closeTimer.current)clearTimeout(closeTimer.current);},[]);
+  const close=()=>{if(closing)return;setClosing(true);closeTimer.current=setTimeout(onClose,matchMedia('(prefers-reduced-motion: reduce)').matches?0:130);};
   const needsHostUpdate=Boolean(error&&t(error)===t('Активность чатов недоступна. Обновите сервер ПК.'));
-  useModal(backdrop,true,onClose);
-  return <div ref={backdrop} className="activity-backdrop" onPointerDown={event=>{if(event.target===event.currentTarget)onClose();}}>
-    <aside className="activity-drawer" role="dialog" aria-modal="true" aria-label={t('Активность чатов')}>
+  useModal(backdrop,!dragging,close);
+  return <div ref={backdrop} className={`activity-backdrop${dragging?' activity-opening':''}${closing?' activity-closing':''}`} style={{'--activity-reveal':`${reveal}px`} as CSSProperties} onPointerDown={event=>{if(event.target===event.currentTarget)close();}}>
+    <aside className="activity-drawer"
+      onClickCapture={event=>{if(suppressClick.current){event.preventDefault();event.stopPropagation();suppressClick.current=false;}}}
+      onPointerDown={event=>{if(!event.isPrimary||event.button!==0||dragging)return;suppressClick.current=false;swipe.current={id:event.pointerId,x:event.clientX,y:event.clientY,started:performance.now(),active:false};}}
+      onPointerMove={event=>{const start=swipe.current;if(!start||start.id!==event.pointerId)return;const dx=event.clientX-start.x,dy=Math.abs(event.clientY-start.y);
+        if(!start.active&&dx>8&&dx>dy*1.3){start.active=true;event.currentTarget.setPointerCapture(event.pointerId);event.currentTarget.dataset.dragging='true';}
+        if(start.active){suppressClick.current=true;event.currentTarget.style.setProperty('--activity-offset',Math.max(0,dx)+'px');}
+      }}
+      onPointerUp={event=>{const start=swipe.current;if(!start||start.id!==event.pointerId)return;swipe.current=null;delete event.currentTarget.dataset.dragging;
+        const dx=event.clientX-start.x;if(start.active&&(dx>64||(dx>20&&dx/Math.max(1,performance.now()-start.started)>.35)))close();
+        event.currentTarget.style.removeProperty('--activity-offset');
+      }}
+      onPointerCancel={event=>{swipe.current=null;delete event.currentTarget.dataset.dragging;event.currentTarget.style.removeProperty('--activity-offset');}}
+      role="dialog" aria-modal="true" aria-label={t('Активность чатов')}>
       <header className="activity-drawer-header">
         <div><h2>{t('Активность')}</h2><p>{t('Запуски через Pocket Code')}</p></div>
         <button className="icon-button" aria-label={t('Обновить активность')} title={t('Обновить активность')} disabled={loading} onClick={onRetry}><RefreshCw size={18} aria-hidden="true"/></button>
-        <button className="icon-button" aria-label={t('Закрыть активность')} title={t('Закрыть активность')} onClick={onClose}><X size={20} aria-hidden="true"/></button>
+        <button className="icon-button" aria-label={t('Закрыть активность')} title={t('Закрыть активность')} onClick={close}><X size={20} aria-hidden="true"/></button>
       </header>
       <div className="activity-drawer-content">
         {error&&<div className="activity-sync-error" role="status"><TriangleAlert size={16} aria-hidden="true"/><p>{needsHostUpdate?t(error):items.length?t('Список не обновлён. Показаны последние полученные данные.'):t('Не удалось загрузить активность.')}</p>{!needsHostUpdate&&<details><summary>{t('Подробности ошибки')}</summary><p>{t(error)}</p></details>}<button disabled={loading} onClick={onRetry}>{t('Повторить')}</button></div>}

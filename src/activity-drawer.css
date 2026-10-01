@@ -4,7 +4,7 @@
 .activity-drawer-header>div{flex:1;min-width:0;}.activity-drawer-header h2{font-size:1.15em;line-height:1.35;margin:0;font-weight:600;overflow-wrap:anywhere;}
 .activity-drawer-header p{margin:3px 0 0;color:var(--muted);font-size:.8em;line-height:1.4;overflow-wrap:anywhere;}
 .activity-drawer .icon-button{flex:0 0 48px;width:48px;height:48px;min-width:48px;min-height:48px;border:0;background:transparent;color:var(--muted);padding:12px;}
-.activity-drawer-content{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:10px 16px 20px;scrollbar-gutter:stable;}
+.activity-drawer-content{touch-action:pan-y;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:10px 16px 20px;scrollbar-gutter:stable;}
 .activity-group{margin:0 0 18px;}.activity-group:last-child{margin-bottom:0;}.activity-group h3{display:flex;align-items:center;gap:8px;margin:0;padding:10px 0;font-size:.9em;font-weight:500;line-height:1.45;color:var(--muted);overflow-wrap:anywhere;}.activity-group h3>span{font-size:.85em;font-weight:400;}
 .activity-group ul{list-style:none;margin:0;padding:0;}.activity-group li+li{border-top:1px solid var(--line);}
 .activity-task-row{display:flex;align-items:flex-start;gap:9px;width:100%;min-width:0;min-height:64px;box-sizing:border-box;padding:12px 0;border:0;border-radius:0;background:transparent;color:var(--text);text-align:left;font:inherit;line-height:1.45;}
@@ -19,4 +19,13 @@
 @media(max-width:360px){.activity-drawer-header{padding-left:12px;padding-right:4px;}.activity-drawer-content{padding-inline:12px;}.activity-task-row{gap:7px;}}
 @media(max-height:480px){.activity-drawer-header{padding-block:3px;}.activity-drawer-content{padding-top:4px;}}
 
-@media(prefers-reduced-motion:no-preference){.activity-drawer{animation:activity-slide-in .18s ease-out}@keyframes activity-slide-in{from{transform:translateX(100%)}to{transform:translateX(0)}}}
+/* Pointer moves update composited transforms directly, without rerendering the chat. */
+.activity-drawer{transform:translateX(var(--activity-offset,0px));transition:transform .12s ease-out;will-change:transform;touch-action:pan-y}
+.activity-opening .activity-drawer{transform:translateX(max(0px,calc(100% - var(--activity-reveal,0px))));transition:none}
+.activity-opening{background:rgb(0 0 0 / clamp(0,calc(var(--activity-reveal,0px) / 360px * .45),.45))}
+.activity-drawer[data-dragging=true]{transition:none}
+.activity-closing .activity-drawer{transform:translateX(100%)}
+.activity-closing{background:transparent;transition:background .12s ease-out}
+@starting-style{.activity-backdrop:not(.activity-opening) .activity-drawer{transform:translateX(100%)}}
+@media(prefers-reduced-motion:reduce){.activity-drawer,.activity-closing{transition:none}}
+

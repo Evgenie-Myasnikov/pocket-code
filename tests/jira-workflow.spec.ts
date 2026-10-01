@@ -130,7 +130,19 @@ test('Jira basic filters combine actual project status type and status category'
 });
 for(const scale of [60,100,130])test('task typography follows saved scale '+scale,async({page})=>{
  await page.addInitScript(scale=>localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({scale,textSize:8})),scale);await fixture(page);await connect(page);
- const font=()=>page.locator('.jira-issue-title').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize));expect(await font()).toBeCloseTo(14*1.07*scale/100,1);
- await page.reload();await page.locator('.mobile-nav').getByRole('button',{name:'Tasks',exact:true}).click();expect(await font()).toBeCloseTo(14*1.07*scale/100,1);
+ const font=()=>page.locator('.jira-issue-title').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize));const savedFont=await font();expect(savedFont).toBeGreaterThanOrEqual(13);
+ await page.reload();await page.locator('.mobile-nav').getByRole('button',{name:'Tasks',exact:true}).click();expect(await font()).toEqual(savedFont);
  await page.screenshot({path:'artifacts/screenshots/tasks-scale-'+scale+'.png'});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+for(const scale of [60,100,130])test(`task typography matches settings at ${scale}%`,async({page})=>{
+  await page.setViewportSize({width:320,height:740});
+  await page.addInitScript(scale=>localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({scale,textSize:9})),scale);
+  await fixture(page);await connect(page);
+  const title=await page.locator('.jira-issue-title').first().evaluate(el=>getComputedStyle(el).fontSize);
+  const detail=await page.locator('.jira-issue-meta').first().evaluate(el=>getComputedStyle(el).fontSize);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:`artifacts/screenshots/task-sizing-${scale}.png`});
+  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();
+  await expect(page.locator('.settings-category strong').first()).toHaveCSS('font-size',title);
+  await expect(page.locator('.settings-category small').first()).toHaveCSS('font-size',detail);
 });

@@ -1,0 +1,25 @@
+/* Shared UI typography. Transcript, Markdown and diff content keep their own reading size. */
+@import './category-sizing.css';
+.jobs-panel,.jira-batch-dialog,.review-panel,.files-panel,.settings-content,
+.chat-outputs-panel,.subagents-panel,.activity-drawer{font-size:var(--category-title-size)}
+.jira-issue-title,.jira-filters input,.jira-filters select,
+.jira-action-form input,.jira-action-form select,.jira-batch-dialog select,
+.file-row span,.language-picker,.settings-panel label>input,.settings-panel label>select,
+.review-options select,.review-filebar select{font-size:var(--category-title-size)}
+.jira-issue-meta,.jira-detail-meta,.jira-site-picker,.jira-check,
+.jira-filters label,.jira-more-filters .muted,.jobs-heading .eyebrow,
+.settings-panel label,.palette-field legend,
+.review-context,.review-options label,.review-scope,.review-note,.review-stats,
+.chat-output-row small,.chat-output-note,.chat-output-empty,
+.subagent-status,.subagents-toolbar p,.subagent-card small,
+.activity-task-row-meta,.activity-drawer-header p{font-size:var(--category-detail-size)}
+.jira-more-filters>summary,.review-button,.review-panel>.error,.review-panel>p[role=status],
+.settings-back,.settings-panel .primary,.settings-panel .secondary,
+.jobs-panel .primary,.jobs-panel .secondary,.jira-batch-dialog .primary,.jira-batch-dialog .secondary,
+.project-docs-toolbar>.text-button,.files-panel .secondary{font-size:var(--category-title-size)}
+.jobs-heading h2,.jira-detail h2,.jira-batch-dialog h2,.settings-panel h2{font-size:var(--category-heading-size)}
+.terminal-entry span,.terminal-keys button,.terminal-hint,.terminal-status{font-size:var(--category-detail-size)}
+/* Do not let an external panel rule override a card inside the transcript. */
+:root[data-theme] .message .subagent-card small{font-size:.85em}
+.jobs-panel .text-button,.jira-batch-dialog .text-button,.settings-content .text-button{font-size:var(--category-title-size)}
+.jobs-panel .muted,.jira-batch-dialog .muted,.settings-content .muted,.files-panel .muted{font-size:var(--category-detail-size)}

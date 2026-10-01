@@ -125,6 +125,9 @@ for(const scale of [60,100,130])test(`project and settings share control sizes a
   await page.setViewportSize({width:320,height:740});await host(page);await openOverview(page,'en',scale);
   const sizes=async(selector:string)=>page.locator(selector).first().evaluate(el=>{const s=getComputedStyle(el),title=getComputedStyle(el.querySelector('strong')!),detail=getComputedStyle(el.querySelector('small')!);return {title:title.fontSize,detail:detail.fontSize,padding:s.padding,minHeight:s.minHeight};});
   const project=await sizes('.project-overview-card');
+  await chooseCategory(page,'files');
+  await expect(page.locator('.file-row span').first()).toHaveCSS('font-size',project.title);
+  await backToOverview(page);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:`artifacts/screenshots/project-sizing-${scale}.png`});
   await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();
