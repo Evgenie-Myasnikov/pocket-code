@@ -66,7 +66,7 @@ test('switching workspace rejects late usage replies and loads Claude limits', a
   const pending = new Promise<void>(resolve => { release = resolve; });
   await setup(page, async (route, provider) => { if (provider === 'codex') await pending; await route.fulfill({ json: snapshot(provider === 'codex' ? 'Old Codex bucket' : 'Claude', provider === 'codex' ? 2 : 81) }); });
   await expect(page.locator('.codex-usage').getByText('Loading limits…')).toBeVisible();
-  await page.locator('.workspace-picker-header select').selectOption('claude');
+  await page.locator('.workspace-picker-settings select').selectOption('claude');
   await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Usage limits', exact: true }).click();
   const card = page.getByRole('region', { name: 'Claude usage limits', exact: true });

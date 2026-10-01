@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-10-01 - 0.14.0
+- Changed: Main Tasks, Project and Settings headers contain only the section title, without a redundant Back arrow or AI selector. Project selection is inside the Project screen; provider selection lives in Chats and AI/usage settings.
 - Tasks replaces Jobs, with native Jira status-category, project, status and type filters. Filter changes clear selection; batch selection follows the active query.
 - Project opens an overview of Files, Rules and Changelog. Saved text/interface scaling is consistent on task and document cards.
 - Simplified headers and compact expandable command/file activity; removed the Normal/Plan selector from chats.

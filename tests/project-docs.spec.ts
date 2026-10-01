@@ -79,8 +79,8 @@ for(const scale of [60,100,130])test('project text follows saved interface scale
  expect(await font()).toBeCloseTo(15*scale/100,1);
  await page.reload();await page.locator('.mobile-nav').getByRole('button',{name:'Project',exact:true}).click();
  await expect(page.locator('.project-overview-cards')).toBeVisible();await page.screenshot({path:'artifacts/screenshots/project-overview-'+scale+'.png'});
- expect(await page.locator('.workspace-picker-header select').evaluate(e=>getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
- expect(await page.locator('.project-picker select').evaluate(e=>getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+ await expect(page.locator('.chat-header select')).toHaveCount(0);
+ await expect(page.locator('.project-context-picker select')).toBeVisible();
  await page.locator('.project-overview-card').filter({hasText:'Instructions for AI'}).click();expect(await font()).toBeCloseTo(15*scale/100,1);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
