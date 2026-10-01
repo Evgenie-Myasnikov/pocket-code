@@ -97,6 +97,41 @@ test('Review closes when the selected chat changes its project during history re
   await page.clock.fastForward(15100);await expect(review(page)).toHaveCount(0);
 });
 
+test('Review refreshes changed content without losing scroll and keeps options over the full diff',async({page})=>{
+  await host(page);await page.setViewportSize({width:390,height:844});await connect(page);
+  const panel=review(page),content=panel.locator('.diff-content');
+  await content.evaluate(element=>{element.scrollTop=240;});
+  const before=await content.boundingBox();
+  await panel.getByRole('button',{name:'Review options',exact:true}).click();
+  expect((await content.boundingBox())?.height).toBe(before?.height);
+  await panel.getByLabel('Code size',{exact:true}).selectOption('18');
+  await page.keyboard.press('Escape');
+  await expect(panel.locator('.diff-table')).toHaveCSS('font-size','18px');
+  expect(await content.evaluate(element=>element.scrollTop)).toBe(240);
+  await page.route('**/api/review?*',route=>route.fulfill({json:{files:[{path:paths[0],added:91,removed:90}],current:'feature/mobile-review',base:'main',branches:['main'],patch:patch('updated'),binary:false}}));
+  await expect(content).toContainText('updated new 0',{timeout:9000});
+  expect(await content.evaluate(element=>element.scrollTop)).toBe(240);
+  await panel.getByRole('button',{name:'Back to chat',exact:true}).click();
+  await page.getByRole('button',{name:'Review',exact:true}).click();
+  await expect(review(page).locator('.diff-table')).toHaveCSS('font-size','18px');
+});
+
+test('Review recovers when a selected file is committed and retains the last patch on network failure',async({page})=>{
+  await host(page);await connect(page);
+  let failed=false;
+  await page.route('**/api/review?*',route=>{
+    if(failed)return route.fulfill({status:503,json:{error:'Offline'}});
+    if(new URL(route.request().url()).searchParams.get('file')===paths[0])return route.fulfill({status:404,json:{error:'This file is not in the current comparison.'}});
+    return route.fulfill({json:{files:[{path:paths[1],added:90,removed:90}],current:'feature',base:'main',branches:['main'],patch:patch('remaining'),binary:false}});
+  });
+  const panel=review(page);
+  await expect(panel.getByLabel('Changed files',{exact:true})).toHaveValue(paths[1],{timeout:9000});
+  await expect(panel.locator('.diff-content')).toContainText('remaining new 0');
+  failed=true;
+  await expect(panel.getByRole('alert')).toBeVisible({timeout:9000});
+  await expect(panel.locator('.diff-content')).toContainText('remaining new 0');
+});
+
 for(const language of ['en','ru'])for(const scale of [60,130])test(`Review fits a 320px phone with ${language} controls at ${scale}% scale`,async({page})=>{
   await host(page);await page.setViewportSize({width:320,height:700});await connect(page,language,scale);
   const panel=review(page),options=panel.getByRole('button',{name:language==='ru'?'Параметры ревью':'Review options',exact:true});
@@ -107,5 +142,6 @@ for(const language of ['en','ru'])for(const scale of [60,130])test(`Review fits 
   expect(await inBounds()).toBe(true);await options.click();expect(await inBounds()).toBe(true);
   await panel.getByLabel(language==='ru'?'Сравнение':'Comparison',{exact:true}).selectOption('branch');await expect(panel.getByLabel(language==='ru'?'Базовая ветка':'Base branch',{exact:true})).toBeVisible();expect(await inBounds()).toBe(true);
   await page.screenshot({path:`artifacts/screenshots/review-${language}-${scale}-320.png`,fullPage:true});
+  await page.keyboard.press('Escape');
   await panel.getByRole('button',{name:language==='ru'?'Режим чтения':'Reading mode',exact:true}).click();expect(await inBounds()).toBe(true);
 });

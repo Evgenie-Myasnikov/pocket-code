@@ -86,6 +86,8 @@ Never publish pairing QR codes, keys, credentials, private chats or the **.pocke
 
 ## Need help?
 
+**[User guide](docs/USER_GUIDE.md)** · **[Руководство на русском](docs/USER_GUIDE.ru.md)** — QR pairing, diffs, updates, chats, project files and Jira tasks with screenshots.
+
 | Problem | Try this |
 | --- | --- |
 | PC unavailable | Check power and host window; scan a fresh QR after a tunnel restart. |

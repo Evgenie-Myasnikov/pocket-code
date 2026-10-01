@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-01 - Readable live review and illustrated user guides (0.19.1)
+- Changed: Review options open in an overlaid sheet instead of reducing the diff viewport. Code follows chat size with a 14 px minimum by default and offers a saved 10-24 px override.
+- Added: Visible comparison mode/file count and immediate refresh. Open review refreshes every five seconds while visible and on resume, preserving selection and scroll. Missing selected files recover through a fresh list; background failures retain content with an error.
+- Documentation: English/Russian guides cover QR pairing, Git comparison scope, APK/host updates, chats, project documents, task integrations and disconnecting, using synthetic screenshots.
+- Files: src/Review.tsx, src/review.css, tests/review-focus.spec.ts, tests/documentation-screenshots.spec.ts, README.md and docs/.
+- Validation: Twelve Review/settings/capture scenarios passed across focused runs, plus the additional removed-file/network recovery scenario and two final screenshot captures. Five Git review server tests passed. TypeScript/Vite/Android build passed (versionCode 33). Screenshots inspected at phone dimensions; 320px English/Russian 60%/130% layouts covered.
+- Follow-up: Physical Android testing unavailable. Review reflects Git state within the project folder, not a chat-only edit log or comparison to the published release.
+
+
 ## 2026-10-01 - Workspace-aware Jira and direct Codex tools (0.19.0)
 - Changed: Jira settings, reads, workflow actions, sequential queues and task notification/read state follow the selected Claude or Codex workspace. No automatic cross-provider fallback is performed; legacy requests without a provider keep Claude behavior.
 - Added: Codex app-server MCP adapter discovers one Jira tool catalog and calls exact tools in an ephemeral thread without starting a model turn. It rejects missing/ambiguous connectors and unrelated tools; uncertain writes are never retried automatically. Native authorization remains in Codex.

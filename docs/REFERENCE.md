@@ -1,6 +1,6 @@
 # Pocket Code technical reference
 
-[Overview](../README.md) | [Russian guide](README.ru.md)
+[Overview](../README.md) | [User guide](USER_GUIDE.md) | [Руководство на русском](USER_GUIDE.ru.md)
 
 Android companion for Claude Code and Codex running on your own Windows PC. Connect over local Wi-Fi or an HTTPS tunnel by scanning a QR code.
 

@@ -21,3 +21,9 @@
 @media(max-width:700px){.review-panel{width:100%;border:0}}
 @media(max-width:360px){.review-header{gap:2px;padding-inline:6px}.review-filebar{gap:6px;padding-inline:12px}.review-controls{grid-template-columns:1fr}}
 @media(max-height:540px){.review-header{padding-block:2px}.review-context{display:none}}
+.review-options-backdrop{position:absolute;inset:0;z-index:4;background:#0008;display:flex;align-items:flex-end;justify-content:center;padding:12px}
+.review-options-backdrop .review-options{width:min(100%,560px);max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:18px;padding:12px 16px;box-shadow:0 12px 40px #0006}
+.review-options-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;font-size:var(--category-title-size)}
+.review-options .review-font-size{margin-top:12px}
+.review-options label{margin-bottom:0}
+.review-summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 16px;color:var(--muted);font-size:.85em;flex-shrink:0;border-bottom:1px solid var(--line)}
