@@ -30,7 +30,7 @@ test('Windows Jira vault encrypts credentials and reloads Unicode data', { skip:
 test('Jira jobs use fresh server issue data, preserve approvals, deduplicate and enforce project roots', async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'pocket-jira-')); const root = path.join(dir, 'project'), outside = path.join(dir, 'outside'); await mkdir(root); await mkdir(outside);
   let prompt = '', launches = 0;
-  const run: any = (input: any) => (async function* () { launches++; prompt = input.prompt; await input.options.canUseTool('Write', { file_path: 'test.txt' }, { signal: input.options.abortController.signal }); yield { type: 'result', is_error: false, total_cost_usd: 0 }; })();
+  const run: any = (input: any) => (async function* () { launches++; prompt = (await input.prompt[Symbol.asyncIterator]().next()).value.message.content; await input.options.canUseTool('Write', { file_path: 'test.txt' }, { signal: input.options.abortController.signal }); yield { type: 'result', is_error: false, total_cost_usd: 0 }; })();
   const issue = { key: 'TEST-1', summary: 'Fix renderer', description: 'Fresh requirement from Jira', status: 'Open', priority: 'High', url: 'https://example.atlassian.net/browse/TEST-1', updated: '' };
   const jira: JiraService = { status: async () => ({ connected: true, sites: [{ id: 'site', name: 'Test', url: 'https://example.atlassian.net' }] }), connect: async () => ({ authorizationUrl: 'https://mcp.atlassian.com/v1/authorize', state: 's'.repeat(43) }), finish: async () => {}, disconnect: async () => {}, issues: async (_s, cursor) => ({ issues: cursor ? [] : [issue], next: cursor ? null : 'page-2' }), issue: async () => issue };
   const jobs = new Jobs(run), token = 't'.repeat(43);

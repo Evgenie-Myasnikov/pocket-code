@@ -29,7 +29,7 @@ async function fixture(t: any) {
   const writes: { key: string; transitionId: string }[] = [], events: string[] = [];
   const runs: { provider: string; permissionMode: string; key: string }[] = [];
   const run = (provider: string): any => ({ prompt, options }: any) => (async function* () {
-    const key = /"key":"(TEST-\d+)"/.exec(prompt)?.[1] || '';
+    const key = /"key":"(TEST-\d+)"/.exec(typeof prompt==='string'?prompt:(await prompt[Symbol.asyncIterator]().next()).value.message.content)?.[1] || '';
     runs.push({ provider, permissionMode: options.permissionMode, key }); events.push(`run:${key}`);
     yield { type: 'system', subtype: 'init', session_id: randomUUID() };
     yield { type: 'result', is_error: false, total_cost_usd: 0 };

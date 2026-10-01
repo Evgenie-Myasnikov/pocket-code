@@ -49,6 +49,18 @@ async function until(predicate: () => boolean) {
   assert.fail('Condition was not reached');
 }
 
+test('active Codex follow-ups steer the exact turn once and reject a finished run',async t=>{
+  const {service,rpc,input}=await setup(t);service.start(input);
+  await until(()=>Boolean(service.get(input.id).turnId));
+  const message={id:'followup-1',text:'Focus on tests'};
+  await Promise.all([service.followup(input.id,message),service.followup(input.id,message)]);
+  const requests=rpc.requests.filter(entry=>entry.method==='turn/steer');assert.equal(requests.length,1);
+  assert.equal(requests[0].params.expectedTurnId,'turn-1');assert.equal(requests[0].params.clientUserMessageId,message.id);
+  assert.equal(service.get(input.id).messages.filter(item=>item.id===message.id).length,1);
+  rpc.notification('turn/completed',{turn:{id:'turn-1',status:'completed'}});await until(()=>service.get(input.id).status==='done');
+  await assert.rejects(service.followup(input.id,{id:'late',text:'Late'}),/ended/);
+});
+
 test('Codex status uses existing sign-in and exposes model capabilities without account details', async t => {
   const { rpc, service } = await setup(t);
   assert.deepEqual(await service.status(), { available: true, authenticated: true, models: [{ id: 'test-model', name: 'Test model', reasoningEfforts: [], isDefault: false }] });

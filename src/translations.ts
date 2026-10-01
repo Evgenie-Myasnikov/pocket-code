@@ -1,5 +1,9 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+"Уточнений в очереди: {0}":"Queued follow-ups: {0}",
+"Необработанных уточнений: {0}":"Unprocessed follow-ups: {0}",
+"Активный ход завершён. Черновик сохранён.":"The active turn has ended. Your draft is preserved.",
+"Ход завершён или ещё не готов. Черновик сохранён.":"The active turn has ended or is not ready. Your draft is preserved.",
 "Чатов в активности: {0}":"Chats in activity: {0}",
 "Повторить":"Retry",
 "Подробности ошибки":"Error details",

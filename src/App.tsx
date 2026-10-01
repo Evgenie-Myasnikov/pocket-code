@@ -1,6 +1,7 @@
 import { Review } from './Review';
 import {ActivityDrawer} from './ActivityDrawer';
 import {ActivityHandle} from './ActivityHandle';
+import {useJiraRole,jiraRoleLabel} from './jira-preferences';
 import {useActivity} from './useActivity';
 import {useChatNotifications,type WatchedChat} from './chat-notifications';
 import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
@@ -42,6 +43,7 @@ export function App() {
 }
 function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   useLanguage();
+  const jiraRole=useJiraRole();
   const appearanceSettings = useAppearance();
   const [provider, setProvider] = useState<WorkspaceProvider>(selectedWorkspace);
   const [providers, setProviders] = useState<ProviderInfo[]>([{id:'claude',name:'Claude',available:true}]);
@@ -420,7 +422,19 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     projectChosen.current=true;setCwd(project);setMobileChat(true);setTab('chats');setTakeover(true);setLoading(false);
   }
   async function send(confirmed = takeover) {
-    if (sending.current || running || loading || uploading || demo || !canRun || selected?.readOnly || !draft.trim() && !attachments.length) return;
+    if (sending.current || loading || uploading || demo || !canRun || selected?.readOnly || !draft.trim() && !attachments.length) return;
+    if(running&&job){
+      sending.current=true;setBusy(true);setError('');
+      const epoch=navigation.current,data={text:draft,attachments:attachments.map(item=>item.id)},signature=JSON.stringify({jobId:job.id,...data});
+      const id=retry.current?.signature===signature?retry.current.id:crypto.randomUUID();retry.current={signature,id};
+      try{
+        const next=await api<JobView>(`/jobs/${job.id}/messages`,{...data,id});
+        if(epoch!==navigation.current)return;
+        setJob(next);setDraft('');setAttachments([]);drafts.current!.delete(currentDraftKey());retry.current=null;nearBottom.current=true;
+      }catch(error){if(epoch===navigation.current)setError((error as Error).message);}
+      finally{sending.current=false;setBusy(false);}
+      return;
+    }
     const sessionId = job?.sessionId || selected?.sessionId;
     if (sessionId && !confirmed) {setPendingTakeover(true);return;}
     sending.current = true;setBusy(true);setError('');
@@ -480,6 +494,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
       <header className="chat-header" data-section={tab}>
         {(tab==='chats'||tab==='terminal')&&<button className="icon-button mobile-back" aria-label={t("К списку чатов")} onClick={() => setMobileChat(false)}><ArrowLeft size={21} /></button>}
         <div className="header-title">{(tab==='chats'||tab==='terminal') && <label className="project-picker"><Folder size={14}/><select aria-label={t("Папка проекта")} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>}<strong>{tab==='jobs'?t("Задачи"):tab==='settings'?t("Настройки"):tab==='files'?t("Проект"):tab==='terminal'?t("Терминал"):selected?.customTitle||selected?.summary||t("Новый разговор")}</strong></div>
+        {tab==='jobs'&&<span className="tasks-header-role">{t(jiraRoleLabel(jiraRole))}</span>}
         {(tab==='chats'||tab==='terminal')&&workspacePicker('header')}
         {tab==='chats' && <><span className="branch"><GitBranch size={13} />{selected?.gitBranch||'local'}</span>{availableReview&&<button className="secondary review-button" aria-label="Review" disabled={!connection||demo||selected?.readOnly} onClick={()=>setReviewOpen(true)}>Review</button>}{hasOutputs&&<button className="icon-button outputs-entry" disabled={!connection||demo||loading} aria-label={t("Результаты")} title={t("Результаты")} onClick={()=>setOutputsOpen(true)}><PanelsTopLeft size={20}/></button>}{(outputMessages.length>0||Boolean(job?.partial))&&<button className="icon-button reading-entry" disabled={loading||!history.length&&!job} aria-label={t("Режим чтения")} title={t("Режим чтения")} aria-pressed={readingMode} onClick={()=>toggleReadingMode(true)}><Eye size={20}/></button>}</>}
       </header>
@@ -507,11 +522,12 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
           </div>
         </div>
         <div className="chat-scroll-actions" hidden={!showScrollActions && !fromStart} style={!showScrollActions && !fromStart ? { display: 'none' } : undefined}><button className="secondary" disabled={loading || busy} onClick={() => void jumpHistory(true)}><ArrowUp size={16} />{t("В начало чата")}</button><button className="secondary" disabled={loading || busy} onClick={() => void jumpHistory(false)}>{t("К новым сообщениям ↓")}</button></div>
+        {Boolean(job?.pendingInputIds?.length)&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}
         <div className="composer-area">{error && <div className="error" role="alert">{t(error)}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
           <div className="composer">{attachments.length > 0 && <div className="attachment-list">{attachments.map((a) => <span className="attachment-chip" key={a.id}><Paperclip size={13} />{a.name}<button className="icon-button" aria-label={t("Убрать {0}", a.name)} onClick={() => setAttachments((old) => old.filter((x) => x.id !== a.id))}><X size={13} /></button></span>)}</div>}
             <textarea aria-label={t("Сообщение {0}",engineName)} placeholder={demo ? t("Подключите ПК, чтобы отправлять сообщения") : t("Что нужно сделать?")} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={demo || busy || selected?.readOnly} onKeyDown={(e) => {if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {e.preventDefault();void send();}}} />
-            <div className="composer-tools"><input hidden ref={fileInput} type="file" multiple onChange={(e) => void upload(e.target.files)} /><button className="icon-button" aria-label={t("Прикрепить файлы")} disabled={demo || uploading || busy || running || selected?.readOnly} onClick={() => fileInput.current?.click()}><Paperclip size={19} /></button><select aria-label={t("Модель {0}",engineName)} value={model} onChange={(e) => setModel(e.target.value)}><option value="">{provider==='claude'?'Sonnet':providerInfo?.models?.find(item=>item.isDefault)?.name||(providerInfo?.models?.length===1?providerInfo.models[0].name:'\u2014')}</option>{(provider === 'claude' ? [{id:'sonnet',name:'Sonnet'},{id:'opus',name:'Opus'},{id:'haiku',name:'Haiku'}] : providerInfo?.models || []).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>{provider==='codex'&&<EffortPicker {...codexEffort} disabled={busy||running||uploading||selected?.readOnly}/>}<span className="composer-spacer" />{running ? <button className="send-button stop-button" aria-label={t("Остановить {0}",engineName)} onClick={async () => {try {await api(`/jobs/${job!.id}/stop`, {});} catch (e) {setError((e as Error).message);}}}><Square size={16} /></button> : <button className="send-button" aria-label={t("Отправить сообщение")} disabled={demo || !canRun || selected?.readOnly || busy || loading || uploading || !draft.trim() && !attachments.length} onClick={() => void send()}><ArrowUp size={21} /></button>}</div>
+            <div className="composer-tools"><input hidden ref={fileInput} type="file" multiple onChange={(e) => void upload(e.target.files)} /><button className="icon-button" aria-label={t("Прикрепить файлы")} disabled={demo || uploading || busy || selected?.readOnly} onClick={() => fileInput.current?.click()}><Paperclip size={19} /></button><select aria-label={t("Модель {0}",engineName)} value={model} disabled={busy||running} onChange={(e) => setModel(e.target.value)}><option value="">{provider==='claude'?'Sonnet':providerInfo?.models?.find(item=>item.isDefault)?.name||(providerInfo?.models?.length===1?providerInfo.models[0].name:'\u2014')}</option>{(provider === 'claude' ? [{id:'sonnet',name:'Sonnet'},{id:'opus',name:'Opus'},{id:'haiku',name:'Haiku'}] : providerInfo?.models || []).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>{provider==='codex'&&<EffortPicker {...codexEffort} disabled={busy||running||uploading||selected?.readOnly}/>}<span className="composer-spacer" />{running && <button className="icon-button stop-button" aria-label={t("Остановить {0}",engineName)} onClick={async () => {try {await api(`/jobs/${job!.id}/stop`, {});} catch (e) {setError((e as Error).message);}}}><Square size={16} /></button>}<button className="send-button" aria-label={t("Отправить сообщение")} disabled={demo || !canRun || selected?.readOnly || busy || loading || uploading || !draft.trim() && !attachments.length} onClick={() => void send()}><ArrowUp size={21} /></button></div>
           </div>
         </div>
       </>}

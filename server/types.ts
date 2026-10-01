@@ -10,6 +10,7 @@ export type ActivityItem = {
   action?: 'command' | 'files' | 'search' | 'agent' | 'responding' | 'tool';
 };
 export type JobView = {
+  pendingInputIds?:string[];
   provider?: 'claude' | 'codex';
   id: string; cwd: string; sessionId?: string; status: 'running' | 'done' | 'error' | 'stopped';
   messages: ChatMessage[]; partial: string; approvals: Approval[]; error?: string;

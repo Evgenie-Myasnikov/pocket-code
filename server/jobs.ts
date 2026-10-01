@@ -3,14 +3,16 @@ import { query, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { HttpError } from './security.js';
 import { normalize, type Approval, type JobView } from './types.js';
 import { updateClaudeAgents, updateClaudeAgentResults } from './subagents.js';
+import {Followups,type FollowupInput} from './followups.js';
+import {PromptStream} from './prompt-stream.js';
 
 type Run = typeof query;
-type Job = JobView & { controller: AbortController; pending: Map<string, (result: PermissionResult) => void> };
+type Job = JobView & { controller: AbortController; pending: Map<string, (result: PermissionResult) => void>; inputs:PromptStream; queued:FollowupInput[]; followups:Followups; acceptingInput:boolean };
 export class Jobs {
   private jobs = new Map<string, Job>();
   constructor(private run: Run = query) {}
   view(job: Job): JobView {
-    const { controller, pending, ...view } = job;
+    const { controller, pending, inputs, queued, followups, acceptingInput, ...view } = job;
     return view;
   }
   list() { return [...this.jobs.values()].map(j => ({ ...this.view(j), messages: [], partial: '' })); }
@@ -25,6 +27,15 @@ export class Jobs {
     if (!job) throw new HttpError(404, 'Задача не найдена. Откройте сохранённый чат заново.');
     return job;
   }
+  async followup(id:string,input:FollowupInput){
+    const job=this.get(id);
+    await job.followups.run(input,async()=>{
+      if(job.status!=='running'||job.controller.signal.aborted||!job.acceptingInput)throw new HttpError(409,'The active turn has ended. Your draft is preserved.');
+      job.queued.push(input);job.pendingInputIds=job.queued.map(message=>message.id);
+      job.messages.push({id:input.id,role:'user',blocks:[{type:'text',text:input.displayText||input.text}]});job.revision++;
+    });
+    return this.view(job);
+  }
   start(input: { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; jira?: JobView['jira'] }) {
     const existing = this.jobs.get(input.id);
     if (existing) return this.view(existing);
@@ -37,14 +48,16 @@ export class Jobs {
     const job: Job = { provider: 'claude', id: input.id, cwd: input.cwd, sessionId: input.sessionId, status: 'running',
       messages: [{ id: randomUUID(), role: 'user', blocks: [{ type: 'text', text: input.displayText || input.text }] }],
       partial: '', approvals: [], startedAt: Date.now(), revision: 0, baseMessageCount: input.baseMessageCount || 0, jira: input.jira,
-      controller: new AbortController(), pending: new Map() };
+      controller: new AbortController(), pending: new Map(),inputs:new PromptStream(),queued:[],followups:new Followups(),acceptingInput:true };
+    job.inputs.push(job.messages[0].id,input.text,input.sessionId);
+    job.controller.signal.addEventListener('abort',()=>{job.acceptingInput=false;job.inputs.close();},{once:true});
     this.jobs.set(job.id, job);
     void this.execute(job, input);
     return this.view(job);
   }
   async execute(job: Job, input: Parameters<Jobs['start']>[0]) {
     try {
-      const stream = this.run({ prompt: input.text, options: {
+      const stream = this.run({ prompt: job.inputs, options: {
         cwd: input.cwd, resume: input.sessionId, model: input.model || undefined,
         permissionMode: input.mode, maxBudgetUsd: input.maxBudgetUsd,
         abortController: job.controller, includePartialMessages: true,
@@ -76,6 +89,9 @@ export class Jobs {
             job.status = 'error';
             job.error = 'errors' in event ? event.errors.join('\n') : 'Claude завершил задачу с ошибкой';
           }
+          const next=!event.is_error&&!job.controller.signal.aborted?job.queued.shift():undefined;
+          if(next){job.pendingInputIds=job.queued.map(message=>message.id);job.inputs.push(next.id,next.text,job.sessionId);}
+          else{job.acceptingInput=false;job.inputs.close();}
         }
         job.revision++;
         if (JSON.stringify(job.messages).length + job.partial.length > 4_000_000)
@@ -87,6 +103,7 @@ export class Jobs {
       if (job.status === 'error') job.error = error instanceof Error ? error.message : 'Не удалось запустить Claude';
       job.controller.abort();
     } finally {
+      job.acceptingInput=false;job.inputs.close();
       // A missing completion event is not proof that a historical agent is active.
       for (const block of job.messages.flatMap(m => m.blocks)) if (block.agent?.status === 'running') block.agent.status = job.status === 'stopped' ? 'stopped' : 'unknown';
       for (const resolve of [...job.pending.values()]) resolve({ behavior: 'deny', message: 'Задача завершена' });

@@ -35,7 +35,7 @@ test('API authenticates, scopes sessions, prevents path escapes and routes attac
     getSessionMessages: async (_id: string, options: any) => Array.from({ length: 105 }, (_, i) => ({ uuid: String(i), type: 'user', message: { content: `Message ${i}` } })).slice(options?.offset || 0, options?.limit ? (options?.offset || 0) + options.limit : undefined),
   };
   let prompt = '';
-  const run: any = ({ prompt: input }: any) => { prompt = input; return (async function* () { yield { type: 'system', subtype: 'init', session_id: id }; yield { type: 'result', subtype: 'success', is_error: false, total_cost_usd: 0 }; })(); };
+  const run: any = ({ prompt: input }: any) => { return (async function* () { prompt = (await input[Symbol.asyncIterator]().next()).value.message.content; yield { type: 'system', subtype: 'init', session_id: id }; yield { type: 'result', subtype: 'success', is_error: false, total_cost_usd: 0 }; })(); };
   const jobs = new Jobs(run);
   const { app } = await createApp({ desktopSessionIndexes: [], roots: [root], token, hostName: 'Test PC', uploads: path.join(temporary, 'uploads') }, jobs, sdk);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(r => server.once('listening', r));

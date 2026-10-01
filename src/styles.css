@@ -186,3 +186,8 @@
 .chat-tab-status{position:absolute;right:-5px;top:-3px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px var(--bg);background:#68b5eb}
 .chat-tab-status-done{background:#70c78a}.chat-tab-status-error{background:#f07575}.chat-tab-status-needs_input{background:#efc35b}
 @media(prefers-reduced-motion:no-preference){.chat-tab-status-running{animation:chat-status-pulse 1.3s ease-in-out infinite}@keyframes chat-status-pulse{50%{opacity:.3}}}
+
+.tasks-header-role{color:var(--muted);font-size:clamp(11px,calc(13px * var(--ui-scale,1)),17px);max-width:55%;overflow-wrap:anywhere;text-align:right}
+.jira-search-tools{display:flex;align-items:flex-end;gap:8px;min-width:0}.jira-search-tools>label{flex:1;min-width:0}.jira-search-tools>.icon-button{flex:0 0 48px;min-height:48px;margin-bottom:0}
+
+.followup-status{margin:0;padding:4px 16px;color:var(--muted);font-size:clamp(11px,calc(12px * var(--ui-scale,1)),16px)}.reading-mode .followup-status{display:none}

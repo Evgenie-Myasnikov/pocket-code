@@ -5,7 +5,7 @@ import { Jobs } from '../server/jobs.js';
 
 test('more than 100 completed chat turns retain running jobs and accept the next message', async () => {
   const run: any = ({ prompt, options }: any) => (async function* () {
-    if (prompt === 'keep running') await new Promise(resolve => options.abortController.signal.addEventListener('abort', resolve, { once: true }));
+    if ((await prompt[Symbol.asyncIterator]().next()).value.message.content === 'keep running') await new Promise(resolve => options.abortController.signal.addEventListener('abort', resolve, { once: true }));
   })();
   const jobs = new Jobs(run);
   const input = { cwd: '/synthetic/project', text: 'complete', mode: 'default' as const, maxBudgetUsd: 1 };

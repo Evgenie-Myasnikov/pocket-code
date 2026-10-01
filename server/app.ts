@@ -346,6 +346,14 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     guardProject(cwd, body.id);
     res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text + attached.map(f => `\n📎 ${f.name}`).join('') }));
   });
+  app.post('/api/jobs/:id/messages',async(req,res)=>{
+    const id=uuid.parse(req.params.id),body=z.object({id:uuid,text:z.string().max(100000),attachments:z.array(uuid).max(10).default([])}).parse(req.body);
+    const engine=engineForJob(id),job=engine.get(id),cwd=await allowedPath(roots,job.cwd,true);
+    const attached=body.attachments.map(id=>{const file=uploads.get(id);if(!file||file.cwd!==cwd||file.expires<Date.now())throw new HttpError(400,'Вложение недоступно. Прикрепите файл ещё раз.');return file;});
+    if(!body.text.trim()&&!attached.length)throw new HttpError(400,'Введите сообщение или прикрепите файл');
+    const prompt=body.text+(attached.length?'\n\nFiles attached by the user (read these local files as needed):\n'+attached.map(file=>JSON.stringify(file.path)).join('\n'):'');
+    res.json(await engine.followup(id,{id:body.id,text:prompt,displayText:body.text+attached.map(file=>`\n📎 ${file.name}`).join(''),attachmentPaths:attached.map(file=>file.path)}));
+  });
   app.post('/api/jobs/:id/stop', (req, res) => { const id = uuid.parse(req.params.id); engineForJob(id).stop(id); res.json({ ok: true }); });
   app.post('/api/jobs/:id/approvals/:approval', (req, res) => {
     const body = z.object({ allow: z.boolean(), answers: z.record(z.string(), z.string()).optional() }).parse(req.body);

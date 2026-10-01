@@ -6,13 +6,14 @@ import { codexAgents, validAgentId } from './subagents.js';
 import { codexMessage } from './codex-content.js';
 import { discoverCodex, StdioCodexRpc, CodexRequestError, type CodexRpc, type RpcEnvelope } from './codex-rpc.js';
 import packageJson from '../package.json';
+import {Followups,type FollowupInput} from './followups.js';
 import { codexPermissions, verifyCodexPermissions, type CodexAccess } from './codex-access.js';
 import { normalizeCodexUsage } from './codex-usage.js';
 import { codexModels } from './codex-models.js';
 
 type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; reasoningEffort?: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
 type Pending = { finish: (allow: boolean, answers?: Record<string, string>) => void };
-type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void> };
+type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void>; followups?:Followups };
 export type CodexSession = { sessionId: string; summary: string; cwd: string; lastModified: number; gitBranch?: string; source: 'codex'; provider: 'codex'; readOnly?: boolean };
 export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexRpc>; approvalTimeoutMs?: number; attachmentRoots?: string[] };
 
@@ -156,7 +157,22 @@ export class CodexService {
     return this.messages(child);
   }
   view(job: CodexJob): JobView {
-    const { pending, turnId, acceptingEvents, cancelled, eventQueue, ...view } = job; return view;
+    const { pending, turnId, acceptingEvents, cancelled, eventQueue, followups, ...view } = job; return view;
+  }
+  async followup(id:string,input:FollowupInput){
+    const job=this.get(id);job.followups??=new Followups();
+    await job.followups.run(input,async()=>{
+      if(job.status!=='running'||job.cancelled||!job.turnId||!job.acceptingEvents)throw new HttpError(409,'The active turn has ended or is not ready. Your draft is preserved.');
+      const turnId=job.turnId,parts:any[]=[{type:'text',text:input.text}];
+      for(const attachment of input.attachmentPaths||[]){
+        const file=await allowedPath([...this.roots,...(this.options.attachmentRoots||[])],attachment);
+        if(/\.(png|jpe?g|gif|webp)$/i.test(file))parts.push({type:'localImage',path:file});
+      }
+      if(job.status!=='running'||job.cancelled||job.turnId!==turnId)throw new HttpError(409,'The active turn has ended. Your draft is preserved.');
+      await (await this.connect()).request('turn/steer',{threadId:job.sessionId,expectedTurnId:turnId,input:parts,clientUserMessageId:input.id});
+      job.messages.push({id:input.id,role:'user',blocks:[{type:'text',text:input.displayText||input.text}]});job.revision++;
+    });
+    return this.view(job);
   }
   list() { return [...this.jobs.values()].map(job => ({ ...this.view(job), messages: [], partial: '' })); }
   get(id: string) { const job = this.jobs.get(id); if (!job) throw new HttpError(404, 'Codex job not found. Reopen the saved chat.'); return job; }
