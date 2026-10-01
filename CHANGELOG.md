@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - Expand bilingual product documentation
+- Changed: Added documentation indexes plus English/Russian guides for providers and accounts, everyday workflows, and troubleshooting. Covered project discovery, concurrent chats, attachments, subagents, diff scaling, Jira workflows, notifications, persistence and update boundaries.
+- Changed: Replaced the obsolete feature matrix with current three-provider coverage; corrected shared Jira account selection, removed terminal navigation claims and linked the guides from both home pages.
+- Files: README.md, FEATURES.md, docs indexes, user guides, reference and six topic guides. Existing synthetic screenshots reused; no user content added.
+- Validation: Checked current implementation and targeted reader findings; all 152 local links/images/anchors across 14 documentation pages resolve. Documentation-only change; no application build or runtime tests required.
+
+
 ## 2026-10-01 - Discover local Git projects and choose folders on the phone (0.20.5)
 - Changed: Project lists incrementally discover local Git repositories and worktrees without existing AI chats. Requests share bounded scan batches, cache results, and refresh completed scans after five minutes.
 - Changed: Windows launch no longer prompts for a folder or Enter. Default access includes the launch project and ready fixed drives; explicit ProjectPath arguments retain restricted roots. Folder selection stays in the phone app.

@@ -6,7 +6,7 @@ Read a reply, send a follow-up, review code or pick up a task while your AI work
 
 **GitHub Copilot:** select its workspace. Existing PC authentication (including GitHub CLI) is detected automatically. Otherwise use **Settings → Workspace → Connect GitHub Copilot** and complete GitHub sign-in in the PC browser. The host installs the official SDK and login runtime through npm; a Copilot entitlement is required. Copilot commands and file changes request approval in the chat. Copilot quota details and subagent transcripts are not yet exposed in Pocket Code.
 
-[Download APK](https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest) · [Get started](#get-started) · [Русский](docs/README.ru.md) · [Detailed guide](docs/REFERENCE.md)
+[Download APK](https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest) · [Get started](#get-started) · [Русский](docs/README.ru.md) · [Documentation](docs/README.md)
 
 <table>
 <tr><td align="center"><b>Continue a conversation</b></td><td align="center"><b>Explore your project</b></td><td align="center"><b>Make it comfortable</b></td></tr>
@@ -73,7 +73,7 @@ Install Node.js 22+ yourself if Windows Package Manager is unavailable. Use **St
 
 - **Permissions:** Codex defaults to Full access. Choose your access level in **Settings → AI & workspace**. Full access allows commands and file changes without approval prompts.
 - **Desktop chats:** supported local histories can be opened. A chat owned by Codex Desktop may remain read-only until Desktop releases it. Cloud-only chats and every desktop artifact are not supported.
-- **Jira is optional:** it uses the selected workspace's Atlassian MCP connection. Codex calls supported Jira tools directly without a model turn; Claude uses its existing connector through the native CLI and can consume Claude usage. A website login alone is insufficient. No silent fallback between accounts/providers occurs.
+- **Jira is optional:** one shared PC connection is selected independently of the task AI. Direct MCP through Codex avoids a model turn; the existing Claude connector can consume Claude usage. Separate authorization may be required; there is no silent account fallback.
 - **Task notifications:** the bell shows periodically detected changes, not Jira's complete inbox or Android push notifications.
 - **Updates:** use **Settings → Updates**. Android asks for installation confirmation. Compatible hosts can apply the matching PC update when idle.
 - **Saved history:** reopening is faster, but the initial connection still needs the host. This is not fully offline mode.
@@ -85,6 +85,10 @@ AI sign-in stays with the native PC tools. Android stores the pairing key throug
 Project operations run on your PC, but prompts and relevant content are processed by your AI provider. Internet mode passes encrypted traffic through Cloudflare; local HTTP is for trusted networks.
 
 Never publish pairing QR codes, keys, credentials, private chats or the **.pocket-code** runtime folder. Documentation examples are synthetic.
+
+## Documentation
+
+[Start here](docs/README.md) | [Everyday workflows](docs/WORKFLOWS.md) | [Providers and accounts](docs/PROVIDERS.md) | [Troubleshooting](docs/TROUBLESHOOTING.md) | [Full user guide](docs/USER_GUIDE.md) | [Russian documentation](docs/INDEX.ru.md)
 
 ## Need help?
 

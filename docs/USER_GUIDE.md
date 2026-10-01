@@ -1,5 +1,7 @@
 # Pocket Code user guide
 
+[Documentation index](README.md) | [Workflows](WORKFLOWS.md) | [Troubleshooting](TROUBLESHOOTING.md)
+
 [Home](../README.md) · [Русский](USER_GUIDE.ru.md) · [Technical reference](REFERENCE.md)
 
 Jump to [QR pairing](#qr), [code review](#diff), [updates](#updates), [chats](#chats), [project](#project), [tasks](#tasks), or [settings](#settings).
@@ -46,7 +48,7 @@ The sliders button opens an options sheet over the diff. Close it with **X**, Ba
 | Staged changes | The Git index: changes prepared for a commit. |
 | Branch changes | Committed changes since the merge base with the selected base branch. It does not include uncommitted edits. |
 
-Choose **One column** for a phone or **Two columns** for side-by-side reading. **Code size** follows chat text with a 14 px minimum by default; you can save a separate size. Long lines scroll horizontally.
+Choose **One column** for a phone or **Two columns** for side-by-side reading. **Code size** follows chat text with a 14 px minimum by default; you can save a separate size. Long lines scroll horizontally. Sizes from 4 to 24 px and **Fit diff to width** are available; fit scales each file independently while retaining normal controls. See [Review workflow](WORKFLOWS.md#inspect-code-changes).
 
 The open review refreshes every five seconds while visible and when returning to the app. The refresh button checks immediately. Background refresh retains collapsed files and the scroll position; files no longer changed disappear from the list. Diffs load near the visible area. A connection error means the retained content may be stale.
 
@@ -86,7 +88,7 @@ AI runtime compatibility checks are separate: a detected Claude/Codex version ch
 
 The small ring on the right of the input shows the **remaining** allowance: the lowest reported shared or matching-model limit. Tap it for window/reset details. It refreshes every minute while visible and on return; a dash means current data is unavailable. The send button has a compact visual face with a larger touch target.
 
-Choose Claude or Codex and a project, then open an existing chat or create one. The composer shows the selected model and supported effort setting. You can send a clarification during execution where the provider supports it.
+Choose Claude, Codex or Copilot and a project, then open an existing chat or create one. The composer shows the selected model and supported effort setting. You can send a clarification during execution where the provider supports it.
 
 Attach images and files with the attachment button. Images have thumbnails; use the cross to remove an attachment before sending. Expand compact tool activity rows to see details. Chat results can be filtered by content type, and subagents can be opened when the provider supplies their context.
 
@@ -106,11 +108,11 @@ Choose the project on your phone under **Project → Project folder**. The stand
 <a id="tasks"></a>
 ## Jira tasks and notifications
 
-Connect Jira in settings for the selected AI workspace. Claude and Codex have separate connector state; authorization in one is not automatically transferred to the other. Codex uses available Jira MCP tools directly; the existing Claude connection path still requires Claude CLI inference. Missing authorization must be completed on the PC.
+Jira uses one shared PC connection, independent of the AI selected for a task. Select the existing Claude connection or the direct MCP path through Codex. Each source needs its own authorization; the Claude path can consume model usage. See [providers and accounts](PROVIDERS.md#jira-is-independent-of-the-task-ai).
 
 Open **Tasks** to search and filter your assigned issues. Open an issue for its description and available actions. Actions depend on the issue's workflow and your selected role. Starting work creates a chat in the chosen project; sending work for review is a separate action. Select several tasks, choose a project and press **Open task chat**. Full descriptions are loaded into one normal chat with a sequential execution prompt; large descriptions become an attachment. Follow progress, clarify requirements or stop work in that chat. Batch chat creation leaves Jira statuses and PR publication to separate task actions.
 
-The bell shows Pocket Code's task-change feed. It is not Jira's internal notification inbox or Android push. The host periodically checks assigned tasks while the connected interface requests updates. Claude and Codex notification/read states remain separate.
+The bell shows Pocket Code's task-change feed. It is not Jira's internal notification inbox or Android push. The host periodically checks assigned tasks while the connected interface requests updates. The feed is distinct from native Android chat alerts.
 
 <a id="settings"></a>
 ## Appearance and disconnecting
@@ -120,7 +122,7 @@ Settings group appearance/language, provider access, integrations, updates, and 
 **Disconnect and forget** is at the end of the main settings list. It clears this phone's saved pairing and cached conversations. It does not stop the PC host or delete your project. Use the PC stop launcher to stop the host; active work can prevent a graceful stop.
 
 For troubleshooting, include app and host versions and reproduction steps in an [issue](https://github.com/Evgenie-Myasnikov/pocket-code/issues), with private data removed.
-# Shared Jira connection on the PC
+## Shared Jira connection on the PC
 
 In the PC QR window, open **Jira · Connect / Settings**. Choose the existing Claude connection, or **Sign in to Atlassian** for direct MCP through Codex, then select that connection. Jira access is shared by Claude and Codex tasks; choosing a task AI does not change your Jira account.
 
