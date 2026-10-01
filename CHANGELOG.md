@@ -2,7 +2,7 @@
 
 ## 2026-10-01 - Public repository privacy skill and publication guards
 - Changed: Added a repository privacy skill referenced by AGENTS.md and CLAUDE.md. Public examples must be synthetic; source, screenshots, archives and release notes require review without copying private values to logs or external tools.
-- Changed: Local commit/push hooks scan Git blobs and outgoing commit trees, including commit metadata. The scanner blocks common credentials, private file names and exact local denylist values, fails closed and refuses unrelated parent repositories. CI checks the public tree; the release script requires a clean checkout and a passing source scan.
+- Changed: Local commit/push hooks scan Git blobs and outgoing commit trees, including commit metadata. The scanner blocks common credentials, private file names and exact local denylist values, fails closed and refuses unrelated parent repositories. CI checks the public tree; the release script requires a clean checkout and a passing source scan. Hook scripts retain LF line endings across Windows/Linux checkouts.
 - Files: .agents/skills/protect-public-data, AGENTS.md, CLAUDE.md, .githooks, .github/workflows/privacy.yml, scripts/privacy-guard.mjs, scripts/publish-release.ps1 and privacy tests.
 - Validation: Skill validator and four privacy tests passed, including staged-versus-working content, historical commits and malformed denylist rejection.
 - Limits: Hooks are locally installed and bypassable; CI is after upload. Pattern scanning does not identify arbitrary business data or read image pixels/unpack archives. Final visual and artifact audits remain required.
