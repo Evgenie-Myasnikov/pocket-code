@@ -33,6 +33,19 @@ for(const layout of ['unified','split'])test(`large ${layout} diff keeps a bound
   await expect(panel.locator('.diff-table')).toHaveCSS('font-size','24px');
   expect(await panel.locator('tr').count()).toBeLessThan(120);
   await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('new 0');
+  await panel.getByRole('button',{name:'Review options',exact:true}).click();
+  await panel.getByLabel('Fit diff to width',{exact:true}).check();await page.keyboard.press('Escape');
+  await expect.poll(()=>content.evaluate(element=>element.scrollWidth-element.clientWidth)).toBeLessThanOrEqual(2);
+  await content.evaluate(element=>{element.scrollTop=element.scrollHeight;});await expect(content).toContainText('new 9999');
+  expect(await panel.locator('tr').count()).toBeLessThan(1000);
+  await panel.getByRole('button',{name:'Review options',exact:true}).click();
+  await panel.getByLabel('Code size',{exact:true}).selectOption('4');await page.keyboard.press('Escape');
+  await expect(panel.locator('.diff-table')).toHaveCSS('font-size','4px');
+  await expect.poll(()=>content.evaluate(element=>element.scrollWidth-element.clientWidth)).toBeLessThanOrEqual(2);
+  await content.evaluate(element=>{element.scrollTop=element.scrollHeight;});await expect(content).toContainText('new 9999');
+  expect(await page.evaluate(()=>localStorage.getItem('pocket-code-diff-fit-width'))).toBe('true');
+  await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('new 0');
+  await page.screenshot({path:`artifacts/screenshots/diff-fit-${layout}.png`});
 });
 
 for(const layout of ['unified','split'])test(`${layout} fallback emoji and CJK glyphs fit stable columns at both code sizes`,async({page})=>{

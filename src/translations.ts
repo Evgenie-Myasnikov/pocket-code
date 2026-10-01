@@ -1,5 +1,6 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+"Диф по ширине экрана":"Fit diff to width",
 "Открыть чат задач":"Open task chat",
 "Подготавливаем задачи: {0} / {1}":"Preparing tasks: {0} / {1}",
 "Выбранные задачи откроются в одном чате. Статусы Jira и pull request изменяются отдельными действиями.":"Selected tasks will open in one chat. Jira status changes and pull requests remain separate actions.",

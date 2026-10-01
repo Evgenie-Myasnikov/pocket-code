@@ -34,3 +34,4 @@
 .review-file-heading strong{flex:1;min-width:0;overflow-wrap:anywhere;font-size:.9em;font-weight:500}.review-file-heading>svg{flex-shrink:0}
 .review-file-patch>p{padding:12px 16px;color:var(--muted);font-size:.9em}
 .review-extension-filters{border:0;padding:0;margin:18px 0;display:flex;flex-wrap:wrap;gap:8px 16px}.review-extension-filters legend{margin-bottom:8px}.review-options .review-extension-filters label{flex-direction:row;align-items:center;min-height:44px;gap:8px}.review-extension-filters input{width:20px;height:20px;accent-color:var(--accent)}
+.review-fit-width{display:flex;align-items:center;gap:10px;min-height:48px;cursor:pointer}.review-fit-width input{width:20px;height:20px;flex-shrink:0;accent-color:var(--accent)}

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - Fit review diffs to phone width (0.20.4)
+- Changed: Review supports independent 4, 6 and 8 px code sizes and a persistent Fit diff to width option. Each file fits its complete unified or split columns without wrapping or shrinking controls.
+- Changed: Virtual rows account for the rendered zoom, retaining access to the final line in large patches.
+- Files: src/Review.tsx, ReviewFileDiff.tsx, DiffTable.tsx, review.css, translations.ts; review performance scenarios.
+- Validation: 14 Review browser scenarios passed; two large-patch scenarios passed again after measurement caching. TypeScript/Vite and Android build passed. Synthetic split-view screenshot inspected.
+- Follow-up: Physical Android zoom behavior remains untested. Very long lines become deliberately small in fit mode; disable it for normal reading.
+
+
 ## 2026-10-01 - Continue large Codex chats and index their images (0.20.3)
 - Changed: Chat history and Results use byte-bounded message pages instead of loading the entire Codex transcript under a 16 MB limit. Results offsets retain every displayable message across page boundaries; latest windows keep the newest messages.
 - Changed: Starting a normal or Jira turn counts displayable items without decoding image files or applying the whole-history display limit. Existing project and writer ownership checks remain.
