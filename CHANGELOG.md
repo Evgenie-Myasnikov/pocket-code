@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - Public onboarding documentation and setup launcher
+- Changed: Replaced the dense landing README with a user-oriented overview, screenshot gallery, quick start, privacy notes and troubleshooting. Added a Russian guide and retained advanced material in docs/REFERENCE.md with corrected update/drawer descriptions.
+- Added: Setup Pocket Code.cmd checks Node.js 22+, offers winget installation when needed, opens the APK release page and starts the existing Wi-Fi/internet launcher. Native AI sign-in and Android installation confirmation remain manual.
+- Privacy: Documentation screenshots are generated from synthetic browser fixtures; no live projects, credentials, conversations or task-provider data were used.
+- Files: README.md, docs/, scripts/setup.ps1, Setup Pocket Code.cmd, tests/documentation-screenshots.spec.ts.
+- Validation: Screenshot scenario passed and all three images visually inspected; 17 local documentation links resolved. PowerShell syntax and three mocked setup paths passed (existing Node, upgrade, winget unavailable). No real software installation was performed.
+
 ## 2026-10-01 - Consistent chat list sizing and saved history (0.18.1)
 - Changed: Chat rows use Project/Settings category typography, spacing, icons and minimum heights at every interface scale.
 - Added: Local bounded cache of the latest session list and last 100 messages in up to 20 recently viewed chats per provider. Saved content appears before host refresh; request failures retain it. Live message snapshots are saved without restoring execution or approval state.
