@@ -106,7 +106,7 @@ The **Project** tab contains **Files**, **Rules**, and **Changelog**. Select the
 
 Connect Jira in settings for the selected AI workspace. Claude and Codex have separate connector state; authorization in one is not automatically transferred to the other. Codex uses available Jira MCP tools directly; the existing Claude connection path still requires Claude CLI inference. Missing authorization must be completed on the PC.
 
-Open **Tasks** to search and filter your assigned issues. Open an issue for its description and available actions. Actions depend on the issue's workflow and your selected role. Starting work creates a chat in the chosen project; sending work for review is a separate action. Select tasks for batch processing when available.
+Open **Tasks** to search and filter your assigned issues. Open an issue for its description and available actions. Actions depend on the issue's workflow and your selected role. Starting work creates a chat in the chosen project; sending work for review is a separate action. Select several tasks, choose a project and press **Open task chat**. Full descriptions are loaded into one normal chat with a sequential execution prompt; large descriptions become an attachment. Follow progress, clarify requirements or stop work in that chat. Batch chat creation leaves Jira statuses and PR publication to separate task actions.
 
 The bell shows Pocket Code's task-change feed. It is not Jira's internal notification inbox or Android push. The host periodically checks assigned tasks while the connected interface requests updates. Claude and Codex notification/read states remain separate.
 

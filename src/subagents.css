@@ -18,3 +18,14 @@
 .subagents-panel{border-radius:24px 0 0 24px;overflow:hidden}.subagents-header{padding:10px 18px;border-bottom:0}.subagents-toolbar{border-bottom:0;padding-bottom:10px}.subagent-list{gap:4px}.subagent-list>li+li{border:0}.subagent-row{padding:14px 12px;border-radius:16px}.subagent-row:active{background:var(--surface)}.subagent-context{border:0;border-radius:14px;background:transparent}.subagent-context>summary{padding:10px 0;color:var(--muted);font-weight:500}.subagent-context>p,.subagent-context>.message{padding:0 0 14px}.subagent-detail h3{line-height:1.45}.subagents-header .icon-button,.subagents-toolbar .icon-button{border:0;border-radius:50%;background:transparent}.subagent-row:focus-visible{border-radius:16px}
 @media(hover:hover){.subagent-row:hover{background:var(--surface)}}
 @media(max-width:760px){.subagents-panel{top:calc(env(safe-area-inset-top) + 8px);border-radius:22px 22px 0 0;padding-top:0;box-shadow:0 -8px 40px #0005}}
+
+/* Agent activity belongs to the transcript, with a quiet rounded touch target. */
+:root[data-theme] .message .subagent-card{width:fit-content;max-width:100%;padding:6px 8px;margin:2px 0;border:0;border-radius:16px;background:transparent;box-shadow:none;color:var(--muted);font-size:.92em;}
+:root[data-theme] .message .subagent-card strong{font-weight:400;color:inherit;}
+:root[data-theme] .subagent-activity>button{border-radius:24px;padding:6px 10px;background:transparent;box-shadow:none;min-height:48px;}
+.subagent-activity{margin:4px 0;}
+:root[data-theme] .subagent-inline{border:0;background:transparent;border-radius:16px;box-shadow:none;color:var(--muted);font-size:.92em;}
+.subagent-inline>summary{min-height:48px;padding:8px;cursor:pointer;line-height:1.5;overflow-wrap:anywhere;}
+.subagent-inline>div{padding:0 8px 8px;}
+@media(hover:hover){:root[data-theme] .message .subagent-card:hover,:root[data-theme] .subagent-activity>button:hover{background:color-mix(in srgb,var(--muted) 8%,transparent);}}
+.subagent-card:focus-visible,.subagent-inline>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:16px;}

@@ -35,6 +35,7 @@ const panel=(page:Page)=>page.locator('.subagents-panel');
 
 test('agent activity opens read-only child messages and Back restores list and parent draft',async({page})=>{
   await page.setViewportSize({width:390,height:844});await mockHost(page);await openChat(page);
+  await page.screenshot({path:'artifacts/screenshots/subagent-chat-quiet.png',fullPage:true});
   await page.getByLabel('Message Codex').fill('Keep the parent draft');
   await page.locator('.subagent-card').click();await expect(panel(page)).toBeVisible();
   await expect(panel(page).getByText('Verified the permission boundaries.')).toBeVisible();

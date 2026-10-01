@@ -1,5 +1,9 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+"Открыть чат задач":"Open task chat",
+"Подготавливаем задачи: {0} / {1}":"Preparing tasks: {0} / {1}",
+"Выбранные задачи откроются в одном чате. Статусы Jira и pull request изменяются отдельными действиями.":"Selected tasks will open in one chat. Jira status changes and pull requests remain separate actions.",
+"Описание не соответствует выбранной задаче.":"Task details do not match the selected issue.",
 "Оценка времени":"Time estimate",
 "Укажите плановую оценку для перехода: w — недели, d — дни, h — часы, m — минуты. Это не списание времени.":"Enter the planned estimate for this transition: w = weeks, d = days, h = hours, m = minutes. This does not log time worked.",
 "Введите оценку времени, например 2h или 1d 30m.":"Enter a time estimate, for example 2h or 1d 30m.",

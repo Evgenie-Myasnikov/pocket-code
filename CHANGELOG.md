@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-01 - Task batches use an ordinary chat (0.20.2)
+- Changed: Selected Jira tasks now open a single normal chat with full issue descriptions and a role-aware sequential execution prompt. Large descriptions use an attachment; preparation failures retain selection and do not start partial work.
+- Changed: Removed the queue panel, queue polling and queue controls from Tasks. Individual workflow actions remain available; starting a batch chat does not automatically change Jira status or publish PRs.
+- Files: src/Jira.tsx, task-chat.ts, translations.ts; Jira workflow scenarios and user guides.
+- Validation: 37 Jira workflow, subagent and workspace UI scenarios passed, including full descriptions, large-batch attachments and preparation failures. TypeScript/Vite and Android build passed.
+- Follow-up: Legacy queue endpoints remain for older clients. A batch attachment is subject to the normal 10 MB file limit.
+
+## 2026-10-01 - Quieter subagent activity (0.20.2)
+- Changed: Subagent links and the activity entry use compact, muted, rounded touch targets. The fallback disclosure no longer uses the boxed tool-card surface; statuses and access to details remain.
+- Files: src/subagents.css, RichBlocks.tsx.
+- Validation: Eight subagent interaction/layout scenarios passed, including mobile widths and enlarged interface scale. The chat screenshot was visually inspected after a focused interaction rerun.
+
+## 2026-10-01 - Remove leftover Claude terminal navigation (0.20.2)
+- Changed: Removed the Claude-only Live terminal button from the chat list and Terminal tab from mobile navigation. Claude now uses the same normal chat navigation as the other providers.
+- Why: The legacy terminal shortcut remained visible after navigation simplification.
+- Files: src/App.tsx and application version metadata.
+- Validation: TypeScript, eight workspace regression scenarios and Android build passed.
+
 ## 2026-10-01 - Public repository privacy skill and publication guards
 - Changed: Added a repository privacy skill referenced by AGENTS.md and CLAUDE.md. Public examples must be synthetic; source, screenshots, archives and release notes require review without copying private values to logs or external tools.
 - Changed: Local commit/push hooks scan Git blobs and outgoing commit trees, including commit metadata. The scanner blocks common credentials, private file names and exact local denylist values, fails closed and refuses unrelated parent repositories. CI checks the public tree; the release script requires a clean checkout and a passing source scan. Hook scripts retain LF line endings across Windows/Linux checkouts.

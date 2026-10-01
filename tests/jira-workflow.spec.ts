@@ -6,15 +6,19 @@ const transition=(id:string,fields:Record<string,unknown>={})=>({id,name:'Procee
 type State={queries:URL[];actions:any[];batches:any[];recoveries:any[];previews:number;view:any;queue:any;issues?:(url:URL)=>{issues:any[];next:string|null}};
 async function fixture(page:Page,custom:Partial<State>={}){
   const state:State={queries:[],actions:[],batches:[],recoveries:[],previews:0,queue:{paused:true,items:[]},view:{issue:issue(1),stage:'open',role:'developer',actions:[{id:'start_development',label:'Start development',kind:'start',transitions:[transition('start')]}]},...custom};
+  let taskJob:any;
   await page.route('**/api/**',route=>{
     const url=new URL(route.request().url()),endpoint=url.pathname.replace('/api','');
     if(endpoint==='/health')return route.fulfill({json:{name:'Synthetic Jira PC',protocol:1,version:'0.11.0',roots:[root]}});
     if(endpoint==='/providers')return route.fulfill({json:[{id:'claude',available:true},{id:'codex',available:true,authenticated:true,models:[]}]});
+    if(endpoint==='/jobs'&&route.request().method()==='POST'){const body=route.request().postDataJSON();state.batches.push(body);taskJob={...body,sessionId:'task-chat',status:'running',messages:[{id:'task-prompt',role:'user',blocks:[{type:'text',text:body.text}]}],partial:'',approvals:[],startedAt:Date.now(),revision:0,baseMessageCount:0};return route.fulfill({json:taskJob});}
+    if(endpoint.startsWith('/jobs/'))return route.fulfill({json:taskJob});
+    if(endpoint.includes('/messages'))return route.fulfill({json:{messages:[],previous:null,next:null}});
     if(endpoint==='/sessions'||endpoint==='/jobs')return route.fulfill({json:[]});
     if(endpoint==='/updates/latest')return route.fulfill({json:{enabled:false}});
     if(endpoint==='/jira/status')return route.fulfill({json:{connected:true,source:'claude',sites:[{id:'site-a',name:'Example Jira',url:'https://example.atlassian.net'},{id:'site-b',name:'Second Jira',url:'https://second.example.atlassian.net'}]}});
     if(endpoint==='/jira/issues'){state.queries.push(url);return route.fulfill({json:state.issues?.(url)||{issues:[issue(1),issue(2)],next:null}});}
-    if(endpoint==='/jira/issue')return route.fulfill({json:state.view.issue});
+    if(endpoint==='/jira/issue')return route.fulfill({json:url.searchParams.get('key')===state.view.issue.key?state.view.issue:issue(Number(url.searchParams.get('key')!.split('-')[1]))});
     if(endpoint==='/jira/workflow')return route.fulfill({json:{...state.view,role:url.searchParams.get('role')}});
     if(endpoint==='/jira/workflow/pr'){state.previews++;return route.fulfill({json:{ready:true,base:'main',head:'feature/demo',headSha:'a'.repeat(40),files:['src/example.ts'],commits:2}});}
     if(endpoint==='/jira/workflow/action'){const data=route.request().postDataJSON();state.actions.push(data);state.view={...state.view,issue:{...state.view.issue,status:'Ready for QA'},actions:[]};return route.fulfill({json:{view:state.view}});}
@@ -50,8 +54,8 @@ test('search and category preserve selection; select all matches every page and 
   await page.getByRole('button',{name:'Select all matching',exact:true}).click();await expect(page.getByLabel('Select DEMO-3',{exact:true})).toBeChecked();await expect(page.getByText('Selected: 2',{exact:true})).toBeVisible();
   expect(state.queries.some(url=>url.searchParams.get('cursor')==='page-2'&&url.searchParams.get('search')==='render'&&url.searchParams.get('type')==='Bug')).toBe(true);
   await page.getByRole('button',{name:'Continue',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Start selected tasks'});await expect(dialog).toContainText('Start 2 tasks?');await expect(dialog).toContainText('Developer');expect(state.batches).toHaveLength(0);
-  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();expect(state.batches).toHaveLength(0);await page.getByRole('button',{name:'Continue',exact:true}).click();await dialog.getByRole('button',{name:'Start selected (2)',exact:true}).click();
-  await expect.poll(()=>state.batches.length).toBe(1);expect(state.batches[0]).toMatchObject({keys:['DEMO-2','DEMO-3'],role:'developer',cwd:root,mode:'default'});expect(state.batches[0].batchId).toBeTruthy();
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();expect(state.batches).toHaveLength(0);await page.getByRole('button',{name:'Continue',exact:true}).click();await dialog.getByRole('button',{name:'Open task chat',exact:true}).click();
+  await expect.poll(()=>state.batches.length).toBe(1);expect(state.batches[0]).toMatchObject({provider:'claude',cwd:root,mode:'default'});expect(state.batches[0].id).toBeTruthy();expect(state.batches[0].text).toContain('Requirements for task 2.');expect(state.batches[0].text).toContain('Requirements for task 3.');await expect(page.getByLabel('Message Claude')).toBeVisible();await expect(page.locator('.jira-queue')).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
@@ -154,4 +158,23 @@ for(const scale of [60,100,130])test(`task typography matches settings at ${scal
   await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();
   await expect(page.locator('.settings-category strong').first()).toHaveCSS('font-size',title);
   await expect(page.locator('.settings-category small').first()).toHaveCSS('font-size',detail);
+});
+
+test('a large task batch becomes an attachment in a single normal chat',async({page})=>{
+ const state=await fixture(page),uploads:any[]=[];
+ const description='Detailed acceptance criterion. '.repeat(3000);
+ await page.route('**/api/jira/issue?*',route=>route.fulfill({json:issue(1,{description})}));
+ await page.route('**/api/uploads?*',route=>{uploads.push(route.request().postDataJSON());return route.fulfill({json:{id:'11111111-1111-4111-8111-111111111111'}});});
+ await connect(page);await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('button',{name:'Open task chat',exact:true}).click();
+ await expect.poll(()=>state.batches.length).toBe(1);expect(uploads).toHaveLength(1);
+ expect(JSON.parse(Buffer.from(uploads[0].base64,'base64').toString())[0].description).toBe(description);
+ expect(state.batches[0].attachments).toHaveLength(1);expect(state.batches[0].text.length).toBeLessThan(60000);
+ await expect(page.getByLabel('Message Claude')).toBeVisible();
+});
+
+test('failed task preparation keeps the selection and never starts an incomplete chat',async({page})=>{
+ const state=await fixture(page);await page.route('**/api/jira/issue?*',route=>route.fulfill({status:403,json:{error:'Synthetic permission denied'}}));
+ await connect(page);await expect(page.getByRole('button',{name:'Live terminal',exact:true})).toHaveCount(0);await expect(page.locator('.mobile-nav').getByRole('button',{name:'Terminal',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('button',{name:'Open task chat',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('Synthetic permission denied');expect(state.batches).toHaveLength(0);await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.getByLabel('Select DEMO-1',{exact:true})).toBeChecked();
 });
