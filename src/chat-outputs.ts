@@ -39,7 +39,7 @@ function name(reference:{path?:string;href?:string}){
 
 /** Read-only index of the loaded transcript. It never fetches URLs or searches the PC filesystem. */
 export function extractChatOutputs(messages:ChatMessage[],limit=OUTPUT_LIMIT):ChatOutput[]{
-  limit=Math.max(1,Math.min(OUTPUT_LIMIT,limit));
+  limit=Math.max(1,limit);
   const output:ChatOutput[]=[],seen=new Set<string>();let visited=0;
   const tools=new Map<string,Block>();
   for(const message of messages)for(const block of message.blocks)if(block.type==='tool_use'&&block.id)tools.set(block.id,block);

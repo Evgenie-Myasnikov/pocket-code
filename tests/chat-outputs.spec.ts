@@ -47,7 +47,8 @@ const panel=(page:Page)=>page.locator('.chat-outputs-panel');
 
 test('results categories isolate outputs from sources and Back preserves the parent draft',async({page})=>{
   await page.setViewportSize({width:390,height:844});await setup(page);await page.getByLabel('Message Codex').fill('Parent draft remains here');await page.getByRole('button',{name:'Results',exact:true}).click();
-  await expect(panel(page)).toBeVisible();await expect(panel(page).getByText('Your brief',{exact:true})).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();await expect(panel(page).getByText('Your brief',{exact:true})).toHaveCount(1);
+  await panel(page).getByRole('button',{name:'Assistant results',exact:true}).click();await expect(panel(page).getByText('Your brief',{exact:true})).toHaveCount(0);
   await panel(page).getByRole('button',{name:/^Code \d/}).click();await expect(panel(page).locator('.chat-output-row')).toHaveCount(1);
   await panel(page).locator('.chat-output-row').click();await expect(panel(page).getByText('const result = 42;',{exact:true})).toBeVisible();
   await page.keyboard.press('Escape');await panel(page).getByRole('button',{name:'Your sources',exact:true}).click();await expect(panel(page).locator('.chat-output-row')).toHaveCount(1);
@@ -128,3 +129,25 @@ for(const profile of [{width:320,height:640,language:'en',scale:130},{width:320,
     await page.screenshot({path:`artifacts/screenshots/results-${profile.width}-${profile.language}.png`,fullPage:true});
   });
 }
+
+test('results scan every history page independently of the visible chat',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await setup(page);
+ const before=await page.locator('.conversation').evaluate(el=>el.scrollTop);let release!:()=>void;
+ const wait=new Promise<void>(resolve=>{release=resolve;});const offsets:number[]=[];
+ await page.route('**/api/sessions/output-chat/messages?*',async route=>{
+  const offset=new URL(route.request().url()).searchParams.get('offset');
+  if(offset===null)return route.fulfill({json:{messages,previous:100,next:null}});
+  offsets.push(Number(offset));if(offset==='100')await wait;
+  return route.fulfill({json:{messages:offset==='0'?[{id:'old',role:'assistant',blocks:[{type:'text',text:'[Older report](old/report.md)'}]}]:[{id:'old-source',role:'user',blocks:[{type:'document',title:'Earlier source',source:{type:'text',text:'Archived input'}}]}],next:offset==='0'?100:null}});
+ });
+ await page.getByRole('button',{name:'Results',exact:true}).click();
+ await expect(panel(page).getByText(/Searching the full history/)).toBeVisible();
+ await expect(panel(page).getByRole('button',{name:/Older report/})).toBeVisible();release();
+ await expect(panel(page).getByText(/History scanned/)).toBeVisible();
+ await expect(panel(page).getByRole('button',{name:/Earlier source/})).toBeVisible();
+ expect(offsets).toContain(0);expect(offsets).toContain(100);
+ await expect(panel(page).getByRole('button',{name:'Load more messages'})).toHaveCount(0);
+ await page.keyboard.press('Escape');
+ expect(await page.locator('.conversation').evaluate(el=>el.scrollTop)).toBe(before);
+ await expect(page.locator('.conversation').getByText('Older report')).toHaveCount(0);
+});

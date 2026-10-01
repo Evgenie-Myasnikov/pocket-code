@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - Complete chat results and durable reading positions (0.20.1)
+- Changed: Results scans every available history page gradually, independently of the chat's 5,000-message viewport. All results and source attachments are initially visible; categories, progressive rendering, scan progress and retry remain available. File contents still load on demand.
+- Changed: Chat positions are stored per host, provider and session, with message anchors and history-window restoration across navigation and reload. Jump controls depend on distance from the latest message instead of scroll direction. The history edge states whether older messages exist, are loading, or the beginning has been reached.
+- Files: src/useChatOutputIndex.ts, chat-position.ts, chat-outputs.ts, ChatOutputs.tsx, App.tsx; chat recovery/output tests and user guides.
+- Validation: 24 Playwright output, recovery and workspace scenarios passed, including complete paginated indexing, scroll anchors, navigation and reload; 10 output parser unit tests passed. TypeScript/Vite and Android APK build passed.
+- Follow-up: Only files represented in provider history can be discovered. Deleted/inaccessible files cannot be previewed. Closing Results cancels further indexing; reopening rescans. Physical Android testing remains unavailable.
+
 ## 2026-10-01 - GitHub Copilot workspace and automatic sign-in detection (0.20.0)
 - Changed: Added GitHub Copilot using the official SDK, with separate project/chat preferences, history, streaming replies, attachments, follow-ups, stop, permission questions and Jira execution queues. Shared Jira authorization remains separate from the selected task AI.
 - Authentication: Existing PC credentials are discovered by the SDK, including GitHub CLI. An explicit settings action launches the bundled official CLI browser login on the PC; it times out after five minutes and is terminated with the host. Pocket Code does not copy GitHub tokens to Android.

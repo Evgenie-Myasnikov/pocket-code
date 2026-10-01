@@ -92,10 +92,11 @@ test('scrolling to history edges loads automatically once and preserves the visi
   await scroller.evaluate(el=>{el.scrollTo({top:0,behavior:'instant'});el.dispatchEvent(new Event('scroll'));el.dispatchEvent(new Event('scroll'));});
   await expect.poll(()=>windows.filter(window=>window===200).length).toBe(1);
   const oldAnchor=page.locator('.message').filter({has:page.getByText('History message 101',{exact:true})});
+  await expect(page.getByText('Loading messages…',{exact:true})).toBeVisible();
   const oldTop=await oldAnchor.evaluate(el=>el.getBoundingClientRect().top);expansion.resolve();
   await expect(page.locator('.message')).toHaveCount(201);
   await expect.poll(()=>oldAnchor.evaluate(el=>el.getBoundingClientRect().top)).toBeCloseTo(oldTop,0);
-  expect(windows.filter(window=>window===200)).toHaveLength(1);
+  expect(windows.filter(window=>window===200)).toHaveLength(1);await expect(page.getByText('Beginning of chat',{exact:true})).toHaveCount(1);
   await page.getByRole('button',{name:'Go to beginning'}).click();await expect(page.locator('.message')).toHaveCount(100);
   await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(0);
   await scroller.evaluate(el=>{el.scrollTo({top:el.scrollHeight,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
@@ -142,4 +143,24 @@ test('cached list and transcript appear before delayed refresh after reload',asy
  await expect(page.getByText('History message 1',{exact:true})).toHaveCount(1);
  waiting.resolve();await expect(page.getByText('History message 2',{exact:true})).toHaveCount(1);
  await expect(page.getByText('History message 1',{exact:true})).toHaveCount(0);
+});
+
+test('chat position and jump controls survive downward scrolling, tab changes and reload',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await host(page);
+ await page.route('**/api/sessions/saved-chat/messages?*',route=>route.fulfill({json:{messages:Array.from({length:100},(_,i)=>message(i+1)),previous:null,next:null}}));
+ await connect(page,'claude');const scroller=page.locator('.conversation');
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
+ await scroller.evaluate(el=>{el.scrollTop=1800;el.dispatchEvent(new Event('scroll'));});
+ await scroller.evaluate(el=>{el.scrollTop=1900;el.dispatchEvent(new Event('scroll'));});
+ await expect(page.getByRole('button',{name:'Go to beginning'})).toBeVisible();
+ const before=await scroller.evaluate(el=>el.scrollTop);
+ await page.locator('.mobile-nav').getByRole('button',{name:'Settings'}).click();
+ await page.locator('.mobile-nav').getByRole('button',{name:'Chats'}).click();
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
+ await page.getByRole('button',{name:'Back to chats',exact:true}).click();
+ await page.getByRole('button',{name:'Saved claude chat'}).click();
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
+ await page.reload();await page.getByRole('button',{name:'Saved claude chat'}).click();
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
+ await expect(page.getByRole('button',{name:'Go to beginning'})).toBeVisible();
 });

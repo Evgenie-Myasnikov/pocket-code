@@ -25,9 +25,9 @@ Keep the PC awake and the host running. Closing the QR browser tab does not stop
 
 <table><tr><td><img src="images/results-images.png" width="280" alt="Results gallery with image thumbnails"></td><td><img src="images/image-viewer.png" width="280" alt="Full-screen image with zoom and Fit to screen controls"></td></tr></table>
 
-Open **Results → Images** to browse thumbnails from the loaded messages. Switch between **Assistant results** and **Your sources** to see generated images or your attachments. Tap a thumbnail to open it, pinch or use **+ / −** to zoom, and drag to inspect details. **Fit to screen** resets the view. Close or press Back to return to the same gallery position.
+Open **Results → Images** to browse thumbnails while the panel gradually scans the complete available chat history. All materials appear by default. Switch between **Assistant results** and **Your sources** to see generated images or your attachments. Tap a thumbnail to open it, pinch or use **+ / −** to zoom, and drag to inspect details. **Fit to screen** resets the view. Close or press Back to return to the same gallery position.
 
-External images have a **Load external image** button. Local images use the connected computer; a missing file can no longer be previewed. Load older messages to include earlier images.
+External images have a **Load external image** button. Local images use the connected computer; a missing file can no longer be previewed. Earlier files appear automatically as the history scan progresses. Closing the panel stops scanning; reopening starts a fresh scan.
 
 <a id="diff"></a>
 ## Review code changes
@@ -90,7 +90,7 @@ Choose Claude or Codex and a project, then open an existing chat or create one. 
 
 Attach images and files with the attachment button. Images have thumbnails; use the cross to remove an attachment before sending. Expand compact tool activity rows to see details. Chat results can be filtered by content type, and subagents can be opened when the provider supplies their context.
 
-Scroll upward to load older messages automatically. The reading-mode eye hides extra controls. Switching main tabs retains the selected chat. Recent history is cached and refreshed after connecting; this is not a full offline archive. Unsaved drafts should not be treated as durable storage.
+Scroll upward to load older messages automatically. An indicator distinguishes more history, loading and the beginning of the chat. Reading position is saved separately per chat, including across app restarts. The reading-mode eye hides extra controls. Switching main tabs retains the selected chat. Recent history is cached and refreshed after connecting; this is not a full offline archive. Unsaved drafts should not be treated as durable storage.
 
 Open the right-edge activity drawer for running chats, errors, and questions needing a response. Reading a finished activity dismisses it from the queue; pending questions still require an answer.
 

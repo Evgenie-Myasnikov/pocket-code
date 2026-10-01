@@ -1,16 +1,17 @@
+import {useChatOutputIndex} from './useChatOutputIndex';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowLeft,ChevronRight,Code2,ExternalLink,FileText,Image,Link,RefreshCw,Wrench,X} from 'lucide-react';
 import {request,type Connection} from './api';
 import {useLanguage} from './i18n';
 import {useModal} from './navigation';
 import {Markdown,RichBlock,safeWebUrl,imageSource} from './RichBlocks';
-import {extractChatOutputs,OUTPUT_LIMIT,type ChatOutput,type OutputCategory,type OutputSource} from './chat-outputs';
+import {type ChatOutput,type OutputCategory,type OutputSource} from './chat-outputs';
 import type {ChatMessage} from '../server/types';
 import './chat-outputs.css';
 import {OutputImageCard,OutputImageViewer} from './OutputImage';
 import {thumbnailQueue} from './image-thumbnails';
 
-type Props={connection:Connection;cwd:string;messages:ChatMessage[];onClose:()=>void;onLoadMore?:()=>void;hasMore?:boolean;loadingMore?:boolean};
+type Props={provider?:string;sessionId?:string;connection:Connection;cwd:string;messages:ChatMessage[];onClose:()=>void;onLoadMore?:()=>void;hasMore?:boolean;loadingMore?:boolean};
 type Artifact={name:string;mimeType:string;data?:string;text?:string};
 const words={
   title:['Results','Результаты'],close:['Back to chat','Вернуться в чат'],back:['All results','Все результаты'],
@@ -30,31 +31,32 @@ const words={
 const icons={images:Image,documents:FileText,code:Code2,links:Link,tools:Wrench};
 const categories=['all','images','documents','code','links','tools'] as const;
 export function ChatOutputs(props:Props){return <OutputPanel key={`${props.connection.url}|${props.connection.token}|${props.cwd}`} {...props}/>;}
-function OutputPanel({connection,cwd,messages,onClose,onLoadMore,hasMore,loadingMore}:Props){
+function OutputPanel({connection,cwd,messages,onClose,onLoadMore,hasMore,loadingMore,provider='claude',sessionId}:Props){
   const language=useLanguage(),label=(key:keyof typeof words)=>words[key][language==='ru'?1:0];
-  const outputs=useMemo(()=>extractChatOutputs(messages),[messages]);
-  const [source,setSource]=useState<OutputSource>('results'),[filter,setFilter]=useState<'all'|OutputCategory>('all'),[selected,setSelected]=useState<ChatOutput|null>(null);
+  const index=useChatOutputIndex(connection,provider,sessionId,messages),outputs=index.outputs;
+  const [visibleCount,setVisibleCount]=useState(100);
+  const [source,setSource]=useState<OutputSource|'all'>('all'),[filter,setFilter]=useState<'all'|OutputCategory>('all'),[selected,setSelected]=useState<ChatOutput|null>(null);
   const [selectedImage,setSelectedImage]=useState<ChatOutput|null>(null),thumbnails=useMemo(()=>thumbnailQueue(),[connection,cwd]);
   const panel=useRef<HTMLElement|null>(null),scroll=useRef<HTMLDivElement|null>(null),backButton=useRef<HTMLButtonElement|null>(null),savedScroll=useRef(0),first=useRef(true);
   useModal(panel,true,()=>selected?setSelected(null):onClose());
   useEffect(()=>{if(scroll.current)scroll.current.scrollTop=selected?0:savedScroll.current;if(!first.current)backButton.current?.focus({preventScroll:true});first.current=false;},[selected]);
-  const scoped=outputs.filter(item=>item.source===source),visible=scoped.filter(item=>filter==='all'||item.category===filter);
+  const scoped=outputs.filter(item=>source==='all'||item.source===source),visible=scoped.filter(item=>filter==='all'||item.category===filter);
   const title=(item:ChatOutput)=>item.title==='Image'?label('image'):item.title==='Document'?label('document'):item.title==='Code'?label('code'):item.title==='Tool result'?label('toolResult'):item.title==='Tool error'?label('toolError'):item.title;
   const choose=(item:ChatOutput)=>{if(item.category==='images'){setSelectedImage(item);return;}savedScroll.current=scroll.current?.scrollTop||0;setSelected(item);};
-  const changeSource=(value:OutputSource)=>{setSource(value);setFilter('all');savedScroll.current=0;if(scroll.current)scroll.current.scrollTop=0;};
+  const changeSource=(value:OutputSource|'all')=>{setSource(value);setFilter('all');setVisibleCount(100);savedScroll.current=0;if(scroll.current)scroll.current.scrollTop=0;};
   return <aside ref={panel} className="chat-outputs-panel" role="dialog" aria-modal="true" aria-label={label('title')}>
     <header className="chat-outputs-header"><h2>{label('title')}</h2><button className="icon-button" aria-label={label('close')} onClick={onClose}><X size={20}/></button></header>
     {selected?<div className="chat-outputs-back"><button ref={backButton} onClick={()=>setSelected(null)}><ArrowLeft size={18}/>{label('back')}</button></div>:<div className="chat-outputs-filters">
-      <div className="chat-output-scope" role="group" aria-label={label('scope')}>{(['results','sources'] as const).map(value=><button key={value} aria-pressed={source===value} onClick={()=>changeSource(value)}>{label(value)}</button>)}</div>
+      <div className="chat-output-scope" role="group" aria-label={label('scope')}>{(['all','results','sources'] as const).map(value=><button key={value} aria-pressed={source===value} onClick={()=>changeSource(value)}>{label(value)}</button>)}</div>
       <div className="chat-output-categories" role="group" aria-label={label('categories')}>{categories.map(value=><button key={value} aria-pressed={filter===value} onClick={()=>{setFilter(value);if(scroll.current)scroll.current.scrollTop=0;}}>{label(value)} <span>{value==='all'?scoped.length:scoped.filter(item=>item.category===value).length}</span></button>)}</div>
     </div>}
-    <div ref={scroll} className="chat-outputs-scroll">
+    <div ref={scroll} className="chat-outputs-scroll" onScroll={event=>{const el=event.currentTarget;if(el.scrollHeight-el.scrollTop-el.clientHeight<400)setVisibleCount(value=>value+100);}}>
       {selected?<><h3 className="chat-output-title">{title(selected)}</h3><OutputPreview key={selected.id} output={selected} connection={connection} cwd={cwd} label={label}/></>:<>
-        <p className="chat-output-note">{label('loaded')}</p>
-        {outputs.length>=OUTPUT_LIMIT&&<p className="chat-output-note">{label('limit')}</p>}
-        {!visible.length&&<p className="chat-output-empty">{label('empty')}</p>}
-        <ul className={'chat-output-list'+(filter==='images'?' chat-output-gallery':'')}>{visible.map(item=>{const Icon=icons[item.category];return <li key={item.id} className={item.category==='images'?'chat-output-image-item':''}>{item.category==='images'?<OutputImageCard output={item} title={title(item)} connection={connection} cwd={cwd} queue={thumbnails} onOpen={()=>choose(item)}/>:<button onClick={()=>choose(item)} className="chat-output-row"><Icon size={20}/><span><strong>{title(item)}</strong><small>{item.path||item.href||label(item.category)}</small></span><ChevronRight size={18}/></button>}</li>;})}</ul>
-        {hasMore&&onLoadMore&&<button className="secondary chat-output-earlier" onClick={onLoadMore} disabled={loadingMore}>{loadingMore?label('loading'):label('earlier')}</button>}
+        <p className="chat-output-note" role="status">{sessionId?(index.error?(language==='ru'?'\u041f\u043e\u0438\u0441\u043a \u043f\u0440\u0435\u0440\u0432\u0430\u043d':'Search interrupted'):index.scanning?(language==='ru'?'Ищем файлы во всей истории':'Searching the full history'):(language==='ru'?'История проверена':'History scanned'))+' · '+index.count:label('loaded')}</p>
+        {index.error&&<p role="alert">{index.error}<button onClick={index.retry}>{language==='ru'?'Повторить':'Retry'}</button></p>}
+        {!visible.length&&<p className="chat-output-empty">{index.scanning?(language==='ru'?'Пока ничего не найдено. Поиск продолжается…':'Nothing found yet. Still searching…'):(language==='ru'?'Нет элементов этой категории.':'No items in this category.')}</p>}
+        <ul className={'chat-output-list'+(filter==='images'?' chat-output-gallery':'')}>{visible.slice(0,visibleCount).map(item=>{const Icon=icons[item.category];return <li key={item.id} className={item.category==='images'?'chat-output-image-item':''}>{item.category==='images'?<OutputImageCard output={item} title={title(item)} connection={connection} cwd={cwd} queue={thumbnails} onOpen={()=>choose(item)}/>:<button onClick={()=>choose(item)} className="chat-output-row"><Icon size={20}/><span><strong>{title(item)}</strong><small>{item.path||item.href||label(item.category)}</small></span><ChevronRight size={18}/></button>}</li>;})}</ul>
+        {!sessionId&&hasMore&&onLoadMore&&<button className="secondary chat-output-earlier" onClick={onLoadMore} disabled={loadingMore}>{loadingMore?label('loading'):label('earlier')}</button>}
       </>}
     </div>
     {selectedImage&&<OutputImageViewer output={selectedImage} title={title(selectedImage)} connection={connection} cwd={cwd} onClose={()=>setSelectedImage(null)}/>}
