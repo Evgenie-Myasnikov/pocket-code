@@ -1,3 +1,4 @@
+import {GitProjects} from './git-projects.js';
 import {CopilotService} from './copilot.js';
 import express from 'express';
 import {TaskNotifications,jiraNotifications} from './task-notifications';
@@ -286,9 +287,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/copilot/login',(_req,res)=>res.json(copilot().loginStatus()));
   app.post('/api/copilot/login',async(_req,res)=>res.json(await copilot().login()));
   // Project folders are shared; conversation histories remain provider-specific.
+  const gitProjects=new GitProjects(roots);
   app.get('/api/projects', async (_req, res) => {
     const results = await Promise.allSettled([sessions('claude'), sessions('codex'),sessions('copilot')]);
-    const projects = new Set(roots);
+    const projects = new Set([...roots,...await gitProjects.list()]);
     for (const result of results) if (result.status === 'fulfilled') {
       for (const session of result.value) {
         if (!session.cwd || session.readOnly) continue;

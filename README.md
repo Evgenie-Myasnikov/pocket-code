@@ -49,7 +49,7 @@ You need **Windows 10+**, **Android 7+**, and **Claude Code and/or Codex install
 
 Download this repository using **Code → Download ZIP**, then extract it. Double-click **Setup Pocket Code.cmd**.
 
-Setup checks Node.js 22+, offers installation through Windows Package Manager if needed, opens the Android download page, and asks whether you want Wi-Fi or internet access. The launcher asks for a project folder, installs dependencies, builds the interface and opens a pairing QR. Internet mode also installs the tunnel client automatically.
+Setup checks Node.js 22+, offers installation through Windows Package Manager if needed, opens the Android download page, and asks whether you want Wi-Fi or internet access. The launcher installs dependencies, builds the interface and opens a pairing QR without a project prompt. Choose a folder on the phone; local Git projects are discovered automatically. Internet mode also installs the tunnel client automatically.
 
 No Android SDK is needed to use the released APK. AI sign-in stays in the native tool on your PC.
 

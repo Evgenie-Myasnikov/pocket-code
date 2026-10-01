@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { mkdtemp, mkdir, rm, symlink, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -83,12 +83,14 @@ test('concurrent API reads share SDK work and the next read revalidates project 
     listSessions: async () => { listings++; await delay(); return [{ sessionId: id, summary: 'Fixture', cwd: link, lastModified: 1 }]; },
     getSessionMessages: async () => { histories++; await delay(); return [{ uuid: 'message', type: 'user', message: { content: 'Fixture' } }]; },
   };
+  const gitOnly=path.join(root,'git-only');await mkdir(path.join(gitOnly,'.git'),{recursive:true});await writeFile(path.join(gitOnly,'.git','HEAD'),'ref: refs/heads/main');
   const jobs = new Jobs();
   const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', desktopSessionIndexes: [] }, jobs, sdk);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
   t.after(async () => { jobs.close(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(temp, { recursive: true, force: true }); });
   const get = (route: string) => fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api${route}`, { headers: { Authorization: `Bearer ${token}` } });
   const responses = await Promise.all(['/sessions', '/projects', `/sessions/${id}/messages?window=100`, `/sessions/${id}/messages?window=50`].map(get));
+  assert.ok((await responses[1].json()).includes(gitOnly), 'Git projects without provider sessions appear in the API');
   assert.ok(responses.every(response => response.ok)); assert.equal(listings, 1); assert.equal(histories, 1);
   await unlink(link); await symlink(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
   assert.equal((await get(`/sessions/${id}/messages?window=100`)).status, 404);

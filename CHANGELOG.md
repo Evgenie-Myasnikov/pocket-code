@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - Discover local Git projects and choose folders on the phone (0.20.5)
+- Changed: Project lists incrementally discover local Git repositories and worktrees without existing AI chats. Requests share bounded scan batches, cache results, and refresh completed scans after five minutes.
+- Changed: Windows launch no longer prompts for a folder or Enter. Default access includes the launch project and ready fixed drives; explicit ProjectPath arguments retain restricted roots. Folder selection stays in the phone app.
+- Files: server/git-projects.ts, app.ts; scripts/start.ps1; project discovery tests and user guides.
+- Validation: Eight discovery and API performance tests passed, covering nested repositories, worktrees, concurrent reads, cache refresh and junction exclusion. TypeScript/Vite and Android build passed. Launcher PowerShell syntax and the noninteractive default-root block were verified without starting a host.
+- Follow-up: Discovery skips system, dependency/build cache directories and directory links. Existing running hosts retain their roots until relaunched; no production process was restarted.
+
+
 ## 2026-10-01 - Fit review diffs to phone width (0.20.4)
 - Changed: Review supports independent 4, 6 and 8 px code sizes and a persistent Fit diff to width option. Each file fits its complete unified or split columns without wrapping or shrinking controls.
 - Changed: Virtual rows account for the rendered zoom, retaining access to the final line in large patches.

@@ -29,9 +29,14 @@ if ($Internet) {
     $BindAddress = '127.0.0.1'
 } else { $env:POCKET_INTERNET = '0' }
 if (-not $ProjectPath) {
-    $chosen = Read-Host 'Project folder on this PC (Enter for current folder)'
-    if (-not $chosen) { $chosen = $projectRoot }
-    $ProjectPath = @($chosen.Trim('"'))
+    # Keep the existing default project, and let the paired phone choose local folders.
+    $ProjectPath = @($projectRoot)
+    foreach ($drive in [IO.DriveInfo]::GetDrives()) {
+        if ($drive.IsReady -and $drive.DriveType -eq [IO.DriveType]::Fixed) {
+            $ProjectPath += $drive.RootDirectory.FullName
+        }
+    }
+    Write-Host 'Choose your project in the phone app. Local Git projects are discovered automatically.'
 }
 $resolvedRoots = @($ProjectPath | ForEach-Object { (Resolve-Path -LiteralPath $_).Path })
 $env:POCKET_ROOTS = ConvertTo-Json -InputObject $resolvedRoots -Compress

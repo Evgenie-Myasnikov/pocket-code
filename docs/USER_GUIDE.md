@@ -13,7 +13,7 @@ Screenshots use the real interface with fictional data. Never publish your pairi
 
 1. Extract the source package on your PC and run **Setup Pocket Code.cmd**. Install Claude Code or Codex and sign in on the PC first.
 2. Choose **Internet / mobile data** for access from another network, or **Same trusted Wi-Fi** for your local network.
-3. Select your project folder and wait for the host and QR page to open.
+3. Wait for the host and QR page to open. The launcher does not ask for a project or require Enter.
 4. Install the APK from the [latest release](https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest) on Android. Tap **Scan QR code**, allow camera access, and scan the PC screen.
 5. The app fills in the connection details and connects automatically.
 
@@ -100,6 +100,8 @@ On Android, allow notifications to follow the last open chat while the app is mi
 ## Project files, rules and changelog
 
 The **Project** tab contains **Files**, **Rules**, and **Changelog**. Select the project folder first. A single document opens directly; multiple matching documents are listed. Markdown is rendered for reading. Viewing a rules document does not edit it or change the AI's instructions.
+
+Choose the project on your phone under **Project → Project folder**. The standard Windows launcher exposes local fixed drives to the paired app, and the list gradually discovers Git repositories and worktrees even without AI chats. Use **Files → New chat in this folder** for other folders. Discovery skips system directories, dependency/build caches and directory links; it refreshes completed scans after five minutes. It does not clone repositories or read remote GitHub accounts. Advanced launchers can restrict access with `scripts/start.ps1 -ProjectPath D:\Projects`; discovery stays within those configured roots.
 
 <a id="tasks"></a>
 ## Jira tasks and notifications
