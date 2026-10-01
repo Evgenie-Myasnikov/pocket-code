@@ -10,6 +10,12 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(JiraLoginPlugin.class);
         registerPlugin(AppUpdatePlugin.class);
         registerPlugin(NavigationPlugin.class);
+        registerPlugin(ChatNotificationsPlugin.class);
         super.onCreate(savedInstanceState);
+    }
+    @Override protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if(getBridge()!=null)getBridge().triggerWindowJSEvent("pocket-code-notification", "{}");
     }
 }

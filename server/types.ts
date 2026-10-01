@@ -7,6 +7,7 @@ export type ActivityItem = {
   status: 'running' | 'needs_input' | 'done' | 'error' | 'stopped'; startedAt: number; version: string;
   /** For completed jobs only: the latest assistant message that must actually be viewed before acknowledging from history. */
   resultMessageId?: string;
+  action?: 'command' | 'files' | 'search' | 'agent' | 'responding' | 'tool';
 };
 export type JobView = {
   provider?: 'claude' | 'codex';

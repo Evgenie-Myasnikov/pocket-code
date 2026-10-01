@@ -15,6 +15,17 @@ function fixture(overrides: Partial<JobView> = {}): JobView {
 }
 const approval = (id: string, tool = 'AskUserQuestion') => ({ id, tool, input: { text: 'PRIVATE_QUESTION_INPUT' }, expiresAt: Date.now() + 10000 });
 
+test('notification activity exposes only a safe action category and clears completed tools',()=>{
+  const job=fixture({messages:[{id:'assistant',role:'assistant',blocks:[{type:'tool_use',id:'call-1',name:'Bash',input:{command:'PRIVATE_COMMAND'}}]}]});
+  assert.equal(activityItem(job).action,'command');
+  assert.doesNotMatch(JSON.stringify(activityItem(job)),/PRIVATE_COMMAND|Bash/);
+  const version=activityItem(job).version;
+  job.messages.push({id:'result',role:'user',blocks:[{type:'tool_result',tool_use_id:'call-1',content:'PRIVATE_OUTPUT'}]});
+  assert.equal(activityItem(job).action,'responding');assert.equal(activityItem(job).version,version);
+  assert.equal(activityItem({...job,status:'done'}).action,undefined);
+  assert.equal(activityItem({...job,approvals:[approval('answer')]}).action,undefined);
+});
+
 test('activity represents questions, permissions and final outcomes without transcript data', () => {
   const job = fixture(), running = activityItem(job);
   assert.equal(running.title, 'Build the app'); assert.equal(running.status, 'running'); assert.equal(running.provider, 'claude');

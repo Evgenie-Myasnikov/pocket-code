@@ -180,3 +180,8 @@
 .app>.sidebar,.app>.workspace{min-height:0}
 .app>.activity-entry{position:fixed;right:env(safe-area-inset-right,0px);top:45%;z-index:40;border:1px solid var(--line);border-right:0;border-radius:14px 0 0 14px;background:var(--bg);color:var(--muted);box-shadow:-2px 2px 8px #0002}
 .reading-mode>.activity-entry{display:none}
+
+.chat-tab-icon{position:relative;display:inline-flex}
+.chat-tab-status{position:absolute;right:-5px;top:-3px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px var(--bg);background:#68b5eb}
+.chat-tab-status-done{background:#70c78a}.chat-tab-status-error{background:#f07575}.chat-tab-status-needs_input{background:#efc35b}
+@media(prefers-reduced-motion:no-preference){.chat-tab-status-running{animation:chat-status-pulse 1.3s ease-in-out infinite}@keyframes chat-status-pulse{50%{opacity:.3}}}

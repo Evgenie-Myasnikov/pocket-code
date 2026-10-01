@@ -23,6 +23,16 @@ export function activityItem(job: JobView): ActivityItem {
   // state. A new question or a terminal outcome does need fresh attention.
   const version = createHash('sha256').update(JSON.stringify([job.id, status, approvalIds])).digest('base64url').slice(0, 24);
   const resultMessageId = status === 'done' ? [...job.messages].reverse().find(message => message.role === 'assistant')?.id : undefined;
+  let action:ActivityItem['action'];
+  if(status==='running'){
+    const blocks=job.messages.flatMap(message=>message.blocks);
+    const finished=new Set(blocks.filter(block=>block.type==='tool_result').map(block=>block.tool_use_id));
+    const pending=[...blocks].reverse().find(block=>block.type==='tool_use'&&block.id&&!finished.has(block.id));
+    if(pending){
+      const name=pending.name||'';
+      action=/bash|command|shell|exec/i.test(name)?'command':/edit|write|patch|file.?change/i.test(name)?'files':/search|grep|glob|find/i.test(name)?'search':/agent|task/i.test(name)?'agent':'tool';
+    }else action='responding';
+  }
   return { id: job.id, provider: job.provider || 'claude', cwd: job.cwd, ...(job.sessionId ? { sessionId: job.sessionId } : {}), title,
-    status, startedAt: job.startedAt, version, ...(resultMessageId ? { resultMessageId } : {}) };
+    status, startedAt: job.startedAt, version, ...(action?{action}:{}), ...(resultMessageId ? { resultMessageId } : {}) };
 }
