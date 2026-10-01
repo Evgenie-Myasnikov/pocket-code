@@ -36,7 +36,7 @@ External images have a **Load external image** button. Local images use the conn
 
 Open a chat and tap **Review** when Git changes are available. Check the repository and branch in the header. The comparison is restricted to the chat's project folder, including when that folder is inside a larger repository.
 
-Select a file using **Changed files**. Green lines were added; red lines were removed. The plus/minus counts apply to the selected file. The summary shows the comparison mode and total file count. Only one file's patch is displayed at a time.
+Scroll through the changed files, as in a pull request. Tap a file heading to collapse or expand its diff. Green lines were added; red lines were removed. Each heading shows that file's plus/minus counts. In options, **Show file types** lets you hide detected extensions, such as `.png`.
 
 The sliders button opens an options sheet over the diff. Close it with **X**, Back, or the backdrop. It does not shrink the code area.
 
@@ -48,7 +48,7 @@ The sliders button opens an options sheet over the diff. Close it with **X**, Ba
 
 Choose **One column** for a phone or **Two columns** for side-by-side reading. **Code size** follows chat text with a 14 px minimum by default; you can save a separate size. Long lines scroll horizontally.
 
-The open review refreshes every five seconds while visible and when returning to the app. The refresh button checks immediately. Background refresh retains the selected file and scroll position; if the selected file is no longer changed, the list is reloaded and another file is selected. A connection error means the retained content may be stale.
+The open review refreshes every five seconds while visible and when returning to the app. The refresh button checks immediately. Background refresh retains collapsed files and the scroll position; files no longer changed disappear from the list. Diffs load near the visible area. A connection error means the retained content may be stale.
 
 Tap the **eye** for reading mode, then the restore button or Android Back to show controls again. **Back to chat** returns to your conversation.
 
@@ -93,6 +93,8 @@ Attach images and files with the attachment button. Images have thumbnails; use 
 Scroll upward to load older messages automatically. The reading-mode eye hides extra controls. Switching main tabs retains the selected chat. Recent history is cached and refreshed after connecting; this is not a full offline archive. Unsaved drafts should not be treated as durable storage.
 
 Open the right-edge activity drawer for running chats, errors, and questions needing a response. Reading a finished activity dismisses it from the queue; pending questions still require an answer.
+
+On Android, allow notifications to follow the last open chat while the app is minimized. **Chat results and questions** is a separate Android notification channel for completion, errors and requests for an answer. Tap an alert to return to its chat. Reopening old completed history does not send another alert. Tracking ends when you explicitly leave the chat; background delivery still requires a reachable PC and Android allowing the service to run.
 
 <a id="project"></a>
 ## Project files, rules and changelog

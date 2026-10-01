@@ -56,7 +56,7 @@ for(const layout of ['unified','split'])test(`${layout} fallback emoji and CJK g
   for(const size of ['14','24']){
     await panel.getByRole('button',{name:'Review options',exact:true}).click();await panel.getByLabel('Code size',{exact:true}).selectOption(size);await page.keyboard.press('Escape');
     for(const file of files){
-      await panel.getByLabel('Changed files',{exact:true}).selectOption(file);
+      for(const name of files){const row=panel.locator('.review-file').filter({has:page.locator('.review-file-heading strong',{hasText:name})});const button=row.getByRole('button');if((await button.getAttribute('aria-expanded')==='true')!==(name===file))await button.click();}
       await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('new 0');
       await expect.poll(overflow).toBeLessThanOrEqual(1);
       const width=await panel.locator('.diff-table').evaluate(element=>element.getBoundingClientRect().width);

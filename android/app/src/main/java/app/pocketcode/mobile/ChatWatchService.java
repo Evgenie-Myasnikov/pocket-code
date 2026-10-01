@@ -13,6 +13,9 @@ import java.util.concurrent.*;
 public class ChatWatchService extends Service {
     static final int NOTIFICATION_ID=4301;
     private static final String CHANNEL="chat-progress";
+    private static final String ALERT_CHANNEL="chat-attention";
+    static final int ALERT_ID=4302;
+    private final ChatAlertState alerts=new ChatAlertState();
     private final Handler main=new Handler(Looper.getMainLooper());
     private final ScheduledExecutorService worker=Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> scheduled;
@@ -31,6 +34,9 @@ public class ChatWatchService extends Service {
             NotificationChannel channel=new NotificationChannel(CHANNEL,"Chat activity",NotificationManager.IMPORTANCE_LOW);
             channel.setDescription("Progress of the last open Pocket Code chat");
             channel.setShowBadge(false);getSystemService(NotificationManager.class).createNotificationChannel(channel);
+            NotificationChannel attention=new NotificationChannel(ALERT_CHANNEL,"Chat results and questions",NotificationManager.IMPORTANCE_HIGH);
+            attention.setDescription("Completion, errors and requests for your answer");
+            getSystemService(NotificationManager.class).createNotificationChannel(attention);
         }
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
@@ -38,7 +44,7 @@ public class ChatWatchService extends Service {
         boolean same=selection!=null&&key(selection).equals(key(intent));
         selection=new Intent(intent);
         if(same)return START_NOT_STICKY;
-        int epoch=++generation;started=System.currentTimeMillis();lastState="";
+        int epoch=++generation;started=System.currentTimeMillis();lastState="";alerts.reset();keepNotification=false;
         if(scheduled!=null)scheduled.cancel(true);
         if(request!=null)request.disconnect();
         Notification initial=notification(text("Checking chat status","Проверяем состояние чата"),true);
@@ -78,6 +84,8 @@ public class ChatWatchService extends Service {
             boolean terminal=status.equals("done")||status.equals("error")||status.equals("stopped");
             if(newest!=null){
                 String jobId=newest.optString("id"),sessionId=newest.optString("sessionId");
+                String eventStatus=status,eventVersion=newest.optString("version");long jobStarted=newest.optLong("startedAt");
+                main.post(()->{if(epoch==generation)alert(config,jobId,sessionId,eventStatus,eventVersion,jobStarted);});
                 main.post(()->{if(epoch==generation){selection.putExtra("jobId",jobId);selection.putExtra("sessionId",sessionId);}});
                 if(status.equals("running")){
                     String action=newest.optString("action");
@@ -100,6 +108,22 @@ public class ChatWatchService extends Service {
         });
     }
     private String text(String en,String ru){return selection!=null&&"ru".equals(selection.getStringExtra("language"))?ru:en;}
+    private void alert(Intent config,String jobId,String sessionId,String state,String version,long jobStarted){
+        if(!alerts.observe(jobId,state,jobStarted,started))return;
+        String identity=value(config,"url")+"|"+value(config,"provider")+"|"+jobId+"|"+version+"|"+state;
+        String key;
+        try{byte[] digest=java.security.MessageDigest.getInstance("SHA-256").digest(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8));key=android.util.Base64.encodeToString(digest,android.util.Base64.NO_WRAP);}catch(Exception ignored){return;}
+        android.content.SharedPreferences seen=getSharedPreferences("chat-alerts",MODE_PRIVATE);
+        if(seen.contains(key))return;
+        NotificationManager manager=getSystemService(NotificationManager.class);
+        if(Build.VERSION.SDK_INT>=24&&!manager.areNotificationsEnabled())return;
+        if(Build.VERSION.SDK_INT>=26&&manager.getNotificationChannel(ALERT_CHANNEL).getImportance()==NotificationManager.IMPORTANCE_NONE)return;
+        selection.putExtra("jobId",jobId);selection.putExtra("sessionId",sessionId);
+        try{manager.notify(ALERT_ID,notification(statusText(state),false,true));}catch(SecurityException ignored){return;}
+        android.content.SharedPreferences.Editor edit=seen.edit();
+        if(seen.getAll().size()>=128){String oldest=seen.getAll().entrySet().stream().min(java.util.Comparator.comparingLong(entry->((Number)entry.getValue()).longValue())).map(java.util.Map.Entry::getKey).orElse(null);if(oldest!=null)edit.remove(oldest);}
+        edit.putLong(key,System.currentTimeMillis()).apply();
+    }
     private String statusText(String state){
         switch(state){
             case "running":return text("Working on your PC","Работает на ПК");
@@ -121,17 +145,21 @@ public class ChatWatchService extends Service {
         }
     }
     private Notification notification(String status,boolean ongoing){
+        return notification(status,ongoing,false);
+    }
+    private Notification notification(String status,boolean ongoing,boolean attention){
         Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         open.putExtra("chatNotification",true);
         for(String key:new String[]{"provider","sessionId","jobId","cwd","title"})open.putExtra(key,value(selection,key));
-        PendingIntent pending=PendingIntent.getActivity(this,NOTIFICATION_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent pending=PendingIntent.getActivity(this,attention?ALERT_ID:NOTIFICATION_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         String title=value(selection,"title");if(title.isEmpty())title="Pocket Code";
-        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this);
+        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,attention?ALERT_CHANNEL:CHANNEL):new Notification.Builder(this);
+        if(attention)builder.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
         return builder.setSmallIcon(R.drawable.ic_chat_notification)
             .setContentTitle(title.substring(0,Math.min(title.length(),120))).setContentText(status)
             .setSubText("codex".equals(value(selection,"provider"))?"Codex":"Claude")
-            .setContentIntent(pending).setOnlyAlertOnce(true).setOngoing(ongoing).setAutoCancel(!ongoing)
-            .setVisibility(Notification.VISIBILITY_PRIVATE).setCategory(Notification.CATEGORY_PROGRESS).build();
+            .setContentIntent(pending).setOnlyAlertOnce(!attention).setOngoing(ongoing).setAutoCancel(!ongoing)
+            .setVisibility(Notification.VISIBILITY_PRIVATE).setCategory(attention?Notification.CATEGORY_MESSAGE:Notification.CATEGORY_PROGRESS).build();
     }
     @Override public void onTimeout(int startId,int fgsType){
         getSystemService(NotificationManager.class).notify(NOTIFICATION_ID,notification(statusText("paused"),false));

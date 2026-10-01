@@ -48,13 +48,15 @@ export const DiffTable=memo(function DiffTable({patch,layout,fontSize,viewport}:
       frame=0;
       const style=getComputedStyle(element),height=Number.parseFloat(style.fontSize)*1.6+2;
       setFont(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`);
-      const start=Math.max(0,Math.min(lines.length-1,Math.floor(scroller.scrollTop/height)-OVERSCAN));
-      const end=Math.min(lines.length,Math.ceil((scroller.scrollTop+scroller.clientHeight)/height)+OVERSCAN);
+      const offset=element.getBoundingClientRect().top-scroller.getBoundingClientRect().top+scroller.scrollTop;
+      const localTop=scroller.scrollTop-offset;
+      const start=Math.max(0,Math.min(lines.length,Math.floor(localTop/height)-OVERSCAN));
+      const end=Math.max(0,Math.min(lines.length,Math.ceil((localTop+scroller.clientHeight)/height)+OVERSCAN));
       setWindow(previous=>previous.start===start&&previous.end===end&&previous.height===height?previous:{start,end,height});
     };
     const schedule=()=>{if(!frame)frame=requestAnimationFrame(measure);};
     measure();scroller.addEventListener('scroll',schedule,{passive:true});
-    const observer=new ResizeObserver(schedule);observer.observe(scroller);observer.observe(element);
+    const observer=new ResizeObserver(schedule);observer.observe(scroller);observer.observe(element);if(element.closest(".review-file-list"))observer.observe(element.closest(".review-file-list")!);
     const appearance=new MutationObserver(schedule);appearance.observe(document.documentElement,{attributes:true,attributeFilter:['style']});
     return()=>{scroller.removeEventListener('scroll',schedule);observer.disconnect();appearance.disconnect();cancelAnimationFrame(frame);};
   },[viewport,lines.length,layout,fontSize]);

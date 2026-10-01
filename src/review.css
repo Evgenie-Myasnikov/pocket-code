@@ -29,3 +29,8 @@
 .review-summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 16px;color:var(--muted);font-size:.85em;flex-shrink:0;border-bottom:1px solid var(--line)}
 .diff-table .diff-line td{width:auto;line-height:inherit;white-space:pre}
 .diff-table .diff-spacer td{min-width:0;line-height:0;font-size:0}
+.review-file{min-width:0;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.review-file-heading{position:sticky;left:0;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:10px 16px;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;text-align:left}
+.review-file-heading strong{flex:1;min-width:0;overflow-wrap:anywhere;font-size:.9em;font-weight:500}.review-file-heading>svg{flex-shrink:0}
+.review-file-patch>p{padding:12px 16px;color:var(--muted);font-size:.9em}
+.review-extension-filters{border:0;padding:0;margin:18px 0;display:flex;flex-wrap:wrap;gap:8px 16px}.review-extension-filters legend{margin-bottom:8px}.review-options .review-extension-filters label{flex-direction:row;align-items:center;min-height:44px;gap:8px}.review-extension-filters input{width:20px;height:20px;accent-color:var(--accent)}

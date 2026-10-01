@@ -49,7 +49,7 @@ test('Review uses the selected chat repository and keeps comparison options out 
   expect(state.calls.some(url=>url.pathname==='/api/review/availability'&&url.searchParams.get('cwd')===chatRoot)).toBe(true);
   await expect(panel.getByRole('button',{name:'Review options',exact:true})).toHaveAttribute('aria-expanded','false');
   await expect(panel.getByLabel('Comparison',{exact:true})).toBeHidden();
-  await expect(panel.getByLabel('Changed files',{exact:true})).toHaveValue(paths[0]);
+  await expect(panel.locator('.review-file-heading')).toHaveCount(3);
   await panel.getByRole('button',{name:'Review options',exact:true}).click();
   await expect(panel.getByRole('button',{name:'Review options',exact:true})).toHaveAttribute('aria-expanded','true');
   await panel.getByLabel('Comparison',{exact:true}).selectOption('branch');
@@ -67,12 +67,13 @@ test('Review reading mode preserves the diff position and draft, and Back restor
   await content.evaluate(element=>{element.scrollTop=480;});const before=await content.evaluate(element=>element.scrollTop);
   await panel.getByRole('button',{name:'Reading mode',exact:true}).click();
   const restore=panel.getByRole('button',{name:'Show review controls',exact:true});await expect(restore).toBeVisible();await expect(restore).toBeFocused();
-  await expect(panel.getByLabel('Changed files',{exact:true})).toBeHidden();await expect(panel.getByRole('button',{name:'Review options',exact:true})).toBeHidden();
+  await expect(panel.getByLabel('Changed files',{exact:true})).toBeVisible();await expect(panel.getByRole('button',{name:'Review options',exact:true})).toBeHidden();
   expect(Math.abs(await content.evaluate(element=>element.scrollTop)-before)).toBeLessThanOrEqual(1);
   await page.keyboard.press('Tab');await expect(content).toBeFocused();
-  await page.keyboard.press('Tab');await expect(restore).toBeFocused();
+  await page.keyboard.press('Tab');await expect(panel.locator('.review-file-heading').first()).toBeFocused();
+  const afterKeyboard=await content.evaluate(element=>element.scrollTop);
   await page.keyboard.press('Escape');await expect(panel).toBeVisible();await expect(panel.getByRole('button',{name:'Reading mode',exact:true})).toBeFocused();
-  expect(Math.abs(await content.evaluate(element=>element.scrollTop)-before)).toBeLessThanOrEqual(1);
+  expect(Math.abs(await content.evaluate(element=>element.scrollTop)-afterKeyboard)).toBeLessThanOrEqual(1);
   await panel.getByRole('button',{name:'Reading mode',exact:true}).click();await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
   await expect(panel.getByRole('button',{name:'Reading mode',exact:true})).toBeVisible();await expect(panel).toBeVisible();
   await panel.getByRole('button',{name:'Reading mode',exact:true}).click();await restore.click();await expect(panel.getByLabel('Changed files',{exact:true})).toBeVisible();
@@ -80,15 +81,15 @@ test('Review reading mode preserves the diff position and draft, and Back restor
   await expect(page.getByLabel('Message Claude')).toHaveValue('Keep my review draft');
 });
 
-test('late file responses cannot display the wrong patch under the selected filename',async({page})=>{
-  const state=await host(page);await connect(page);state.delayed=gate();
-  const panel=review(page),files=panel.getByLabel('Changed files',{exact:true});
+test('late file responses stay inside their own file and cannot reopen a collapsed patch',async({page})=>{
+  const state=await host(page);state.delayed=gate();await connect(page);
+  const panel=review(page),first=panel.locator('.review-file').nth(0),second=panel.locator('.review-file').nth(1),third=panel.locator('.review-file').nth(2);
   try{
-    await files.selectOption(paths[1]);await expect.poll(()=>state.calls.some(url=>url.pathname==='/api/review'&&url.searchParams.get('file')===paths[1])).toBe(true);
-    await expect(panel.locator('.diff-content')).not.toContainText('src/first.ts new 0');
-    await files.selectOption(paths[2]);await expect(panel.locator('.diff-content')).toContainText('src/third.ts new 0');
+    await first.getByRole('button').click();
+    await expect.poll(()=>state.calls.some(url=>url.searchParams.get('file')===paths[1])).toBe(true);
+    await second.getByRole('button').click();await expect(third).toContainText('src/third.ts new 0');
     state.delayed.resolve();await expect.poll(()=>state.delayedFinished).toBe(true);
-    await expect(files).toHaveValue(paths[2]);await expect(panel.locator('.diff-content')).toContainText('src/third.ts new 0');await expect(panel.locator('.diff-content')).not.toContainText('src/second.ts new 0');
+    await expect(second.locator('.diff-table')).toHaveCount(0);await expect(third).not.toContainText('src/second.ts new 0');
   }finally{state.delayed.resolve();}
 });
 
@@ -106,7 +107,7 @@ test('Review refreshes changed content without losing scroll and keeps options o
   expect((await content.boundingBox())?.height).toBe(before?.height);
   await panel.getByLabel('Code size',{exact:true}).selectOption('18');
   await page.keyboard.press('Escape');
-  await expect(panel.locator('.diff-table')).toHaveCSS('font-size','18px');
+  await expect(panel.locator('.diff-table').first()).toHaveCSS('font-size','18px');
   expect(await content.evaluate(element=>element.scrollTop)).toBe(240);
   await page.route('**/api/review?*',route=>route.fulfill({json:{files:[{path:paths[0],added:91,removed:90}],current:'feature/mobile-review',base:'main',branches:['main'],patch:patch('updated'),binary:false}}));
   await expect(content).toContainText('updated new 0',{timeout:9000});
@@ -125,7 +126,7 @@ test('Review recovers when a selected file is committed and retains the last pat
     return route.fulfill({json:{files:[{path:paths[1],added:90,removed:90}],current:'feature',base:'main',branches:['main'],patch:patch('remaining'),binary:false}});
   });
   const panel=review(page);
-  await expect(panel.getByLabel('Changed files',{exact:true})).toHaveValue(paths[1],{timeout:9000});
+  await expect(panel.locator('.review-file-heading')).toHaveCount(1,{timeout:9000});await expect(panel.locator('.review-file-heading')).toContainText(paths[1]);
   await expect(panel.locator('.diff-content')).toContainText('remaining new 0');
   failed=true;
   await expect(panel.getByRole('alert')).toBeVisible({timeout:9000});

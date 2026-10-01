@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - Collapsible review and chat attention alerts (0.19.8)
+- Changed: Review displays one scrollable list of changed files, each with a collapsible diff. Options derive visibility checkboxes from actual file extensions. Nearby patches load with three concurrent requests; virtualized rows account for preceding files changing height.
+- Changed: Subagent panels use rounded edges, compact borderless rows and lighter task disclosures.
+- Changed: Android has a separate notification channel for the watched chat completing, failing, stopping or requesting an answer. Event fingerprints prevent repeat alerts; old completed history stays quiet. Tapping an alert opens its chat.
+- Files: src/Review.tsx, ReviewFileDiff.tsx, DiffTable.tsx, review.css, subagents.css; Android ChatWatchService, ChatAlertState and ChatNotificationsPlugin; user guides and focused tests.
+- Validation: TypeScript and all 23 Review/subagent browser scenarios passed, including long diffs, network recovery, stale responses and small screens. All five Android notification state unit tests passed.
+- Follow-up: Android notification presentation, sound and background delivery still require a physical-device check. Alerts cover the last open watched chat and obey Android permissions/channel settings.
+
 ## 2026-10-01 - Codex history across projects (0.19.7)
 - Fixed: Production hosts now list and read Codex chats from other project folders. Previously directory authorization silently removed these chats from the list.
 - Boundaries: Out-of-scope or missing project folders mark chats read-only. Resume, commands, project files and local image reads retain the configured folder checks; child history still checks parent membership.

@@ -52,6 +52,7 @@ public class ChatNotificationsPlugin extends Plugin {
             ChatWatchService.cancelActive();
             getContext().stopService(new Intent(getContext(),ChatWatchService.class));
             getContext().getSystemService(android.app.NotificationManager.class).cancel(ChatWatchService.NOTIFICATION_ID);
+            getContext().getSystemService(android.app.NotificationManager.class).cancel(ChatWatchService.ALERT_ID);
             call.resolve();
         });
     }
