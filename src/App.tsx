@@ -1,5 +1,6 @@
 import { Review } from './Review';
 import {ActivityDrawer} from './ActivityDrawer';
+import {ActivityHandle} from './ActivityHandle';
 import {useActivity} from './useActivity';
 import {useChatNotifications,type WatchedChat} from './chat-notifications';
 import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
@@ -13,7 +14,7 @@ import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
 import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
-import { ArrowUp, ArrowLeft, Plus, Search, MessageSquare, Folder, Settings, Terminal, Wifi, ChevronDown, Paperclip, Square, X, GitBranch, RefreshCw, Laptop, LogOut, ShieldCheck, ClipboardList, Eye, EyeOff, PanelsTopLeft,PanelRight } from 'lucide-react';
+import { ArrowUp, ArrowLeft, Plus, Search, MessageSquare, Folder, Settings, Terminal, Wifi, ChevronDown, Paperclip, Square, X, GitBranch, RefreshCw, Laptop, LogOut, ShieldCheck, ClipboardList, Eye, EyeOff, PanelsTopLeft } from 'lucide-react';
 import { Connect } from './Connect';
 import { useAppearance } from './Appearance';
 import {SettingsPanel,type SettingsPage} from './SettingsPanel';
@@ -458,11 +459,10 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const chatStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>item.status===status));
   const chatStatusLabel=chatStatus?t(({needs_input:'Waiting for input',error:'Error',running:'Running',done:'Completed'} as const)[chatStatus]):'';
   const chatStatusDot=chatStatus?<span className={'chat-tab-status chat-tab-status-'+chatStatus} aria-hidden="true"/>:null;
-  const activityEntry=()=><button className="icon-button activity-entry" aria-label={t('Активность чатов')} aria-description={t('Чатов в активности: {0}',activity.count)} aria-haspopup="dialog" title={t('Активность чатов')} disabled={demo} onClick={()=>setActivityOpen(true)}><PanelRight size={21}/>{activity.count>0&&<span className="activity-badge" aria-hidden="true">{activity.count>99?'99+':activity.count}</span>}</button>;
   return <div className={`app ${mobileChat ? 'show-chat' : ''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
     {activityOpen&&<ActivityDrawer items={activity.items} loading={activity.loading} error={activity.error} busy={busy||uploading||Boolean(activityTarget)} onRetry={activity.refresh} onOpen={openActivity} onClose={()=>setActivityOpen(false)}/>}
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={21}/></button>}
-    {activityEntry()}
+    <ActivityHandle count={activity.count} disabled={demo} onOpen={()=>setActivityOpen(true)}/>
     <aside className="sidebar">
       <div className="chat-list-actions">{workspacePicker('sidebar')}
       <button className="primary new-chat" disabled={busy || uploading} onClick={() => newChat()}><Plus size={18} />{t("Новый чат")}</button></div>

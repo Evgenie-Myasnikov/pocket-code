@@ -143,3 +143,15 @@ test('Chats tab preserves the open conversation until explicit Back and shows ac
  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'New chat',exact:false})).toBeVisible();
  await nav.getByRole('button',{name:'Settings',exact:true}).click();await chats.click();await expect(page.getByRole('button',{name:'New chat',exact:false})).toBeVisible();
 });
+
+test('edge handle supports taps, keyboard and left swipes without opening on vertical gestures',async({page})=>{
+ await host(page);await page.setViewportSize({width:390,height:844});await open(page);
+ const handle=page.locator('.activity-entry'),box=(await handle.boundingBox())!;
+ await expect(handle.locator('svg,.activity-badge')).toHaveCount(0);
+ expect(await handle.locator('.activity-handle-line').evaluate(el=>{const r=el.getBoundingClientRect();return [r.width,r.height];})).toEqual([4,44]);
+ await page.screenshot({path:'artifacts/screenshots/activity-edge-handle.png',fullPage:true});
+ await page.mouse.move(box.x+30,box.y+30);await page.mouse.down();await page.mouse.move(box.x+30,box.y+110,{steps:6});await page.mouse.up();await expect(drawer(page)).toHaveCount(0);
+ await page.mouse.move(box.x+30,box.y+30);await page.mouse.down();await page.mouse.move(box.x-45,box.y+31,{steps:6});await page.mouse.up();await expect(drawer(page)).toBeVisible();
+ await page.keyboard.press('Escape');await expect(handle).toBeFocused();await page.keyboard.press('Enter');await expect(drawer(page)).toBeVisible();
+ await page.keyboard.press('Escape');await openDrawer(page);
+});

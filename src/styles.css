@@ -172,13 +172,14 @@
 .chat-list-actions .workspace-picker-sidebar select:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .chat-list-actions .new-chat{width:100%;min-width:0;min-height:48px;margin:0;padding:8px 10px;justify-content:center;gap:7px;font-size:clamp(11px,calc(13px * var(--ui-scale,1)),17px);white-space:nowrap}
 .chat-list-actions .new-chat svg{flex-shrink:0}
-.activity-entry{position:relative;flex-shrink:0;min-width:48px;min-height:48px;width:48px;height:48px}
-.activity-entry .activity-badge{position:absolute;top:1px;right:0;display:grid;place-items:center;min-width:16px;height:16px;margin:0;padding:0 3px;border-radius:9px;background:var(--accent);color:var(--accent-dark);font-size:10px;line-height:1;font-weight:600;letter-spacing:0}
-.list-label .activity-entry{margin-left:8px;letter-spacing:normal}
 
 /* Activity is reachable from every section without a header row. */
 .app>.sidebar,.app>.workspace{min-height:0}
-.app>.activity-entry{position:fixed;right:env(safe-area-inset-right,0px);top:45%;z-index:40;border:1px solid var(--line);border-right:0;border-radius:14px 0 0 14px;background:var(--bg);color:var(--muted);box-shadow:-2px 2px 8px #0002}
+.app>.activity-entry{position:fixed;right:env(safe-area-inset-right,0px);top:45%;z-index:40;display:block;width:48px;min-width:48px;height:64px;min-height:64px;padding:0;border:0;border-radius:12px 0 0 12px;background:transparent;box-shadow:none;touch-action:pan-y;user-select:none;-webkit-tap-highlight-color:transparent}
+.activity-handle-line{position:absolute;right:4px;top:10px;width:4px;height:44px;border-radius:4px;background:var(--muted);opacity:.55;pointer-events:none}
+.activity-entry:is(:hover,:focus-visible,:active) .activity-handle-line{opacity:1;background:var(--accent)}
+.activity-entry:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.activity-entry:disabled .activity-handle-line{opacity:.2}
 .reading-mode>.activity-entry{display:none}
 
 .chat-tab-icon{position:relative;display:inline-flex}
