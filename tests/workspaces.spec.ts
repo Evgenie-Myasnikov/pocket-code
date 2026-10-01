@@ -33,14 +33,14 @@ const switchHeader=(page:Page,provider:string)=>page.locator('.workspace-picker-
 test('mobile workspaces keep separate histories, drafts, models and in-flight attachments',async({page})=>{
   const upload=gate();await mockHost(page,{upload});await page.setViewportSize({width:390,height:844});await connect(page);
   await page.getByRole('button',{name:/Claude thread/}).click();await expect(page.getByText('claude history only')).toBeVisible();
-  await page.getByLabel('Message Claude').fill('Claude draft');await page.getByLabel('Claude model').selectOption('sonnet');await page.getByLabel('Mode',{exact:true}).selectOption('plan');
+  await page.getByLabel('Message Claude').fill('Claude draft');await page.getByLabel('Claude model').selectOption('sonnet');await expect(page.getByLabel('Mode',{exact:true})).toHaveCount(0);
   await page.locator('input[type=file]').setInputFiles({name:'draft-note.txt',mimeType:'text/plain',buffer:Buffer.from('note')});
   await switchHeader(page,'codex');await expect(page.getByRole('button',{name:/Codex thread/})).toBeVisible();await expect(page.getByRole('button',{name:/Claude thread/})).toHaveCount(0);
   await page.getByRole('button',{name:/Codex thread/}).click();await expect(page.getByText('codex history only')).toBeVisible();await expect(page.getByText('claude history only')).toHaveCount(0);
   await page.getByLabel('Message Codex').fill('Codex draft');await page.getByLabel('Codex model').selectOption('test-codex-model');
   upload.resolve();await expect(page.getByText('draft-note.txt')).toHaveCount(0);await expect(page.getByLabel('Message Codex')).toHaveValue('Codex draft');
-  await switchHeader(page,'claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Claude draft');await expect(page.getByText('draft-note.txt')).toBeVisible();await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');await expect(page.getByLabel('Mode',{exact:true})).toHaveValue('plan');await expect(page.getByText('claude history only')).toBeVisible();
-  await switchHeader(page,'codex');await expect(page.getByLabel('Message Codex')).toHaveValue('Codex draft');await expect(page.getByLabel('Codex model')).toHaveValue('test-codex-model');await expect(page.getByLabel('Mode',{exact:true})).toHaveValue('default');
+  await switchHeader(page,'claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Claude draft');await expect(page.getByText('draft-note.txt')).toBeVisible();await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');await expect(page.getByLabel('Mode',{exact:true})).toHaveCount(0);await expect(page.getByText('claude history only')).toBeVisible();
+  await switchHeader(page,'codex');await expect(page.getByLabel('Message Codex')).toHaveValue('Codex draft');await expect(page.getByLabel('Codex model')).toHaveValue('test-codex-model');await expect(page.getByLabel('Mode',{exact:true})).toHaveCount(0);
   await page.screenshot({path:'artifacts/screenshots/codex-workspace-mobile.png',fullPage:true});
 });
 
@@ -61,7 +61,7 @@ test('workspace selection and provider preferences survive reload with Claude le
   await switchSidebar(page,'codex');await page.locator('.new-chat').click();await expect(page.locator('.header-title')).toContainText('first');await page.getByLabel('Codex model').selectOption('test-codex-model');
   await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'AI & workspace',exact:true}).click();await page.getByLabel('Folder for new chats').selectOption(roots[1]);
   await page.reload();await expect(page.locator('.workspace-picker-sidebar select')).toHaveValue('codex');await expect(page.getByLabel('Codex model')).toHaveValue('test-codex-model');await expect(page.locator('.header-title')).toContainText('second');
-  await switchSidebar(page,'claude');await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');await expect(page.getByLabel('Mode',{exact:true})).toHaveValue('plan');await expect(page.locator('.header-title')).toContainText('second');
+  await switchSidebar(page,'claude');await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');await expect(page.getByLabel('Mode',{exact:true})).toHaveCount(0);await expect(page.locator('.header-title')).toContainText('second');
 });
 
 test('older bridge remains usable for Claude and cannot mix Claude sessions into Codex',async({page})=>{

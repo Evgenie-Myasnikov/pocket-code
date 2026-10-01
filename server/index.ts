@@ -12,6 +12,7 @@ import { AtlassianJira } from './jira.js';
 import { ReleaseUpdater } from './updates.js';
 import { ExistingClaudeJira } from './jira-existing.js';
 import { WindowsJiraStore } from './jira-vault.js';
+import { EngineUpdates } from './engine-updates.js';
 import { CodexService } from './codex.js';
 
 const local = path.resolve(process.env.POCKET_DATA_DIR || path.join(homedir(), '.pocket-code'));
@@ -33,8 +34,10 @@ const codex = new CodexService(roots, { attachmentRoots: [path.join(local, 'uplo
 let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
-const { app, jobs, terminals, queue, codexQueue, workflow, isBusy } = await createApp({ runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira });
+const { app, jobs, terminals, queue, codexQueue, workflow, isBusy, maintainEngines } = await createApp({ engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira });
 runtimeReady = true;
+const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
+void maintainEngines().catch(()=>{});
 const workflowTimer = setInterval(() => void workflow?.sync().catch(() => {}), 2000); workflowTimer.unref();
 let tunnel: Awaited<ReturnType<typeof startInternetTunnel>> | undefined;
 let closing = false;
@@ -76,7 +79,7 @@ const server = app.listen(port, host, () => {
 let shutdownPromise: Promise<void> | undefined;
 function shutdown(preserveTunnel = false): Promise<void> {
   if (shutdownPromise) return shutdownPromise;
-  closing = true; runtimeReady = false; hostUpdater.close(); clearInterval(workflowTimer);
+  closing = true; runtimeReady = false; hostUpdater.close(); clearInterval(workflowTimer); clearInterval(engineTimer);
   const stopped = new Promise<void>(resolve => server.close(() => resolve()));
   const queues = [queue?.close(), codexQueue?.close()];
   codex.close(); jobs.close(); terminals.close();

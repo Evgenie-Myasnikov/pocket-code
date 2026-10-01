@@ -62,13 +62,13 @@ test('Codex access selection survives reload and workspace switches without chan
 
 test('selected access reaches both Jira batch and individual workflow requests',async({page})=>{
   const batches:any[]=[],actions:any[]=[];await setup(page,{batches,actions});await settings(page);await page.getByRole('radio',{name:'Approve for me',exact:true}).check();
-  await page.locator('.mobile-nav').getByRole('button',{name:'Jobs',exact:true}).click();await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Start selected (1)',exact:true}).click();await expect.poll(()=>batches.length).toBe(1);expect(batches[0]).toMatchObject({provider:'codex',codexAccess:'auto'});
+  await page.locator('.mobile-nav').getByRole('button',{name:'Tasks',exact:true}).click();await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Start selected (1)',exact:true}).click();await expect.poll(()=>batches.length).toBe(1);expect(batches[0]).toMatchObject({provider:'codex',codexAccess:'auto'});
   await page.getByRole('button',{name:'Access task',exact:true}).click();await page.getByRole('button',{name:'Start development',exact:true}).click();await page.locator('.jira-form-actions').getByRole('button',{name:'Start development',exact:true}).click();await expect.poll(()=>actions.length).toBe(1);expect(actions[0]).toMatchObject({provider:'codex',codexAccess:'auto'});
 });
 
-test('Plan keeps its mode with Full access selected, and empty chats hide unused actions',async({page})=>{
+test('Chat hides the mode selector with Full access selected, and empty chats hide unused actions',async({page})=>{
   const sent:any[]=[];await setup(page,{sent});await newChat(page);await expect(page.getByRole('button',{name:'Review',exact:true})).toHaveCount(0);await expect(page.locator('.outputs-entry')).toHaveCount(0);await expect(page.locator('.reading-entry')).toHaveCount(0);
-  await page.getByLabel('Mode',{exact:true}).selectOption('plan');await page.getByLabel('Message Codex').fill('Plan this task');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);expect(sent[0]).toMatchObject({codexAccess:'full',mode:'plan'});await expect(page.locator('.reading-entry')).toBeVisible();await expect(page.locator('.outputs-entry')).toHaveCount(0);
+  await expect(page.getByLabel('Mode',{exact:true})).toHaveCount(0);await page.getByLabel('Message Codex').fill('Plan this task');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);expect(sent[0]).toMatchObject({codexAccess:'full',mode:'default'});await expect(page.locator('.reading-entry')).toBeVisible();await expect(page.locator('.outputs-entry')).toHaveCount(0);
 });
 
 test('Review appears for actual branch changes and opens that mode, then disappears in a clean project',async({page})=>{

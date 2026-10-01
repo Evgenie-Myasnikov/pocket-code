@@ -16,12 +16,12 @@ test('Jira Connect lives in Settings; Jobs selects all pages and sends a batch w
   });
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('http://127.0.0.1:5173');
   await page.getByLabel('Адрес компьютера').fill('http://127.0.0.1:4319'); await page.getByLabel('Ключ подключения').fill('test-only-'.repeat(5)); await page.getByRole('button', { name: 'Подключить компьютер' }).click();
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Jobs', exact: true }).click();
+  await page.locator('.mobile-nav').getByRole('button', { name: 'Задачи', exact: true }).click();
   await page.getByRole('button', { name: 'Открыть настройки Jira' }).click();
   await expect(page.getByRole('button', { name: 'Connect', exact: true })).toBeVisible();
   await expect(page.locator('.mobile-nav').getByText('Jira', { exact: true })).toHaveCount(0);
   connected = true;
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Jobs', exact: true }).click();
+  await page.locator('.mobile-nav').getByRole('button', { name: 'Задачи', exact: true }).click();
   await expect(page.getByText('Task 1', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Выбрать задачи', exact: true }).click();
   await page.getByLabel('Выбрать TEST-1', { exact: true }).check();

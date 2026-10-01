@@ -5,15 +5,15 @@ Android companion for Claude Code and Codex running on your own Windows PC. Conn
 ## Features
 
 - Read and continue local Claude Code and supported Claude Desktop Code histories.
-- Switch between Claude and Codex workspaces in the sidebar or chat header. Each keeps its own chats, active task, draft, attachments, model, mode and project folder. Workspace/model/project choices persist across app restarts; message drafts stay in memory for the current connection.
+- Switch between Claude and Codex workspaces in the sidebar or chat header. Each keeps its own chats, active task, draft, attachments, model and project folder. Workspace/model/project choices persist across app restarts; message drafts stay in memory for the current connection.
 - Codex uses the installed local app-server and existing PC login. Import local histories from allowed project folders, start/resume chats, attach images/files, view streamed responses and tools, answer questions, approve individual actions and stop turns. Model choices come from the installed Codex catalog.
 - Live terminal, file uploads, project file browser, and explicit tool approvals.
 - Markdown, code blocks, tables, images with enlargement, nested tool results, PDF attachments, and visible fallback for other structured blocks. External images load only when tapped. Interactive Claude/Codex artifacts and every provider-specific block are not implemented.
 - Review panel for working-tree, staged, and branch Git changes within the selected project folder. Side-by-side and unified layouts. Changes include edits made outside the current chat.
-- English/Russian interface, saved palettes and themes, 8–22 px chat text, 60–130% interface scale, spacing and compact mode. Model, request mode, budget and last allowed project folder are saved locally.
+- English/Russian interface, saved palettes and themes, 8–22 px chat text, 60–130% interface scale, spacing and compact mode. Model, budget and last allowed project folder are saved locally.
 - Automatic older-history loading at the top edge, stable reading position, and an eye toggle for content-only reading with a visible return control.
 - Agent activity cards open a separate read-only context panel, with task, available result and child conversation. Back returns to the parent draft and scroll position. Status is shown only when the provider supplies evidence; saved starts alone do not prove that an agent is still running.
-- Jira Jobs through an existing **claude.ai Atlassian MCP** connection available to native Claude Code. Read assigned issues and manually send selected issues to a sequential AI queue. Jira reads consume Claude usage; no tasks start merely by opening Jobs.
+- Jira Tasks through an existing **claude.ai Atlassian MCP** connection available to native Claude Code. Read assigned issues and manually send selected issues to a sequential AI queue. Jira reads consume Claude usage; no tasks start merely by opening Jobs.
 - GitHub release checks through the connected PC. Android can download and verify a new APK, then open the system installer. Android requires installation permission and user confirmation; silent installation is not available on ordinary devices.
 - After the Android app updates, it requests the matching PC release automatically. The PC verifies and installs it separately, waits for jobs, Jira operations and terminals to finish, then restarts. If the new host cannot start, it attempts to restore the previous version. Status and retry are in Settings → Updates. Requires bridge 0.13.0 or newer and access to GitHub/npm from the PC.
 
@@ -41,7 +41,7 @@ Select **Claude** or **Codex** from **Workspace**. The model, project and conver
 
 Codex Desktop can retain exclusive write access even after its response finishes. If Pocket Code says the chat is open on the PC, history is still readable; finish the desktop work, close Codex Desktop and retry on the phone. Pocket Code does not remove locks, stop Desktop or resend rejected messages automatically. This replaces the opaque `-32600` error for an active writer.
 
-Codex must provide the app-server protocol. The bridge discovers its native executable on Windows; `POCKET_CODEX_EXECUTABLE` can point to a custom installation. Credentials remain in Codex's own local storage. Settings → AI & workspace selects the Codex access mode: **Full access** (the mobile default: unrestricted files/network, no approval prompts), **Ask for approval** (project sandbox with user approvals), or **Approve for me** (project sandbox with native Codex automatic review). The question-mark button explains each mode. The choice is saved on the phone and applies to the next message, including continued chats and newly queued Jira tasks. Native managed policies still apply; rejected settings are not silently replaced. Plan mode and Jira Reviewer/QA jobs stay read-only without escalation. Unsupported interactive requests fail closed. The Claude request budget does not apply to Codex.
+Codex must provide the app-server protocol. The bridge discovers its native executable on Windows; `POCKET_CODEX_EXECUTABLE` can point to a custom installation. Credentials remain in Codex's own local storage. Settings → AI & workspace selects the Codex access mode: **Full access** (the mobile default: unrestricted files/network, no approval prompts), **Ask for approval** (project sandbox with user approvals), or **Approve for me** (project sandbox with native Codex automatic review). The question-mark button explains each mode. The choice is saved on the phone and applies to the next message, including continued chats and newly queued Jira tasks. Native managed policies still apply; rejected settings are not silently replaced. Jira Reviewer/QA jobs stay read-only without escalation. Unsupported interactive requests fail closed. The Claude request budget does not apply to Codex.
 
 Settings → Usage limits displays account windows, remaining percentages and reset times for the selected Claude or Codex workspace. Codex uses its native account rate-limit RPC. Claude uses the installed Agent SDK's experimental structured usage control request, without a model turn or transcript scan; updates are cached for one minute. API-key/provider accounts and older CLI versions may not expose subscription limits. Missing values are shown as unavailable, never zero usage. Credentials stay in the native clients.
 
@@ -51,7 +51,7 @@ The live terminal currently supports Claude. Codex operates through the structur
 
 ## Project rules and results
 
-**Project** replaces the previous Files navigation item. Its Rules, Changelog and Files tabs stay tied to the selected project folder. Rules are discovered from `AGENTS.md`, `AGENTS.override.md`, `CLAUDE.md`, `CLAUDE.local.md`, `RULES.md` and Markdown files under `.claude/rules`, `.codex/rules`, `.agents/rules` or `rules`. Changelogs use `CHANGELOG.md`, `CHANGES.md` or `HISTORY.md` in the project root or `docs` (case-insensitive names). The viewer does not create rules or change which instructions the native agent loads.
+**Project** replaces the previous Files navigation item. Its overview offers Files, Rules and Changelog with a short explanation for each. The selected folder is shared across these views. Rules are discovered from `AGENTS.md`, `AGENTS.override.md`, `CLAUDE.md`, `CLAUDE.local.md`, `RULES.md` and Markdown files under `.claude/rules`, `.codex/rules`, `.agents/rules` or `rules`. Changelogs use `CHANGELOG.md`, `CHANGES.md` or `HISTORY.md` in the project root or `docs` (case-insensitive names). The viewer does not create rules or change which instructions the native agent loads.
 
 Markdown retains headings, lists, tables, links and code blocks. Open documents refresh every 15 seconds while visible; Refresh also rediscovers files. Discovery stays within the selected allowed folder, skips symlinks and dependency trees, and is bounded to 150 documents. Markdown previews are limited to 1 MB. An unavailable refresh retains the last loaded copy with a visible error.
 
@@ -63,7 +63,9 @@ Connect Atlassian MCP in your Claude account and verify that `claude mcp list` r
 
 Issue lists are cached for one minute, site discovery for ten minutes. The latest individual issue is read before starting work. Each read has a four-turn, 85-second bound and an exact read-only tool guard. Standalone Android OAuth is an alternative activated with `POCKET_JIRA_MODE=oauth` on the PC; it may require separate organization approval.
 
-Jobs starts with assigned issues, search and categories by workflow stage or issue type. Selecting an issue opens its details and current actions; folder and execution options appear only before starting work. Selections survive filter changes, and **Select all matching** follows every result page. Search uses Jira's text search (including summary and description), or an exact issue key. Stage filtering preserves pagination and recognizes the supported English/Russian status names.
+Tasks starts with assigned issues, search and Jira's native status categories (To do, In progress, Done). Expand Jira filters to combine project, exact status and issue type. Suggestions come from loaded tasks; any valid Jira value can be entered. Filters are applied on the server, always within the current user's assigned issues. Changing filters clears selection; Select all matching follows every page of the current query. Search supports Jira text search or an exact issue key.
+
+This follows [Jira basic search](https://support.atlassian.com/jira-software-cloud/docs/find-specific-issues/) and [status category filtering](https://support.atlassian.com/jira/kb/how-to-search-using-statuscategory-statuscategorychangeddate-function-with-jql/).
 
 Task detail requests the full issue view separately from transition metadata. The connector's default compact view can omit a description even when it exists in Jira. Markdown and safe rich-text descriptions are supported; embedded resources become explicit links instead of loading automatically. Loading, failed retrieval and an actually empty description are distinct states.
 
@@ -111,3 +113,13 @@ powershell -NoProfile -File scripts/publish-release.ps1 -Repository owner/reposi
 ```
 
 The publishing script never overwrites an existing release. Publish reviewed source separately; never push local runtime/build directories or signing keys.
+
+## AI runtime compatibility checks
+
+Settings → Updates → AI compatibility shows the effective Codex executable and Claude Agent SDK runtime versions. The host checks every five minutes, establishes a baseline on first run and saves subsequent changes privately. Automatic checks are enabled by default and can be disabled here. The last workspace selected on the phone chooses the reviewing AI.
+
+When a runtime version changes, the host waits for its Pocket Code jobs and terminals to be idle, then creates one compatibility task in a shared Pocket Code **source** folder (identified by package name and Android build script). Installed host bundles are excluded. If no source folder is shared, changes remain pending. Reservations survive host restarts; failed or interrupted launches are not automatically repeated. Check Chats before manually retrying an interrupted task.
+
+The task researches official changes, checks protocol/file/image/tool compatibility, makes necessary source changes and runs tests. It does not automatically publish or restart the server. The trigger is separate from the signed APK/host release updater. Claude desktop/CLI updates do not affect a pinned Agent SDK runtime unless that effective runtime or an explicit CLAUDE_EXECUTABLE changes.
+
+Chat command/file activity uses compact expandable rows without provider headers or bubbles. Call/result pairs retain all output and errors. The Normal/Plan selector has been removed from chats; normal chats use the standard mode, while Jira review/QA retains its read-only workflow.

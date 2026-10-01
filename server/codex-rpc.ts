@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { access, readdir } from 'node:fs/promises';
+import { access, readdir, stat } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
 
@@ -47,7 +47,10 @@ export async function discoverCodex(env: NodeJS.ProcessEnv = process.env): Promi
   }
   if (process.platform === 'win32' && env.LOCALAPPDATA) {
     const root = path.join(env.LOCALAPPDATA, 'OpenAI', 'Codex', 'bin');
-    try { for (const entry of await readdir(root, { withFileTypes: true })) if (entry.isDirectory()) candidates.push(path.join(root, entry.name, 'codex.exe')); } catch { /* Optional desktop install. */ }
+    try {
+      const installed=await Promise.all((await readdir(root,{withFileTypes:true})).filter(entry=>entry.isDirectory()).map(async entry=>{const file=path.join(root,entry.name,'codex.exe');return {file,time:await stat(file).then(value=>value.mtimeMs).catch(()=>0)};}));
+      candidates.push(...installed.filter(entry=>entry.time>0).sort((a,b)=>b.time-a.time).map(entry=>entry.file));
+    } catch { /* Optional desktop install. */ }
   }
   for (const candidate of candidates) { try { await access(candidate); return candidate; } catch { /* Try next install. */ } }
   throw new Error('Codex is not installed on this PC. Install Codex CLI or configure POCKET_CODEX_EXECUTABLE.');

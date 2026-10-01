@@ -22,8 +22,9 @@ import { JiraWorkflow } from './jira-workflow.js';
 import type { JiraService } from './jira.js';
 import type { CodexService } from './codex.js';
 import { claudeSubagents, claudeSubagentMessages } from './subagents.js';
+import { EngineUpdates, pocketSource } from './engine-updates.js';
 
-export type Config = { runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -74,6 +75,15 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.end = function (this: express.Response, ...args: any[]) { try { return (end as any).apply(this, args); } finally { release(); } } as typeof res.end;
     res.once('finish', release); next();
   });
+  const sourceRoot = await pocketSource(roots);
+  const engineStatus = async () => config.engineUpdates ? { supported: true, sourceRoot, ...(await config.engineUpdates.status()) } : { supported: false };
+  app.get('/api/engine-updates', async (_req,res) => res.json(await engineStatus()));
+  app.post('/api/engine-updates/check', async (_req,res) => { if(config.engineUpdates)await config.engineUpdates.check();res.json(await engineStatus()); });
+  app.post('/api/engine-updates/settings', async (req,res) => {
+    const body=z.object({provider:providerSchema,enabled:z.boolean().optional()}).parse(req.body);
+    if(config.engineUpdates){const state=await config.engineUpdates.status();await config.engineUpdates.configure(body.enabled??state.enabled,body.provider);}
+    res.json(await engineStatus());
+  });
   app.get('/api/runtime', (_req, res) => res.json({ applicationId: 'app.pocketcode.host', processId: process.pid, version: packageJson.version, busy: isBusy(), internet: config.runtime?.internet() ?? false }));
   app.post('/api/runtime/stop', (_req, res) => {
     if (!config.runtime) throw new HttpError(404, 'Runtime control is unavailable.');
@@ -100,8 +110,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.post('/api/jira/disconnect', async (_req, res) => { await jira().disconnect(); res.json({ ok: true }); });
   app.get('/api/jira/issues', async (req, res) => {
-    const query = z.object({ site: z.string().min(1).max(100), cursor: z.string().max(4000).optional(), search: z.string().max(200).optional(), type: z.string().max(100).optional(), stage: z.string().max(30).optional() }).parse(req.query);
-    res.json(await jira().issues(query.site, query.cursor, { search: query.search, type: query.type, stage: query.stage }));
+    const query = z.object({ site: z.string().min(1).max(100), cursor: z.string().max(4000).optional(), search: z.string().max(200).optional(), type: z.string().max(100).optional(), stage: z.string().max(30).optional(),statusCategory:z.enum(['new','indeterminate','done']).optional(),status:z.string().max(100).optional(),project:z.string().max(100).optional() }).parse(req.query);
+    res.json(await jira().issues(query.site, query.cursor, { search: query.search, type: query.type, stage: query.stage,...(query.statusCategory?{statusCategory:query.statusCategory}:{}),...(query.status?{status:query.status}:{}),...(query.project?{project:query.project}:{}) }));
   });
   app.get('/api/jira/issue', async (req, res) => {
     const query = z.object({ site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i) }).parse(req.query);
@@ -391,5 +401,16 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const status = error instanceof z.ZodError ? 400 : error.status || 500;
     res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message });
   });
-  return { app, jobs, terminals, queue, codexQueue, workflow, isBusy };
+  async function maintainEngines() {
+    if(!config.engineUpdates||runtimeStopping||config.hostUpdater?.draining)return;
+    const state=await config.engineUpdates.status();
+    if(Date.now()-state.checkedAt>=300000)await config.engineUpdates.check();
+    if(!sourceRoot||isBusy())return;
+    await config.engineUpdates.dispatch(async ({id,provider,prompt})=>{
+      guardProject(sourceRoot,id);
+      const engine=provider==='codex'?codex():jobs;
+      engine.start({id,cwd:sourceRoot,text:prompt,displayText:'Check Pocket Code compatibility after an AI runtime update.',mode:'default',codexAccess:'full',maxBudgetUsd:5});
+    });
+  }
+  return { app, jobs, terminals, queue, codexQueue, workflow, isBusy, maintainEngines };
 }

@@ -9,7 +9,7 @@ import type { JiraStore } from './jira-vault.js';
 const endpoint = 'https://mcp.atlassian.com/v1/mcp';
 export type JiraIssue = { key: string; summary: string; description: string; descriptionFormat?: 'markdown' | 'html' | 'text'; status: string; priority: string; url: string; updated: string; statusId?: string; issueType?: string; projectKey?: string; assigneeId?: string };
 export type JiraSite = { id: string; name: string; url: string };
-export type JiraIssueQuery = { search?: string; type?: string; stage?: string };
+export type JiraIssueQuery = { search?: string; type?: string; stage?: string; statusCategory?: string; status?: string; project?: string };
 export type JiraTransitionField = { name: string; required: boolean; schema: { type: string; items?: string; system?: string; custom?: string }; allowedValues?: any[]; hasDefaultValue?: boolean };
 export type JiraTransition = { id: string; name: string; to: { id?: string; name: string }; fields: Record<string, JiraTransitionField> };
 export const jiraIssueFields = ['summary', 'description', 'status', 'priority', 'updated', 'issuetype', 'project', 'assignee'];
@@ -36,6 +36,11 @@ export function jiraIssuesJql(query: JiraIssueQuery = {}) {
   const clauses = ['assignee = currentUser()'];
   if (search) clauses.push(/^[A-Z][A-Z0-9_]*-\d+$/i.test(search) ? `key = ${jqlString(search.toUpperCase())}` : `text ~ ${jqlString(search)}`);
   if (type) clauses.push(`issuetype = ${jqlString(type)}`);
+  const category = queryText(query.statusCategory, 30), status = queryText(query.status, 100), project = queryText(query.project, 100);
+  const categories: Record<string,string> = {new:'To Do',indeterminate:'In Progress',done:'Done'};
+  if(category){if(!Object.hasOwn(categories,category))throw new HttpError(400,'Invalid Jira status category.');clauses.push(`statusCategory = ${jqlString(categories[category])}`);}
+  if(status)clauses.push(`status = ${jqlString(status)}`);
+  if(project)clauses.push(`project = ${jqlString(project)}`);
   if (stage) {
     if (!Object.hasOwn(jiraStageAliases, stage)) throw new HttpError(400, 'Unknown Jira workflow stage.');
     // Jira rejects unknown status names. Aliases from other languages/workflows

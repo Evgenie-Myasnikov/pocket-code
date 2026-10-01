@@ -39,9 +39,9 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
   test(`${provider} ${language}: chat labels, commands, changes and rich content scale with 8–22px body`, async ({ page }) => {
     await openChat(page, provider, language);
     const selectors = [
-      '.markdown>p', '.message-label', '.claude-mark', '.tool-card.combined summary', '.tool-card.combined summary strong',
-      '.tool-card.combined summary span', '.tool-card.combined>pre', '.tool-result-content .markdown>p',
-      '.tool-card:not(.combined)>summary', '.tool-card:not(.combined)>pre', '.markdown>pre code', '.markdown table',
+      '.markdown>p', '.message-label', '.claude-mark', '.tool-card.combined summary', '.tool-card.combined .activity-details>strong',
+      '.tool-card.combined summary span', '.tool-card.combined .activity-details>pre', '.tool-result-content .markdown>p',
+      '.tool-card:not(.combined)>summary', '.tool-card:not(.combined) .activity-details>pre', '.markdown>pre code', '.markdown table',
       '.document-card>strong', '.document-card>pre', '.thinking summary', '.thinking p', '.subagent-card strong', '.subagent-card small',
     ];
     let baseline: number[] | undefined, navigationFont = 0;
@@ -55,6 +55,7 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
           navigationFont: parseFloat(getComputedStyle(document.querySelector('.mobile-nav button')!).fontSize),
           taps: [...message.querySelectorAll('summary,button')].map(element => element.getBoundingClientRect().height),
           width: message.getBoundingClientRect().width, scroll: message.scrollWidth,
+          overflow:[...message.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>message.getBoundingClientRect().right+1).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width,scroll:e.scrollWidth})),
           labelHeight: message.querySelector('.message-label')!.getBoundingClientRect().height,
         };
       }, selectors);
@@ -63,7 +64,7 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
       result.fonts.forEach((font, index) => expect(font / baseline![index], `${selectors[index]} at ${size}px`).toBeCloseTo(size / 8, 2));
       expect(result.navigationFont).toBe(navigationFont);
       result.taps.forEach(height => expect(height).toBeGreaterThanOrEqual(48));
-      expect(result.scroll).toBeLessThanOrEqual(Math.ceil(result.width) + 1);
+      expect(result.scroll,JSON.stringify(result.overflow)).toBeLessThanOrEqual(Math.ceil(result.width) + 1);
       expect(result.labelHeight).toBeGreaterThanOrEqual(48);
     }
     if (provider === 'codex' && language === 'en') {

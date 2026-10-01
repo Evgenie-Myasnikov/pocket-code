@@ -5,6 +5,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Block, SubagentView } from '../server/types';
 import { t } from './i18n';
+import {Terminal, Pencil, ChevronRight, Wrench} from 'lucide-react';
+import {toolActivity} from './tool-activity';
 
 import {Installer as Documents} from './native-update';
 export function safeWebUrl(value?: string) {
@@ -34,7 +36,7 @@ function Document({block}:{block:Block}) {
 function ToolResultContent({block,depth}:{block:Block;depth:number}) {
   return <>{Array.isArray(block.content)?block.content.map((item:any,i:number)=>item && typeof item==='object' && typeof item.type==='string'?<RichBlock block={item} depth={depth+1} key={i}/>:<pre key={i}>{JSON.stringify(item,null,2)}</pre>):<Markdown text={typeof block.content==='string'?block.content:JSON.stringify(block.content,null,2)||''}/>}</>;
 }
-export function RichBlock({block,depth=0,result,onSubagent}:{block:Block;depth?:number;result?:Block;onSubagent?(agent:SubagentView):void}) {
+export function RichBlock({block,depth=0,result,onSubagent,running=false}:{block:Block;depth?:number;result?:Block;running?:boolean;onSubagent?(agent:SubagentView):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;
   if(block.type==='text')return <Markdown text={block.text || ''}/>;
   if(block.type==='subagent' && block.agent) {
@@ -44,8 +46,10 @@ export function RichBlock({block,depth=0,result,onSubagent}:{block:Block;depth?:
   if(block.type==='image'){const src=imageSource(block);return src?<Picture src={src} alt={block.title||t('Изображение')}/>:<span className="attachment-chip">📎 {t('Изображение недоступно в сохранённой истории')}</span>;}
   if(block.type==='document')return <Document block={block}/>;
   if(block.type==='tool_result')return <details className={`tool-card result ${block.is_error?'failed':''}`}><summary>{block.is_error?t('Ошибка инструмента'):t('Результат инструмента')}</summary><ToolResultContent block={block} depth={depth}/></details>;
-  if(block.type==='tool_use' && result)return <details className={`tool-card combined ${result.is_error?'failed':''}`}><summary><strong>{block.name}</strong><span>{result.is_error?t('Ошибка инструмента'):t('Результат инструмента')}</span></summary><pre>{JSON.stringify(block.input,null,2)}</pre><div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div></details>;
-  if(block.type==='tool_use')return <details className="tool-card"><summary><strong>{block.name}</strong> · {t('Вызов инструмента')}</summary><pre>{JSON.stringify(block.input,null,2)}</pre></details>;
+  if(block.type==='tool_use'){
+    const activity=toolActivity(block,result,running),Icon=activity.kind==='command'?Terminal:activity.kind==='edit'?Pencil:Wrench;
+    return <details className={`tool-card activity-row ${result?'combined':''} ${activity.failed?'failed':''}`}><summary><Icon size={16}/><span>{t(activity.label)}{activity.kind==='tool'&&block.name?` · ${block.name}`:''}</span><ChevronRight className="activity-chevron" size={14}/></summary><div className="activity-details"><strong>{block.name}</strong><pre>{JSON.stringify(block.input,null,2)}</pre>{result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}</div></details>;
+  }
   if(block.type==='thinking')return <details className="thinking"><summary>{t('Рассуждения')}</summary><p>{block.thinking}</p></details>;
   if(block.type==='redacted_thinking')return <p className="muted">{t('Этот блок размышлений скрыт провайдером')}</p>;
   return <details className="tool-card"><summary>{block.type==='codexItem'?t('Подробности действия'):<>{t('Дополнительные данные')} · {block.type}</>}</summary><pre>{JSON.stringify(block,null,2)}</pre></details>;

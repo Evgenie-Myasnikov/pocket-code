@@ -15,8 +15,9 @@ test('matching tool call and result use one disclosure without hiding errors or 
   await page.getByRole('button',{name:'Connect computer',exact:true}).click();
   await page.getByRole('button',{name:/Tool activity/}).click();
   const paired=page.locator('.tool-card.combined');
-  await expect(paired).toHaveCount(1);await expect(paired).toHaveClass(/failed/);
-  await expect(paired.locator('summary')).toContainText('Tool error');
+  await expect(page.locator('[data-message-id=activity] .message-label')).toHaveCount(0);await expect(paired).toHaveCount(1);await expect(paired).toHaveClass(/failed/);
+  await expect(paired.locator('summary')).toContainText('Action failed');
+  expect(await paired.evaluate(e=>getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   await paired.locator('summary').click();
   await expect(paired).toContainText('synthetic check');await expect(paired).toContainText('Synthetic command failed');
   await expect(page.locator('.tool-card.result')).toHaveCount(1);

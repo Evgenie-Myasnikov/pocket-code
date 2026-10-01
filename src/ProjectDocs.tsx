@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {ArrowLeft,BookOpen,FileText,RefreshCw} from 'lucide-react';
+import {ArrowLeft,BookOpen,FileText,RefreshCw,Folder,ChevronRight} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {request,type Connection} from './api';
@@ -14,6 +14,7 @@ type DocumentIndex={project:string;documents:ProjectDocument[];truncated:boolean
 type DocumentContent=ProjectDocument&{content:string};
 type Props={connection:Connection;root:string;provider?:'claude'|'codex';onProject:(path:string)=>void};
 const labels={
+  overview:['Project overview','Обзор проекта'],location:['Project folder','Расположение проекта'],rootLabel:['Project root','Корень проекта'],browse:['Browse folders and open files','Папки и просмотр файлов'],ruleHelp:['Instructions for AI in this project','Инструкции для AI в этом проекте'],historyHelp:['Read the project change history','Посмотреть историю изменений проекта'],
   rules:['Rules','Правила'],changelog:['Changelog','История изменений'],files:['Files','Файлы'],tabs:['Project sections','Разделы проекта'],back:['Back to documents','К документам'],
   refresh:['Refresh documents','Обновить документы'],refreshDocument:['Refresh document','Обновить документ'],
   loading:['Loading documents…','Загружаем документы…'],reading:['Loading document…','Загружаем документ…'],
@@ -41,7 +42,7 @@ export function ProjectDocs(props:Props){
 }
 
 function ProjectDocuments({connection,root,onProject,label}:Props&{label:(key:Label)=>string}){
-  const [kind,setKind]=useState<'rules'|'changelog'|'files'>('rules');
+  const [kind,setKind]=useState<'overview'|'rules'|'changelog'|'files'>('overview');
   const [index,setIndex]=useState<DocumentIndex|null>(null),[loading,setLoading]=useState(true),[listError,setListError]=useState('');
   const [indexRevision,setIndexRevision]=useState(0),[selected,setSelected]=useState<ProjectDocument|null>(null);
   const [document,setDocument]=useState<DocumentContent|null>(null),[reading,setReading]=useState(false),[documentError,setDocumentError]=useState('');
@@ -50,7 +51,7 @@ function ProjectDocuments({connection,root,onProject,label}:Props&{label:(key:La
   const returnFocus=useRef<HTMLButtonElement|null>(null),returnPath=useRef(''),focusBack=useRef(false);
   const cwd=`cwd=${encodeURIComponent(root)}`;
   function goBack(){setSelected(null);focusBack.current=true;}
-  useBackAction(()=>{goBack();return true;},20,Boolean(selected));
+  useBackAction(()=>{if(selected)goBack();else setKind('overview');return true;},20,Boolean(selected)||kind!=='overview');
 
   useEffect(()=>{
     let cancelled=false;setLoading(true);setListError('');
@@ -78,9 +79,10 @@ function ProjectDocuments({connection,root,onProject,label}:Props&{label:(key:La
   const appliesTo=(item:ProjectDocument)=>item.appliesTo==='all'?label('all'):item.appliesTo==='codex'?'Codex':'Claude';
   const failure=(message:string,kind:'list'|'document',saved:boolean)=><div className="project-docs-error" role="alert"><p>{label(kind==='list'?'listError':'documentError')}{saved?` ${label('lastCopy')}`:''}</p><details><summary>{label('details')}</summary><p>{message}</p></details><button className="secondary" disabled={kind==='list'?loading:reading} onClick={()=>kind==='list'?setIndexRevision(value=>value+1):refreshDocument.current()}>{label('retry')}</button></div>;
 
+  if(kind==='overview')return <section className="project-docs" aria-label={label('overview')}><h2 className="project-overview-title">{label('overview')}</h2><div className="project-overview-cards">{(['files','rules','changelog'] as const).map(value=>{const Icon=value==='files'?Folder:value==='rules'?BookOpen:FileText;return <button key={value} className="project-overview-card" onClick={()=>setKind(value)}><Icon size={24}/><span><strong>{label(value)}</strong><small>{label(value==='files'?'browse':value==='rules'?'ruleHelp':'historyHelp')}</small></span><ChevronRight size={18}/></button>;})}</div><details className="project-location"><summary>{label('location')}</summary><p>{root}</p></details></section>;
   return <section className="project-docs" ref={scroller} aria-label={selected?.name||label(kind)}>
     <div className="project-docs-toolbar">
-      {selected?<button className="text-button" onClick={goBack}><ArrowLeft size={18}/>{label('back')}</button>:<><p className="project-docs-root">{root}</p><div className="project-docs-tabs" role="tablist" aria-label={label('tabs')}>{(['rules','changelog','files'] as const).map(value=><button role="tab" key={value} id={`project-tab-${value}`} tabIndex={kind===value?0:-1} aria-selected={kind===value} aria-controls="project-documents-list" className={kind===value?'active':''} onKeyDown={event=>{const tabs=['rules','changelog','files'] as const,index=tabs.indexOf(value),next=event.key==='Home'?0:event.key==='End'?2:event.key==='ArrowRight'?(index+1)%3:event.key==='ArrowLeft'?(index+2)%3:null;if(next!==null){event.preventDefault();setKind(tabs[next]);globalThis.document.getElementById(`project-tab-${tabs[next]}`)?.focus();}}} onClick={()=>{setKind(value);if(scroller.current)scroller.current.scrollTop=0;}}>{label(value)}</button>)}</div></>}
+      {selected?<button className="text-button" onClick={goBack}><ArrowLeft size={18}/>{label('back')}</button>:<><button className="text-button project-overview-back" onClick={()=>setKind('overview')}><ArrowLeft size={18}/>{label('overview')}</button><div className="project-docs-tabs" role="tablist" aria-label={label('tabs')}>{(['rules','changelog','files'] as const).map(value=><button role="tab" key={value} id={`project-tab-${value}`} tabIndex={kind===value?0:-1} aria-selected={kind===value} aria-controls="project-documents-list" className={kind===value?'active':''} onKeyDown={event=>{const tabs=['rules','changelog','files'] as const,index=tabs.indexOf(value),next=event.key==='Home'?0:event.key==='End'?2:event.key==='ArrowRight'?(index+1)%3:event.key==='ArrowLeft'?(index+2)%3:null;if(next!==null){event.preventDefault();setKind(tabs[next]);globalThis.document.getElementById(`project-tab-${tabs[next]}`)?.focus();}}} onClick={()=>{setKind(value);if(scroller.current)scroller.current.scrollTop=0;}}>{label(value)}</button>)}</div></>}
       {kind!=='files'&&<button className="icon-button" aria-label={label(selected?'refreshDocument':'refresh')} disabled={selected?reading:loading} onClick={()=>selected?refreshDocument.current():setIndexRevision(value=>value+1)}><RefreshCw size={18} className={(selected?reading:loading)?'project-docs-refreshing':''}/></button>}
     </div>
     {selected?<article className="project-document">
@@ -90,11 +92,11 @@ function ProjectDocuments({connection,root,onProject,label}:Props&{label:(key:La
       {reading&&!document&&<p role="status">{label('reading')}</p>}
       {document&&(document.content.trim()?<div className="markdown project-docs-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<a className="project-docs-image-link" href={safeWebUrl(src as string)!} target="_blank" rel="noopener noreferrer">{label('attachment')}{alt?` · ${alt}`:''}</a>:<span>📎 {alt||label('attachment')}</span>}}>{document.content}</ReactMarkdown></div>:<p className="project-docs-empty">{label('emptyDocument')}</p>)}
     </article>:kind==='files'?<div className="project-docs-files" id="project-documents-list" role="tabpanel" aria-labelledby="project-tab-files"><Files connection={connection} root={root} onProject={onProject}/></div>:<div id="project-documents-list" role="tabpanel" aria-labelledby={`project-tab-${kind}`}>
-      <p className="project-docs-note">{label(kind==='rules'?'note':'filesNote')}</p>
+
       {listError&&failure(listError,'list',Boolean(index))}
       {loading&&!index&&<p role="status">{label('loading')}</p>}
       {index?.truncated&&<p className="project-docs-limit" role="status">{label('truncated')}</p>}
-      <div className="project-docs-list">{documents.map(item=><button key={item.path} ref={element=>{if(item.path===returnPath.current)returnFocus.current=element;}} className="project-docs-item" onClick={event=>{listScroll.current=scroller.current?.scrollTop||0;returnPath.current=item.path;returnFocus.current=event.currentTarget;setSelected(item);}}>{item.kind==='rules'?<BookOpen size={20} aria-hidden="true"/>:<FileText size={20} aria-hidden="true"/>}<span><strong>{item.name}</strong>{item.path!==item.name&&<span>{item.path}</span>}<small>{item.kind==='rules'?`${appliesTo(item)} · `:''}{item.source}</small></span></button>)}</div>
+      <div className="project-docs-list">{documents.map(item=><button key={item.path} ref={element=>{if(item.path===returnPath.current)returnFocus.current=element;}} className="project-docs-item" onClick={event=>{listScroll.current=scroller.current?.scrollTop||0;returnPath.current=item.path;returnFocus.current=event.currentTarget;setSelected(item);}}>{item.kind==='rules'?<BookOpen size={20} aria-hidden="true"/>:<FileText size={20} aria-hidden="true"/>}<span><strong>{item.name}</strong>{item.path!==item.name&&<span>{item.path}</span>}<small>{item.kind==='rules'?`${appliesTo(item)} · `:''}{item.source==='Project root'?label('rootLabel'):item.source}</small></span></button>)}</div>
       {!loading&&!listError&&!documents.length&&<div className="project-docs-empty"><h3>{label(kind==='rules'?'emptyRules':'emptyChangelog')}</h3><p>{label(kind==='rules'?'rulePaths':'changelogPaths')}</p></div>}
     </div>}
   </section>;

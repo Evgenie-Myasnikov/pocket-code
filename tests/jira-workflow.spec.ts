@@ -29,7 +29,7 @@ async function fixture(page:Page,custom:Partial<State>={}){
 }
 async function connect(page:Page,language='en'){
   await page.goto('http://127.0.0.1:5173');await page.getByLabel(language==='ru'?'Адрес компьютера':'Computer address').fill('http://127.0.0.1:4319');await page.getByLabel(language==='ru'?'Ключ подключения':'Connection key').fill('test-only-'.repeat(5));await page.getByRole('button',{name:language==='ru'?'Подключить компьютер':'Connect computer',exact:true}).click();
-  await page.locator('.mobile-nav').getByRole('button',{name:'Jobs',exact:true}).click();await expect(page.getByRole('button',{name:'Task 1',exact:true})).toBeVisible();
+  await page.locator('.mobile-nav').getByRole('button',{name:language==='ru'?'Задачи':'Tasks',exact:true}).click();await expect(page.getByRole('button',{name:'Task 1',exact:true})).toBeVisible();
 }
 test.beforeEach(async({page})=>{await page.setViewportSize({width:390,height:844});});
 test.use({hasTouch:true,isMobile:true});
@@ -37,19 +37,19 @@ test.use({hasTouch:true,isMobile:true});
 test('search and category preserve selection; select all matches every page and requires a batch confirmation',async({page})=>{
   const state=await fixture(page,{issues:url=>url.searchParams.get('search')==='render'&&url.searchParams.get('type')==='Bug'?url.searchParams.get('cursor')?{issues:[issue(3,{summary:'Render task 3',issueType:'Bug'})],next:null}:{issues:[issue(2,{summary:'Render task 2',issueType:'Bug'})],next:'page-2'}:{issues:[issue(1)],next:null}});
   await connect(page);await expect(page.getByLabel('Project folder for Claude')).toHaveCount(0);await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();
-  await page.getByLabel('Search issues').fill('render');await page.getByLabel('Category').selectOption('type:Bug');await expect(page.getByRole('button',{name:'Render task 2',exact:true})).toBeVisible();await expect(page.getByText('Selected: 1',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Select all matching',exact:true}).click();await expect(page.getByLabel('Select DEMO-3',{exact:true})).toBeChecked();await expect(page.getByText('Selected: 3',{exact:true})).toBeVisible();
+  await page.getByLabel('Search issues').fill('render');await page.locator('.jira-more-filters summary').click();await page.getByLabel('Issue type',{exact:true}).fill('Bug');await page.getByRole('button',{name:'Apply filters',exact:true}).click();await expect(page.getByRole('button',{name:'Render task 2',exact:true})).toBeVisible();await expect(page.getByText('Selected: 1',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Select all matching',exact:true}).click();await expect(page.getByLabel('Select DEMO-3',{exact:true})).toBeChecked();await expect(page.getByText('Selected: 2',{exact:true})).toBeVisible();
   expect(state.queries.some(url=>url.searchParams.get('cursor')==='page-2'&&url.searchParams.get('search')==='render'&&url.searchParams.get('type')==='Bug')).toBe(true);
-  await page.getByRole('button',{name:'Continue',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Start selected tasks'});await expect(dialog).toContainText('Start 3 tasks?');await expect(dialog).toContainText('Developer');expect(state.batches).toHaveLength(0);
-  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();expect(state.batches).toHaveLength(0);await page.getByRole('button',{name:'Continue',exact:true}).click();await dialog.getByRole('button',{name:'Start selected (3)',exact:true}).click();
-  await expect.poll(()=>state.batches.length).toBe(1);expect(state.batches[0]).toMatchObject({keys:['DEMO-1','DEMO-2','DEMO-3'],role:'developer',cwd:root,mode:'default'});expect(state.batches[0].batchId).toBeTruthy();
+  await page.getByRole('button',{name:'Continue',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Start selected tasks'});await expect(dialog).toContainText('Start 2 tasks?');await expect(dialog).toContainText('Developer');expect(state.batches).toHaveLength(0);
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();expect(state.batches).toHaveLength(0);await page.getByRole('button',{name:'Continue',exact:true}).click();await dialog.getByRole('button',{name:'Start selected (2)',exact:true}).click();
+  await expect.poll(()=>state.batches.length).toBe(1);expect(state.batches[0]).toMatchObject({keys:['DEMO-2','DEMO-3'],role:'developer',cwd:root,mode:'default'});expect(state.batches[0].batchId).toBeTruthy();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
 test('Jira role persists through reload and detail shows only eligible actions with required fields',async({page})=>{
   const state=await fixture(page,{view:{issue:issue(1,{status:'PR Review'}),stage:'pr_review',actions:[{id:'approve_review',label:'Approve review',kind:'transition',transitions:[transition('approve',{resolution:{name:'Resolution',required:true,schema:{type:'option'},allowedValues:[{id:'1',name:'Verified'}]}})]}]}});
   await connect(page);await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Jira',exact:true}).click();await page.getByLabel('Jira role').selectOption('reviewer');await page.reload();await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Jira',exact:true}).click();await expect(page.getByLabel('Jira role')).toHaveValue('reviewer');
-  await page.locator('.mobile-nav').getByRole('button',{name:'Jobs',exact:true}).click();await page.getByRole('button',{name:'Task 1',exact:true}).click();await expect(page.getByLabel('Search issues')).toHaveCount(0);await expect(page.getByRole('button',{name:'Start development',exact:true})).toHaveCount(0);
+  await page.locator('.mobile-nav').getByRole('button',{name:'Tasks',exact:true}).click();await page.getByRole('button',{name:'Task 1',exact:true}).click();await expect(page.getByLabel('Search issues')).toHaveCount(0);await expect(page.getByRole('button',{name:'Start development',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Approve review',exact:true}).click();await expect(page.getByRole('button',{name:'Approve review',exact:true})).toBeDisabled();await page.getByLabel('Resolution *',{exact:true}).selectOption('0');await page.getByRole('button',{name:'Approve review',exact:true}).click();
   await expect.poll(()=>state.actions.length).toBe(1);expect(state.actions[0]).toMatchObject({role:'reviewer',action:'approve_review',transitionId:'approve',fields:{resolution:{id:'1'}}});
   await page.getByRole('button',{name:'Back to issues',exact:true}).click();await expect(page.getByLabel('Search issues')).toBeVisible();
@@ -70,8 +70,8 @@ test('Send for review shows a PR preview and waits for explicit final confirmati
 });
 
 test('empty filtered pages are followed and changing site clears selection',async({page})=>{
-  const state=await fixture(page,{issues:url=>url.searchParams.get('stage')==='review'?(url.searchParams.get('cursor')?{issues:[issue(2,{summary:'Review task'})],next:null}:{issues:[],next:'filtered-page'}):{issues:[issue(1)],next:null}});
-  await connect(page);await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();await page.getByLabel('Category').selectOption('stage:review');await expect(page.getByRole('button',{name:'Review task',exact:true})).toBeVisible();expect(state.queries.some(url=>url.searchParams.get('cursor')==='filtered-page')).toBe(true);await expect(page.getByText('Selected: 1',{exact:true})).toBeVisible();
+  const state=await fixture(page,{issues:url=>url.searchParams.get('statusCategory')==='indeterminate'?(url.searchParams.get('cursor')?{issues:[issue(2,{summary:'Review task'})],next:null}:{issues:[],next:'filtered-page'}):{issues:[issue(1)],next:null}});
+  await connect(page);await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();await page.getByLabel('Status category').selectOption('indeterminate');await expect(page.getByRole('button',{name:'Review task',exact:true})).toBeVisible();expect(state.queries.some(url=>url.searchParams.get('cursor')==='filtered-page')).toBe(true);await expect(page.getByText('Selected: 1',{exact:true})).toHaveCount(0);
   await page.locator('.jira-site-picker summary').click();await page.getByLabel('Jira site',{exact:true}).selectOption('site-b');await expect(page.getByText('Selected: 1',{exact:true})).toHaveCount(0);
 });
 
@@ -119,4 +119,18 @@ for(const profile of [{width:360,height:760,language:'ru',scale:100},{width:320,
   await page.getByRole('button',{name:'Task 1',exact:true}).click();await expect(page.getByRole('button',{name:ru?'К списку задач':'Back to issues',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:ru?'Начать разработку':'Start development',exact:true})).toBeVisible();await check('detail');
   await page.getByRole('button',{name:ru?'Начать разработку':'Start development',exact:true}).click();await expect(page.getByLabel('Target version *',{exact:true})).toBeVisible();await check('required-fields');
   await page.getByRole('button',{name:ru?'К задаче':'Back to issue',exact:true}).click();state.view={issue:issue(1,{status:'In Development'}),stage:'development',actions:[{id:'submit_review',label:'Send for review',kind:'pr',transitions:[transition('review')]}]};await page.getByRole('button',{name:ru?'Обновить задачу':'Refresh issue',exact:true}).click();await page.getByRole('button',{name:ru?'Отправить на ревью':'Send for review',exact:true}).click();await expect(page.getByLabel(ru?'Название PR':'PR title')).toBeVisible();await check('pr-preview');
+});
+
+
+test('Jira basic filters combine actual project status type and status category',async({page})=>{
+ const state=await fixture(page);await connect(page);await page.getByLabel('Status category').selectOption('indeterminate');
+ await page.locator('.jira-more-filters summary').click();await page.getByLabel('Jira project',{exact:true}).fill('DEMO');await page.getByLabel('Status',{exact:true}).fill('PR Review');await page.getByLabel('Issue type',{exact:true}).fill('Custom Task');await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+ await expect.poll(()=>state.queries.some(url=>url.searchParams.get('project')==='DEMO'&&url.searchParams.get('status')==='PR Review'&&url.searchParams.get('type')==='Custom Task'&&url.searchParams.get('statusCategory')==='indeterminate')).toBe(true);
+ await page.getByRole('button',{name:'Clear filters',exact:true}).click();await expect.poll(()=>state.queries.at(-1)?.searchParams.has('project')).toBe(false);
+});
+for(const scale of [60,100,130])test('task typography follows saved scale '+scale,async({page})=>{
+ await page.addInitScript(scale=>localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({scale,textSize:8})),scale);await fixture(page);await connect(page);
+ const font=()=>page.locator('.jira-issue-title').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize));expect(await font()).toBeCloseTo(14*1.07*scale/100,1);
+ await page.reload();await page.locator('.mobile-nav').getByRole('button',{name:'Tasks',exact:true}).click();expect(await font()).toBeCloseTo(14*1.07*scale/100,1);
+ await page.screenshot({path:'artifacts/screenshots/tasks-scale-'+scale+'.png'});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

@@ -30,7 +30,7 @@ async function host(page:Page){
 }
 async function openProject(page:Page,language='en',scale=100){
   await page.addInitScript(({connection,language,scale})=>{sessionStorage.setItem('connection',JSON.stringify(connection));localStorage.setItem('pocket-code-language-v1',language);localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',theme:'dark',textSize:14,scale}));},{connection,language,scale});
-  await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:language==='ru'?'Проект':'Project',exact:true}).click();await expect(page.getByRole('tab',{name:language==='ru'?'Правила':'Rules',exact:true})).toBeVisible();
+  await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:language==='ru'?'Проект':'Project',exact:true}).click();await expect(page.locator('.project-overview-cards')).toBeVisible();await page.locator('.project-overview-card').filter({hasText:language==='ru'?'Инструкции для AI':'Instructions for AI'}).click();await expect(page.getByRole('tab',{name:language==='ru'?'Правила':'Rules',exact:true})).toBeVisible();
 }
 const panel=(page:Page)=>page.locator('.project-docs');
 const openRule=async(page:Page)=>{await panel(page).getByRole('button',{name:/^AGENTS.md/}).click();};
@@ -48,7 +48,7 @@ test('project rules and changelog render safe Markdown and Files remains availab
 test('late document responses cannot cross document or project selection',async({page})=>{
   let resolve!:()=>void;const promise=new Promise<void>(done=>{resolve=done;});const state=await host(page);state.delayed={promise,resolve};await openProject(page);await openRule(page);await expect(panel(page).getByText('Loading document…')).toBeVisible();
   await panel(page).getByRole('button',{name:'Back to documents'}).click();await panel(page).getByRole('button',{name:/^testing.md/}).click();await expect(panel(page).getByRole('heading',{name:'Testing rules'})).toBeVisible();
-  await page.getByLabel('Project folder',{exact:true}).selectOption(second);await expect(panel(page).getByRole('tab',{name:'Rules',exact:true})).toBeVisible();await openRule(page);await expect(panel(page).getByRole('heading',{name:'Second project rules'})).toBeVisible();resolve();
+  await page.getByLabel('Project folder',{exact:true}).selectOption(second);await panel(page).getByRole('button').filter({hasText:'Instructions for AI in this project'}).click();await expect(panel(page).getByRole('tab',{name:'Rules',exact:true})).toBeVisible();await openRule(page);await expect(panel(page).getByRole('heading',{name:'Second project rules'})).toBeVisible();resolve();
   await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toHaveCount(0);await expect(panel(page).getByRole('heading',{name:'Second project rules'})).toBeVisible();
 });
 
@@ -71,4 +71,16 @@ for(const profile of [{width:320,height:640,language:'en',scale:130},{width:360,
   await page.setViewportSize(profile);const state=await host(page);state.content='# Project rules\n\n'+('Readable project guidance. '.repeat(30))+'\n\n```text\n'+('a'.repeat(250))+'\n```';await openProject(page,profile.language,profile.scale);
   async function check(name:string){expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);for(const height of await panel(page).locator('button').evaluateAll(elements=>elements.filter(element=>element.getClientRects().length).map(element=>element.getBoundingClientRect().height)))expect(height).toBeGreaterThanOrEqual(47);await page.screenshot({path:`artifacts/screenshots/project-docs-${profile.width}-${profile.language}-${name}.png`,fullPage:true});}
   await expect(panel(page).locator('.project-docs-item')).toHaveCount(2);await check('list');await openRule(page);await expect(panel(page).getByRole('heading',{name:'Project rules'})).toBeVisible();await check('document');await expect(panel(page).getByRole('button',{name:profile.language==='ru'?'К документам':'Back to documents'})).toBeVisible();
+});
+
+for(const scale of [60,100,130])test('project text follows saved interface scale '+scale,async({page})=>{
+ await page.setViewportSize({width:360,height:760});await host(page);await openProject(page,'en',scale);
+ const font=()=>page.locator('.project-docs-item strong').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize));
+ expect(await font()).toBeCloseTo(15*scale/100,1);
+ await page.reload();await page.locator('.mobile-nav').getByRole('button',{name:'Project',exact:true}).click();
+ await expect(page.locator('.project-overview-cards')).toBeVisible();await page.screenshot({path:'artifacts/screenshots/project-overview-'+scale+'.png'});
+ expect(await page.locator('.workspace-picker-header select').evaluate(e=>getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+ expect(await page.locator('.project-picker select').evaluate(e=>getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+ await page.locator('.project-overview-card').filter({hasText:'Instructions for AI'}).click();expect(await font()).toBeCloseTo(15*scale/100,1);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
