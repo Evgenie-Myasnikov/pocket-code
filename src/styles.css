@@ -176,10 +176,7 @@
 .activity-entry .activity-badge{position:absolute;top:1px;right:0;display:grid;place-items:center;min-width:16px;height:16px;margin:0;padding:0 3px;border-radius:9px;background:var(--accent);color:var(--accent-dark);font-size:10px;line-height:1;font-weight:600;letter-spacing:0}
 .list-label .activity-entry{margin-left:8px;letter-spacing:normal}
 
-/* Shared activity header stays outside section navigation. */
-.app{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
-.app-header{grid-column:1 / -1;display:flex;align-items:center;gap:8px;min-height:48px;padding:0 12px;background:var(--bg);border-bottom:1px solid var(--line);font-size:calc(13px * var(--ui-scale,1));color:var(--text)}
+/* Activity is reachable from every section without a header row. */
 .app>.sidebar,.app>.workspace{min-height:0}
-.app.reading-mode{grid-template-rows:minmax(0,1fr)}
-.reading-mode .app-header{display:none}
-@media(max-width:760px){.app{grid-template-columns:minmax(0,1fr)}.app>.sidebar,.app>.workspace{grid-column:1;grid-row:2}.app.reading-mode>.workspace{grid-row:1}}
+.app>.activity-entry{position:fixed;right:env(safe-area-inset-right,0px);top:45%;z-index:40;border:1px solid var(--line);border-right:0;border-radius:14px 0 0 14px;background:var(--bg);color:var(--muted);box-shadow:-2px 2px 8px #0002}
+.reading-mode>.activity-entry{display:none}

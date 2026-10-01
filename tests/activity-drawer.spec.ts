@@ -43,8 +43,8 @@ async function open(page:Page,scale=100){
 test('activity groups work across providers and closes without losing a draft',async({page})=>{
   await host(page);await page.setViewportSize({width:390,height:844});await open(page);await page.getByLabel('Message Claude').fill('Keep this draft');await openDrawer(page);
   await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toBeVisible();await expect(drawer(page).getByRole('button',{name:'claude question',exact:true})).toBeVisible();await expect(drawer(page).getByRole('button',{name:'codex working',exact:true})).toBeVisible();
-  await expect(drawer(page).locator('.activity-group')).toHaveCount(3);await page.keyboard.press('Escape');await expect(drawer(page)).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');await expect(page.locator('.app-header .activity-entry')).toBeFocused();
-  await openDrawer(page);await drawer(page).getByRole('button',{name:'All chats',exact:true}).click();await expect(drawer(page)).toHaveCount(0);await expect(page.getByRole('button',{name:'New chat',exact:false})).toBeVisible();
+  await expect(drawer(page).locator('.activity-group')).toHaveCount(3);await page.keyboard.press('Escape');await expect(drawer(page)).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');await expect(page.locator('.app > .activity-entry')).toBeFocused();
+  await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'All chats',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await expect(drawer(page)).toHaveCount(0);await expect(page.getByRole('button',{name:'New chat',exact:false})).toBeVisible();
 });
 
 test('a completed result is acknowledged only after loading and stays viewed after reload',async({page})=>{
@@ -84,7 +84,7 @@ test('opening session history acknowledges completion only once its exact final 
   await page.clock.install();const state=await host(page);state.items=[{...item('result','claude','done'),resultMessageId:'final-answer'}];
   state.sessions=[{sessionId:'session-result',provider:'claude',cwd:root,summary:'Saved completed chat',lastModified:1}];
   state.history=[{id:'stale-reply',role:'assistant',blocks:[{type:'text',text:'An earlier response before the task completed.'}]}];
-  await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);await drawer(page).getByRole('button',{name:'All chats',exact:true}).click();await page.getByRole('button',{name:/Saved completed chat/}).click();
+  await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'All chats',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await page.getByRole('button',{name:/Saved completed chat/}).click();
   await expect(page.getByText('An earlier response before the task completed.',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'claude result',exact:true})).toBeVisible();
   await drawer(page).getByRole('button',{name:'Close activity',exact:true}).click();state.history=[...state.history,{id:'final-answer',role:'assistant',blocks:[{type:'text',text:'The actual completed result is now in history.'}]}];await page.clock.fastForward(3100);
   await expect(page.getByText('The actual completed result is now in history.',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'claude result',exact:true})).toHaveCount(0);expect(state.jobCalls).toBe(0);
@@ -122,13 +122,13 @@ for(const scale of [60,130])test(`activity fits a narrow phone at ${scale}% scal
   await page.screenshot({path:`artifacts/screenshots/activity-${scale}-320.png`,fullPage:true});
 });
 
-test('global activity header remains available in every main section',async({page})=>{
+test('right activity drawer remains available in every main section',async({page})=>{
  await host(page);await page.setViewportSize({width:390,height:844});await open(page);
  for(const name of ['Tasks','Chats','Project','Settings']){
   await page.locator('.mobile-nav').getByRole('button',{name,exact:true}).click();
-  await expect(page.locator('.app-header')).toBeVisible();
+  await expect(page.locator('.app-header')).toHaveCount(0);await expect(page.locator('.app > .activity-entry')).toBeVisible();
   await expect(page.locator('.activity-entry:visible')).toHaveCount(1);
-  await openDrawer(page);await page.keyboard.press('Escape');
-  await expect(page.locator('.app-header .activity-entry')).toBeFocused();
+  await openDrawer(page);expect(await drawer(page).evaluate(el=>Math.abs(el.getBoundingClientRect().right-innerWidth))).toBeLessThan(2);await page.keyboard.press('Escape');
+  await expect(page.locator('.app > .activity-entry')).toBeFocused();
  }
 });

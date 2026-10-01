@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - Right-edge activity drawer and quieter composer (0.16.2)
+- Changed: Activity opens from a right-edge handle across main sections. Removed the global activity header and All chats action; the panel slides from the right and respects reduced-motion preferences. Reading mode hides the handle.
+- Changed: Removed the redundant provider connection/work caption below the composer; active work remains visible in the conversation and activity feed.
+- Files: src/App.tsx, src/ActivityDrawer.tsx, src/activity-drawer.css, src/styles.css, tests/activity-drawer.spec.ts and release versions.
+- Validation: All 13 activity/navigation UI scenarios passed, including global access, right alignment, focus restoration, drafts and 320px layouts at 60/130%. Inspected the 130% screenshot. TypeScript/Vite/Android build passed.
+- Follow-up: Physical-phone installation remains unverified.
+
 ## 2026-10-01 - Global activity header and explicit inference choices (0.16.1)
 - Changed: Chat activity opens from one shared application header in Tasks, Chats, Project and Settings, including the chat list. Reading mode hides this header; Back and focus restoration remain available.
 - Changed: Model selection displays the advertised Codex default name or Sonnet for Claude; effort displays the actual advertised default level without a Default label. Unknown legacy metadata shows a dash. Claude requests explicitly select Sonnet when no other model is chosen; legacy Codex requests preserve host configuration.

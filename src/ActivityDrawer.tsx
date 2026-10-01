@@ -1,5 +1,5 @@
 import {useId,useRef} from 'react';
-import {ArrowRight,Check,ChevronRight,LoaderCircle,MessageCircle,MessagesSquare,RefreshCw,Square,TriangleAlert,X} from 'lucide-react';
+import {Check,ChevronRight,LoaderCircle,MessageCircle,RefreshCw,Square,TriangleAlert,X} from 'lucide-react';
 import type {ActivityItem} from '../server/types';
 import {t,useLanguage} from './i18n';
 import {useModal} from './navigation';
@@ -13,7 +13,6 @@ export type ActivityDrawerProps={
   onRetry:()=>void;
   onOpen:(item:ActivityItem)=>void;
   onClose:()=>void;
-  onAllChats?:()=>void;
 };
 const groups=[
   {id:'attention',title:'Требует внимания',statuses:['needs_input','error']},
@@ -31,7 +30,7 @@ function state(item:ActivityItem){
 }
 
 /** Unmount to close. Viewing/acknowledging results belongs to the parent navigator. */
-export function ActivityDrawer({items,loading,error,busy=false,onRetry,onOpen,onClose,onAllChats}:ActivityDrawerProps){
+export function ActivityDrawer({items,loading,error,busy=false,onRetry,onOpen,onClose}:ActivityDrawerProps){
   useLanguage();
   const backdrop=useRef<HTMLDivElement|null>(null),id=useId();
   const needsHostUpdate=Boolean(error&&t(error)===t('Активность чатов недоступна. Обновите сервер ПК.'));
@@ -43,7 +42,6 @@ export function ActivityDrawer({items,loading,error,busy=false,onRetry,onOpen,on
         <button className="icon-button" aria-label={t('Обновить активность')} title={t('Обновить активность')} disabled={loading} onClick={onRetry}><RefreshCw size={18} aria-hidden="true"/></button>
         <button className="icon-button" aria-label={t('Закрыть активность')} title={t('Закрыть активность')} onClick={onClose}><X size={20} aria-hidden="true"/></button>
       </header>
-      {onAllChats&&<button className="activity-all-chats" disabled={busy} onClick={onAllChats}><MessagesSquare size={18} aria-hidden="true"/><span>{t('Все чаты')}</span><ArrowRight size={17} aria-hidden="true"/></button>}
       <div className="activity-drawer-content">
         {error&&<div className="activity-sync-error" role="status"><TriangleAlert size={16} aria-hidden="true"/><p>{needsHostUpdate?t(error):items.length?t('Список не обновлён. Показаны последние полученные данные.'):t('Не удалось загрузить активность.')}</p>{!needsHostUpdate&&<details><summary>{t('Подробности ошибки')}</summary><p>{t(error)}</p></details>}<button disabled={loading} onClick={onRetry}>{t('Повторить')}</button></div>}
         {loading&&!items.length&&<p className="activity-empty" role="status">{t('Загружаем активность…')}</p>}
