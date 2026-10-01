@@ -1,5 +1,6 @@
 import { jiraStageAliases, type JiraIssue, type JiraTransition } from './jira.js';
 import { HttpError } from './security.js';
+import {isTimeTracking,validEstimate} from '../src/jira-time.js';
 
 export type JiraRole = 'developer' | 'reviewer' | 'qa';
 export type WorkflowAction = { id: string; label: string; kind: 'start' | 'transition' | 'pr'; transitions: JiraTransition[] };
@@ -42,7 +43,9 @@ export function validateTransitionFields(transition: JiraTransition, fields: Rec
   for (const [key, meta] of Object.entries(transition.fields)) {
     const value = fields[key], empty = value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length);
     if (empty) { if (meta.required && !meta.hasDefaultValue) throw new HttpError(400, `Required Jira field: ${meta.name}`); continue; }
-    if (meta.allowedValues?.length) {
+    if(isTimeTracking(meta)){
+      if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['originalEstimate','remainingEstimate'].includes(k))||!validEstimate((value as any).originalEstimate)||((value as any).remainingEstimate!==undefined&&!validEstimate((value as any).remainingEstimate)))throw new HttpError(400,'Enter a time estimate, for example 2h or 1d 30m.');
+    } else if (meta.allowedValues?.length) {
       const identity = (v: any) => String(v && typeof v === 'object' ? v.id ?? v.accountId ?? v.value ?? v.name : v);
       const values = Array.isArray(value) ? value : [value];
       if (values.some(v => !meta.allowedValues!.some(allowed => identity(allowed) === identity(v)))) throw new HttpError(400, `Invalid Jira field: ${meta.name}`);

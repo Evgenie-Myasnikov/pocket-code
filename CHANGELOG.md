@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - Jira transition time estimates (0.19.6)
+- Changed: Transition forms support Jira timetracking fields with explicit-unit original estimates, such as 2h or 1d 30m. Required estimates block submission until valid; estimates travel with the transition and never create a worklog.
+- Validation: Server rejects empty, zero, malformed or extra time-tracking properties before side effects. TypeScript and 12 time/workflow tests passed; the required-estimate browser scenario and Android build passed (versionCode 38).
+- Files: src/jira-time.ts, JiraWorkflow.tsx, translations.ts; server/jira-workflow-actions.ts and focused tests.
+- Follow-up: This supports fields exposed by Jira transition metadata. Hidden workflow validators or required worklogs are not inferred; they may still require completion in Jira.
+
+
 ## 2026-10-01 - Simpler mobile connection screen (0.19.5)
 - Changed: Removed the first-time setup disclosure, storage explanation and descriptive footer below the connection form. QR scanning and image import remain the primary connection actions.
 - Why: The extra introductory details cluttered the mobile entry screen.

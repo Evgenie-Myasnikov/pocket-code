@@ -8,13 +8,14 @@ import {JiraDescription} from './JiraDescription';
 import type {JiraIssue,JiraTransition,JiraTransitionField} from '../server/jira';
 import type {JobView} from '../server/types';
 import type {CodexAccess} from './preferences';
+import {isTimeTracking,validEstimate} from './jira-time';
 
 export type JiraLink={provider:'claude'|'codex';cwd:string;jobId?:string;sessionId?:string;pr?:{url:string;number:number}};
 type Action={id:string;label:string;kind:'start'|'transition'|'pr';transitions:JiraTransition[]};
 type WorkflowView={issue:JiraIssue;stage:string;role:JiraRole;actions:Action[];link?:JiraLink;pending?:{id:string;action:string;phase:string;provider:'claude'|'codex';message:string}};
 type PullRequestPreview={ready:boolean;reason?:string;base:string;head:string;headSha:string;files:unknown[];commits:number|unknown[];existing?:{url:string;number:number}};
 type Props={connection:Connection;site:string;issue:JiraIssue;provider:'claude'|'codex';codexAccess?:CodexAccess;role:JiraRole;roots:string[];budget:number;jobs:JobView[];onBack():void;onOpen(job:JobView):void;onOpenLinked?(link:JiraLink):void;onChanged(issue:JiraIssue):void};
-const supported=(field:JiraTransitionField)=>Boolean(field.allowedValues?.length)||['string','number','date','datetime'].includes(field.schema.type);
+const supported=(field:JiraTransitionField)=>isTimeTracking(field)||Boolean(field.allowedValues?.length)||['string','number','date','datetime'].includes(field.schema.type);
 const optionLabel=(value:any)=>typeof value==='object'&&value?String(value.name||value.label||value.displayName||value.value||value.id||value.accountId):String(value);
 function optionValue(value:any,field:JiraTransitionField){
   if(typeof value!=='object'||!value)return value;
@@ -24,6 +25,7 @@ function optionValue(value:any,field:JiraTransitionField){
   return value;
 }
 function fieldValue(raw:string,field:JiraTransitionField){
+  if(isTimeTracking(field))return {originalEstimate:raw.trim()};
   if(field.allowedValues?.length){
     const indices=field.schema.type==='array'?raw.split(',').filter(Boolean):[raw];
     const values=indices.map(index=>optionValue(field.allowedValues![Number(index)],field));
@@ -37,14 +39,16 @@ function fieldValue(raw:string,field:JiraTransitionField){
 }
 function requiredInvalid(field:JiraTransitionField,value:string|undefined){
   if(!value?.trim())return field.required&&!field.hasDefaultValue;
+  if(isTimeTracking(field))return !validEstimate(value);
   if(field.schema.type==='number'||field.schema.type==='integer')return !Number.isFinite(Number(value))||field.schema.type==='integer'&&!Number.isInteger(Number(value));
   return false;
 }
 function RequiredFields({transition,values,onChange}:{transition?:JiraTransition;values:Record<string,string>;onChange(id:string,value:string):void}){
   if(!transition)return null;
-  return <>{Object.entries(transition.fields).filter(([id,field])=>field.required&&!field.hasDefaultValue||values[id]).map(([id,field])=>{
+  return <>{Object.entries(transition.fields).filter(([id,field])=>isTimeTracking(field)||field.required&&!field.hasDefaultValue||values[id]).map(([id,field])=>{
     if(!supported(field))return null;
     const value=values[id]||'',label=`${field.name}${field.required?' *':''}`;
+    if(isTimeTracking(field))return <label key={id}>{t('Оценка времени')}{field.required?' *':''}<input aria-label={t('Оценка времени')} value={value} placeholder="2h / 1d 30m" onChange={event=>onChange(id,event.target.value)}/><small>{t('Укажите плановую оценку для перехода: w — недели, d — дни, h — часы, m — минуты. Это не списание времени.')}</small>{value&&!validEstimate(value)&&<small role="alert">{t('Введите оценку времени, например 2h или 1d 30m.')}</small>}</label>;
     return <label key={id}>{label}{field.allowedValues?.length?<select aria-label={label} multiple={field.schema.type==='array'} value={field.schema.type==='array'?value.split(',').filter(Boolean):value} onChange={event=>onChange(id,field.schema.type==='array'?[...event.target.selectedOptions].map(option=>option.value).join(','):event.target.value)}>{field.schema.type!=='array'&&<option value="">{t('Выберите значение')}</option>}{field.allowedValues.map((option,index)=><option key={index} value={String(index)}>{optionLabel(option)}</option>)}</select>:field.schema.type==='boolean'?<select aria-label={label} value={value} onChange={event=>onChange(id,event.target.value)}><option value="">{t('Выберите значение')}</option><option value="true">{t('Да')}</option><option value="false">{t('Нет')}</option></select>:field.schema.type==='array'?<textarea aria-label={label} value={value} onChange={event=>onChange(id,event.target.value)} placeholder={t('По одному значению на строку')}/>:<input aria-label={label} type={field.schema.type==='date'?'date':field.schema.type==='datetime'?'datetime-local':field.schema.type==='number'||field.schema.type==='integer'?'number':'text'} step={field.schema.type==='integer'?1:'any'} value={value} onChange={event=>onChange(id,event.target.value)}/>}</label>;
   })}</>;
 }

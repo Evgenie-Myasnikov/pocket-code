@@ -34,6 +34,15 @@ async function connect(page:Page,language='en'){
 test.beforeEach(async({page})=>{await page.setViewportSize({width:390,height:844});});
 test.use({hasTouch:true,isMobile:true});
 
+test('required time estimate is entered before a task transition and is not a worklog',async({page})=>{
+ const state=await fixture(page,{view:{issue:issue(1),stage:'open',role:'developer',actions:[{id:'start_development',label:'Start development',kind:'start',transitions:[transition('start',{timetracking:{name:'Time tracking',required:true,schema:{type:'timetracking',system:'timetracking'}}})]}]}});
+ await connect(page);await page.getByRole('button',{name:'Task 1',exact:true}).click();await page.getByRole('button',{name:'Start development',exact:true}).click();
+ const submit=page.locator('.jira-form-actions').getByRole('button',{name:'Start development',exact:true});await expect(submit).toBeDisabled();
+ await page.getByLabel('Time estimate',{exact:true}).fill('0m');await expect(submit).toBeDisabled();
+ await page.getByLabel('Time estimate',{exact:true}).fill('2h');await expect(submit).toBeEnabled();await submit.click();
+ await expect.poll(()=>state.actions.length).toBe(1);expect(state.actions[0].fields).toEqual({timetracking:{originalEstimate:'2h'}});
+});
+
 test('search and category preserve selection; select all matches every page and requires a batch confirmation',async({page})=>{
   const state=await fixture(page,{issues:url=>url.searchParams.get('search')==='render'&&url.searchParams.get('type')==='Bug'?url.searchParams.get('cursor')?{issues:[issue(3,{summary:'Render task 3',issueType:'Bug'})],next:null}:{issues:[issue(2,{summary:'Render task 2',issueType:'Bug'})],next:'page-2'}:{issues:[issue(1)],next:null}});
   await connect(page);await expect(page.getByLabel('Project folder for Claude')).toHaveCount(0);await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();

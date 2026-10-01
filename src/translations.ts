@@ -1,5 +1,8 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+"Оценка времени":"Time estimate",
+"Укажите плановую оценку для перехода: w — недели, d — дни, h — часы, m — минуты. Это не списание времени.":"Enter the planned estimate for this transition: w = weeks, d = days, h = hours, m = minutes. This does not log time worked.",
+"Введите оценку времени, например 2h или 1d 30m.":"Enter a time estimate, for example 2h or 1d 30m.",
 "Jira MCP настроен в Codex, но вход не выполнен. На ПК выполните codex mcp login jira, завершите вход в Atlassian и повторите подключение. Вход Claude действует отдельно.":"Jira MCP is configured in Codex but is not signed in. On the PC, run codex mcp login jira and complete Atlassian sign-in, then retry. Claude sign-in is separate.",
 "Уточнений в очереди: {0}":"Queued follow-ups: {0}",
 "Необработанных уточнений: {0}":"Unprocessed follow-ups: {0}",
