@@ -23,3 +23,8 @@
 :root[data-theme] .message .subagent-card small{font-size:.85em}
 .jobs-panel .text-button,.jira-batch-dialog .text-button,.settings-content .text-button{font-size:var(--category-title-size)}
 .jobs-panel .muted,.jira-batch-dialog .muted,.settings-content .muted,.files-panel .muted{font-size:var(--category-detail-size)}
+
+/* Back navigation is anchored to the content edge, never centered in a grid track. */
+.project-docs-toolbar>.text-button,.jira-detail-nav>.text-button,.settings-back,.subagent-back,.chat-outputs-back button{justify-content:flex-start;text-align:left;padding-left:0;min-width:0;max-width:100%}
+.project-docs-toolbar>.text-button{justify-self:start}
+.project-docs-toolbar>.text-button svg,.jira-detail-nav>.text-button svg,.settings-back svg{flex-shrink:0}

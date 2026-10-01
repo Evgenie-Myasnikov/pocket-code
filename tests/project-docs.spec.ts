@@ -47,7 +47,9 @@ test.beforeEach(async({page})=>{await page.setViewportSize({width:390,height:844
 
 test('project rules and changelog render safe Markdown and Files remains available',async({page})=>{
   const resources:string[]=[];await page.route('https://assets.example/**',route=>{resources.push(route.request().url());return route.abort();});await host(page);await openProject(page);
-  await expect(panel(page).locator('.project-docs-item')).toHaveCount(2);await expect(panel(page).getByText('Shared · Project root')).toBeVisible();await openRule(page);
+  await expect(panel(page).locator('.project-docs-item')).toHaveCount(2);
+  const backIcon=await panel(page).locator('.project-overview-back svg').boundingBox(),toolbar=await panel(page).locator('.project-docs-toolbar').boundingBox();expect(Math.abs(backIcon!.x-toolbar!.x)).toBeLessThanOrEqual(1);
+  await expect(panel(page).getByText('Shared · Project root')).toBeVisible();await openRule(page);
   await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();await expect(panel(page).locator('li')).toHaveCount(2);await expect(panel(page).locator('pre code')).toHaveText('const safe = true;\n');await expect(panel(page).getByRole('link',{name:'Reference'})).toHaveAttribute('href','https://example.com/rules');await expect(panel(page).getByRole('link',{name:'Open image link · Diagram'})).toBeVisible();await expect(panel(page).locator('img')).toHaveCount(0);expect(resources).toEqual([]);
   await page.keyboard.press('Escape');await expect(panel(page).getByRole('button',{name:/^AGENTS.md/})).toBeFocused();await backToOverview(page);await chooseCategory(page,'changelog');await expect(panel(page).getByRole('heading',{name:'2026-09-30'})).toBeVisible();
   await backToOverview(page);await chooseCategory(page,'files');await panel(page).getByRole('button',{name:'example.txt'}).click();await expect(page.locator('.file-preview')).toContainText('File preview stays available.');

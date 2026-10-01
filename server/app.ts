@@ -1,4 +1,5 @@
 import express from 'express';
+import {TaskNotifications,jiraNotifications} from './task-notifications';
 import packageJson from '../package.json';
 import type { HostUpdater } from './host-update.js';
 import { review, reviewAvailability } from './review.js';
@@ -103,14 +104,17 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/host-update/check', async (req, res) => { const body = z.object({ appVersion: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/) }).parse(req.body); res.json(config.hostUpdater ? await config.hostUpdater.check(body.appVersion) : { supported: false, currentVersion: packageJson.version, state: 'idle' }); });
   app.post('/api/host-update/handoff', (req, res) => { const body = z.object({ targetVersion: z.string(), expectedPid: z.number().int().positive() }).parse(req.body); if (!config.hostUpdater) throw new HttpError(404, 'PC updates unavailable.'); config.hostUpdater.handoff(body.targetVersion, body.expectedPid); res.once('finish', () => config.hostUpdater!.finishHandoff()); res.json({ accepted: true }); });
   const jira = () => { if (!config.jira) throw new HttpError(503, 'Обновите и перезапустите сервер для подключения Jira'); return config.jira; };
-  app.post('/api/jira/connect-existing', async (_req, res) => { const service = jira(); if (!service.useExisting) throw new HttpError(400, 'Existing Claude connection is unavailable'); res.json(await service.useExisting()); });
+  const taskNotifications=new TaskNotifications(path.join(path.dirname(config.uploads),'task-notifications.json'),config.jira?[jiraNotifications(config.jira)]:[]);
+  app.get('/api/task-notifications',async(_req,res)=>res.json(await taskNotifications.view()));
+  app.post('/api/task-notifications/read',async(req,res)=>{const {ids}=z.object({ids:z.array(z.string().min(1).max(100)).max(300)}).parse(req.body);await taskNotifications.read(ids);res.json({ok:true});});
+  app.post('/api/jira/connect-existing', async (_req, res) => { const service = jira(); if (!service.useExisting) throw new HttpError(400, 'Existing Claude connection is unavailable'); await taskNotifications.clear('jira');res.json(await service.useExisting()); });
   app.get('/api/jira/status', async (_req, res) => res.json(await jira().status()));
   app.post('/api/jira/connect', async (req, res) => { const body = z.object({ redirectUrl: z.string().max(200) }).parse(req.body); res.json(await jira().connect(body.redirectUrl)); });
   app.post('/api/jira/finish', async (req, res) => {
     const body = z.object({ code: z.string().min(1).max(8192), state: z.string().min(32).max(128), issuer: z.string().max(200).nullish() }).parse(req.body);
-    await jira().finish(body.code, body.state, body.issuer || undefined); res.json({ ok: true });
+    await jira().finish(body.code, body.state, body.issuer || undefined); await taskNotifications.clear('jira'); res.json({ ok: true });
   });
-  app.post('/api/jira/disconnect', async (_req, res) => { await jira().disconnect(); res.json({ ok: true }); });
+  app.post('/api/jira/disconnect', async (_req, res) => { await jira().disconnect(); await taskNotifications.clear('jira'); res.json({ ok: true }); });
   app.get('/api/jira/issues', async (req, res) => {
     const query = z.object({ site: z.string().min(1).max(100), cursor: z.string().max(4000).optional(), search: z.string().max(200).optional(), type: z.string().max(100).optional(), stage: z.string().max(30).optional(),statusCategory:z.enum(['new','indeterminate','done']).optional(),status:z.string().max(100).optional(),project:z.string().max(100).optional() }).parse(req.query);
     res.json(await jira().issues(query.site, query.cursor, { search: query.search, type: query.type, stage: query.stage,...(query.statusCategory?{statusCategory:query.statusCategory}:{}),...(query.status?{status:query.status}:{}),...(query.project?{project:query.project}:{}) }));

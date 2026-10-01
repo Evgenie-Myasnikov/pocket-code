@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-01 - Provider-neutral task notification inbox (0.18.0)
+- Added: Tasks header bell with unread count, unread filtering, explicit read-all, and navigation to the correct Jira site/issue. Opening the inbox alone does not acknowledge notifications; failed or cancelled navigation remains unread.
+- Backend: Provider adapter interface with Jira as the first implementation. Foreground clients request cached inbox state; the host polls assigned-task changes at most once per minute, coalesces reads, resumes paginated scans and stores the latest 300 notifications/read states locally. Initial sync establishes a quiet baseline.
+- Events: Status changes, general updates and comment-count increases when supplied by Jira. This is a Pocket Code change feed, not Jira's internal notification inbox or Android push notifications. Existing MCP authorization is reused; no Jira writes are introduced.
+- Reliability: Atomic serialized persistence, stable event IDs, provider/site isolation, disconnect generation guards and cursor recovery. Draft navigation waits for issue retrieval and rejects stale replies after inbox closure/connection changes.
+- Files: server/task-notifications.ts, Jira adapters and app routes; src/TaskNotifications.tsx, Jira.tsx and App.tsx; notification tests.
+- Validation: 175 server/state tests passed, followed by six focused inbox/API tests including authenticated routes. 26 Jira/notification/attachment UI tests and six final notification UI scenarios passed; inspected English/Russian 320px layouts at 60%/130%. TypeScript/Vite/Android build passed.
+- Follow-up: Live account-backed Jira delivery and physical Android installation were not exercised. Other task systems can implement the provider interface but are not connected yet; mentions and full comment bodies are not available in this feed.
+
+## 2026-10-01 - Attachment previews and left-aligned Back navigation (0.18.0)
+- Changed: Images attached to a draft display local thumbnails; other files show a compact name/type/size card. Each has a separate 48px removal target; the strip scrolls horizontally and stays bounded on narrow screens.
+- Reliability: Preview object URLs are released when cards unmount; failed/unsupported image previews fall back to file cards. Draft attachments survive tab/workspace navigation and rejected sends; only upload IDs are sent to the host.
+- Fixed: Back controls in Project, task details, Settings, results and subagent panels align with the left content edge rather than centering in a stretched track.
+- Files: src/AttachmentTray.tsx, attachment-tray.css, App.tsx and interface-sizing.css; attachment, project and draft-navigation tests.
+- Validation: 25 attachment/project/recovery/navigation scenarios plus 12 attachment/workspace/follow-up scenarios passed. Checked decoded image previews, removal cleanup, invalid images, saved drafts and Back icon alignment; inspected 320px screenshots. Android build passed.
+
 ## 2026-10-01 - Direct manipulation of the activity drawer (0.17.2)
 - Changed: Larger, higher-contrast right-edge handle (8x72px with a 56x88px touch target). The drawer follows left opening drags and right closing drags before release, then settles in 120ms; tap, Back and keyboard access remain available.
 - Reliability: Pointer movement updates composited transforms without rerendering the chat; suppresses post-drag clicks, handles cancelled gestures and respects reduced motion. The scroll container explicitly permits vertical panning so browsers do not cancel horizontal touch drags.

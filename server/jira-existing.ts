@@ -108,7 +108,7 @@ export class ExistingClaudeJira implements JiraService {
   private async site(id: string) { await this.ready; if (!this.enabled) throw new HttpError(401, "Enable the existing Claude connection in Settings → Jira."); if (!this.sites) await this.status(); const site = this.sites?.find(s => s.id === id); if (!site) throw new HttpError(400, 'Select an available Jira site.'); return site; }
   async issues(id: string, cursor?: string, query?: JiraIssueQuery) {
     const site = await this.site(id);
-    const raw = await this.read('searchJiraIssuesUsingJql', { cloudId: id, jql: jiraIssuesJql(query), maxResults: 50, fields: jiraIssueFields, ...(cursor ? { nextPageToken: cursor } : {}) }, 60000);
+    const raw = await this.read('searchJiraIssuesUsingJql', { cloudId: id, jql: jiraIssuesJql(query), maxResults: 50, fields: query?.notifications ? ['summary','status','updated','comment'] : jiraIssueFields, ...(cursor ? { nextPageToken: cursor } : {}) }, 60000);
     const data = raw.data || raw;
     if (!Array.isArray(data.issues)) throw new HttpError(502, 'Jira returned an unexpected issue list.');
     return { issues: data.issues.map((item: any) => jiraIssue(item, site)).filter((issue: any) => jiraMatchesStage(issue, query?.stage)), next: data.nextPageToken || null };

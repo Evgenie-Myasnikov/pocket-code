@@ -48,10 +48,10 @@ test('busy Codex restores the rejected draft and attachment without automatic re
   const {reject,sent}=await rejectedHost(page);await connect(page);
   await page.getByLabel('Message Codex').fill('Continue my saved task');
   await page.locator('input[type=file]').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('note')});
-  await expect(page.locator('.attachment-chip')).toContainText('notes.txt');await submit(page);
+  await expect(page.locator('.draft-attachment')).toContainText('notes.txt');await submit(page);
   await expect(page.getByLabel('Message Codex')).toHaveValue('');reject.resolve();
   await expect(page.getByRole('alert')).toContainText('Your message and attachments are back in the draft');
-  await expect(page.getByLabel('Message Codex')).toHaveValue('Continue my saved task');await expect(page.locator('.attachment-chip')).toContainText('notes.txt');
+  await expect(page.getByLabel('Message Codex')).toHaveValue('Continue my saved task');await expect(page.locator('.draft-attachment')).toContainText('notes.txt');
   await expect(page.locator('.message.user')).toHaveCount(0);expect(sent).toHaveLength(1);
   await page.getByRole('button',{name:'Send message',exact:true}).click();
   await expect.poll(()=>sent.length).toBe(2);expect(sent[1].id).not.toBe(sent[0].id);expect(sent[1].attachments).toEqual(['saved-upload']);
@@ -62,14 +62,14 @@ test('busy recovery preserves a newer draft and remains isolated when switching 
   const {reject,sent}=await rejectedHost(page);await connect(page);
   await page.getByLabel('Message Codex').fill('Unsent Codex task');
   await page.locator('input[type=file]').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('note')});
-  await expect(page.locator('.attachment-chip')).toContainText('notes.txt');await submit(page);
+  await expect(page.locator('.draft-attachment')).toContainText('notes.txt');await submit(page);
   await expect(page.getByLabel('Message Codex')).toHaveValue('');await page.getByLabel('Message Codex').fill('Newer Codex draft');
   await page.locator('.workspace-picker-sidebar select').selectOption('claude');await page.getByLabel('Message Claude').fill('Private Claude draft');reject.resolve();
-  await expect(page.getByLabel('Message Claude')).toHaveValue('Private Claude draft');await expect(page.locator('.attachment-chip')).toHaveCount(0);
+  await expect(page.getByLabel('Message Claude')).toHaveValue('Private Claude draft');await expect(page.locator('.draft-attachment')).toHaveCount(0);
   await page.locator('.workspace-picker-sidebar select').selectOption('codex');
   await expect(page.getByRole('alert')).toContainText('Your newer draft is unchanged');await expect(page.getByLabel('Message Codex')).toHaveValue('Newer Codex draft');
   await page.getByRole('button',{name:'Add unsent message to draft'}).click();
-  await expect(page.getByLabel('Message Codex')).toHaveValue('Newer Codex draft\n\nUnsent Codex task');await expect(page.locator('.attachment-chip')).toContainText('notes.txt');
+  await expect(page.getByLabel('Message Codex')).toHaveValue('Newer Codex draft\n\nUnsent Codex task');await expect(page.locator('.draft-attachment')).toContainText('notes.txt');
   expect(sent).toHaveLength(1);await page.locator('.workspace-picker-sidebar select').selectOption('claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Private Claude draft');
 });
 

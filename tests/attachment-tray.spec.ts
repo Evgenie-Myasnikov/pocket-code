@@ -1,0 +1,30 @@
+﻿import {test,expect} from '@playwright/test';
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+for(const scale of [60,130])test(`attachment thumbnails and file cards at ${scale}%`,async({page})=>{
+ await page.setViewportSize({width:320,height:740});
+ await page.addInitScript(scale=>{sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)}));localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({scale,textSize:14}));
+  (window as any).revoked=[];const revoke=URL.revokeObjectURL;URL.revokeObjectURL=url=>{(window as any).revoked.push(url);revoke(url);};
+ },scale);
+ let sequence=0;await page.route('**/api/**',route=>{const endpoint=new URL(route.request().url()).pathname.replace('/api','');
+  if(endpoint==='/health')return route.fulfill({json:{name:'Fixture',roots:['C:\\Fixture'],version:'0.17.2',protocol:1}});
+  if(endpoint==='/providers')return route.fulfill({json:[{id:'claude',available:true},{id:'codex',available:true,models:[]}]});
+  if(endpoint==='/sessions'||endpoint==='/jobs')return route.fulfill({json:[]});
+  if(endpoint==='/uploads'){const body=route.request().postDataJSON();return route.fulfill({json:{id:'upload-'+(++sequence),name:body.name,size:Buffer.from(body.base64,'base64').length}});}
+  if(endpoint==='/updates/latest')return route.fulfill({json:{enabled:false}});
+  return route.fulfill({status:404,json:{error:'Fixture'}});
+ });
+ await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:'New chat',exact:false}).click();
+ await page.locator('input[type=file]').setInputFiles([{name:'preview.png',mimeType:'image/png',buffer:png},{name:'project-notes-with-a-long-name.md',mimeType:'text/markdown',buffer:Buffer.from('# Notes')}]);
+ const tray=page.locator('.attachment-tray'),photo=tray.getByRole('img',{name:'preview.png'});
+ await expect(photo).toBeVisible();await expect(tray.getByRole('button',{name:'Remove preview.png',exact:true})).toBeVisible();await expect.poll(()=>photo.evaluate(el=>(el as HTMLImageElement).naturalWidth)).toBe(1);
+ await expect(tray).toContainText('project-notes-with-a-long-name.md');await expect(tray).toContainText('MD');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(await tray.locator('button').first().evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(48);
+ await page.screenshot({path:`artifacts/screenshots/attachment-tray-${scale}.png`});
+ await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await expect(photo).toBeVisible();
+ const src=await photo.getAttribute('src');await tray.locator('.draft-attachment-image button').click();await expect(photo).toHaveCount(0);
+ await expect.poll(()=>page.evaluate(src=>(window as any).revoked.includes(src),src)).toBe(true);await expect(tray.locator('.draft-attachment')).toHaveCount(1);
+ await tray.locator('button').click();await expect(tray).toHaveCount(0);
+ await page.locator('input[type=file]').setInputFiles({name:'broken.png',mimeType:'image/png',buffer:Buffer.from('not an image')});
+ await expect(page.locator('.draft-attachment-info')).toContainText('broken.png');await expect(page.locator('.draft-attachment-image')).toHaveCount(0);
+});

@@ -60,7 +60,7 @@ export function JiraSettings({ connection }: {connection: Connection | null;}) {
     <label className="jira-role-setting">{t('Роль в Jira')}<select value={role} onChange={event=>setJiraRole(event.target.value as JiraRole)}>{(['developer','reviewer','qa'] as const).map(item=><option key={item} value={item}>{t(jiraRoleLabel(item))}</option>)}</select></label><p className="muted">{t('Роль определяет доступные действия в задачах. Права вашего аккаунта Jira остаются прежними.')}</p>
   </section>;
 }
-export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provider='claude',codexAccess='full',onOpenLinked}:{provider?:'claude'|'codex';codexAccess?:CodexAccess;connection:Connection|null;roots:string[];jobs:JobView[];budget:number;onOpen(job:JobView):void;onSettings():void;onOpenLinked?(link:JiraLink):void}){
+export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provider='claude',codexAccess='full',onOpenLinked,notificationTarget,onNotificationOpened}:{notificationTarget?:{id:string;site:string;issue:JiraIssue}|null;onNotificationOpened?:()=>void;provider?:'claude'|'codex';codexAccess?:CodexAccess;connection:Connection|null;roots:string[];jobs:JobView[];budget:number;onOpen(job:JobView):void;onSettings():void;onOpenLinked?(link:JiraLink):void}){
   const role=useJiraRole();
   const [status,setStatus]=useState<Status|null>(null),[site,setSite]=useState(''),[issues,setIssues]=useState<JiraIssue[]>([]),[next,setNext]=useState<string|null>(null);
   const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[category,setCategory]=useState(''),[updated,setUpdated]=useState(0);
@@ -81,6 +81,7 @@ export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provide
     return()=>{cancelled=true;};
   },[connection]);
   useEffect(()=>{setChecked(new Map());setSelected(null);setBatchOpen(false);batchId.current=null;setSuggestions({project:[],status:[],type:[]});setFilters({project:'',status:'',type:''});setFilterDraft({project:'',status:'',type:''});},[site]);
+  useEffect(()=>{if(!notificationTarget||!status)return;if(site!==notificationTarget.site){setSite(notificationTarget.site);return;}setSelected(notificationTarget.issue);onNotificationOpened?.();},[notificationTarget,status,site]);
   useEffect(()=>{
     if(!connection)return;let cancelled=false,timer:ReturnType<typeof setTimeout>;
     async function poll(){try{const value=await request<{paused:boolean;items:QueueItem[]}>(connection!,'/jira/queue'+(provider==='codex'?'?provider=codex':''));if(!cancelled)setQueue(value);}catch{/* Queue refresh must not block browsing issues. */}if(!cancelled)timer=setTimeout(poll,3000);}

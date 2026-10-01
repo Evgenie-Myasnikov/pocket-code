@@ -7,9 +7,9 @@ import { HttpError, validToken } from './security.js';
 import type { JiraStore } from './jira-vault.js';
 
 const endpoint = 'https://mcp.atlassian.com/v1/mcp';
-export type JiraIssue = { key: string; summary: string; description: string; descriptionFormat?: 'markdown' | 'html' | 'text'; status: string; priority: string; url: string; updated: string; statusId?: string; issueType?: string; projectKey?: string; assigneeId?: string };
+export type JiraIssue = { commentCount?: number; key: string; summary: string; description: string; descriptionFormat?: 'markdown' | 'html' | 'text'; status: string; priority: string; url: string; updated: string; statusId?: string; issueType?: string; projectKey?: string; assigneeId?: string };
 export type JiraSite = { id: string; name: string; url: string };
-export type JiraIssueQuery = { search?: string; type?: string; stage?: string; statusCategory?: string; status?: string; project?: string };
+export type JiraIssueQuery = { notifications?: boolean; search?: string; type?: string; stage?: string; statusCategory?: string; status?: string; project?: string };
 export type JiraTransitionField = { name: string; required: boolean; schema: { type: string; items?: string; system?: string; custom?: string }; allowedValues?: any[]; hasDefaultValue?: boolean };
 export type JiraTransition = { id: string; name: string; to: { id?: string; name: string }; fields: Record<string, JiraTransitionField> };
 export const jiraIssueFields = ['summary', 'description', 'status', 'priority', 'updated', 'issuetype', 'project', 'assignee'];
@@ -104,7 +104,7 @@ export function jiraText(value: any, depth = 0): string {
 export function jiraIssue(raw: any, site: JiraSite): JiraIssue {
   if (!/^[A-Z][A-Z0-9_]*-\d+$/i.test(raw?.key || '')) throw new HttpError(502, 'Jira вернула неверную задачу');
   const f = raw.fields || raw;
-  return { key: raw.key, summary: String(f.summary || '').slice(0, 1000), description: jiraText(f.description), descriptionFormat: raw.appliedContentFormat === 'html' ? 'html' : typeof f.description === 'string' ? 'markdown' : 'text', status: String(f.status?.name || (typeof f.status === 'string' ? f.status : '')), priority: String(f.priority?.name || (typeof f.priority === 'string' ? f.priority : '')), updated: String(f.updated || ''), url: `${site.url}/browse/${raw.key}`,
+  return { ...(Number.isFinite(f.comment?.total)?{commentCount:Number(f.comment.total)}:{}), key: raw.key, summary: String(f.summary || '').slice(0, 1000), description: jiraText(f.description), descriptionFormat: raw.appliedContentFormat === 'html' ? 'html' : typeof f.description === 'string' ? 'markdown' : 'text', status: String(f.status?.name || (typeof f.status === 'string' ? f.status : '')), priority: String(f.priority?.name || (typeof f.priority === 'string' ? f.priority : '')), updated: String(f.updated || ''), url: `${site.url}/browse/${raw.key}`,
     ...(f.status?.id !== undefined ? { statusId: String(f.status.id) } : {}),
     ...(f.issuetype?.name ? { issueType: String(f.issuetype.name) } : {}),
     ...(f.project?.key ? { projectKey: String(f.project.key) } : {}),
@@ -192,7 +192,7 @@ export class AtlassianJira implements JiraService, OAuthClientProvider {
   private site(id: string) { const site = this.data.sites?.find(s => s.id === id); if (!site) throw new HttpError(400, 'Выберите сайт Jira'); return site; }
   async issues(id: string, cursor?: string, query?: JiraIssueQuery) {
     await this.ready; const site = this.site(id);
-    const raw = await this.call('searchJiraIssuesUsingJql', { cloudId: id, jql: jiraIssuesJql(query), maxResults: 50, fields: jiraIssueFields, ...(cursor ? { nextPageToken: cursor } : {}) });
+    const raw = await this.call('searchJiraIssuesUsingJql', { cloudId: id, jql: jiraIssuesJql(query), maxResults: 50, fields: query?.notifications ? ['summary','status','updated','comment'] : jiraIssueFields, ...(cursor ? { nextPageToken: cursor } : {}) });
     const result = raw.data || raw;
     if (!Array.isArray(result.issues)) throw new HttpError(502, 'Неизвестный формат списка Jira');
     return { issues: result.issues.map((r: any) => jiraIssue(r, site)).filter((issue: JiraIssue) => jiraMatchesStage(issue, query?.stage)), next: result.nextPageToken || null };

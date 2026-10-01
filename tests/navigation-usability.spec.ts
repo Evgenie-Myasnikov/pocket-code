@@ -20,11 +20,11 @@ test('chat drafts survive navigation and modal Back/Escape restores focus',async
   const draft=page.getByLabel('Message Claude');await draft.fill('First unsent message');
   for(const name of ['Tasks','Project','Settings']){await page.locator('.mobile-nav').getByRole('button',{name,exact:true}).click();await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await expect(draft).toHaveValue('First unsent message');await expect(page.locator('.chat-header')).toContainText('First');}
   await page.locator('input[type=file]').setInputFiles({name:'draft.txt',mimeType:'text/plain',buffer:Buffer.from('note')});
-  await expect(page.locator('.attachment-chip')).toContainText('draft.txt');
+  await expect(page.locator('.draft-attachment')).toContainText('draft.txt');
   await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
   await page.getByRole('button',{name:/^Second/}).click();await expect(draft).toHaveValue('');await draft.fill('Second unsent message');
   await page.keyboard.press('Escape');await page.getByRole('button',{name:/^First/}).click();
-  await expect(draft).toHaveValue('First unsent message');await expect(page.locator('.attachment-chip')).toContainText('draft.txt');
+  await expect(draft).toHaveValue('First unsent message');await expect(page.locator('.draft-attachment')).toContainText('draft.txt');
   await page.getByRole('button',{name:'Review',exact:true}).click();
   const back=page.getByRole('button',{name:'Back to chat',exact:true});await expect(back).toBeFocused();
   await expect(page.locator('.chat-header')).toHaveJSProperty('inert',true);
