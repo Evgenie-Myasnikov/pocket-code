@@ -131,3 +131,15 @@ test('reading mode hides controls and preserves the chat, draft and scroll on ex
   await page.getByRole('button',{name:'Reading mode',exact:true}).click();await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
   await expect(page.locator('.app')).not.toHaveClass(/reading-mode/);await expect(page.locator('.header-title')).toContainText('Saved claude chat');await expect(page.getByLabel('Message Claude')).toHaveValue('Draft kept during reading');await expect.poll(offset).toBeCloseTo(before,0);
 });
+
+test('cached list and transcript appear before delayed refresh after reload',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await host(page);await connect(page);
+ await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).some(key=>key.startsWith('pocket-code-chats-v1:')&&localStorage.getItem(key)!.includes('History message 1')))).toBe(true);
+ const waiting=gate();
+ await page.route('**/api/sessions?*',async route=>{await waiting.promise;await route.fulfill({json:[{sessionId:'saved-chat',provider:'codex',summary:'Updated title',cwd:root,lastModified:Date.now()}]});});
+ await page.route('**/api/sessions/saved-chat/messages?*',async route=>{await waiting.promise;await route.fulfill({json:{messages:[message(2)],previous:null,next:null}});});
+ await page.reload();await page.getByRole('button',{name:'Saved codex chat'}).click();
+ await expect(page.getByText('History message 1',{exact:true})).toHaveCount(1);
+ waiting.resolve();await expect(page.getByText('History message 2',{exact:true})).toHaveCount(1);
+ await expect(page.getByText('History message 1',{exact:true})).toHaveCount(0);
+});

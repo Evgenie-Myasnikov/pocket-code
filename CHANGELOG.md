@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - Consistent chat list sizing and saved history (0.18.1)
+- Changed: Chat rows use Project/Settings category typography, spacing, icons and minimum heights at every interface scale.
+- Added: Local bounded cache of the latest session list and last 100 messages in up to 20 recently viewed chats per provider. Saved content appears before host refresh; request failures retain it. Live message snapshots are saved without restoring execution or approval state.
+- Privacy: Cache namespaces use a SHA-256 pairing-key fingerprint, never the raw key; providers remain separate. Disconnect and forget clears cached conversations. Tunnel address changes retain the same paired cache.
+- Files: src/chat-cache.ts, App.tsx, interface-sizing.css; cache and chat recovery tests.
+- Validation: Two cache tests and six browser recovery tests passed, including delayed refresh after reload. TypeScript/Vite/Android build passed (versionCode 31).
+- Follow-up: Initial connection still requires the host health check; this is cached history after connection, not a fully offline mode. Physical Android testing was unavailable.
+
 ## 2026-10-01 - Provider-neutral task notification inbox (0.18.0)
 - Added: Tasks header bell with unread count, unread filtering, explicit read-all, and navigation to the correct Jira site/issue. Opening the inbox alone does not acknowledge notifications; failed or cancelled navigation remains unread.
 - Backend: Provider adapter interface with Jira as the first implementation. Foreground clients request cached inbox state; the host polls assigned-task changes at most once per minute, coalesces reads, resumes paginated scans and stores the latest 300 notifications/read states locally. Initial sync establishes a quiet baseline.

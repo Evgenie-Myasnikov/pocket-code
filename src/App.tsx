@@ -1,3 +1,4 @@
+import {chatCacheScope,readChatCache,writeChatCache,clearChatCache} from './chat-cache';
 import {TaskNotificationBell,TaskNotificationInbox,useTaskNotifications} from './TaskNotifications';
 import type {JiraIssue} from '../server/jira';
 import {AttachmentTray,type DraftAttachment} from './AttachmentTray';
@@ -65,6 +66,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const [fromStart, setFromStart] = useStateForWorkspace(false);
   const lastScrollTop = useRefForWorkspace(0);
   const [connection, setConnection] = useState<Connection | null>(null),[saved, setSaved] = useState<Connection | null>(null);
+  const [cacheScope,setCacheScope]=useState('');
   const [health, setHealth] = useState<Health | null>(null),[sessions, setSessions] = useStateForWorkspace<Session[]>([]),[jobs, setJobs] = useStateForWorkspace<JobView[]>([]);
   const [selected, setSelected] = useStateForWorkspace<Session | null>(null),[history, setHistory] = useStateForWorkspace<ChatMessage[]>([]),[job, setJob] = useStateForWorkspace<JobView | null>(null);
   const [projects, setProjects] = useState<string[] | null>(null);
@@ -245,7 +247,8 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     try {
       const h = await request<Health>(c, '/health');
       if (h.protocol !== 1) throw new Error(t("Обновите приложение и сервер до одной версии"));
-      await saveConnection(c);setSaved(c);setConnection(c);setHealth(h);setDemo(false);
+      const scope=await chatCacheScope(c);
+      await saveConnection(c);setCacheScope(scope);setSaved(c);setConnection(c);setHealth(h);setDemo(false);
     } catch (e) {setError((e as Error).message);} finally {setBusy(false);}
   }
   useEffect(() => {loadConnection().then((c) => {if (c) {setSaved(c);void connect(c);}}).catch(() => setError(t("Не удалось прочитать сохранённое подключение. Введите ключ снова.")));}, []);
@@ -279,6 +282,16 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [connection, health, demo]);
   useEffect(()=>{if(provider==='codex' && model && providerInfo?.models?.length && !providerInfo.models.some(item=>item.id===model))setModel('');},[provider,providerInfo?.models,model]);
+  useEffect(()=>{
+    if(!cacheScope||demo)return;
+    const cached=readChatCache<Session[]>(cacheScope,provider,'sessions');
+    if(Array.isArray(cached))setSessions(cached);
+  },[cacheScope,provider,demo]);
+  useEffect(()=>{
+    if(!cacheScope||demo||!selected||loading||fromStart||!outputMessages.length)return;
+    const timer=setTimeout(()=>writeChatCache(cacheScope,provider,'chat:'+selected.sessionId,outputMessages.slice(-100)),400);
+    return()=>clearTimeout(timer);
+  },[cacheScope,provider,demo,selected?.sessionId,history,loading,fromStart,job]);
   useEffect(() => {
     if (!connection || demo || !providerInfo) return;
     let cancelled = false,timer: ReturnType<typeof setTimeout>;
@@ -287,13 +300,14 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
         const [s, j] = await Promise.all([request<Session[]>(connection!, `/sessions?provider=${provider}`), request<JobView[]>(connection!, `/jobs?provider=${provider}`)]);
         if (!cancelled) {
           const scopedSessions=s.filter(item=>!item.provider || item.provider===provider),scopedJobs=j.filter(item=>!item.provider || item.provider===provider);
+          if(cacheScope)writeChatCache(cacheScope,provider,'sessions',scopedSessions.slice(0,300));
           setSessions(scopedSessions);setJobs(scopedJobs);setSelected(old=>old?scopedSessions.find(item=>item.sessionId===old.sessionId)||old:null);setNetworkError('');
         }
       } catch (e) {if (!cancelled) setNetworkError((e as Error).message);}
       if (!cancelled) timer = setTimeout(refresh, 5000);
     }
     void refresh();return () => {cancelled = true;clearTimeout(timer);};
-  }, [connection, demo, provider, Boolean(providerInfo)]);
+  }, [connection, demo, provider, Boolean(providerInfo),cacheScope]);
   useEffect(() => {
     if (!connection || !job || demo || job.status !== 'running') return;
     let cancelled = false,timer: ReturnType<typeof setTimeout>,revision = -1;
@@ -411,7 +425,8 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     rememberDraft();setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
     historyWindow.current = 100;setHistoryError('');setFromStart(false);setShowScrollActions(false);lastScrollTop.current = 0;
-    setHistory([]);setJob(null);restoreDraft(activeJob?.sessionId||s.sessionId);setError('');setTakeover(false);setHasMore(null);nearBottom.current = true;
+    const cached=cacheScope&&!demo?readChatCache<ChatMessage[]>(cacheScope,provider,'chat:'+s.sessionId):null;
+    setHistory(Array.isArray(cached)?cached:[]);setJob(null);restoreDraft(activeJob?.sessionId||s.sessionId);setError('');setTakeover(false);setHasMore(null);nearBottom.current = true;
     if (demo) {setHistory(demoMessages);return;}
     setLoading(true);
     try {
@@ -419,6 +434,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
       const full = active ? await api<JobView>(`/jobs/${active.id}`) : null;
       if (epoch !== navigation.current) return;
       if(full&&(full.provider||'claude')!==provider)throw new Error(t('Чат относится к другому рабочему пространству.'));
+      if(full)setHistory([]);
       setJob(full);setTakeover(Boolean(full));
       const resolved=full?.sessionId?{...s,sessionId:full.sessionId,cwd:full.cwd}:s;
       if(resolved.sessionId!==s.sessionId)setSelected(resolved);
@@ -476,7 +492,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     } catch (e) {setError((e as Error).message);} finally {setUploading(false);if (fileInput.current) fileInput.current.value = '';}
   }
   function startDemo() {setDemo(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.10.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
-  async function disconnect() {try {await saveConnection(null);onDisconnect();}catch(e){setError((e as Error).message);}}
+  async function disconnect() {try {await saveConnection(null);clearChatCache();onDisconnect();}catch(e){setError((e as Error).message);}}
   if (!health) return <Connect initial={saved} onConnect={connect} onDemo={startDemo} busy={busy} error={error} />;
   const visible = sessions.filter((s) => `${s.customTitle || ""} ${s.summary} ${s.cwd}`.toLowerCase().includes(search.toLowerCase()));
   const workspacePicker = (location:'sidebar'|'header'|'settings') => <label className={`workspace-picker workspace-picker-${location}`}>{location==='settings'&&<span>{t("Рабочее пространство")}</span>}<select aria-label={t("Рабочее пространство")} value={provider} disabled={demo} onChange={event=>setProvider(event.target.value as WorkspaceProvider)}><option value="claude">Claude</option><option value="codex">Codex</option></select></label>;

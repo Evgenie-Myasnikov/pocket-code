@@ -28,3 +28,10 @@
 .project-docs-toolbar>.text-button,.jira-detail-nav>.text-button,.settings-back,.subagent-back,.chat-outputs-back button{justify-content:flex-start;text-align:left;padding-left:0;min-width:0;max-width:100%}
 .project-docs-toolbar>.text-button{justify-self:start}
 .project-docs-toolbar>.text-button svg,.jira-detail-nav>.text-button svg,.settings-back svg{flex-shrink:0}
+
+/* Chat navigation follows the same scale as Project and Settings categories. */
+.sidebar .session-row{min-height:var(--category-min-height);padding:var(--category-padding);gap:12px}
+.sidebar .session-row strong{font-size:var(--category-title-size);font-weight:600;line-height:1.4}
+.sidebar .session-row small{font-size:var(--category-detail-size);line-height:1.4}
+.sidebar .session-row>svg{width:var(--category-icon-size);height:var(--category-icon-size);flex-shrink:0}
+.sidebar .new-chat,.sidebar .search input{font-size:var(--category-title-size)}
