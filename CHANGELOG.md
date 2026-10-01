@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - Simpler mobile connection screen (0.19.5)
+- Changed: Removed the first-time setup disclosure, storage explanation and descriptive footer below the connection form. QR scanning and image import remain the primary connection actions.
+- Why: The extra introductory details cluttered the mobile entry screen.
+- Files: src/Connect.tsx.
+- Validation: TypeScript/Vite/Android build passed (versionCode 37). Source/APK/host privacy checks passed.
+
+
 ## 2026-10-01 - Shared PC Jira connection and compact stop control (0.19.4)
 - Changed: The PC QR page links to a common Jira setup screen. Select the existing Claude connector or sign in to direct MCP through Codex; the saved Jira connection serves both task AI providers.
 - Fixed: Codex reports configured-but-not-signed-in Jira explicitly instead of suggesting an unrelated runtime update. A live read-only discovery confirmed this condition; no Jira content or credentials were exported.

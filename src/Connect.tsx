@@ -1,7 +1,7 @@
 import { LanguageSelector } from './Language';
 import { t, getLanguage } from "./i18n";import { useEffect, useRef, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { ArrowUpRight, Eye, EyeOff, Laptop, ShieldCheck, Wifi, ArrowRight, Terminal } from 'lucide-react';
+import { ArrowUpRight, Eye, EyeOff, Laptop, Wifi, ArrowRight, Terminal } from 'lucide-react';
 import { normalizeUrl, type Connection } from './api';
 import { parsePairingCode, readQrImage } from './pairing';
 import { ScanLine, ImagePlus } from 'lucide-react';
@@ -37,10 +37,7 @@ export function Connect({ initial, onConnect, onDemo, busy, error }: {initial?: 
       <label>{t("Ключ подключения")}<div className="secret-input"><input type={visible ? 'text' : 'password'} required minLength={32} value={token} onChange={(e) => {edited.current.token=true;setToken(e.target.value);}} placeholder={t("Вставьте ключ с вашего ПК")} autoComplete="off" /><button type="button" className="icon-button" aria-label={visible ? t("Скрыть ключ") : t("Показать ключ")} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
       {(localError || error) && <div className="error" role="alert">{t(localError || error)}</div>}
       <button className="primary connect-button" disabled={busy || scanning}>{busy ? t("Подключаемся…") : t("Подключить компьютер")}<ArrowRight size={18} /></button>
-      <p className="security-note"><ShieldCheck size={16} />{t("Ключ хранится на телефоне. Claude и Codex работают на ПК.")}</p>
     </form>
-    <details className="setup-help"><summary>{t("Как подключиться в первый раз? ")}<ArrowUpRight size={15} /></summary><ol><li>{t("Для мобильного интернета запустите на ПК ")}<code>Start Pocket Code Internet.cmd</code>{t(". Для одной домашней сети — ")}<code>Start Pocket Code.cmd</code>.</li><li>{t("Закройте прежнее окно сервера перед запуском. Выберите папку проекта и дождитесь страницы с QR-кодом.")}</li><li>{t("Нажмите «Сканировать QR-код» на телефоне. Интернет QR начинается с HTTPS и не требует VPN на телефоне.")}</li></ol><p>{t("ПК и окно сервера должны оставаться включены. Интернет-соединение проходит через Cloudflare. После перезапуска интернет-режима сканируйте новый QR.")}</p></details>
     <button className="text-button demo-button" onClick={onDemo}>{t("Посмотреть интерфейс без подключения ")}<ArrowUpRight size={14} /></button>
-    <footer>{t("Независимый клиент для Claude Code и Codex")}</footer>
   </div>;
 }
