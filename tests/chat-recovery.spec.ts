@@ -164,3 +164,27 @@ test('chat position and jump controls survive downward scrolling, tab changes an
  await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
  await expect(page.getByRole('button',{name:'Go to beginning'})).toBeVisible();
 });
+
+
+test('Codex byte-limited history advances by returned offsets in both directions',async({page})=>{
+  await host(page);const requests:string[]=[];
+  await page.route('**/api/sessions/saved-chat/messages?*',route=>{
+    const url=new URL(route.request().url());requests.push(url.search);
+    const beginning=url.searchParams.get('from')==='start',older=url.searchParams.get('end')==='30';
+    const start=beginning||older?1:31;
+    return route.fulfill({json:{messages:Array.from({length:30},(_,i)=>message(start+i)),previous:start===31?30:null,next:beginning?30:null}});
+  });
+  await page.goto('http://127.0.0.1:5173');
+  await page.getByLabel('Computer address').fill('http://127.0.0.1:4319');await page.getByLabel('Connection key').fill('test-only-'.repeat(5));
+  await page.getByRole('button',{name:'Connect computer',exact:true}).click();
+  await page.locator('.workspace-picker-sidebar select').selectOption('codex');await page.getByRole('button',{name:'Saved codex chat'}).click();
+  await expect(page.locator('.message')).toHaveCount(30);
+  const scroller=page.locator('.conversation');await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
+  await scroller.evaluate(el=>{el.scrollTo({top:0,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
+  await expect(page.locator('.message')).toHaveCount(60);
+  expect(requests.some(query=>query.includes('end=30'))).toBe(true);
+  await page.getByRole('button',{name:'Go to beginning'}).click();await expect(page.locator('.message')).toHaveCount(30);
+  await scroller.evaluate(el=>{el.scrollTo({top:el.scrollHeight,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
+  await expect(page.locator('.message')).toHaveCount(60);
+  expect(requests.some(query=>query.includes('offset=30'))).toBe(true);
+});

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - Continue large Codex chats and index their images (0.20.3)
+- Changed: Chat history and Results use byte-bounded message pages instead of loading the entire Codex transcript under a 16 MB limit. Results offsets retain every displayable message across page boundaries; latest windows keep the newest messages.
+- Changed: Starting a normal or Jira turn counts displayable items without decoding image files or applying the whole-history display limit. Existing project and writer ownership checks remain.
+- Changed: Codex edge scrolling follows returned offsets and merges pages, so a byte-limited page does not prevent reaching earlier or later messages. Android versionCode is 44.
+- Files: server/codex.ts, codex-content.ts, app.ts; src/App.tsx; Codex, provider and chat recovery tests; application version metadata.
+- Validation: 211 server/state tests and 17 history/Results browser scenarios passed. A synthetic history over 16 MB reproduced the old failure, returned all 20 images through the HTTP API, and resumed the same thread successfully. TypeScript/Vite and Android builds passed; unpacked APK/host credential and configured-denylist checks found no matches.
+- Follow-up: Legacy Codex history still depends on its unpaginated RPC response; single messages over 16 MB and full subagent history retain display limits. Physical Android behavior has not been tested.
+
 ## 2026-10-01 - Task batches use an ordinary chat (0.20.2)
 - Changed: Selected Jira tasks now open a single normal chat with full issue descriptions and a role-aware sequential execution prompt. Large descriptions use an attachment; preparation failures retain selection and do not start partial work.
 - Changed: Removed the queue panel, queue polling and queue controls from Tasks. Individual workflow actions remain available; starting a batch chat does not automatically change Jira status or publish PRs.

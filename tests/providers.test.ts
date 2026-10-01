@@ -19,6 +19,13 @@ test('provider routes isolate history and dispatch jobs, approvals and stop to t
     status:async()=>({available:true,authenticated:true,models:[{id:'fixture-model',name:'Fixture'}]}),
     sessions:async()=>[{sessionId:sid,summary:'Codex fixture',cwd:root,lastModified:Date.now(),provider:'codex',source:'codex'}],
     messages:async()=>all,
+    messageCount:async()=>all.length,
+    messagePage:async(_id:string,options:any)=>{
+      const end=Math.min(options.end??all.length,all.length),size=options.window??100;
+      const start=options.window!==undefined&&!options.fromStart?Math.max(0,end-size):options.offset??0;
+      const stop=Math.min(start+size,end);
+      return {messages:all.slice(start,stop),previous:start||null,next:stop<end?stop:null};
+    },
     start:(input:any)=>{codexInputs.push(input);engine.start(input);engine.get(input.id).provider='codex';return engine.view(engine.get(input.id));},
     list:()=>engine.list(), get:(id:string)=>engine.get(id),view:(job:any)=>engine.view(job),
     stop:(id:string)=>engine.stop(id),approve:(...args:any[])=>(engine.approve as any)(...args),close:()=>engine.close(),

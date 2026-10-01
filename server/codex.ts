@@ -3,7 +3,7 @@ import path from 'node:path';
 import { allowedPath, HttpError } from './security.js';
 import type { Approval, ChatMessage, JobView, SubagentView } from './types.js';
 import { codexAgents, validAgentId } from './subagents.js';
-import { codexMessage } from './codex-content.js';
+import { codexMessage, isCodexMessage } from './codex-content.js';
 import { discoverCodex, StdioCodexRpc, CodexRequestError, type CodexRpc, type RpcEnvelope } from './codex-rpc.js';
 import packageJson from '../package.json';
 import {Followups,type FollowupInput} from './followups.js';
@@ -126,6 +126,60 @@ export class CodexService {
   }
   async messages(id: string): Promise<ChatMessage[]> {
     return this.messageReads(id, () => this.loadMessages(id));
+  }
+  private async *historyItems(id: string) {
+    const metadata = await this.readThread(id, false, true);
+    if (metadata.historyMode !== 'paginated') {
+      const thread = await this.readThread(id, true, true);
+      for (const turn of thread.turns || []) for (const item of turn.items || []) yield item;
+      return;
+    }
+    const rpc = await this.connect(), seen = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const result = await rpc.request('thread/items/list', { threadId: id, cursor, limit: 100, sortDirection: 'asc' });
+      for (const entry of result.data || []) yield entry.item;
+      cursor = result.nextCursor || null;
+      if (cursor && seen.has(cursor)) throw new HttpError(502, 'Codex history pagination did not advance.');
+      if (cursor) seen.add(cursor);
+    } while (cursor);
+  }
+  async messageCount(id: string): Promise<number> {
+    // Counting must not decode images or enforce a whole-conversation display limit.
+    let count = 0;
+    for await (const item of this.historyItems(id)) if (isCodexMessage(item)) count++;
+    return count;
+  }
+  async messagePage(id: string, options: { offset?: number; window?: number; end?: number; fromStart?: boolean }) {
+    const tail = options.window !== undefined && !options.fromStart;
+    const limit = options.window ?? 100, offset = options.offset ?? 0;
+    const end = options.end ?? Infinity, budget = 12_000_000;
+    const selected: { item: any; index: number; bytes: number }[] = [];
+    let total = 0, bytes = 0, more = false;
+    for await (const item of this.historyItems(id)) {
+      if (!isCodexMessage(item)) continue;
+      const index = total++;
+      if (index >= end) { more = true; break; }
+      if (!tail && index < offset) continue;
+      const size = Buffer.byteLength(JSON.stringify(item));
+      if (!tail && selected.length && (selected.length >= limit || bytes + size > budget)) { more = true; break; }
+      selected.push({ item, index, bytes: size }); bytes += size;
+      if (tail) while (selected.length > 1 && (selected.length > limit || bytes > budget)) bytes -= selected.shift()!.bytes;
+    }
+    const messages: ChatMessage[] = [];
+    let start = selected[0]?.index ?? Math.min(offset, total), stop = start, displayBytes = 0;
+    // Tail windows keep the newest messages when local image decoding expands the payload.
+    for (const entry of tail ? [...selected].reverse() : selected) {
+      const message = await codexMessage(entry.item, [...this.roots, ...(this.options.attachmentRoots || [])]);
+      if (!message) continue;
+      const size = Buffer.byteLength(JSON.stringify(message));
+      if (messages.length && displayBytes + size > budget) { more = true; break; }
+      if (size > 16_000_000) throw new HttpError(413, 'A single Codex message is too large to display on the phone.');
+      displayBytes += size;
+      if (tail) { messages.unshift(message); start = entry.index; stop = selected[selected.length - 1].index + 1; }
+      else { messages.push(message); stop = entry.index + 1; }
+    }
+    return { messages, previous: start || null, next: !tail && stop < end && (more || stop < total) ? stop : null };
   }
   private async loadMessages(id: string): Promise<ChatMessage[]> {
     const { items } = await this.threadItems(id);

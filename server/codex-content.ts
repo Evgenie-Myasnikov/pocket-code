@@ -39,6 +39,12 @@ function outputBlocks(content: unknown): Block[] {
   });
 }
 /** Only the model's public reasoning summary is displayed, never internal reasoning content. */
+export function isCodexMessage(item: any): boolean {
+  if (!item || typeof item.id !== 'string') return false;
+  if (item.type === 'reasoning') return Boolean(item.summary?.length);
+  if (item.type === 'collabAgentToolCall' || item.type === 'subAgentActivity') return codexAgents(item).length > 0;
+  return true;
+}
 export async function codexMessage(item: any, roots: string[], live = false): Promise<ChatMessage | null> {
   if (!item || typeof item.id !== 'string') return null;
   let blocks: Block[] = [], role: ChatMessage['role'] = 'assistant';

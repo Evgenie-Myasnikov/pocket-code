@@ -313,3 +313,60 @@ test('Codex displays inline conversation and generated raster images without per
   assert.equal(user?.blocks[0].source?.media_type, 'image/png'); assert.equal(generated?.blocks[0].type, 'image');
   assert.equal(unsafe?.blocks[0].type, 'text');
 });
+
+
+test('large Codex history pages preserve every image and allow sending in the same thread', async t => {
+  const { rpc, service, input, root } = await setup(t);
+  const { createApp } = await import('../server/app.js');
+  const { randomUUID } = await import('node:crypto');
+  const sessionId = randomUUID();
+  rpc.thread.id = sessionId; rpc.thread.historyMode = 'paginated';
+  const data = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB' + 'A'.repeat(1_000_000);
+  const items = Array.from({ length: 20 }, (_, n) => ({ id: `image-${n}`, type: 'imageGeneration', result: data, status: 'completed' }));
+  rpc.handler = (method, params) => method === 'thread/items/list'
+    ? { data: items.slice(Number(params.cursor || 0), Number(params.cursor || 0) + 5).map(item => ({ item })), nextCursor: Number(params.cursor || 0) + 5 < items.length ? String(Number(params.cursor || 0) + 5) : null } : undefined;
+  // The old whole-history path reproduces the reported failure.
+  await assert.rejects(service.messages(sessionId), (error: any) => error.status === 413);
+  assert.equal(await service.messageCount(sessionId), 20);
+  const runtime = await createApp({ roots: [root], uploads: path.join(root, 'uploads'), token: 't'.repeat(43), hostName: 'Fixture', desktopSessionIndexes: [], codex: service });
+  const server = runtime.app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(async () => { runtime.terminals.close(); await new Promise<void>(resolve => server.close(() => resolve())); });
+  const base = `http://127.0.0.1:${(server.address() as any).port}/api`;
+  const request = (url: string, body?: any) => fetch(base + url, { method: body ? 'POST' : 'GET', headers: { Authorization: 'Bearer ' + 't'.repeat(43), 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const ids: string[] = []; let offset: number | null = 0;
+  while (offset !== null) {
+    const response = await request(`/sessions/${sessionId}/messages?provider=codex&offset=${offset}`);
+    assert.equal(response.status, 200);
+    const page = await response.json();
+    assert.ok(Buffer.byteLength(JSON.stringify(page)) < 16_000_000);
+    assert.ok(page.messages.every((m: any) => m.blocks[0].type === 'image'));
+    ids.push(...page.messages.map((m: any) => m.id));
+    assert.ok(page.next === null || page.next > offset);
+    offset = page.next;
+  }
+  assert.deepEqual(ids, items.map(item => item.id));
+  const latest = await (await request(`/sessions/${sessionId}/messages?provider=codex&window=500`)).json();
+  assert.equal(latest.messages.at(-1).id, 'image-19'); assert.ok(latest.previous > 0);
+  const id = randomUUID();
+  const response = await request('/jobs', { ...input, id, provider: 'codex', sessionId, takeoverConfirmed: true });
+  assert.equal(response.status, 200); assert.equal((await response.json()).baseMessageCount, 20);
+  await until(() => Boolean(service.get(id).turnId));
+  assert.equal(rpc.requests.find(r => r.method === 'thread/resume')?.params.excludeTurns, true);
+});
+
+test('Codex history pages retain offsets, hidden reasoning, legacy support and cursor failure checks', async t => {
+  const { rpc, service } = await setup(t);
+  const items = [{ id: 'hidden', type: 'reasoning', summary: [] }, ...Array.from({ length: 5 }, (_, n) => ({ id: `m${n}`, type: 'agentMessage', text: 'Synthetic' }))];
+  rpc.thread.turns = [{ items }];
+  assert.equal(await service.messageCount('session-1'), 5);
+  const tail = await service.messagePage('session-1', { window: 2, end: 4 });
+  assert.deepEqual(tail.messages.map(m => m.id), ['m2', 'm3']); assert.equal(tail.previous, 2); assert.equal(tail.next, null);
+  const first = await service.messagePage('session-1', { window: 2, fromStart: true });
+  assert.deepEqual(first.messages.map(m => m.id), ['m0', 'm1']); assert.equal(first.next, 2);
+  assert.equal((await service.messagePage('session-1', { window: 2, end: 0 })).messages.length, 0);
+  rpc.thread.historyMode = 'paginated';
+  rpc.handler = method => method === 'thread/items/list' ? { data: [], nextCursor: 'loop' } : undefined;
+  await assert.rejects(service.messageCount('session-1'), /did not advance/);
+  await assert.rejects(service.messagePage('session-1', { offset: 0 }), /did not advance/);
+});

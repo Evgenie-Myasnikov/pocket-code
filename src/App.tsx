@@ -399,11 +399,14 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     paging.current=requestId;setLoadingOlder(true);
     try {
       const active=job?.errorCode==='codex_thread_busy'?null:job;
-      const data=await api<{messages:ChatMessage[];previous:number|null;next:number|null}>(`/sessions/${encodeURIComponent(selected.sessionId)}/messages?provider=${provider}&window=${nextWindow}${fromStart?'&from=start':''}${active?`&end=${active.baseMessageCount}`:''}`);
+      const query=provider==='codex'
+        ? fromStart ? `offset=${hasMore}${active?`&end=${active.baseMessageCount}`:''}` : `window=100&end=${hasMore}`
+        : `window=${nextWindow}${fromStart?'&from=start':''}${active?`&end=${active.baseMessageCount}`:''}`;
+      const data=await api<{messages:ChatMessage[];previous:number|null;next:number|null}>(`/sessions/${encodeURIComponent(selected.sessionId)}/messages?provider=${provider}&${query}`);
       if(epoch!==navigation.current||paging.current!==requestId)return;
       captureScrollAnchor(!fromStart);
       nearBottom.current=false;historyWindow.current=nextWindow;
-      setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));
+      setHistory(old=>shareMessages(old,uniqueMessages(provider==='codex'?(fromStart?[...old,...data.messages]:[...data.messages,...old]):data.messages).slice(fromStart?0:-5000,fromStart?5000:undefined)));
       setHasMore(fromStart?data.next:data.previous);setHistoryError('');
     } catch(e) {if(epoch===navigation.current)setHistoryError((e as Error).message);}
     finally {if(paging.current===requestId){paging.current=null;setLoadingOlder(false);}}
