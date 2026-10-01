@@ -5,9 +5,9 @@ const connection={url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)};
 const rule={path:'AGENTS.md',name:'AGENTS.md',kind:'rules',source:'Project root',appliesTo:'all',bytes:120};
 const claude={path:'.claude/rules/testing.md',name:'testing.md',kind:'rules',source:'.claude/rules',appliesTo:'claude',bytes:80};
 const changelog={path:'CHANGELOG.md',name:'CHANGELOG.md',kind:'changelog',source:'Project root',appliesTo:'all',bytes:90};
-type State={calls:URL[];listFailure:boolean;contentFailure:boolean;empty:boolean;truncated:boolean;content:string;delayed?:{promise:Promise<void>;resolve:()=>void}};
+type State={calls:URL[];listFailure:boolean;contentFailure:boolean;empty:boolean;truncated:boolean;documents:typeof rule[];content:string;delayed?:{promise:Promise<void>;resolve:()=>void}};
 async function host(page:Page){
-  const state:State={calls:[],listFailure:false,contentFailure:false,empty:false,truncated:false,content:'# Project conventions\n\n- Keep changes focused\n- Add **useful checks**\n\n```ts\nconst safe = true;\n```\n\n[Reference](https://example.com/rules)\n\n![Diagram](https://assets.example/diagram.png)'};
+  const state:State={calls:[],listFailure:false,contentFailure:false,empty:false,truncated:false,documents:[rule,claude,changelog],content:'# Project conventions\n\n- Keep changes focused\n- Add **useful checks**\n\n```ts\nconst safe = true;\n```\n\n[Reference](https://example.com/rules)\n\n![Diagram](https://assets.example/diagram.png)'};
   await page.route('**/api/**',async route=>{
     const url=new URL(route.request().url()),path=url.pathname.replace('/api','');state.calls.push(url);
     if(path==='/health')return route.fulfill({json:{name:'Synthetic PC',protocol:1,version:'0.11.0',roots:[first,second]}});
@@ -15,7 +15,7 @@ async function host(page:Page){
     if(path==='/sessions'||path==='/jobs')return route.fulfill({json:[]});
     if(path==='/updates/latest')return route.fulfill({json:{enabled:false}});
     if(path==='/jira/status')return route.fulfill({json:{connected:false,sites:[]}});
-    if(path==='/project-docs')return state.listFailure?route.fulfill({status:503,json:{error:'Synthetic outage'}}):route.fulfill({json:{project:url.searchParams.get('cwd'),documents:state.empty?[]:[rule,claude,changelog],truncated:state.truncated}});
+    if(path==='/project-docs')return state.listFailure?route.fulfill({status:503,json:{error:'Synthetic outage'}}):route.fulfill({json:{project:url.searchParams.get('cwd'),documents:state.empty?[]:state.documents,truncated:state.truncated}});
     if(path==='/project-doc'){
       const old=url.searchParams.get('cwd')===first,docPath=url.searchParams.get('path');
       if(state.delayed&&old&&docPath===rule.path)await state.delayed.promise;
@@ -28,27 +28,64 @@ async function host(page:Page){
     return route.fulfill({status:404,json:{error:'Synthetic endpoint not configured'}});
   });return state;
 }
-async function openProject(page:Page,language='en',scale=100){
+async function openOverview(page:Page,language='en',scale=100){
   await page.addInitScript(({connection,language,scale})=>{sessionStorage.setItem('connection',JSON.stringify(connection));localStorage.setItem('pocket-code-language-v1',language);localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',theme:'dark',textSize:14,scale}));},{connection,language,scale});
-  await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:language==='ru'?'Проект':'Project',exact:true}).click();await expect(page.locator('.project-overview-cards')).toBeVisible();await page.locator('.project-overview-card').filter({hasText:language==='ru'?'Инструкции для AI':'Instructions for AI'}).click();await expect(page.getByRole('tab',{name:language==='ru'?'Правила':'Rules',exact:true})).toBeVisible();
+  await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:language==='ru'?'Проект':'Project',exact:true}).click();await expect(page.locator('.project-overview-cards')).toBeVisible();
 }
 const panel=(page:Page)=>page.locator('.project-docs');
 const openRule=async(page:Page)=>{await panel(page).getByRole('button',{name:/^AGENTS.md/}).click();};
+const chooseCategory=async(page:Page,kind:'rules'|'changelog'|'files',language='en')=>{
+  const name={rules:language==='ru'?'Правила':'Rules',changelog:language==='ru'?'История изменений':'Changelog',files:language==='ru'?'Файлы':'Files'}[kind];
+  await page.locator('.project-overview-card').filter({has:page.getByText(name,{exact:true})}).click();
+  await expect(page.locator('.project-overview-cards')).toHaveCount(0);
+  await expect(page.locator('.project-context-picker')).toHaveCount(0);
+  await expect(panel(page).getByRole('tablist')).toHaveCount(0);
+};
+async function openProject(page:Page,language='en',scale=100){await openOverview(page,language,scale);await chooseCategory(page,'rules',language);}
+const backToOverview=async(page:Page)=>{await panel(page).getByRole('button',{name:'Project overview',exact:true}).click();await expect(page.locator('.project-overview-cards')).toBeVisible();};
 test.beforeEach(async({page})=>{await page.setViewportSize({width:390,height:844});});
 
 test('project rules and changelog render safe Markdown and Files remains available',async({page})=>{
   const resources:string[]=[];await page.route('https://assets.example/**',route=>{resources.push(route.request().url());return route.abort();});await host(page);await openProject(page);
   await expect(panel(page).locator('.project-docs-item')).toHaveCount(2);await expect(panel(page).getByText('Shared · Project root')).toBeVisible();await openRule(page);
   await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();await expect(panel(page).locator('li')).toHaveCount(2);await expect(panel(page).locator('pre code')).toHaveText('const safe = true;\n');await expect(panel(page).getByRole('link',{name:'Reference'})).toHaveAttribute('href','https://example.com/rules');await expect(panel(page).getByRole('link',{name:'Open image link · Diagram'})).toBeVisible();await expect(panel(page).locator('img')).toHaveCount(0);expect(resources).toEqual([]);
-  await page.keyboard.press('Escape');await expect(panel(page).getByRole('button',{name:/^AGENTS.md/})).toBeFocused();await page.getByRole('tab',{name:'Changelog',exact:true}).click();await panel(page).getByRole('button',{name:/^CHANGELOG.md/}).click();await expect(panel(page).getByRole('heading',{name:'2026-09-30'})).toBeVisible();
-  await panel(page).getByRole('button',{name:'Back to documents'}).click();await page.getByRole('tab',{name:'Files',exact:true}).click();await panel(page).getByRole('button',{name:'example.txt'}).click();await expect(page.locator('.file-preview')).toContainText('File preview stays available.');
-  await page.keyboard.press('Escape');await expect(page.locator('.file-preview')).toHaveCount(0);await expect(panel(page).getByRole('button',{name:'example.txt'})).toBeFocused();await panel(page).getByRole('button',{name:'notes.md'}).click();await expect(page.getByRole('dialog',{name:'notes.md'}).getByRole('heading',{name:'Rendered file notes'})).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('tab',{name:'Files',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.keyboard.press('Escape');await expect(panel(page).getByRole('button',{name:/^AGENTS.md/})).toBeFocused();await backToOverview(page);await chooseCategory(page,'changelog');await expect(panel(page).getByRole('heading',{name:'2026-09-30'})).toBeVisible();
+  await backToOverview(page);await chooseCategory(page,'files');await panel(page).getByRole('button',{name:'example.txt'}).click();await expect(page.locator('.file-preview')).toContainText('File preview stays available.');
+  await page.keyboard.press('Escape');await expect(page.locator('.file-preview')).toHaveCount(0);await expect(panel(page).getByRole('button',{name:'example.txt'})).toBeFocused();await panel(page).getByRole('button',{name:'notes.md'}).click();await expect(page.getByRole('dialog',{name:'notes.md'}).getByRole('heading',{name:'Rendered file notes'})).toBeVisible();await page.keyboard.press('Escape');await expect(panel(page).locator('.project-docs-files')).toBeVisible();
+});
+
+test('a single rule opens directly as a document and Back restores the overview',async({page})=>{
+  const state=await host(page);state.documents=[rule,changelog];await openOverview(page);
+  await expect(page.locator('.project-context-picker')).toBeVisible();await expect(panel(page).locator('.project-overview-card')).toHaveCount(3);await expect(panel(page).locator('.project-location')).toHaveCount(0);await expect(panel(page).getByText(first,{exact:true})).toHaveCount(0);
+  await chooseCategory(page,'rules');await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();
+  await expect(panel(page).locator('.project-docs-list')).toHaveCount(0);await expect(panel(page).getByRole('button',{name:'Back to documents'})).toHaveCount(0);await expect(panel(page).getByRole('button',{name:'Project overview',exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');await expect(panel(page).locator('.project-overview-card')).toHaveCount(3);await expect(page.locator('.project-context-picker')).toBeVisible();await expect(panel(page).locator('.project-document')).toHaveCount(0);
+  await chooseCategory(page,'rules');await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();await backToOverview(page);await expect(panel(page).locator('.project-document')).toHaveCount(0);
+});
+
+test('Russian single-document view keeps only the document context',async({page})=>{
+  await page.setViewportSize({width:360,height:760});const state=await host(page);state.documents=[rule,changelog];state.content='# Правила проекта\n\n- Сохраняйте понятную структуру.\n- Проверяйте внесённые изменения.';
+  await openProject(page,'ru');await expect(panel(page).getByRole('heading',{name:'Правила проекта',exact:true})).toBeVisible();await expect(panel(page).getByRole('button',{name:'Обзор проекта',exact:true})).toBeVisible();await expect(page.locator('.project-context-picker')).toHaveCount(0);await expect(panel(page).getByRole('tablist')).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:'artifacts/screenshots/project-single-document-ru.png',fullPage:true});await panel(page).getByRole('button',{name:'Обзор проекта',exact:true}).click();await expect(page.getByLabel('Папка проекта',{exact:true})).toBeVisible();await expect(panel(page).locator('.project-overview-card')).toHaveCount(3);
+});
+
+test('multiple rules keep their own list without repeating other categories',async({page})=>{
+  await host(page);await openProject(page);await expect(panel(page).locator('.project-docs-item')).toHaveCount(2);await expect(panel(page).locator('.project-docs-item')).not.toContainText(['CHANGELOG.md']);
+  await openRule(page);await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();await expect(page.locator('.project-context-picker')).toHaveCount(0);
+  await panel(page).getByRole('button',{name:'Back to documents'}).click();await expect(panel(page).locator('.project-docs-item')).toHaveCount(2);await expect(panel(page).getByRole('button',{name:/^AGENTS.md/})).toBeFocused();await expect(panel(page).getByRole('tablist')).toHaveCount(0);
+  await page.keyboard.press('Escape');await expect(panel(page).locator('.project-overview-card')).toHaveCount(3);await expect(page.locator('.project-context-picker')).toBeVisible();
+});
+
+test('a truncated index does not mistake one visible rule for the only document',async({page})=>{
+  const state=await host(page);state.documents=[rule];state.truncated=true;await openProject(page);
+  await expect(panel(page).getByText(/Some documents are not listed/)).toBeVisible();await expect(panel(page).locator('.project-docs-item')).toHaveCount(1);await expect(panel(page).locator('.project-document')).toHaveCount(0);expect(state.calls.filter(url=>url.pathname==='/api/project-doc')).toHaveLength(0);
+  await openRule(page);await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();await panel(page).getByRole('button',{name:'Back to documents'}).click();await expect(panel(page).locator('.project-docs-item')).toHaveCount(1);await expect(panel(page).getByText(/Some documents are not listed/)).toBeVisible();
 });
 
 test('late document responses cannot cross document or project selection',async({page})=>{
   let resolve!:()=>void;const promise=new Promise<void>(done=>{resolve=done;});const state=await host(page);state.delayed={promise,resolve};await openProject(page);await openRule(page);await expect(panel(page).getByText('Loading document…')).toBeVisible();
   await panel(page).getByRole('button',{name:'Back to documents'}).click();await panel(page).getByRole('button',{name:/^testing.md/}).click();await expect(panel(page).getByRole('heading',{name:'Testing rules'})).toBeVisible();
-  await page.getByLabel('Project folder',{exact:true}).selectOption(second);await panel(page).getByRole('button').filter({hasText:'Instructions for AI in this project'}).click();await expect(panel(page).getByRole('tab',{name:'Rules',exact:true})).toBeVisible();await openRule(page);await expect(panel(page).getByRole('heading',{name:'Second project rules'})).toBeVisible();resolve();
+  await panel(page).getByRole('button',{name:'Back to documents'}).click();await backToOverview(page);await page.getByLabel('Project folder',{exact:true}).selectOption(second);await chooseCategory(page,'rules');await openRule(page);await expect(panel(page).getByRole('heading',{name:'Second project rules'})).toBeVisible();resolve();
   await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toHaveCount(0);await expect(panel(page).getByRole('heading',{name:'Second project rules'})).toBeVisible();
 });
 
@@ -64,7 +101,7 @@ test('document errors retain the previous copy and can be retried explicitly',as
 
 test('list error, recognized empty paths and truncation have clear states',async({page})=>{
   const state=await host(page);state.listFailure=true;await openProject(page);await expect(panel(page).getByRole('alert')).toContainText('Could not refresh documents.');await expect(panel(page).getByText('No project rules found.')).toHaveCount(0);state.listFailure=false;state.empty=true;await panel(page).getByRole('button',{name:'Try again'}).click();await expect(panel(page).getByText('No project rules found.')).toBeVisible();await expect(panel(page).getByText(/Recognized files: AGENTS.md/)).toBeVisible();
-  await page.getByRole('tab',{name:'Changelog',exact:true}).click();await expect(panel(page).getByText('No changelog found.')).toBeVisible();state.empty=false;state.truncated=true;await panel(page).getByRole('button',{name:'Refresh documents'}).click();await expect(panel(page).getByText(/Some documents are not listed/)).toBeVisible();
+  await backToOverview(page);await chooseCategory(page,'changelog');await expect(panel(page).getByText('No changelog found.')).toBeVisible();state.empty=false;state.truncated=true;await panel(page).getByRole('button',{name:'Refresh documents'}).click();await expect(panel(page).getByText(/Some documents are not listed/)).toBeVisible();
 });
 
 for(const profile of [{width:320,height:640,language:'en',scale:130},{width:360,height:760,language:'ru',scale:100}])test(`project documents fit ${profile.width}px ${profile.language} ${profile.scale}%`,async({page})=>{
