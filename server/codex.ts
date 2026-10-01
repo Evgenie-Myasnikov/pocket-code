@@ -16,7 +16,7 @@ type StartInput = { id: string; cwd: string; sessionId?: string; text: string; m
 type Pending = { finish: (allow: boolean, answers?: Record<string, string>) => void };
 type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void>; followups?:Followups };
 export type CodexSession = { sessionId: string; summary: string; cwd: string; lastModified: number; gitBranch?: string; source: 'codex'; provider: 'codex'; readOnly?: boolean };
-export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexRpc>; approvalTimeoutMs?: number; attachmentRoots?: string[] };
+export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexRpc>; approvalTimeoutMs?: number; attachmentRoots?: string[]; allProjectHistory?:boolean };
 
 export class CodexService {
   async usage() { return normalizeCodexUsage(await (await this.connect()).request('account/rateLimits/read', {})); }
@@ -64,11 +64,11 @@ export class CodexService {
       return { available, authenticated, models, ...(!authenticated ? { error: 'Sign in to Codex on this PC, then reconnect.' } : {}) };
     } catch (error) { return { available, authenticated: false, models: [], error: error instanceof Error ? error.message : 'Codex is unavailable.' }; }
   }
-  private async readThread(id: string, includeTurns = false) {
+  private async readThread(id: string, includeTurns = false, historyOnly = false) {
     if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw new HttpError(400, 'Invalid Codex conversation.');
     const rpc = await this.connect(), result = await rpc.request('thread/read', { threadId: id, includeTurns });
     if (!result?.thread?.cwd) throw new HttpError(404, 'Codex conversation not found.');
-    await allowedPath(this.roots, result.thread.cwd, true);
+    if(!(historyOnly&&this.options.allProjectHistory))await allowedPath(this.roots, result.thread.cwd, true);
     return result.thread;
   }
   async sessions(): Promise<CodexSession[]> {
@@ -82,11 +82,13 @@ export class CodexService {
       const result = await rpc.request('thread/list', { cursor, limit: 100, archived: false, sortKey: 'updated_at', sourceKinds: ['cli', 'vscode', 'appServer', 'exec'], modelProviders: [] });
       for (const thread of result.data || []) {
         try {
-          const cwd = await allowedPath(this.roots, thread.cwd, true);
+          if(typeof thread.cwd!=='string'||!thread.cwd)continue;
+          let cwd=thread.cwd,readOnly=false;
+          try{cwd=await allowedPath(this.roots,thread.cwd,true);}catch{if(!this.options.allProjectHistory)continue;readOnly=true;}
           if (typeof thread.id !== 'string' || seen.has(thread.id)) continue;
           seen.add(thread.id);
           sessions.push({ sessionId: thread.id, summary: String(thread.name || thread.preview || 'Codex chat').slice(0, 500), cwd,
-            lastModified: Number(thread.updatedAt || thread.createdAt || 0) * 1000, gitBranch: thread.gitInfo?.branch, source: 'codex', provider: 'codex' });
+            lastModified: Number(thread.updatedAt || thread.createdAt || 0) * 1000, gitBranch: thread.gitInfo?.branch, source: 'codex', provider: 'codex',...(readOnly?{readOnly:true}:{}) });
         } catch { /* Other projects must not become visible through this bridge. */ }
       }
       if (!result.nextCursor || result.nextCursor === cursor) break;
@@ -98,7 +100,7 @@ export class CodexService {
     return this.itemReads(id, () => this.loadThreadItems(id));
   }
   private async loadThreadItems(id: string) {
-    const metadata = await this.readThread(id), rpc = await this.connect();
+    const metadata = await this.readThread(id,false,true), rpc = await this.connect();
     let items: any[] = [], serializedSize = 2;
     if (metadata.historyMode === 'paginated') {
       let cursor: string | null = null;
@@ -116,7 +118,7 @@ export class CodexService {
         cursor = result.nextCursor;
       }
     } else {
-      const thread = await this.readThread(id, true);
+      const thread = await this.readThread(id, true,true);
       items = (thread.turns || []).flatMap((turn: any) => turn.items || []);
     }
     if (metadata.historyMode !== 'paginated' && JSON.stringify(items).length > 16_000_000) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
@@ -142,7 +144,7 @@ export class CodexService {
     const mentioned = spawned || items.some(item => (item.type === 'subAgentActivity' && item.agentThreadId === child)
       || (item.type === 'collabAgentToolCall' && item.receiverThreadIds?.includes(child)));
     if (!mentioned) throw new HttpError(404, 'Agent does not belong to this conversation.');
-    const metadata = await this.readThread(child);
+    const metadata = await this.readThread(child,false,true);
     const source = metadata.source?.subAgent?.thread_spawn;
     if (source ? source.parent_thread_id !== parent : !spawned) throw new HttpError(404, 'Agent does not belong to this conversation.');
     return metadata;

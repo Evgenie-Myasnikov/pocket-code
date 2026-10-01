@@ -119,6 +119,17 @@ test('Codex lists only allowed projects and checks scope before loading history'
   assert.equal(rpc.requests.filter(r => r.method === 'thread/read' && r.params.includeTurns).length, 0);
 });
 
+test('all-project history includes other folders read-only without allowing resume or file access',async t=>{
+ const {rpc,root,outside,input}=await setup(t);
+ const service=new CodexService([root],{rpcFactory:()=>rpc,allProjectHistory:true});t.after(()=>service.close());
+ const valid={...rpc.thread};rpc.handler=(method,params)=>method==='thread/list'?{data:params.cursor?[{...valid,id:'outside',cwd:outside}]:[valid],nextCursor:params.cursor?null:'page-2'}:undefined;
+ const sessions=await service.sessions();assert.equal(sessions.length,2);assert.equal(sessions.find(s=>s.sessionId==='outside')?.readOnly,true);assert.equal(sessions.find(s=>s.sessionId===valid.id)?.readOnly,undefined);
+ rpc.thread={...valid,cwd:outside,turns:[{items:[{id:'answer',type:'agentMessage',text:'Saved response'}]}]};
+ assert.equal((await service.messages('outside')).length,1);
+ service.start({...input,sessionId:'outside'});await until(()=>service.get(input.id).status==='error');
+ assert.equal(rpc.requests.some(r=>r.method==='thread/resume'||r.method==='turn/start'),false);
+});
+
 test('Codex paginated history preserves rich content and excludes private reasoning', async t => {
   const { rpc, service } = await setup(t); rpc.thread.historyMode = 'paginated';
   rpc.handler = (method, params) => method === 'thread/items/list' ? params.cursor ? { data: [{ item: { id: 'a', type: 'agentMessage', text: 'Done' } }], nextCursor: null } : {

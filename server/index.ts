@@ -39,7 +39,7 @@ const jiraConnection=new JiraConnection(path.join(local,'jira-connection.json'),
 await jiraConnection.ready;
 const jiraSetupKey=randomBytes(32).toString('base64url');
 const jiraLogin=new JiraLogin(async()=>Boolean((await jiraConnection.verify('codex')).connected));
-const codex = new CodexService(roots, { attachmentRoots: [path.join(local, 'uploads')] });
+const codex = new CodexService(roots, { attachmentRoots: [path.join(local, 'uploads')],allProjectHistory:true });
 let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });

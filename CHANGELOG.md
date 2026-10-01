@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - Codex history across projects (0.19.7)
+- Fixed: Production hosts now list and read Codex chats from other project folders. Previously directory authorization silently removed these chats from the list.
+- Boundaries: Out-of-scope or missing project folders mark chats read-only. Resume, commands, project files and local image reads retain the configured folder checks; child history still checks parent membership.
+- Files: server/codex.ts, server/index.ts, tests/codex.test.ts.
+- Validation: TypeScript passed; live metadata-only check returned 165 chats (162 read-only, three within the connected project). No conversation bodies were inspected by the live check. 30 Codex/subagent tests and TypeScript/Vite/Android build passed (versionCode 39).
+- Follow-up: Archived chats remain excluded, as before. To continue a read-only chat, connect its project folder on the PC.
+
+
 ## 2026-10-01 - Jira transition time estimates (0.19.6)
 - Changed: Transition forms support Jira timetracking fields with explicit-unit original estimates, such as 2h or 1d 30m. Required estimates block submission until valid; estimates travel with the transition and never create a worklog.
 - Validation: Server rejects empty, zero, malformed or extra time-tracking properties before side effects. TypeScript and 12 time/workflow tests passed; the required-estimate browser scenario and Android build passed (versionCode 38).
