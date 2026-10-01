@@ -157,7 +157,7 @@ public class ChatWatchService extends Service {
         if(attention)builder.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
         return builder.setSmallIcon(R.drawable.ic_chat_notification)
             .setContentTitle(title.substring(0,Math.min(title.length(),120))).setContentText(status)
-            .setSubText("codex".equals(value(selection,"provider"))?"Codex":"Claude")
+            .setSubText("copilot".equals(value(selection,"provider"))?"Copilot":"codex".equals(value(selection,"provider"))?"Codex":"Claude")
             .setContentIntent(pending).setOnlyAlertOnce(!attention).setOngoing(ongoing).setAutoCancel(!ongoing)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setCategory(attention?Notification.CATEGORY_MESSAGE:Notification.CATEGORY_PROGRESS).build();
     }

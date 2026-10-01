@@ -7,7 +7,7 @@ import {useModal} from './navigation';
 import './task-notifications.css';
 type Inbox={items:TaskNotification[];unread:number;loading:boolean;checkedAt:number;error?:string;sources?:{id:string;name:string}[]};
 const empty:Inbox={items:[],unread:0,loading:false,checkedAt:0};
-export function useTaskNotifications(connection:Connection|null,provider:'claude'|'codex'='claude'){
+export function useTaskNotifications(connection:Connection|null,provider:'claude'|'codex'|'copilot'='claude'){
  const request=providerRequest(provider);
  const [inbox,setInbox]=useState<Inbox>(empty),generation=useRef(0),pending=useRef(false),refreshRef=useRef<()=>Promise<void>>(async()=>{});
  useEffect(()=>{const current=++generation.current;setInbox(empty);pending.current=false;if(!connection)return;

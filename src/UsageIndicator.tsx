@@ -6,19 +6,19 @@ import {remainingUsage} from './usage-summary';
 import type {CodexUsageSnapshot} from '../server/codex-usage';
 import './usage-indicator.css';
 
-export function UsageIndicator({connection,provider,models,onOpen}:{connection:Connection;provider:'claude'|'codex';models:string[];onOpen:()=>void}){
+export function UsageIndicator({connection,provider,models,onOpen}:{connection:Connection;provider:'claude'|'codex'|'copilot';models:string[];onOpen:()=>void}){
   const ru=useLanguage()==='ru',button=useRef<HTMLButtonElement|null>(null);
   const [visible,setVisible]=useState(false),[snapshot,setSnapshot]=useState<CodexUsageSnapshot|null>(null),[failed,setFailed]=useState(false);
   useEffect(()=>{const node=button.current;if(!node)return;const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)));observer.observe(node);return()=>observer.disconnect();},[]);
   useEffect(()=>{
-    if(!visible)return;let active=true;
+    if(!visible||provider==='copilot')return;let active=true;
     const stop=startVisiblePoll(async()=>{
       try{const value=await request<CodexUsageSnapshot>(connection,`/${provider}/usage`);if(active){setSnapshot(value);setFailed(false);}}
       catch{if(active)setFailed(true);}
     },60_000);
     return()=>{active=false;stop();};
   },[visible,connection.url,connection.token,provider]);
-  const remaining=failed?null:remainingUsage(snapshot,provider,models),engine=provider==='codex'?'Codex':'Claude';
+  const remaining=provider==='copilot'||failed?null:remainingUsage(snapshot,provider,models),engine=provider==='copilot'?'Copilot':provider==='codex'?'Codex':'Claude';
   const percent=remaining===null?'—':`${Math.floor(remaining)}%`;
   const label=remaining===null?(ru?`${engine}: лимиты недоступны`:`${engine}: limits unavailable`):(ru?`${engine}: осталось ${percent} лимита`:`${engine}: ${percent} allowance remaining`);
   const hint=ru?'Минимальный остаток доступных лимитов для текущей модели. Нажмите для подробностей.':'Lowest remaining allowance across available limits for the current model. Open for details.';

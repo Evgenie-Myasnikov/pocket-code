@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01 - GitHub Copilot workspace and automatic sign-in detection (0.20.0)
+- Changed: Added GitHub Copilot using the official SDK, with separate project/chat preferences, history, streaming replies, attachments, follow-ups, stop, permission questions and Jira execution queues. Shared Jira authorization remains separate from the selected task AI.
+- Authentication: Existing PC credentials are discovered by the SDK, including GitHub CLI. An explicit settings action launches the bundled official CLI browser login on the PC; it times out after five minutes and is terminated with the host. Pocket Code does not copy GitHub tokens to Android.
+- Files: server/copilot.ts, copilot-login.ts, app.ts, index.ts; provider-aware UI/types, CopilotConnection.tsx and workspace tests.
+- Validation: TypeScript, seven Copilot unit/API tests and the mobile Copilot scenario passed; eight existing workspace scenarios and 27 provider/activity/workflow tests passed. A live SDK check detected GitHub CLI authentication, and a tool-free prompt completed with an assistant response.
+- Follow-up: Copilot quota details, subagent transcripts and version-triggered maintenance are not yet integrated. First-time OAuth interaction was not exercised because this PC was already authenticated; Android device behavior remains unverified.
+
 ## 2026-10-01 - Collapsible review and chat attention alerts (0.19.8)
 - Changed: Review displays one scrollable list of changed files, each with a collapsible diff. Options derive visibility checkboxes from actual file extensions. Nearby patches load with three concurrent requests; virtualized rows account for preceding files changing height.
 - Changed: Subagent panels use rounded edges, compact borderless rows and lighter task disclosures.

@@ -13,7 +13,7 @@ function windowLabel(window: CodexUsageWindow) {
 }
 const dateLabel = (milliseconds: number) => new Date(milliseconds).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' });
 
-export function CodexUsage({ connection, provider = 'codex' }: { connection: Connection | null; provider?: 'claude' | 'codex' }) {
+export function CodexUsage({ connection, provider = 'codex' }: { connection: Connection | null; provider?: 'claude' | 'codex' | 'copilot' }) {
   useLanguage();
   const providerName = provider === 'claude' ? 'Claude' : 'Codex';
   const [snapshot, setSnapshot] = useState<CodexUsageSnapshot | null>(null);

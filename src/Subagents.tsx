@@ -9,7 +9,7 @@ import type {ChatMessage,SubagentView} from '../server/types';
 export type {SubagentView} from '../server/types';
 import './subagents.css';
 
-type Props={connection:Connection;provider:'claude'|'codex';parentId:string;onClose:()=>void;initialAgentId?:string;initialAgent?:SubagentView};
+type Props={connection:Connection;provider:'claude'|'codex'|'copilot';parentId:string;onClose:()=>void;initialAgentId?:string;initialAgent?:SubagentView};
 const states=new Set(['running','completed','error','stopped','unknown']);
 function status(agent:SubagentView){return states.has(agent.status)?agent.status:'unknown';}
 function State({agent}:{agent:SubagentView}){

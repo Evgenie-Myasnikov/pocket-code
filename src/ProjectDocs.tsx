@@ -9,10 +9,10 @@ import {safeWebUrl} from './RichBlocks';
 import {Files} from './Files';
 import './project-docs.css';
 
-type ProjectDocument={path:string;name:string;kind:'rules'|'changelog';source:string;appliesTo:'all'|'claude'|'codex';bytes:number};
+type ProjectDocument={path:string;name:string;kind:'rules'|'changelog';source:string;appliesTo:'all'|'claude'|'codex'|'copilot';bytes:number};
 type DocumentIndex={project:string;documents:ProjectDocument[];truncated:boolean};
 type DocumentContent=ProjectDocument&{content:string};
-type Props={roots?:string[];onSelectProject?(root:string):void;connection:Connection;root:string;provider?:'claude'|'codex';onProject:(path:string)=>void};
+type Props={roots?:string[];onSelectProject?(root:string):void;connection:Connection;root:string;provider?:'claude'|'codex'|'copilot';onProject:(path:string)=>void};
 const labels={
   projectFolder:['Project folder','Папка проекта'],
   overview:['Project overview','Обзор проекта'],location:['Project folder','Расположение проекта'],rootLabel:['Project root','Корень проекта'],browse:['Browse folders and open files','Папки и просмотр файлов'],ruleHelp:['Instructions for AI in this project','Инструкции для AI в этом проекте'],historyHelp:['Read the project change history','Посмотреть историю изменений проекта'],

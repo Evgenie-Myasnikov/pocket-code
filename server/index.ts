@@ -1,3 +1,4 @@
+import {CopilotService} from './copilot.js';
 import { randomBytes } from 'node:crypto';
 import { hostname, homedir, networkInterfaces } from 'node:os';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -40,10 +41,11 @@ await jiraConnection.ready;
 const jiraSetupKey=randomBytes(32).toString('base64url');
 const jiraLogin=new JiraLogin(async()=>Boolean((await jiraConnection.verify('codex')).connected));
 const codex = new CodexService(roots, { attachmentRoots: [path.join(local, 'uploads')],allProjectHistory:true });
+const copilot=new CopilotService(roots);
 let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
-const { app, jobs, terminals, queue, codexQueue, workflow, isBusy, maintainEngines } = await createApp({ pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
+const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines } = await createApp({ copilot,pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
 runtimeReady = true;
 const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
 void maintainEngines().catch(()=>{});
@@ -90,7 +92,7 @@ function shutdown(preserveTunnel = false): Promise<void> {
   if (shutdownPromise) return shutdownPromise;
   closing = true; runtimeReady = false; hostUpdater.close(); clearInterval(workflowTimer); clearInterval(engineTimer);
   const stopped = new Promise<void>(resolve => server.close(() => resolve()));
-  const queues = [queue?.close(), codexQueue?.close()];
+  const queues = [queue?.close(), codexQueue?.close(),copilotQueue?.close(),copilot.close()];
   jiraLogin.close(); codexJiraTools.close(); codex.close(); jobs.close(); terminals.close();
   // Keep shutdown bounded if a network client fails to finish closing, but let
   // local workflow writes and owned tunnel termination settle before exit.

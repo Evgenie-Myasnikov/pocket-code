@@ -8,16 +8,16 @@ import { JiraPullRequests } from './jira-pr.js';
 import type { CodexAccess } from './codex-access.js';
 import { workflowActions, workflowStage, validateTransitionFields, type JiraRole } from './jira-workflow-actions.js';
 
-export type WorkflowLink = { provider: 'claude' | 'codex'; cwd: string; role: JiraRole; jobId?: string; sessionId?: string; pr?: { url: string; number: number } };
-export type WorkflowInput = { id: string; site: string; key: string; provider: 'claude' | 'codex'; role: JiraRole; action: string; cwd: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; transitionId?: string; fields?: Record<string, unknown>; pullRequest?: { title: string; body: string; base: string; head: string; headSha: string } };
+export type WorkflowLink = { provider: 'claude' | 'codex' | 'copilot'; cwd: string; role: JiraRole; jobId?: string; sessionId?: string; pr?: { url: string; number: number } };
+export type WorkflowInput = { id: string; site: string; key: string; provider: 'claude' | 'codex' | 'copilot'; role: JiraRole; action: string; cwd: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; transitionId?: string; fields?: Record<string, unknown>; pullRequest?: { title: string; body: string; base: string; head: string; headSha: string } };
 type Operation = { id: string; signature: string; action: string; source: string; cwd: string; role: JiraRole; transition?: JiraTransition; phase: 'prepared' | 'pr_pending' | 'pr_done' | 'transition_pending' | 'transition_done' | 'job_pending' | 'done'; jobId?: string; previousSession?: string; aliases?: string[]; pullRequest?: WorkflowInput['pullRequest'] };
-type RecordEntry = { site: string; key: string; provider: 'claude' | 'codex'; link?: WorkflowLink; links?: Partial<Record<JiraRole, WorkflowLink>>; pr?: WorkflowLink['pr']; prCwd?: string; operation?: Operation; completed: string[]; abandoned?: string[] };
+type RecordEntry = { site: string; key: string; provider: 'claude' | 'codex' | 'copilot'; link?: WorkflowLink; links?: Partial<Record<JiraRole, WorkflowLink>>; pr?: WorkflowLink['pr']; prCwd?: string; operation?: Operation; completed: string[]; abandoned?: string[] };
 const canonical = (value: any): any => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().filter(key => value[key] !== undefined).map(key => [key, canonical(value[key])])) : value;
 const sameFolder = (a: string, b: string) => process.platform === 'win32' ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
 const atDestination = (issue: JiraIssue, transition: JiraTransition) => issue.statusId && transition.to.id ? issue.statusId === transition.to.id : issue.status.normalize('NFKC').trim().toLowerCase() === transition.to.name.normalize('NFKC').trim().toLowerCase();
 type Dependencies = {
   jira: JiraService;
-  jiraForProvider?(provider:'claude'|'codex'):JiraService;
+  jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService;
   validate(input: WorkflowInput): Promise<string>;
   start(input: WorkflowInput, issue: JiraIssue, sessionId?: string): Promise<JobView>;
   job(id: string): JobView | undefined;
@@ -59,7 +59,7 @@ export class JiraWorkflow {
     });
     return this.writes;
   }
-  private jira(provider:'claude'|'codex'){return this.deps.jiraForProvider?.(provider)||this.deps.jira;}
+  private jira(provider:'claude'|'codex'|'copilot'){return this.deps.jiraForProvider?.(provider)||this.deps.jira;}
   private recordKey(site: string, key: string, provider: string) { return JSON.stringify([site, key.toUpperCase(), provider]); }
   private issueKey(site: string, key: string) { return JSON.stringify([site, key.toUpperCase()]); }
   private issueRecords(site: string, key: string) { return Object.values(this.records).filter(record => record.site === site && record.key.toUpperCase() === key.toUpperCase()); }
@@ -83,7 +83,7 @@ export class JiraWorkflow {
     if (changed) await this.save();
   }
   async sync() { await this.ready; for (const entry of Object.values(this.records)) await this.syncLink(entry); await this.writes; }
-  async view(site: string, key: string, provider: 'claude' | 'codex', role: JiraRole) {
+  async view(site: string, key: string, provider: 'claude' | 'codex' | 'copilot', role: JiraRole) {
     await this.ready;
     const record = this.records[this.recordKey(site, key, provider)]; await this.syncLink(record);
     const issue = await this.jira(provider).issue(site, key);
@@ -96,7 +96,7 @@ export class JiraWorkflow {
       message: operation.phase === 'prepared' ? 'This action was prepared but has not changed Jira or GitHub. You can clear it and choose another action.' : 'This action is incomplete. Check Jira, pull requests and existing chats before clearing it. Existing changes will not be undone.' } : undefined;
     return { issue, stage: workflowStage(issue.status), role, actions: this.jira(provider).transition ? workflowActions(issue, role, transitions) : [], link, ...(pending ? { pending } : {}) };
   }
-  async recover(site: string, key: string, provider: 'claude' | 'codex', operationId: string): Promise<void> {
+  async recover(site: string, key: string, provider: 'claude' | 'codex' | 'copilot', operationId: string): Promise<void> {
     await this.ready;
     const lock = this.issueKey(site, key);
     if (this.locks.has(lock)) throw new HttpError(409, 'An action is already running for this task. Wait and refresh.');

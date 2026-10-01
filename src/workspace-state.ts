@@ -6,7 +6,7 @@ import type { WorkspaceProvider } from './preferences';
 export function useWorkspaceState<T>(provider: WorkspaceProvider, initial: T | ((provider: WorkspaceProvider) => T)): [T, Dispatch<SetStateAction<T>>] {
   const [values, setValues] = useState<Record<WorkspaceProvider, T>>(() => {
     const create = (id: WorkspaceProvider) => typeof initial === 'function' ? (initial as (id: WorkspaceProvider) => T)(id) : initial;
-    return { claude: create('claude'), codex: create('codex') };
+    return { claude: create('claude'), codex: create('codex'), copilot:create('copilot') };
   });
   const setValue = useCallback<Dispatch<SetStateAction<T>>>((next) => {
     setValues(previous => {
@@ -17,6 +17,6 @@ export function useWorkspaceState<T>(provider: WorkspaceProvider, initial: T | (
   return [values[provider], setValue];
 }
 export function useWorkspaceRef<T>(provider: WorkspaceProvider, initial: T) {
-  const refs = useRef({ claude: { current: initial }, codex: { current: initial } });
+  const refs = useRef({ claude: { current: initial }, codex: { current: initial }, copilot:{current:initial} });
   return refs.current[provider];
 }

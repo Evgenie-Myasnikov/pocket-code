@@ -78,7 +78,7 @@ export function ActivityDrawer({items,loading,error,busy=false,onRetry,onOpen,on
               const project=item.cwd.split(/[\\/]/).filter(Boolean).at(-1)||item.cwd;
               return <li key={`${item.provider}:${item.id}`}><button className={`activity-task-row activity-task-${item.status}`} aria-label={title} aria-describedby={meta} disabled={busy} onClick={()=>onOpen(item)}>
                 <Icon className="activity-task-row-icon" size={18} aria-hidden="true"/>
-                <span className="activity-task-row-content"><strong>{title}</strong><span className="activity-task-row-meta" id={meta}><span>{item.provider==='codex'?'Codex':'Claude'}</span><span aria-hidden="true">·</span><span className="activity-project" title={item.cwd}>{project}</span><span className="activity-task-row-status">{label}</span></span></span>
+                <span className="activity-task-row-content"><strong>{title}</strong><span className="activity-task-row-meta" id={meta}><span>{item.provider==='copilot'?'Copilot':item.provider==='codex'?'Codex':'Claude'}</span><span aria-hidden="true">·</span><span className="activity-project" title={item.cwd}>{project}</span><span className="activity-task-row-status">{label}</span></span></span>
                 <ChevronRight className="activity-task-row-chevron" size={16} aria-hidden="true"/>
               </button></li>;
             })}</ul>

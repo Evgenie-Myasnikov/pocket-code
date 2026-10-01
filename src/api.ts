@@ -1,7 +1,7 @@
 import { t } from "./i18n";import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { networkFailure } from './connection-errors';
 export type Connection = {url: string;token: string;};
-export function providerRequest(provider:'claude'|'codex'){
+export function providerRequest(provider:'claude'|'codex'|'copilot'){
   return <T,>(connection:Connection,endpoint:string,data?:unknown):Promise<T>=>{
     const [pathname,search]=endpoint.split('?');const params=new URLSearchParams(search);
     if(!params.has('provider'))params.set('provider',provider);

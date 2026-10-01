@@ -1,11 +1,11 @@
-export type WorkspaceProvider = 'claude' | 'codex';
+export type WorkspaceProvider = 'claude' | 'codex' | 'copilot';
 export type CodexAccess = 'full' | 'ask' | 'auto';
 function codexAccess(value:unknown):CodexAccess{return value==='ask'||value==='auto'?value:'full';}
 const preferenceKey = (provider: WorkspaceProvider) => `pocket-code-chat-preferences-${provider}`;
 export function preferences(provider: WorkspaceProvider = 'claude') {
   try {
     const value = JSON.parse(localStorage.getItem(preferenceKey(provider)) || (provider === 'claude' ? localStorage.getItem('pocket-code-chat-preferences') : null) || '{}');
-    const validModel = typeof value.model === 'string' && value.model.length <= 200 && (provider === 'codex' || ['', 'sonnet', 'opus', 'haiku'].includes(value.model));
+    const validModel = typeof value.model === 'string' && value.model.length <= 200 && (provider !== 'claude' || ['', 'sonnet', 'opus', 'haiku'].includes(value.model));
     return { model: validModel ? value.model : '', mode: ['default', 'plan'].includes(value.mode) ? value.mode : 'default', budget: typeof value.budget === 'number' && Number.isFinite(value.budget) && value.budget >= 0.1 && value.budget <= 100 ? value.budget : 5, codexAccess:codexAccess(value.codexAccess) };
   } catch { return { model: '', mode: 'default', budget: 5, codexAccess:'full' as CodexAccess }; }
 }
@@ -23,7 +23,7 @@ export function savePreferredRoot(host: string, root: string, provider: Workspac
   try { const key = `pocket-code-projects-${provider}`, saved = JSON.parse(localStorage.getItem(key) || '{}'); saved[host] = root; localStorage.setItem(key, JSON.stringify(saved)); } catch { /* Keep the current project for this session. */ }
 }
 export function selectedWorkspace(): WorkspaceProvider {
-  try { return localStorage.getItem('pocket-code-workspace') === 'codex' ? 'codex' : 'claude'; } catch { return 'claude'; }
+  try { const value=localStorage.getItem('pocket-code-workspace');return value==='codex'||value==='copilot'?value:'claude'; } catch { return 'claude'; }
 }
 export function saveSelectedWorkspace(provider: WorkspaceProvider) {
   try { localStorage.setItem('pocket-code-workspace', provider); } catch { /* Keep the workspace selected for this session. */ }

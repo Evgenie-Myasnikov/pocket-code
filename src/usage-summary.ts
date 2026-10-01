@@ -2,7 +2,7 @@ import type {CodexUsageSnapshot} from '../server/codex-usage';
 
 const normalized=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]/g,'');
 /** Only shared and explicitly matched model limits participate; unrelated model quotas do not. */
-export function remainingUsage(snapshot:CodexUsageSnapshot|null,provider:'claude'|'codex',models:string[],now=Date.now()):number|null{
+export function remainingUsage(snapshot:CodexUsageSnapshot|null,provider:'claude'|'codex'|'copilot',models:string[],now=Date.now()):number|null{
   if(!snapshot||!Number.isFinite(snapshot.checkedAt)||now-snapshot.checkedAt>120_000)return null;
   if(snapshot.ordinaryUsageAllowed===false)return 0;
   const names=models.filter(Boolean).map(normalized);
