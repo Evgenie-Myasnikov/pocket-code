@@ -84,6 +84,8 @@ AI runtime compatibility checks are separate: a detected Claude/Codex version ch
 <a id="chats"></a>
 ## Chats, attachments and activity
 
+The small ring on the right of the input shows the **remaining** allowance: the lowest reported shared or matching-model limit. Tap it for window/reset details. It refreshes every minute while visible and on return; a dash means current data is unavailable. The send button has a compact visual face with a larger touch target.
+
 Choose Claude or Codex and a project, then open an existing chat or create one. The composer shows the selected model and supported effort setting. You can send a clarification during execution where the provider supports it.
 
 Attach images and files with the attachment button. Images have thumbnails; use the cross to remove an attachment before sending. Expand compact tool activity rows to see details. Chat results can be filtered by content type, and subagents can be opened when the provider supplies their context.

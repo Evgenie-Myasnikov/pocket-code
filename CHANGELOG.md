@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 - Compact chat allowance indicator (0.19.3)
+- Changed: Added a small right-aligned ring and remaining percentage inside the composer. Tapping opens the existing usage details; returning to chat preserves its draft and selected conversation.
+- Semantics: Uses the lowest reported remaining percentage across shared and explicitly matched model windows for the selected provider. Missing, expired, stale or failed data shows a neutral dash; unrelated model quotas are excluded.
+- Changed: Reduced the visible send button to 28-36 px with a smaller arrow, retaining its 48 px touch target.
+- Performance: Refreshes once per minute while visible and on return, pauses in hidden documents and prevents overlapping requests. Late replies cannot cross provider/connection changes.
+- Files: src/UsageIndicator.tsx, usage-summary.ts, usage-indicator.css, composer-controls.css, App.tsx and focused quota/layout tests.
+- Validation: Two summary unit tests, 64 responsive layouts and seven final usage UI scenarios passed. The compact send face retains a 48 px touch target. TypeScript/Vite/Android build passed (versionCode 35); screenshot inspected. Physical Android testing unavailable.
+
 ## 2026-10-01 - Image gallery and touch zoom (0.19.2)
 - Changed: Results shows image thumbnails, with a shared full-screen image viewer for Results and chat images. Pinch/pan, zoom buttons, Fit to screen, Back and focus restoration keep the surrounding conversation/gallery intact.
 - Performance: Only nearby thumbnails load, with at most two authenticated reads/decodes at a time. Off-screen previews release object URLs. External images still require an explicit load; the existing local endpoint transfers the original file before downsampling.
