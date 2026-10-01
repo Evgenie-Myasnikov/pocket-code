@@ -21,6 +21,7 @@ import { JiraQueue } from './jira-queue.js';
 import { JiraWorkflow } from './jira-workflow.js';
 import type { JiraService } from './jira.js';
 import type { CodexService } from './codex.js';
+import { codexEffortPattern } from './codex-models.js';
 import { claudeSubagents, claudeSubagentMessages } from './subagents.js';
 import { EngineUpdates, pocketSource } from './engine-updates.js';
 
@@ -310,11 +311,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/jobs', async (req, res) => {
     const body = z.object({ provider: providerSchema, id: uuid, cwd: text, sessionId: uuid.optional(), text: z.string().max(100000),
       attachments: z.array(uuid).max(10).default([]), model: z.string().max(128).regex(/^[a-zA-Z0-9._/-]*$/).default(''),
+      reasoningEffort: z.string().regex(codexEffortPattern).optional(),
       mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
       takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
     const cwd = await allowedPath(roots, body.cwd, true);
     const engine = body.provider === 'codex' ? codex() : jobs;
     if (body.provider === 'claude') z.enum(['', 'sonnet', 'opus', 'haiku']).parse(body.model);
+    if (body.provider !== 'codex' && body.reasoningEffort) throw new HttpError(400, 'Reasoning effort is available for Codex chats only.');
     const existing = allJobs().find(j => j.id === body.id);
     if (existing) { if ((existing.provider || 'claude') !== body.provider) throw new HttpError(409, 'Task belongs to another workspace'); res.json(jobView(body.id)); return; }
     if (terminals.list().some(t => t.cwd === cwd && t.status === 'running')) throw new HttpError(409, 'В проекте открыт живой терминал. Завершите его перед запуском обычного чата.');

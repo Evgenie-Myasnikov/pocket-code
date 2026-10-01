@@ -83,7 +83,7 @@ function SubagentsPanel({connection,provider,parentId,onClose,initialAgentId,ini
       {!selected?<>
         {listBusy&&!agents.length&&<p role="status">{label('loading')}</p>}
         {!listBusy&&!agents.length&&!listError&&<p className="subagents-empty">{label('empty')}</p>}
-        <ul className="subagent-list">{agents.map(item=><li key={item.id}><button className="subagent-row" onClick={()=>choose(item.id)}><span><strong>{item.name}</strong><State agent={item}/>{item.prompt&&<small>{item.prompt}</small>}</span><ChevronRight size={18} aria-hidden="true"/></button></li>)}</ul>
+        <ul className="subagent-list">{agents.map(item=><li key={item.id}><button className="subagent-row" onClick={()=>choose(item.id)}><span><strong>{item.name}</strong><State agent={item}/></span><ChevronRight size={18} aria-hidden="true"/></button></li>)}</ul>
       </>:<section className="subagent-detail">
         {agent&&agent.name.length>110?<details className="subagent-full-name"><summary><h3>{agent.name.slice(0,110)}…</h3></summary><p>{agent.name}</p></details>:<h3>{agent?.name||label('agents')}</h3>}{agent&&<State agent={agent}/>}
         {visibleHistoryError&&<Failure text={label('historyError')} error={visibleHistoryError}/>}

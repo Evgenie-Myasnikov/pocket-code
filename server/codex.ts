@@ -8,8 +8,9 @@ import { discoverCodex, StdioCodexRpc, CodexRequestError, type CodexRpc, type Rp
 import packageJson from '../package.json';
 import { codexPermissions, verifyCodexPermissions, type CodexAccess } from './codex-access.js';
 import { normalizeCodexUsage } from './codex-usage.js';
+import { codexModels } from './codex-models.js';
 
-type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
+type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; reasoningEffort?: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
 type Pending = { finish: (allow: boolean, answers?: Record<string, string>) => void };
 type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void> };
 export type CodexSession = { sessionId: string; summary: string; cwd: string; lastModified: number; gitBranch?: string; source: 'codex'; provider: 'codex'; readOnly?: boolean };
@@ -54,7 +55,7 @@ export class CodexService {
       const account = await rpc.request('account/read', { refreshToken: false });
       const authenticated = Boolean(account.account) || account.requiresOpenaiAuth === false;
       const result = await rpc.request('model/list', { includeHidden: false, limit: 100 });
-      const models = (result.data || []).filter((m: any) => !m.hidden && typeof m.model === 'string').map((m: any) => ({ id: m.model, name: m.displayName || m.model }));
+      const models = codexModels(result.data);
       return { available, authenticated, models, ...(!authenticated ? { error: 'Sign in to Codex on this PC, then reconnect.' } : {}) };
     } catch (error) { return { available, authenticated: false, models: [], error: error instanceof Error ? error.message : 'Codex is unavailable.' }; }
   }
@@ -200,9 +201,17 @@ export class CodexService {
       verifyCodexPermissions(session, permissions);
       job.sessionId = session.thread.id; job.cwd = cwd; job.revision++;
       if (job.cancelled) return;
+      if (input.reasoningEffort) {
+        const catalog = codexModels((await rpc.request('model/list', { includeHidden: false, limit: 100 })).data);
+        const effectiveModel = input.model || session.model;
+        const model = catalog.find(candidate => candidate.id === effectiveModel);
+        if (!model?.reasoningEfforts.includes(input.reasoningEffort)) throw new HttpError(400, 'This reasoning effort is unavailable for the selected Codex model. Refresh the models and choose another effort.');
+      }
+      if (job.cancelled) return;
       job.acceptingEvents = true;
       const result = await rpc.request('turn/start', { threadId: job.sessionId, input: turnInput, cwd, approvalPolicy, approvalsReviewer,
         ...(input.model ? { model: input.model } : {}), clientUserMessageId: job.messages[0].id,
+        ...(input.reasoningEffort ? { effort: input.reasoningEffort } : {}),
         sandboxPolicy });
       job.turnId = result.turn.id; job.revision++;
       if (job.cancelled) { await this.interrupt(job, rpc); this.finish(job, 'stopped'); }

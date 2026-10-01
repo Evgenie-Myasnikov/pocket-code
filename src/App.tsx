@@ -1,4 +1,5 @@
 import { Review } from './Review';
+import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
 import { Subagents } from './Subagents';
 import { ChatOutputs } from './ChatOutputs';
 import {extractChatOutputs} from './chat-outputs';
@@ -23,7 +24,7 @@ import type { ChatMessage, JobView, SubagentView } from '../server/types';
 
 type Session = {sessionId: string;summary: string;customTitle?: string;cwd?: string;lastModified: number;gitBranch?: string;source?: string;readOnly?: boolean;archived?: boolean;provider?: WorkspaceProvider;};
 type Health = {name: string;roots: string[];version: string;protocol: number;};
-type ProviderInfo = {id: WorkspaceProvider;name: string;available: boolean;authenticated?: boolean;models?: {id:string;name:string}[];error?: string;};
+type ProviderInfo = {id: WorkspaceProvider;name: string;available: boolean;authenticated?: boolean;models?: EffortModel[];error?: string;};
 type Attachment = {id: string;name: string;size: number;};
 type Draft = {text: string;attachments: Attachment[];};
 type RejectedDraft = Draft & {restored: boolean;};
@@ -64,6 +65,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const [cwd, setCwd] = useStateForWorkspace(''),[tab, setTab] = useStateForWorkspace<'chats' | 'files' | 'settings' | 'terminal' | 'jobs'>('chats'),[mobileChat, setMobileChat] = useStateForWorkspace(false);
   const [settingsPage,setSettingsPage]=useStateForWorkspace<SettingsPage>('index');
   const [draft, setDraft] = useStateForWorkspace(''),[search, setSearch] = useStateForWorkspace(''),[model, setModel] = useStateForWorkspace(id=>preferences(id).model);
+  const codexEffort=useCodexEffort(provider==='codex'?providerInfo?.models:undefined,model);
   const [codexAccess,setCodexAccess]=useStateForWorkspace(id=>preferences(id).codexAccess);
   const [error, setError] = useStateForWorkspace(''),[networkError, setNetworkError] = useStateForWorkspace(''),[busy, setBusy] = useStateForWorkspace(false),[loading, setLoading] = useStateForWorkspace(false);
   const [hostRestarting,setHostRestarting] = useState(false);
@@ -103,7 +105,6 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   },[connection,health,projects,projectReady,cwd,provider]);
   useEffect(()=>{if(connection&&!demo)void request(connection,'/engine-updates/settings',{provider}).catch(()=>{});},[connection,provider,demo]);
   useEffect(()=>{if(connection&&projectReady&&projects?.includes(cwd))savePreferredRoot(connection.url,cwd,provider);},[connection,cwd,projects,projectReady,provider]);
-  useEffect(()=>setReviewOpen(false),[connection,cwd]);
   useEffect(()=>{if(tab!=='chats')setReadingMode(false);if(provider==='codex'&&tab==='terminal')setTab('chats');},[provider,tab]);
   const historyWindow = useRefForWorkspace(100);
   const [historyError, setHistoryError] = useStateForWorkspace('');
@@ -115,21 +116,24 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const outputMessages=useMemo(()=>uniqueMessages([...history,...(job?.errorCode!=='codex_thread_busy'?job?.messages||[]:[])]),[history,job?.messages,job?.errorCode]);
   const toolResults=useMemo(()=>{const blocks=outputMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b]));},[outputMessages]);
   const hasOutputs=useMemo(()=>extractChatOutputs(outputMessages).length>0,[outputMessages]);
-  const reviewContext=[connection?.url,provider,cwd,parentChatId].join('|');
+  // Review follows the open conversation, never a remembered folder from another screen.
+  const reviewCwd=selected?selected.cwd:job?.cwd||cwd;
+  const reviewContext=[connection?.url,provider,reviewCwd,parentChatId].join('|');
+  useEffect(()=>setReviewOpen(false),[connection,reviewCwd,parentChatId]);
   const availableReview=reviewAvailability?.key===reviewContext?reviewAvailability:null;
   useEffect(()=>{
     setReviewAvailability(null);
-    if(!connection||!cwd||demo||selected?.readOnly||networkError||tab!=='chats'||readingMode)return;
+    if(!connection||!reviewCwd||demo||selected?.readOnly||networkError||tab!=='chats'||readingMode)return;
     let cancelled=false,timer:ReturnType<typeof setTimeout>|undefined;
     const poll=async()=>{
       if(document.visibilityState!=='hidden'&&document.querySelector('.workspace')?.getClientRects().length)try{
-        const value=await request<{available:boolean;mode:'working'|'branch'}>(connection,`/review/availability?cwd=${encodeURIComponent(cwd)}`);
+        const value=await request<{available:boolean;mode:'working'|'branch'}>(connection,`/review/availability?cwd=${encodeURIComponent(reviewCwd)}`);
         if(!cancelled)setReviewAvailability(value.available&&(value.mode==='working'||value.mode==='branch')?{key:reviewContext,mode:value.mode}:null);
       }catch{if(!cancelled)setReviewAvailability(null);}
       if(!cancelled)timer=setTimeout(poll,15000);
     };
     void poll();return()=>{cancelled=true;clearTimeout(timer);};
-  },[connection,cwd,provider,parentChatId,tab,mobileChat,readingMode,networkError,demo,selected?.readOnly,job?.status]);
+  },[connection,reviewCwd,provider,parentChatId,tab,mobileChat,readingMode,networkError,demo,selected?.readOnly,job?.status]);
   const agentMap = new Map<string,SubagentView>();
   for(const message of [...history,...(job?.messages || [])]) for(const block of message.blocks) if(block.agent) agentMap.set(block.agent.id,block.agent);
   for(const agent of agentList) {
@@ -369,7 +373,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     if (sessionId && !confirmed) {setPendingTakeover(true);return;}
     sending.current = true;setBusy(true);setError('');
     const epoch = ++navigation.current;
-    const data = { provider, cwd, sessionId, text: draft, attachments: attachments.map((a) => a.id), model, mode: "default", ...(provider==='claude'?{maxBudgetUsd:budget}:{codexAccess}), takeoverConfirmed: confirmed };
+    const data = { provider, cwd, sessionId, text: draft, attachments: attachments.map((a) => a.id), model:provider==='codex'&&codexEffort.options.length?codexEffort.modelId||model:model, mode: "default", ...(provider==='claude'?{maxBudgetUsd:budget}:{codexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}), takeoverConfirmed: confirmed };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {
@@ -413,7 +417,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
         {!visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : t("Здесь появятся чаты {0} из разрешённых папок.",engineName)}</p></div>}
       </div></aside>
     <main className="workspace">
-      {reviewOpen && connection && <Review key={provider} connection={connection} cwd={cwd} initialMode={availableReview?.mode} onClose={()=>setReviewOpen(false)}/>}
+      {reviewOpen && connection && reviewCwd && <Review key={reviewContext} connection={connection} cwd={reviewCwd} initialMode={availableReview?.mode} onClose={()=>setReviewOpen(false)}/>}
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       <header className="chat-header" data-section={tab}>
@@ -450,7 +454,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
           <div className="composer">{attachments.length > 0 && <div className="attachment-list">{attachments.map((a) => <span className="attachment-chip" key={a.id}><Paperclip size={13} />{a.name}<button className="icon-button" aria-label={t("Убрать {0}", a.name)} onClick={() => setAttachments((old) => old.filter((x) => x.id !== a.id))}><X size={13} /></button></span>)}</div>}
             <textarea aria-label={t("Сообщение {0}",engineName)} placeholder={demo ? t("Подключите ПК, чтобы отправлять сообщения") : t("Что нужно сделать?")} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={demo || busy || selected?.readOnly} onKeyDown={(e) => {if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {e.preventDefault();void send();}}} />
-            <div className="composer-tools"><input hidden ref={fileInput} type="file" multiple onChange={(e) => void upload(e.target.files)} /><button className="icon-button" aria-label={t("Прикрепить файлы")} disabled={demo || uploading || busy || running || selected?.readOnly} onClick={() => fileInput.current?.click()}><Paperclip size={19} /></button><select aria-label={t("Модель {0}",engineName)} value={model} onChange={(e) => setModel(e.target.value)}><option value="">{t("По умолчанию")}</option>{(provider === 'claude' ? [{id:'sonnet',name:'Sonnet'},{id:'opus',name:'Opus'},{id:'haiku',name:'Haiku'}] : providerInfo?.models || []).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select><span className="composer-spacer" />{running ? <button className="send-button stop-button" aria-label={t("Остановить {0}",engineName)} onClick={async () => {try {await api(`/jobs/${job!.id}/stop`, {});} catch (e) {setError((e as Error).message);}}}><Square size={16} /></button> : <button className="send-button" aria-label={t("Отправить сообщение")} disabled={demo || !canRun || selected?.readOnly || busy || loading || uploading || !draft.trim() && !attachments.length} onClick={() => void send()}><ArrowUp size={21} /></button>}</div>
+            <div className="composer-tools"><input hidden ref={fileInput} type="file" multiple onChange={(e) => void upload(e.target.files)} /><button className="icon-button" aria-label={t("Прикрепить файлы")} disabled={demo || uploading || busy || running || selected?.readOnly} onClick={() => fileInput.current?.click()}><Paperclip size={19} /></button><select aria-label={t("Модель {0}",engineName)} value={model} onChange={(e) => setModel(e.target.value)}><option value="">{t("По умолчанию")}</option>{(provider === 'claude' ? [{id:'sonnet',name:'Sonnet'},{id:'opus',name:'Opus'},{id:'haiku',name:'Haiku'}] : providerInfo?.models || []).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>{provider==='codex'&&<EffortPicker {...codexEffort} disabled={busy||running||uploading||selected?.readOnly}/>}<span className="composer-spacer" />{running ? <button className="send-button stop-button" aria-label={t("Остановить {0}",engineName)} onClick={async () => {try {await api(`/jobs/${job!.id}/stop`, {});} catch (e) {setError((e as Error).message);}}}><Square size={16} /></button> : <button className="send-button" aria-label={t("Отправить сообщение")} disabled={demo || !canRun || selected?.readOnly || busy || loading || uploading || !draft.trim() && !attachments.length} onClick={() => void send()}><ArrowUp size={21} /></button>}</div>
           </div><div className="composer-caption" role="status"><span className={`status-light ${networkError ? "offline" : ""}`} />{hostRestarting?t("Перезапускаем сервер ПК…"):loadingOlder?t("Загружаем историю с ПК…"):networkError ? t("Связь потеряна · повторяем подключение") : uploading ? t("Передаём файлы на ПК…") : running ? job?.approvals.length ? t("Ожидается ваше решение") : t("{0} работает",engineName) : t("{0} · подключён к ПК",engineName)}<span className="desktop-only">{t("Ctrl + Enter для отправки")}</span></div>
         </div>
       </>}

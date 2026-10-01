@@ -1,7 +1,8 @@
 import { RichBlock } from './RichBlocks';
 import { t } from "./i18n";import { useState } from 'react';
-import { Copy, Check, Terminal, ShieldCheck, X, ChevronDown } from 'lucide-react';
+import { Copy, Check, ShieldCheck, X } from 'lucide-react';
 import type { ChatMessage, Approval, SubagentView, Block } from '../server/types';
+import './messages.css';
 function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
@@ -9,10 +10,9 @@ function CopyButton({ text }: {text: string;}) {
 export function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false }: {message: ChatMessage;provider?: 'claude' | 'codex';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean}) {
   const plain = message.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
   if(message.blocks.length&&message.blocks.every(b=>b.type==='tool_result'&&b.tool_use_id&&toolResults?.has(b.tool_use_id)))return null;
-  const toolOnly = message.blocks.every((b) => ['tool_result','tool_use','thinking','codexItem'].includes(b.type));
-  return <article data-message-id={message.id} className={`message ${message.role} ${toolOnly ? 'tool-result' : ''}`}>
-    {!toolOnly && <div className="message-label">{message.role === 'assistant' ? <><span className="claude-mark">{provider === 'codex' ? '⌘' : '✳'}</span> {provider.toUpperCase()}</> : message.role === 'user' ? t("ВЫ") : t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
-    {message.blocks.map((block,i) => {
+  const isUser = message.role === 'user';
+  const toolOnly = !isUser && message.blocks.length > 0 && message.blocks.every((b) => ['tool_result','tool_use','thinking','codexItem','subagent'].includes(b.type));
+  const content = message.blocks.map((block,i) => {
       if(block.type==='tool_result'&&block.tool_use_id&&toolResults?.has(block.tool_use_id))return null;
       const previous=message.blocks[i-1],next=message.blocks[i+1];
       // Keep a call and its adjacent matching result in one disclosure. Unknown
@@ -20,7 +20,12 @@ export function Message({ message, provider = 'claude', onSubagent, agents,toolR
       if(block.type==='tool_result' && previous?.type==='tool_use' && previous.id && previous.id===block.tool_use_id)return null;
       const result=block.type==='tool_use' && block.id ? toolResults?.get(block.id)||(next?.type==='tool_result'&&next.tool_use_id===block.id?next:undefined):undefined;
       return <RichBlock key={i} running={running} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
-    })}
+    });
+  return <article data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${message.role} ${toolOnly ? 'tool-result' : ''}`}>
+    {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{content}</div></> : <>
+      {!toolOnly && <div className="message-label">{message.role === 'assistant' ? <><span className="claude-mark">{provider === 'codex' ? '⌘' : '✳'}</span> {provider.toUpperCase()}</> : t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
+      {content}
+    </>}
   </article>;
 }
 export function ApprovalCard({ approval, decide, provider = 'claude' }: {approval: Approval;provider?: 'claude' | 'codex';decide: (allow: boolean, answers?: Record<string, string>) => Promise<void>;}) {

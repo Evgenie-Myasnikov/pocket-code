@@ -11,7 +11,7 @@ export async function review(roots:string[],input:string,mode:'working'|'staged'
   while(true){try{await stat(path.join(root,'.git'));break;}catch{const parent=path.dirname(root);if(parent===root)throw new HttpError(400,'This project is not a Git repository.');root=parent;}}
   const filterOverrides:string[]=[];
   // Reading a worktree diff otherwise runs configured clean/process filters.
-  const safeArgs=['--no-optional-locks','-c',`safe.directory=${root}`,'-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-c','core.quotePath=false'];
+  const safeArgs=['--no-optional-locks','--literal-pathspecs','-c',`safe.directory=${root}`,'-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-c','core.quotePath=false'];
   let filterKeys='';
   try { filterKeys=(await execute('git',[...safeArgs,'-C',root,'config','--null','--name-only','--get-regexp','^filter\\.'],{windowsHide:true,timeout:15000,maxBuffer:100_000})).stdout; }
   catch(error:any) { if(error.code!==1)throw new HttpError(400,'Could not inspect Git filters safely.'); }
@@ -37,7 +37,9 @@ export async function review(roots:string[],input:string,mode:'working'|'staged'
     for(const name of newFiles)if(within(cwd,path.resolve(root,name)))files.push({path:name,added:0,removed:0,binary:false,untracked:true});
   }
   if(files.length>1000)throw new HttpError(400,'Too many changed files. Narrow the project folder.');
-  const result={files,current,base:comparison,branches,mode,scope,patch:'',binary:false};
+  // A chat may start in a subfolder or a linked worktree. Report the resolved
+  // context without widening the comparison to sibling projects in its repo.
+  const result={files,current,base:comparison,branches,mode,scope,repositoryRoot:root,projectPath:cwd,patch:'',binary:false};
   if(file===undefined)return result;
   const selected=files.find(item=>item.path===file);if(!selected)throw new HttpError(404,'This file is not in the current comparison.');
   if(selected.untracked){

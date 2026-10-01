@@ -1,0 +1,20 @@
+/* User messages have one quiet surface, without a redundant author toolbar. */
+:root[data-theme] article.message.user,
+:root[data-compact=true] .message.user {
+  display:flex;align-items:flex-end;gap:4px;width:fit-content;max-width:100%;
+  margin:12px 0 24px auto;padding:0;border:0;border-radius:0;background:transparent;
+}
+.message.user .user-message-content {
+  min-width:0;max-width:100%;padding:.65em .95em;border-radius:16px;
+  background:var(--panel);color:var(--text);overflow-wrap:anywhere;
+}
+.message.user .user-message-content>.markdown:first-child>:first-child {margin-top:0;}
+.message.user .user-message-content>.markdown:last-child>:last-child {margin-bottom:0;}
+.message.user>.copy-button {
+  flex:0 0 48px;width:48px;min-width:48px;height:48px;min-height:48px;
+  margin:0;align-self:flex-end;opacity:1;color:var(--muted);background:transparent;border:0;
+}
+.message.user>.copy-button svg {width:1em;height:1em;min-width:12px;min-height:12px;}
+.message.user .user-message-content :is(.document-card,.image-preview) {max-width:100%;}
+.message.user .user-message-content .markdown pre {max-width:100%;}
+.reading-mode .message.user>.copy-button {display:none;}

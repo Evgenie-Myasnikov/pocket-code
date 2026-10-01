@@ -49,11 +49,52 @@ async function until(predicate: () => boolean) {
   assert.fail('Condition was not reached');
 }
 
-test('Codex status uses existing sign-in and only exposes model names', async t => {
+test('Codex status uses existing sign-in and exposes model capabilities without account details', async t => {
   const { rpc, service } = await setup(t);
-  assert.deepEqual(await service.status(), { available: true, authenticated: true, models: [{ id: 'test-model', name: 'Test model' }] });
+  assert.deepEqual(await service.status(), { available: true, authenticated: true, models: [{ id: 'test-model', name: 'Test model', reasoningEfforts: [], isDefault: false }] });
   assert.equal(rpc.requests[0].method, 'initialize');
   assert.deepEqual(rpc.requests.find(r => r.method === 'account/read')?.params, { refreshToken: false });
+});
+
+test('Codex effort choices come from the current model catalog, including new levels', async t => {
+  const { rpc, service } = await setup(t);
+  rpc.handler = method => method === 'model/list' ? { data: [{ model: 'test-model', displayName: 'Test model', isDefault: true, defaultReasoningEffort: 'low',
+    supportedReasoningEfforts: [{reasoningEffort:'low'},{reasoningEffort:'ultra'},{reasoningEffort:'ultra'}, {reasoningEffort:''}, {reasoningEffort:'bad\nvalue'}] },
+    {model:'other',defaultReasoningEffort:'unavailable',supportedReasoningEfforts:[{reasoningEffort:'medium'}]}, {model:'hidden',hidden:true}] } : undefined;
+  const status = await service.status();
+  assert.deepEqual(status.models, [{id:'test-model',name:'Test model',isDefault:true,defaultReasoningEffort:'low',reasoningEfforts:['low','ultra']},
+    {id:'other',name:'other',isDefault:false,reasoningEfforts:['medium']}]);
+});
+
+test('Codex forwards supported effort for new and resumed chats and omits an unselected effort', async t => {
+  for (const sessionId of [undefined, 'session-1']) {
+    const { rpc, service, input } = await setup(t);
+    rpc.handler = method => method === 'model/list' ? {data:[{model:'test-model',supportedReasoningEfforts:[{reasoningEffort:'ultra'}]}]} :
+      method === 'thread/start' || method === 'thread/resume' ? {thread:rpc.thread,model:'test-model'} : undefined;
+    service.start({...input,sessionId,reasoningEffort:'ultra'});
+    await until(()=>rpc.requests.some(request=>request.method==='turn/start'));
+    const turn=rpc.requests.find(request=>request.method==='turn/start')!;
+    assert.equal(turn.params.effort,'ultra');assert.equal(turn.params.reasoningEffort,undefined);
+    service.stop(input.id);
+  }
+  const {rpc,service,input}=await setup(t);
+  service.start(input);await until(()=>rpc.requests.some(request=>request.method==='turn/start'));
+  assert.ok(!('effort' in rpc.requests.find(request=>request.method==='turn/start')!.params));
+  assert.ok(!rpc.requests.some(request=>request.method==='model/list'),'unchanged clients do not need catalog validation');
+});
+
+test('Codex validates effort against the effective resumed model before starting inference', async t => {
+  const {rpc,service,input}=await setup(t);
+  rpc.handler=method=>method==='thread/resume'?{thread:rpc.thread,model:'actual-model'}:method==='model/list'?{data:[
+    {model:'picker-default',isDefault:true,supportedReasoningEfforts:[{reasoningEffort:'ultra'}]},
+    {model:'actual-model',supportedReasoningEfforts:[{reasoningEffort:'medium'}]}]}:undefined;
+  service.start({...input,sessionId:'session-1',reasoningEffort:'ultra'});
+  await until(()=>service.get(input.id).status==='error');
+  assert.match(service.get(input.id).error||'',/reasoning effort is unavailable/);
+  assert.ok(!rpc.requests.some(request=>request.method==='turn/start'));
+  service.start({...input,id:'job-2',sessionId:'session-1',model:'picker-default',reasoningEffort:'ultra'});
+  await until(()=>rpc.requests.some(request=>request.method==='turn/start'));
+  assert.equal(rpc.requests.find(request=>request.method==='turn/start')!.params.model,'picker-default','an explicit turn model takes precedence over the resumed default');
 });
 
 test('Codex lists only allowed projects and checks scope before loading history', async t => {
