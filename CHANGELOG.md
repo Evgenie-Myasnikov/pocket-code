@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-02 - Automatic Windows runtime bootstrap and simpler launchers
+- Changed: Shared bootstrap detects compatible Node.js through the current/registry PATH and standard install locations. If missing, it downloads a private Node.js 24 LTS ZIP from nodejs.org, verifies SHA-256 and archive paths, and reuses it without administrator access, winget or shell restart.
+- Fixed: Clean setup now installs npm dependencies with development tools before the desktop build. Missing/partial dependencies are repaired; healthy retries do not reinstall. Per-user/runtime and per-project locks prevent overlapping installation.
+- Changed: Kept only Setup Pocket Code.cmd and Start Pocket Code.cmd in the root. Removed duplicate desktop-install, internet-console and stop batch files; advanced PowerShell scripts remain. Removed the pre-login gate so users can reach provider settings after setup.
+- Files: scripts/bootstrap.ps1, setup.ps1, start.ps1, build-desktop.ps1; root launchers; setup documentation; tests/bootstrap.test.ts.
+- Validation: Downloaded and verified the official private runtime and ran it. An isolated clean install added 387 dependencies, ran TypeScript successfully, and reused them on a second setup. Bootstrap tests covered stale PATH, unsupported versions, invalid metadata/hash and dev-tool installation; six existing launcher tests passed.
+- Follow-up: Existing running hosts are not stopped. Node downloads require access to nodejs.org; package installation requires the configured npm registry.
+
+
 ## 2026-10-02 - Manual provider sign-in and separate connection states
 - Changed: Added shared provider cards to desktop settings and mobile AI settings, with detected version, installation, local transport and authentication states. Desktop Connection now distinguishes host activity and actual tunnel availability.
 - Changed: Added explicit Windows CLI login methods for Claude subscription/Console/SSO, Codex browser/device/API-key/access-token, and Copilot browser/device/token. Secret entry stays in a local hidden-input prompt and reaches the CLI through stdin. Advanced cloud/enterprise methods link to official configuration guides.

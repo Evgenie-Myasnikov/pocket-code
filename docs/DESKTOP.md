@@ -4,7 +4,7 @@ See [Provider sign-in and status](PROVIDER-SIGN-IN.md) for manual login, device 
 
 [Home](../README.md) · [Русский](#russian)
 
-Run **Setup Pocket Code.cmd** from the extracted source package. Existing users can run **Install Pocket Code Desktop.cmd**. This builds a small native Windows application and adds **Pocket Code** shortcuts to the Desktop and Start menu. Administrator access is not required. Keep the source folder: the application uses its host scripts, Node.js and dependencies. Moving that folder requires running the installer again.
+Run **Setup Pocket Code.cmd** from the extracted source package to install or update. Setup automatically detects Node.js, downloads a checksum-verified private Node.js 24 LTS copy if needed, and installs npm dependencies before building. It does not require winget, administrator rights or restarting PowerShell after an existing Node installation. It adds **Pocket Code** shortcuts to Desktop and Start menu. Keep the source folder: the application uses its host scripts and dependencies. Moving that folder requires running setup again. **Start Pocket Code.cmd** opens the app and installs it if missing; internet mode and Exit are inside the app instead of separate batch files.
 
 The desktop window uses the same TypeScript/React message renderer, Review, results gallery, image viewer, subagent viewer, themes and sizing controls as Android. Its wider layout has a left sidebar with provider, project and conversation selection. Chats are **read-only**: send messages and answer agent questions from your phone. The view refreshes automatically while open. Review uses the selected conversation's project folder; results scan that conversation's available history.
 
@@ -28,7 +28,7 @@ The application recognizes an existing authenticated Pocket Code host and does n
 
 The PC must stay awake. A temporary internet tunnel can receive a different URL after restart; the phone then needs the new QR. This does not provide a permanent address or remote wake-up. Connection keys stay in the existing private host storage; the desktop settings file stores preferences, not a second copy of the key.
 
-The existing host updater updates the server. It does not replace the desktop executable: after downloading updated sources, exit the tray app and rerun **Install Pocket Code Desktop.cmd**. To remove the desktop app, disable Windows startup, exit it, then remove its shortcuts and installed application folder. This leaves host data intact.
+The existing host updater updates the server. It does not replace the desktop executable: after downloading updated sources, exit the tray app and rerun **Setup Pocket Code.cmd**. To remove the desktop app, disable Windows startup, exit it, then remove its shortcuts and installed application folder. This leaves host data intact.
 
 <a id="russian"></a>
 ## Приложение для Windows
@@ -37,7 +37,7 @@ The existing host updater updates the server. It does not replace the desktop ex
 
 QR-код и Jira находятся в **Подключении**, язык, оформление, автозапуск и восстановление связи — в **Настройках**. Настройки оформления сохраняются отдельно на каждом устройстве. Нужна 64-битная Windows; WebView2 при необходимости устанавливается автоматически.
 
-Для первой установки запустите **Setup Pocket Code.cmd**. Если сервер уже настроен — **Install Pocket Code Desktop.cmd**. Появится ярлык **Pocket Code** на рабочем столе и в меню «Пуск». Папку исходников оставьте на месте: приложение использует её сервер и зависимости. После переноса папки повторите установку.
+Для установки или обновления запустите **Setup Pocket Code.cmd**. Node.js определяется автоматически даже в старом окне PowerShell; если подходящей версии нет, загрузится проверенная локальная копия Node.js 24 LTS. Права администратора и winget не нужны. Зависимости, включая TypeScript, устанавливаются до сборки. Для запуска остаётся **Start Pocket Code.cmd** или ярлык **Pocket Code**. Интернет-режим и выход доступны в приложении. Папку исходников оставьте на месте; после её переноса повторите установку.
 
 - **Крестик и сворачивание** скрывают окно в трей, сервер продолжает работать.
 - **Двойной щелчок по значку** возвращает окно с QR-кодом и настройкой Jira.
@@ -50,4 +50,4 @@ QR-код и Jira находятся в **Подключении**, язык, о
 
 Если сервер уже запущен старым консольным способом, приложение покажет его без создания второго процесса. Для полного перехода завершите старый сервер, когда нет активных задач, и запустите соединение из нового окна.
 
-Обновления сервера продолжают работать отдельно. Для обновления самого окна Windows закройте приложение через трей, получите новые исходники и повторите **Install Pocket Code Desktop.cmd**. APK для этой desktop-функции переустанавливать не нужно.
+Обновления сервера продолжают работать отдельно. Для обновления самого окна Windows закройте приложение через трей, получите новые исходники и повторите **Setup Pocket Code.cmd**. APK для этой desktop-функции переустанавливать не нужно.

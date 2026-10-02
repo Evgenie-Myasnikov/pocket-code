@@ -21,9 +21,9 @@ Android companion for Claude Code and Codex running on your own Windows PC. Conn
 
 ## Run the PC bridge
 
-Requires Windows 10 or newer and Node.js 22+. Install and sign in to Claude Code and/or Codex on the PC for the workspace you want to use. Install dependencies with `npm ci` and build with `npm run build`.
+Requires Windows 10 or newer. **Setup Pocket Code.cmd** detects or downloads Node.js and installs dependencies, including development/build tools, before building. No winget or elevated Node installer is needed. For manual development use Node.js 22.12+/24+, `npm ci --include=dev`, then `npm run build`. Provider sign-in is available in the desktop settings.
 
-Run **Start Pocket Code.cmd** for the native desktop application, with LAN/internet selection in its window. **Start Pocket Code Internet.cmd** remains the legacy console launcher. Choose projects on the phone; ready local fixed drives are available by default. The console script supports restricting access with explicit -ProjectPath. Internet mode installs Cloudflare's tunnel client locally. A restarted temporary tunnel may have a new address: scan its new QR. See [desktop setup](DESKTOP.md).
+Run **Start Pocket Code.cmd** for the native desktop application, with LAN/internet selection in its window. **scripts/start.ps1 -Internet** remains the legacy console launcher. Choose projects on the phone; ready local fixed drives are available by default. The console script supports restricting access with explicit -ProjectPath. Internet mode installs Cloudflare's tunnel client locally. A restarted temporary tunnel may have a new address: scan its new QR. See [desktop setup](DESKTOP.md).
 
 The native desktop application owns its hidden launcher and server process tree. Close/minimize hides to the tray; explicit tray Exit disposes the job. The legacy console launcher terminates its process tree when its window closes or Ctrl+C is pressed. Both include the tunnel and replacement hosts created by an update. Starting again detects an existing host rather than creating duplicates. Closing a QR browser tab or disconnecting the phone leaves the server running. Use desktop Disconnect to preserve disconnected state; an external stop command can be followed by desktop automatic reconnection.
 

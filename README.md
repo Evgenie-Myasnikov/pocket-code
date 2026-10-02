@@ -51,7 +51,7 @@ You need **Windows 10+**, **Android 7+**, and **Claude Code and/or Codex install
 
 Download this repository using **Code → Download ZIP**, then extract it. Double-click **Setup Pocket Code.cmd**.
 
-Setup checks Node.js 22+, offers installation through Windows Package Manager if needed, opens the Android download page, and installs the native Windows application with Desktop and Start menu shortcuts. Its window shows the pairing QR and connection settings. Dependencies and the internet tunnel are prepared automatically. Choose a project on the phone; local Git projects are discovered automatically.
+Setup detects a compatible Node.js installation, including installations not yet visible in the current terminal's PATH. If needed, it downloads a private Node.js 24 LTS copy from nodejs.org and verifies its SHA-256 checksum. No winget, administrator prompt or terminal restart is required. It installs dependencies (including TypeScript) before building the Windows application and creating Desktop/Start menu shortcuts. Sign in to your provider in Settings, then pair Android by QR. Dependencies and the internet tunnel are prepared automatically.
 
 No Android SDK is needed to use the released APK. AI sign-in stays in the native tool on your PC.
 
@@ -67,7 +67,7 @@ No Android SDK is needed to use the released APK. AI sign-in stays in the native
 <details>
 <summary>Manual setup and subsequent launches</summary>
 
-Install Node.js 22+ yourself if Windows Package Manager is unavailable. Use the **Pocket Code** shortcut or **Start Pocket Code.cmd** to open the desktop application. Choose internet or LAN in its window. **Start Pocket Code Internet.cmd** remains the legacy console launcher. Use the desktop **Disconnect** button to stop the host and disable reconnection; **Stop Pocket Code.cmd** is intended for the legacy console host.
+There are only two launchers: **Setup Pocket Code.cmd** to install/update and **Start Pocket Code.cmd** to open the application. Choose internet/LAN inside the app; disconnect there or use **Exit** from the tray. Rerunning setup repairs missing build dependencies. A working Node.js 22.12+ or 24+ installation is reused; private runtime files are stored under `%LOCALAPPDATA%\Pocket Code\runtime\node`. Advanced troubleshooting scripts remain in `scripts/`.
 
 </details>
 

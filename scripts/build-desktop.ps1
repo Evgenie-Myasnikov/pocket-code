@@ -1,6 +1,8 @@
 param([switch]$InstallShortcut,[switch]$SkipWebBuild)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'bootstrap.ps1')
+if(-not $SkipWebBuild){Ensure-PocketDependencies $root}
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 if(-not (Test-Path -LiteralPath $compiler)){throw '.NET Framework 4 compiler is required.'}
 $output=Join-Path $root 'artifacts/desktop'

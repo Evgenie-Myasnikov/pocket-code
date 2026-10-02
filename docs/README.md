@@ -30,7 +30,7 @@ The four main sections are **Tasks**, **Chats**, **Project** and **Settings**. R
 
 ## What is required
 
-- Windows PC, Node.js 22+ and an installed, authenticated supported AI runtime. The current standard launcher checks for Claude or Codex; Copilot is an additional workspace.
+- Windows PC and a supported AI account. Setup detects Node.js 22.12+/24+ or downloads a private Node.js 24 LTS copy automatically. Sign in through provider settings after installation.
 - Android 7+ with the release APK installed. Android confirms APK installation and updates.
 - The PC stays awake and the host stays running. Internet mode uses a temporary HTTPS tunnel; a separate tunnel restart can change its address.
 - Provider accounts and their usage limits apply. Installing Pocket Code does not include an AI subscription or grant Jira/GitHub permissions.
