@@ -9,7 +9,8 @@ test('pairing only accepts our versioned QR format and safe transport', () => {
   assert.deepEqual(parsePairingCode(code()), { url: 'http://100.64.10.1:4318', token });
   assert.equal(parsePairingCode(code('https://bridge.example.com/')).url, 'https://bridge.example.com');
   assert.throws(() => parsePairingCode('https://example.com'), /не QR-код/);
-  assert.throws(() => parsePairingCode(JSON.stringify({ type: 'pocket-code', version: 2, url: 'http://127.0.0.1', token })), /Неверный/);
+  assert.deepEqual(parsePairingCode(JSON.stringify({ type: 'pocket-code', version: 2, url: 'http://100.64.10.1:4318', token })), { url: 'http://100.64.10.1:4318', token, pairing: true });
+  assert.throws(() => parsePairingCode(JSON.stringify({ type: 'pocket-code', version: 3, url: 'http://127.0.0.1', token })), /Неверный/);
   assert.throws(() => parsePairingCode(code('http://public.example.com')), /HTTPS/);
   assert.throws(() => parsePairingCode(code('javascript:alert(1)')));
   assert.throws(() => parsePairingCode(code().replace(token, 'short')));

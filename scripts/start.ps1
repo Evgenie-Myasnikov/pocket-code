@@ -52,9 +52,8 @@ if (-not (Test-Path -LiteralPath $keyPath)) {
     $key = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+','-').Replace('/','_')
     [System.IO.File]::WriteAllText($keyPath, $key)
 }
-$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-& icacls.exe $storagePath '/inheritance:r' '/grant:r' ($identity + ':(OI)(CI)F') | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'Could not restrict access to connection key' }
+Protect-PocketStorage $storagePath | Out-Null
+Start-PocketCleanup $storagePath
 Write-Host ''
 Write-Host 'Pocket Code - private connection key (paste into the Android app):' -ForegroundColor Green
 if(-not $Desktop){Write-Host ([System.IO.File]::ReadAllText($keyPath)) -ForegroundColor Yellow}

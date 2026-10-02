@@ -18,6 +18,8 @@ From version **0.21.0**, **Settings → Application updates** checks GitHub afte
 
 The updater verifies the release version, archive size, SHA-256 and file paths, prepares dependencies in a separate version folder, and waits for active tasks to finish. It then restarts the app and checks the host. If startup fails, it restores the previous version. Accounts, chat history, pairing key and preferences stay in the existing private data folder. A temporary internet tunnel can receive a new address after restart and require scanning the new QR.
 
+After an update the window reopens if it was open; otherwise the application stays in the tray. When the host starts, a background cleanup removes old application builds, superseded PC host versions, downloaded update archives and older cached APKs. Running, current, shortcut and startup builds, unfinished updates and anything created within the last hour are kept. Data folder permissions are re-applied only when they are not already private, so a large data folder does not delay the connection.
+
 Older Windows builds need one manual installation: update the source and run **Setup Pocket Code.cmd**, then exit the old tray app when its tasks finish and start Pocket Code again. Subsequent releases install automatically. The Windows ZIP is also available in releases; extract it and run **Pocket Code.exe** (existing WebView2 Runtime required).
 
 See [Provider sign-in and status](PROVIDER-SIGN-IN.md) for manual login, device codes, local secret entry and server diagnostics.
@@ -70,4 +72,4 @@ QR-код и Jira находятся в **Подключении**, язык, о
 
 Если сервер уже запущен старым консольным способом, приложение покажет его без создания второго процесса. Для полного перехода завершите старый сервер, когда нет активных задач, и запустите соединение из нового окна.
 
-Обновления сервера продолжают работать отдельно. Для обновления самого окна Windows закройте приложение через трей, получите новые исходники и повторите **Setup Pocket Code.cmd**. APK для этой desktop-функции переустанавливать не нужно.
+С версии **0.21.0** приложение и сервер ПК обновляются автоматически (**Настройки → Обновления приложения**). После обновления окно открывается снова, если было открыто; иначе приложение остаётся в трее. Временный интернет-туннель может получить новый адрес — тогда отсканируйте новый QR. При запуске сервера фоновая очистка удаляет старые сборки приложения, устаревшие версии сервера, скачанные архивы обновлений и старые APK. Текущие, запущенные и недавно установленные версии сохраняются.

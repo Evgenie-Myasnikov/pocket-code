@@ -58,6 +58,19 @@ public static class DesktopSmoke {
                     Call(form,"ExitApp");
                     try{using(var process=Process.GetProcessById((int)browser))process.WaitForExit(10000);}catch(ArgumentException){/* Already exited. */}
                 }
+                Directory.CreateDirectory(Path.Combine(temp,"desktop-update"));
+                foreach(bool wasVisible in new[]{true,false}){
+                    string marker=Path.Combine(temp,"desktop-update","reopen.txt");if(wasVisible)File.WriteAllText(marker,"synthetic");
+                    using(var form=new PocketDesktop(new[]{"--source",temp,"--updated","--background"},false)){
+                        form.Show();var timer=(System.Windows.Forms.Timer)Field(form,"timer");DateTime deadline=DateTime.UtcNow.AddSeconds(20);
+                        while(!timer.Enabled&&DateTime.UtcNow<deadline){Application.DoEvents();Thread.Sleep(20);}
+                        Check(form.Visible==wasVisible,wasVisible?"Window reopens after an update when it was open":"Updated window stays in the tray when it was hidden");
+                        Check(!File.Exists(marker),"Reopen marker is consumed");
+                        uint browser=((Microsoft.Web.WebView2.WinForms.WebView2)Field(form,"web")).CoreWebView2.BrowserProcessId;
+                        Call(form,"ExitApp");
+                        try{using(var process=Process.GetProcessById((int)browser))process.WaitForExit(10000);}catch(ArgumentException){/* Already exited. */}
+                    }
+                }
                 using(var form=new PocketDesktop(new[]{"--source",temp},false)){
                     using(var bitmap=new Bitmap(2,2))using(var image=new MemoryStream()){
                         bitmap.Save(image,System.Drawing.Imaging.ImageFormat.Png);

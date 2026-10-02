@@ -76,7 +76,7 @@ try{
     $newExe=Join-Path $staged 'Pocket Code.exe'
     [IO.File]::WriteAllText((Join-Path $installRoot 'current.txt'),$newExe)
     $next=Start-Process -FilePath $newExe -ArgumentList ('--updated --background --source "'+$hostRoot+'"') -WindowStyle Hidden -PassThru
-    $healthy=$false;$deadline=[DateTime]::UtcNow.AddSeconds(120)
+    $healthy=$false;$deadline=[DateTime]::UtcNow.AddSeconds(300)
     do{
         Start-Sleep -Seconds 2
         try{$token=(Get-Content -LiteralPath (Join-Path $Storage 'connection-key.txt') -Raw).Trim();$runtime=Invoke-RestMethod -Uri 'http://127.0.0.1:4318/api/runtime' -Headers @{Authorization='Bearer '+$token} -TimeoutSec 3;$healthy=$runtime.applicationId -eq 'app.pocketcode.host' -and [version]$runtime.version -ge [version]$manifest.version}catch{}

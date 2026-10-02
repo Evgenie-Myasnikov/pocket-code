@@ -60,6 +60,8 @@ public sealed class PocketDesktop:Form {
             try{
                 // The server rechecks busy state atomically before accepting shutdown.
                 await Request("runtime/stop",true);
+                // The updated window starts in the tray; reopen it only if the user was looking at it.
+                if(Visible)File.WriteAllText(Path.Combine(storage,"desktop-update","reopen.txt"),updateTicket);
                 File.WriteAllText(Path.Combine(storage,"desktop-update","apply.txt"),updateTicket);
                 exiting=true;timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;Close();
             }finally{changing=false;}
@@ -82,7 +84,7 @@ public sealed class PocketDesktop:Form {
     DateTime nextAttempt=DateTime.MinValue;
     string status="Ready to connect",jiraUrl;
     object[] addresses=new object[0];
-    readonly bool preview;
+    readonly bool preview,reopen;
     public Task Ready{get{return initialized.Task;}}
 
     [STAThread] public static void Main(string[] args){
@@ -102,6 +104,8 @@ public sealed class PocketDesktop:Form {
     public PocketDesktop(string[] args,bool previewMode){
         preview=previewMode;storage=Environment.GetEnvironmentVariable("POCKET_DATA_DIR")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".pocket-code");
         settingsFile=Path.Combine(storage,"desktop.json");preferences=new DesktopPreferences();
+        string reopenFile=Path.Combine(storage,"desktop-update","reopen.txt");reopen=!preview&&Array.IndexOf(args,"--updated")>=0&&File.Exists(reopenFile);
+        if(!preview&&File.Exists(reopenFile))try{File.Delete(reopenFile);}catch(IOException){}catch(UnauthorizedAccessException){}
         if(!preview&&File.Exists(settingsFile))try{preferences=json.Deserialize<DesktopPreferences>(File.ReadAllText(settingsFile))??preferences;}catch{}
         int source=Array.IndexOf(args,"--source");if(source>=0&&source+1<args.Length)preferences.Source=Path.GetFullPath(args[source+1]);
         else if(File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"host","package.json")))preferences.Source=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"host");
@@ -113,7 +117,7 @@ public sealed class PocketDesktop:Form {
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
         Resize+=(_,e)=>{if(WindowState==FormWindowState.Minimized)Hide();};timer.Tick+=async(_,e)=>await Poll();autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
-        Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0)Hide();await InitializeWeb();}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);return;}
+        Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0&&!reopen)Hide();await InitializeWeb();}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);return;}
             if(preview)return;
             // Host polling must not depend on this write; the next Toggle or settings change saves again.
             try{Save();}catch(IOException){}catch(UnauthorizedAccessException){}

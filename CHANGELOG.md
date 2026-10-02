@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-02 - Faster host start, automatic cleanup of old builds and visible window after updates (0.22.2)
+- Fixed: Every host start re-applied data folder permissions recursively. With many stored host versions this took about a minute or more, which delayed the QR connection and could exceed the update health check, causing a rollback and a second restart. Permissions are now re-applied only when the folder is not already private.
+- Added: A background cleanup after host start removes old Windows application builds, superseded PC host versions, downloaded update archives and older cached APKs. Builds that are running, loaded, current, referenced by shortcuts or Windows startup, part of an unfinished update or created within the last hour are kept; a folder with open files is never partly deleted.
+- Changed: The Windows updater waits up to five minutes for the new host. After an update the window reopens if it was open instead of staying in the tray.
+- Fixed: The pairing parser test now expects QR version 2, accepted since 0.22.0, and rejects an unknown version.
+- Files: scripts/bootstrap.ps1, start.ps1, desktop-update.ps1; desktop/DesktopWindow.cs; docs/DESKTOP.md; tests/storage-maintenance.test.ts, DesktopSmoke.cs, pairing.test.ts.
+- Validation: New tests cover one-time permission repair and cleanup of synthetic host, desktop, update-archive and APK folders, including kept current, pending, recent, open and newest items and no desktop cleanup during an update. Checking an already private folder took 1 ms. Desktop smoke covers reopening after an update and staying in the tray otherwise. TypeScript/Vite build and all 233 server tests passed.
+- Follow-up: The first host start after updating removes existing old builds in the background; large dependency folders can take several minutes to delete.
+
 ## 2026-10-02 - Shared app icon and theme-aware window controls (0.22.1)
 - Changed: Added a pocket-and-code vector identity, Windows executable/tray icon at seven sizes, Android adaptive/legacy launcher assets and browser favicon. Assets are reproducible through scripts/build-icons.mjs.
 - Changed: Native Windows caption, border and background follow the selected palette and light/dark/system theme. Standard window controls remain native; unsupported DWM attributes retain OS defaults.

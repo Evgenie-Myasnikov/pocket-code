@@ -101,3 +101,70 @@ function Ensure-PocketDependencies([string]$Root) {
         if (-not (Test-Path -LiteralPath 'node_modules/.bin/tsc.cmd')) { throw 'TypeScript build tools are still missing after installation.' }
     } finally { Pop-Location;if($locked){$mutex.ReleaseMutex()};$mutex.Dispose() }
 }
+function Test-PocketPrivateStorage([string]$Path) {
+    $acl=Get-Acl -LiteralPath $Path;if(-not $acl.AreAccessRulesProtected){return $false}
+    $user=[Security.Principal.WindowsIdentity]::GetCurrent().User;$full=[Security.AccessControl.FileSystemRights]::FullControl
+    foreach($rule in $acl.GetAccessRules($true,$false,[Security.Principal.SecurityIdentifier])){
+        if($rule.IdentityReference -eq $user -and $rule.AccessControlType -eq 'Allow' -and ($rule.FileSystemRights -band $full) -eq $full -and $rule.InheritanceFlags -eq 'ContainerInherit, ObjectInherit' -and $rule.PropagationFlags -eq 'None'){return $true}
+    }
+    return $false
+}
+function Protect-PocketStorage([string]$Path) {
+    # Reapplying the inheritable ACL walks every stored file and can take minutes, delaying host start and update health checks.
+    if (Test-PocketPrivateStorage $Path) { return $false }
+    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    & icacls.exe $Path '/inheritance:r' '/grant:r' ($identity + ':(OI)(CI)F') | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not restrict access to connection key' }
+    return $true
+}
+function Remove-PocketDirectory([string]$Path) {
+    # A rename fails while a file inside is open, so a folder in use is never half-deleted.
+    $Path=[IO.Path]::GetFullPath($Path);$trash=$Path
+    if(-not (Split-Path -Leaf $Path).StartsWith('.removing-')){$trash=Join-Path (Split-Path -Parent $Path) ('.removing-'+[guid]::NewGuid().ToString('N'));try{[IO.Directory]::Move($Path,$trash)}catch{return $false}}
+    # rd handles dependency paths beyond MAX_PATH; empty input means it can never wait for a prompt.
+    $null | & cmd.exe /d /c rd /s /q ('\\?\'+$trash) 2>$null | Out-Null
+    return -not (Test-Path -LiteralPath $trash)
+}
+function Remove-PocketStaleVersions([string]$Storage,[string]$InstallRoot,[int]$WaitSeconds=600) {
+    $mutex=New-Object Threading.Mutex($false,('Local\PocketCodeCleanup-'+[Security.Principal.WindowsIdentity]::GetCurrent().User.Value));$locked=$false
+    try {
+        try { $locked=$mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $locked=$true }
+        if(-not $locked){return}
+        # A desktop update may still roll back to the previous build, so wait for it to settle.
+        $desktopIdle={try{$s=Get-Content -LiteralPath (Join-Path $Storage 'desktop-update/state.json') -Raw -ErrorAction Stop|ConvertFrom-Json;return -not ($s.state -in 'checking','downloading','preparing','ready','restarting' -and [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()-[long]$s.at -lt 86400000)}catch{return $true}}
+        for($waited=0;$waited -lt $WaitSeconds -and -not (& $desktopIdle);$waited+=10){Start-Sleep -Seconds 10}
+        $refs=New-Object 'Collections.Generic.List[string]'
+        # Running images and loaded modules do not block a folder rename, so check them explicitly.
+        # Only the host and window load native modules from version folders; scanning every process takes tens of seconds.
+        foreach($process in Get-Process){try{if($process.Path){$refs.Add($process.Path)};if($process.ProcessName -in 'node','Pocket Code'){foreach($module in $process.Modules){$refs.Add($module.FileName)}}}catch{}}
+        try{foreach($item in Get-CimInstance Win32_Process){if($item.CommandLine){$refs.Add($item.CommandLine)}}}catch{}
+        foreach($name in 'current.json','pending.json'){try{$pointer=Get-Content -LiteralPath (Join-Path $Storage ('host/'+$name)) -Raw -ErrorAction Stop|ConvertFrom-Json;foreach($value in @($pointer.directory,$pointer.stagedDir)){if($value){$refs.Add([string]$value)}}}catch{}}
+        try{$refs.Add([IO.File]::ReadAllText((Join-Path $InstallRoot 'current.txt')))}catch{}
+        try{$refs.Add([string](Get-Content -LiteralPath (Join-Path $Storage 'desktop.json') -Raw -ErrorAction Stop|ConvertFrom-Json).Source)}catch{}
+        try{$refs.Add([string](Get-ItemProperty -LiteralPath 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Run' -Name PocketCode -ErrorAction Stop).PocketCode)}catch{}
+        try{$shell=New-Object -ComObject WScript.Shell;foreach($folder in @([Environment]::GetFolderPath('Desktop'),[Environment]::GetFolderPath('Programs'))){$file=Join-Path $folder 'Pocket Code.lnk';if(Test-Path -LiteralPath $file){$link=$shell.CreateShortcut($file);$refs.Add($link.TargetPath);$refs.Add($link.Arguments)}}}catch{}
+        $refs=@($refs|Where-Object{$_}|ForEach-Object{$_.Replace('/','\')})
+        $used={param($path) foreach($ref in $refs){if($ref.IndexOf($path+'\',[StringComparison]::OrdinalIgnoreCase) -ge 0 -or $ref.TrimEnd('\','"',' ').EndsWith($path,[StringComparison]::OrdinalIgnoreCase)){return $true}};return $false}
+        $recent=(Get-Date).AddHours(-1)
+        $roots=@(Join-Path $Storage 'host/versions');if(& $desktopIdle){$roots+=Join-Path $InstallRoot 'versions'}
+        foreach($root in $roots){if(Test-Path -LiteralPath $root){foreach($dir in Get-ChildItem -LiteralPath $root -Directory -Force){
+            if($dir.Name.StartsWith('.removing-') -or ($dir.CreationTime -lt $recent -and -not (& $used $dir.FullName))){Remove-PocketDirectory $dir.FullName|Out-Null}
+        }}}
+        if(& $desktopIdle){
+            $ticket='';try{$ticket=(Get-Content -LiteralPath (Join-Path $Storage 'desktop-update/state.json') -Raw -ErrorAction Stop|ConvertFrom-Json).ticket}catch{}
+            $downloads=Join-Path $Storage 'desktop-update'
+            if(Test-Path -LiteralPath $downloads){Get-ChildItem -LiteralPath $downloads -File|Where-Object{$_.Name -match '^[0-9a-f]{32}\.(zip|json)$' -and $_.LastWriteTime -lt $recent -and -not ($ticket -and $_.Name.StartsWith($ticket))}|Remove-Item -Force -ErrorAction SilentlyContinue}
+        }
+        $apks=Join-Path $Storage 'updates'
+        if(Test-Path -LiteralPath $apks){
+            # The newest verified APK is the one phones can still request.
+            Get-ChildItem -LiteralPath $apks -File -Filter '*.apk'|Sort-Object LastWriteTime -Descending|Select-Object -Skip 1|Where-Object{$_.LastWriteTime -lt $recent}|Remove-Item -Force -ErrorAction SilentlyContinue
+            Get-ChildItem -LiteralPath $apks -Directory -Filter 'download-*'|Where-Object{$_.CreationTime -lt $recent}|ForEach-Object{Remove-PocketDirectory $_.FullName|Out-Null}
+        }
+    } finally { if($locked){$mutex.ReleaseMutex()};$mutex.Dispose() }
+}
+function Start-PocketCleanup([string]$Storage) {
+    # Removal can take minutes for old dependency folders; never delay the host start.
+    $command=". '"+(Join-Path $PSScriptRoot 'bootstrap.ps1').Replace("'","''")+"'; Remove-PocketStaleVersions '"+$Storage.Replace("'","''")+"' '"+(Join-Path $env:LOCALAPPDATA 'Pocket Code Desktop').Replace("'","''")+"'"
+    Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand '+[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))) -WindowStyle Hidden | Out-Null
+}
