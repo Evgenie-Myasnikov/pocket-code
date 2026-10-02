@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
 Write-Host 'Pocket Code setup' -ForegroundColor Green
-Write-Host 'Your AI runs on this PC. Keep its host window open while using your phone.'
+Write-Host 'Your AI runs on this PC. Pocket Code keeps the connection running in the system tray.'
 
 function Test-SupportedNode {
     $command = Get-Command node.exe -ErrorAction SilentlyContinue
@@ -33,8 +33,5 @@ if (-not $claude -and -not $codex -and -not (Test-Path -LiteralPath $desktopCode
 
 Write-Host 'Install the latest Android APK on your phone; the release page is opening.'
 Start-Process 'https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest'
-Write-Host '1. Internet / mobile data (HTTPS tunnel)'
-Write-Host '2. Same trusted Wi-Fi network'
-do { $mode = Read-Host 'Connection [1 or 2, Enter for Internet]'; if (-not $mode) { $mode = '1' } } while ($mode -notin @('1','2'))
-Write-Host 'Next: choose your project folder. First-time preparation may take several minutes.'
-& (Join-Path $PSScriptRoot 'start.ps1') -Internet:($mode -eq '1')
+& (Join-Path $PSScriptRoot 'build-desktop.ps1') -InstallShortcut
+& (Join-Path $PSScriptRoot 'start-desktop.ps1')

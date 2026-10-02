@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-02 - Native Windows tray application
+- Changed: Added a native Windows window with embedded pairing QR, Jira setup, connection controls, optional per-user Windows startup and saved reconnect preferences. Close/minimize hides to the tray; explicit Exit terminates the owned process tree. Explicit Disconnect persists across launches.
+- Changed: Setup installs Desktop/Start menu shortcuts; the standard start command opens the desktop application. The legacy internet console launcher remains available. Desktop mode suppresses the separate QR browser and console key output.
+- Files: desktop/PocketCode.cs and manifest; desktop build/start/test scripts; OwnedHost.cs, start.ps1, setup.ps1; launchers and bilingual desktop/lifecycle documentation.
+- Validation: Native build and Windows smoke checks passed: window/tray lifecycle, synthetic QR parsing, hidden and nested process cleanup, persisted disconnect and reconnect on next launch. Eight existing launcher/process ownership tests passed. Documentation links checked.
+- Follow-up: Windows sign-in startup was not tested by logging out. Temporary tunnel URLs can change and require a new phone QR scan. Desktop executable updates require rerunning its installer; server updates remain separate. No Android code changed.
+
 ## 2026-10-01 - QR-only connection screen (0.20.6)
 - Changed: Removed manual address/key fields and their divider from app entry. Camera scanning and QR image import connect immediately; a saved or scanned connection can be retried without displaying credentials.
 - Changed: Updated connection-error recovery text and illustrated pairing guides. Migrated browser test setup to synthetic QR image decoding.

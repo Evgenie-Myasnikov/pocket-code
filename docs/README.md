@@ -9,6 +9,7 @@ Pocket Code is an Android companion for AI coding tools running on your Windows 
 | What you want to do | Guide |
 | --- | --- |
 | Install, pair by QR and connect away from home | [User guide: connection](USER_GUIDE.md#qr) |
+| Use the Windows tray app and automatic startup | [Desktop application](DESKTOP.md) |
 | Choose Claude, Codex or GitHub Copilot | [Providers and accounts](PROVIDERS.md) |
 | Choose a project and complete a coding task | [Everyday workflows](WORKFLOWS.md) |
 | Read code changes, adjust size or fit a diff to the screen | [Review](USER_GUIDE.md#diff) |

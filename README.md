@@ -49,7 +49,7 @@ You need **Windows 10+**, **Android 7+**, and **Claude Code and/or Codex install
 
 Download this repository using **Code → Download ZIP**, then extract it. Double-click **Setup Pocket Code.cmd**.
 
-Setup checks Node.js 22+, offers installation through Windows Package Manager if needed, opens the Android download page, and asks whether you want Wi-Fi or internet access. The launcher installs dependencies, builds the interface and opens a pairing QR without a project prompt. Choose a folder on the phone; local Git projects are discovered automatically. Internet mode also installs the tunnel client automatically.
+Setup checks Node.js 22+, offers installation through Windows Package Manager if needed, opens the Android download page, and installs the native Windows application with Desktop and Start menu shortcuts. Its window shows the pairing QR and connection settings. Dependencies and the internet tunnel are prepared automatically. Choose a project on the phone; local Git projects are discovered automatically.
 
 No Android SDK is needed to use the released APK. AI sign-in stays in the native tool on your PC.
 
@@ -60,12 +60,12 @@ No Android SDK is needed to use the released APK. AI sign-in stays in the native
 3. Open Pocket Code, tap **Scan QR code**, and scan the PC pairing QR.
 4. Choose **Claude** or **Codex**, then open a chat or start one in your project.
 
-**Keep the host window running.** Closing only the QR browser tab does not stop it. Treat the QR like a password. Restarting a temporary internet tunnel changes its address: scan the new QR.
+**Closing or minimizing the desktop window keeps Pocket Code in the system tray.** Right-click its icon and choose **Выход (Exit)** to stop it. Windows startup is an optional checkbox. An explicitly disconnected connection stays disconnected; otherwise the application can reconnect on launch. Treat the QR like a password. A restarted temporary internet tunnel may require scanning a new QR. [Desktop application guide](docs/DESKTOP.md).
 
 <details>
 <summary>Manual setup and subsequent launches</summary>
 
-Install Node.js 22+ yourself if Windows Package Manager is unavailable. Use **Start Pocket Code.cmd** for the same trusted Wi-Fi, or **Start Pocket Code Internet.cmd** for mobile data or another network. Both prepare dependencies on first use. **Stop Pocket Code.cmd** stops the host gracefully when work is idle.
+Install Node.js 22+ yourself if Windows Package Manager is unavailable. Use the **Pocket Code** shortcut or **Start Pocket Code.cmd** to open the desktop application. Choose internet or LAN in its window. **Start Pocket Code Internet.cmd** remains the legacy console launcher. Use the desktop **Disconnect** button to stop the host and disable reconnection; **Stop Pocket Code.cmd** is intended for the legacy console host.
 
 </details>
 

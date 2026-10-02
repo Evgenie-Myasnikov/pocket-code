@@ -21,7 +21,7 @@ Screenshots use the real interface with fictional data. Never publish your pairi
 
 If the camera is unavailable, choose **QR from image**. The QR supplies the address and pairing key automatically; there are no manual credential fields. If a scanned or saved connection fails, **Reconnect** retries it. Scan a new QR when the PC's address changes.
 
-Keep the PC awake and the host running. Closing the QR browser tab does not stop the host; closing the host launcher window ends its processes. Restarting a temporary internet tunnel changes its address: scan the new QR. A local Wi-Fi address normally cannot be reached over mobile data.
+Keep the PC awake and the host running. The native desktop window closes to the tray; use its tray menu **Exit** to terminate it. Only the legacy console launcher terminates the host when its window closes. Restarting a temporary internet tunnel changes its address: scan the new QR. A local Wi-Fi address normally cannot be reached over mobile data. See [desktop setup and autostart](DESKTOP.md).
 
 ## View images from a conversation
 

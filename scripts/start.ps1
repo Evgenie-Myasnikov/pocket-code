@@ -1,4 +1,4 @@
-param([string[]]$ProjectPath, [int]$Port = 4318, [string]$BindAddress = '0.0.0.0', [switch]$Internet)
+param([string[]]$ProjectPath, [int]$Port = 4318, [string]$BindAddress = '0.0.0.0', [switch]$Internet, [switch]$Desktop)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
@@ -17,7 +17,7 @@ if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyCon
     if($running.protocol -eq 1 -and $running.processId -and $running.version){
         Write-Host 'Pocket Code is already running. No second server was started.'
         $pairing=Join-Path $storagePath 'pairing.html'
-        if(Test-Path -LiteralPath $pairing){Start-Process -FilePath 'explorer.exe' -ArgumentList ('"'+$pairing+'"') -WindowStyle Hidden}
+        if(-not $Desktop -and (Test-Path -LiteralPath $pairing)){Start-Process -FilePath 'explorer.exe' -ArgumentList ('"'+$pairing+'"') -WindowStyle Hidden}
         return
     }
     throw ('Port ' + $Port + ' belongs to another process. No process was stopped.')
@@ -42,7 +42,7 @@ $resolvedRoots = @($ProjectPath | ForEach-Object { (Resolve-Path -LiteralPath $_
 $env:POCKET_ROOTS = ConvertTo-Json -InputObject $resolvedRoots -Compress
 $env:POCKET_HOST = $BindAddress
 $env:POCKET_PORT = [string]$Port
-$env:POCKET_OPEN_PAIRING = '1'
+$env:POCKET_OPEN_PAIRING = if($Desktop){'0'}else{'1'}
 if ($claudeCommand) { $env:POCKET_CLAUDE_EXECUTABLE = $claudeCommand.Source }
 if (-not (Test-Path -LiteralPath 'node_modules')) { & npm.cmd ci; if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' } }
 if (-not (Test-Path -LiteralPath 'dist/index.html')) { & npm.cmd run build; if ($LASTEXITCODE -ne 0) { throw 'Application build failed' } }
@@ -60,7 +60,7 @@ $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 if ($LASTEXITCODE -ne 0) { throw 'Could not restrict access to connection key' }
 Write-Host ''
 Write-Host 'Pocket Code - private connection key (paste into the Android app):' -ForegroundColor Green
-Write-Host ([System.IO.File]::ReadAllText($keyPath)) -ForegroundColor Yellow
+if(-not $Desktop){Write-Host ([System.IO.File]::ReadAllText($keyPath)) -ForegroundColor Yellow}
 Write-Host ''
 Write-Host ('Open on this PC: http://127.0.0.1:' + $Port)
 if ($Internet) { Write-Host 'Scan the new HTTPS QR code for mobile internet. Keep this window open.' }

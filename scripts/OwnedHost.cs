@@ -41,7 +41,8 @@ public sealed class PocketCodeOwnedHost : IDisposable {
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetExitCodeProcess(IntPtr process, out uint code);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     static void Check(bool ok) { if(!ok) throw new Win32Exception(Marshal.GetLastWin32Error()); }
-    public static PocketCodeOwnedHost Start(string executable, string arguments, string directory) {
+    public static PocketCodeOwnedHost Start(string executable, string arguments, string directory) { return Start(executable, arguments, directory, false); }
+    public static PocketCodeOwnedHost Start(string executable, string arguments, string directory, bool hidden) {
         var owner=new PocketCodeOwnedHost(); IntPtr attributes=IntPtr.Zero, value=IntPtr.Zero; bool initialized=false;
         try {
             owner.job=CreateJobObject(IntPtr.Zero,null); Check(owner.job!=IntPtr.Zero);
@@ -54,7 +55,7 @@ public sealed class PocketCodeOwnedHost : IDisposable {
             Check(UpdateProcThreadAttribute(attributes,0,new IntPtr(0x0002000D),value,new IntPtr(IntPtr.Size),IntPtr.Zero,IntPtr.Zero));
             var startup=new StartupInfoEx(); startup.Info.cb=(uint)Marshal.SizeOf(typeof(StartupInfoEx)); startup.Attributes=attributes;
             ProcessInformation info;
-            Check(CreateProcessW(executable,new StringBuilder("\""+executable+"\" "+arguments),IntPtr.Zero,IntPtr.Zero,false,0x00080000,IntPtr.Zero,directory,ref startup,out info));
+            Check(CreateProcessW(executable,new StringBuilder("\""+executable+"\" "+arguments),IntPtr.Zero,IntPtr.Zero,false,0x00080000 | (hidden ? 0x08000000u : 0u),IntPtr.Zero,directory,ref startup,out info));
             owner.initial=info.Process; owner.ProcessId=(int)info.ProcessId; CloseHandle(info.Thread);
             return owner;
         } catch { owner.Dispose(); throw; }
