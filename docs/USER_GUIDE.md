@@ -64,11 +64,12 @@ Review includes manual edits and edits by other tools in the project, not just t
 This screenshot shows the browser presentation. APK downloading and the Android installation prompt are available in the native app.
 
 1. The PC checks releases at startup and every six hours, then downloads and verifies the APK.
-2. The connected phone receives that APK from the PC. It does not check GitHub itself.
-3. **Android asks you to confirm installation.** If prompted, allow Pocket Code to install updates, return, and choose **Install update**. Install over the existing app to preserve settings.
-4. Windows updates its desktop application and host together when idle, with rollback if the new host fails to start. APK transfers block a restart.
+2. While the PC is connected and answering, the phone receives that APK from the PC.
+3. If the PC is not connected, does not answer or has updates disabled, the phone checks the latest GitHub release itself when it starts, when you return to it and at most hourly while open. It downloads the APK and opens the installer, accepting only an APK whose checksum matches the release and whose signing certificate matches the installed app.
+4. **Android asks you to confirm installation.** If prompted, allow Pocket Code to install updates, return, and choose **Install update**. Install over the existing app to preserve settings.
+5. Windows updates its desktop application and host together when idle, with rollback if the new host fails to start. APK transfers block a restart.
 
-Use **Settings ? Updates ? Check for updates on PC** to request a check from the phone. After a transfer failure, choose **Receive APK from PC** to retry. A cancelled installation can be reopened with **Install update**.
+Use **Settings → Updates → Check for updates on PC** to request a check from the phone. Without a reachable PC the same section offers **Check for updates**, which asks GitHub directly. After a failed download, choose **Receive APK from PC** or **Download update** to retry. A cancelled installation can be reopened with **Install update**.
 
 The PC needs public GitHub/npm access, but updates do not require GitHub CLI or GitHub login. Older hosts may need a manual PC update. Restarting a temporary tunnel may require a fresh QR.
 

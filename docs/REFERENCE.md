@@ -81,7 +81,7 @@ PR publication requires GitHub CLI sign-in, the exact repository root, a clean w
 
 ## Updates
 
-Install the first APK manually. From 0.21.1 the PC checks public releases at startup and every six hours, downloads and verifies the APK, then makes it available to connected phones. The phone reads the PC's update status and receives its prepared APK; it does not check GitHub independently. **Settings → Updates → Check for updates on PC** explicitly requests a new PC check. GitHub CLI and GitHub login are not required for updates.
+Install the first APK manually. From 0.21.1 the PC checks public releases at startup and every six hours, downloads and verifies the APK, then makes it available to connected phones. While the PC answers, the phone reads its update status and receives the prepared APK. From 0.22.4, when the PC is not connected, does not answer or has updates disabled, the phone checks the latest GitHub release itself at startup, on return and at most hourly, downloads the APK and opens the installer; it accepts only an APK matching the release checksum and the installed app's signing certificate. **Settings → Updates → Check for updates on PC** explicitly requests a new PC check; without a PC, **Check for updates** asks GitHub directly. GitHub CLI and GitHub login are not required for updates.
 
 The official public release repository is configured by default. For a custom distribution, set `POCKET_UPDATE_REPO=owner/repository`, or create `%USERPROFILE%/.pocket-code/updates.json` containing `{"repository":"owner/repository"}`. Restart the bridge after configuring it. The phone never receives a GitHub token.
 

@@ -61,15 +61,39 @@ public class AppUpdatePlugin extends Plugin {
             boolean privateHost = host.equals("localhost") || host.equals("127.0.0.1") || host.matches("10\\..*|192\\.168\\..*|172\\.(1[6-9]|2[0-9]|3[01])\\..*|100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\..*");
             if (!(base.getProtocol().equals("https") || base.getProtocol().equals("http") && privateHost) || base.getUserInfo() != null || base.getQuery() != null || base.getRef() != null || !(base.getPath().isEmpty() || base.getPath().equals("/")) || token.length() < 32 || token.contains("\n") || token.contains("\r") || !expected.matches("[a-f0-9]{64}") || release == null || release <= 0 || expectedSize == null || expectedSize < 1 || expectedSize > 200000000 || expectedCode == null || expectedCode < 1) throw new Exception();
         } catch (Exception e) { call.reject("Invalid update source."); return; }
+        URL source;
+        try { source = new URL(address.replaceAll("/$", "") + "/api/updates/download?release=" + release); }
+        catch (Exception e) { call.reject("Invalid update source."); return; }
+        transfer(call, source, token, expectedSize, expected, expectedCode);
+    }
+    @PluginMethod public void downloadRelease(PluginCall call) {
+        String expected = call.getString("sha256", "");
+        Long expectedSize = UpdateNumbers.positiveInteger(call.getData().opt("size")), expectedCode = UpdateNumbers.positiveInteger(call.getData().opt("versionCode"));
+        URL source;
+        try {
+            source = ReleaseSource.apk(call.getString("version", ""));
+            if (!expected.matches("[a-f0-9]{64}") || expectedSize == null || expectedSize < 1 || expectedSize > 200000000 || expectedCode == null || expectedCode < 1) throw new Exception();
+        } catch (Exception e) { call.reject("Invalid update source."); return; }
+        transfer(call, source, null, expectedSize, expected, expectedCode);
+    }
+    // A null token means the public GitHub release; the PC path keeps its key on one direct connection.
+    private void transfer(PluginCall call, URL source, String token, long expectedSize, String expected, long expectedCode) {
         if (!downloading.compareAndSet(false, true)) { call.reject("An update is already downloading."); return; }
         ready = null;
         new Thread(() -> {
             HttpURLConnection connection = null; File partial = new File(updateFile().getParentFile(), "update.part");
             try {
                 partial.getParentFile().mkdirs();
-                connection = (HttpURLConnection) new URL(address.replaceAll("/$", "") + "/api/updates/download?release=" + release).openConnection();
-                connection.setInstanceFollowRedirects(false); connection.setConnectTimeout(15000); connection.setReadTimeout(240000); connection.setRequestProperty("Authorization", "Bearer " + token);
-                if (connection.getResponseCode() != 200) throw new Exception("The PC could not download this release. Check for updates again.");
+                URL current = source;
+                for (int hop = 0; ; hop++) {
+                    connection = (HttpURLConnection) current.openConnection();
+                    connection.setInstanceFollowRedirects(false); connection.setConnectTimeout(15000); connection.setReadTimeout(240000);
+                    if (token != null) connection.setRequestProperty("Authorization", "Bearer " + token);
+                    int status = connection.getResponseCode();
+                    if (token == null && status >= 300 && status < 400 && hop < 5) { URL next = ReleaseSource.redirect(current, connection.getHeaderField("Location")); connection.disconnect(); connection = null; current = next; continue; }
+                    if (status != 200) throw new Exception(token == null ? "GitHub did not provide this release. Check for updates again." : "The PC could not download this release. Check for updates again.");
+                    break;
+                }
                 MessageDigest digest = MessageDigest.getInstance("SHA-256"); long received = 0;
                 try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(partial)) {
                     byte[] buffer = new byte[65536]; int count;

@@ -28,6 +28,8 @@ test('a newer release invalidates a previously downloaded APK and install is bou
       },
     };
   });
+  // The unpaired start screen checks releases directly; keep it offline and silent here.
+  await page.route(/^https:\/\/(api\.)?github\.com\//,route=>route.fulfill({status:404,json:{},headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*'}}));
   const checks:string[]=[];await page.route('**/api/updates/**',route=>{checks.push(route.request().url());return route.fulfill({json:{enabled:true,state:'ready',update:release}});});
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('http://127.0.0.1:5173');
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));

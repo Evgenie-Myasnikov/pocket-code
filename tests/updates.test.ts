@@ -7,6 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {ReleaseUpdater,validateUpdate} from '../server/updates';
+import {latestPublishedUpdate} from '../src/release-update';
 const bytes=Buffer.from('Synthetic APK test bytes');
 const hash=createHash('sha256').update(bytes).digest('hex');
 const manifest={applicationId:'app.pocketcode.mobile',version:'0.9.0',versionCode:9,apk:'Pocket-Code-0.9.0.apk',size:bytes.length,sha256:hash};
@@ -49,4 +50,14 @@ test('PC preparation coalesces work and mobile status reads never contact GitHub
  const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-pc-update-'));const service=new ReleaseUpdater('example/pocket-code',dir);let calls=0;
  (service as any).publicGet=async(url:string)=>{calls++;return url.endsWith('.apk')?bytes:Buffer.from(JSON.stringify(url.endsWith('/latest')?release:manifest));};
  try{assert.equal(service.status().state,'idle');assert.equal(calls,0);await Promise.all([service.prepare(),service.prepare()]);assert.equal(calls,3);assert.equal(service.status().state,'ready');assert.equal(service.status().update?.sha256,hash);for(let i=0;i<10;i++)service.status();assert.equal(calls,3);assert.deepEqual(await readFile(await service.download(23)),bytes);assert.equal(calls,3);service.close();await service.prepare(true);assert.equal(calls,3);}finally{service.close();await rm(dir,{recursive:true,force:true});}
+});
+test('phones without a PC read only the latest published release manifest',async()=>{
+  const latest='https://api.github.com/repos/Evgenie-Myasnikov/pocket-code/releases/latest',file='https://github.com/Evgenie-Myasnikov/pocket-code/releases/download/v0.9.0/update.json';
+  const urls:string[]=[];const get=(answers:Record<string,unknown>)=>async(url:string)=>{urls.push(url);if(!(url in answers))throw Error('Unexpected request');return answers[url];};
+  assert.equal((await latestPublishedUpdate(get({[latest]:release,[file]:manifest}))).versionCode,9);
+  assert.deepEqual(urls,[latest,file]);
+  await assert.rejects(latestPublishedUpdate(get({[latest]:{...release,tag_name:'v0.9.0/../other'}})));
+  await assert.rejects(latestPublishedUpdate(get({[latest]:{...release,assets:release.assets.filter(asset=>asset.name!=='update.json')}})));
+  await assert.rejects(latestPublishedUpdate(get({[latest]:release,[file]:{...manifest,sha256:'0'.repeat(64)}})));
+  await assert.rejects(latestPublishedUpdate(get({[latest]:{...release,prerelease:true},[file]:manifest})));
 });
