@@ -90,7 +90,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.use(express.json({ limit: '15mb' }));
   const devices=()=>{if(!config.devices)throw new HttpError(404,'Device management is unavailable. Update the PC host.');return config.devices;};
-  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32)}).parse(req.body);res.json(await devices().pair((req.headers.authorization||'').replace(/^Bearer /,''),input));});
+  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);res.json(await devices().pair((req.headers.authorization||'').replace(/^Bearer /,''),input));});
+  app.post('/api/devices/self/forget',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().forget(res.locals.deviceId);res.json({ok:true});});
   app.post('/api/devices/heartbeat',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().heartbeat();res.json({ok:true});});
   app.post('/api/devices/:id/rename',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');const {name}=z.object({name:z.string().trim().min(1).max(80)}).parse(req.body);await devices().rename(uuid.parse(req.params.id),name);res.json({ok:true});});
   app.get('/api/devices',(_req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');res.json(devices().list());});

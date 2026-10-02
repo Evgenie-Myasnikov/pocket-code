@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import type {AddressInfo} from 'node:net';
@@ -36,5 +36,27 @@ test('only PC admin manages devices; pairing keys cannot read data and remote sh
  assert.equal((await(await req('/devices',admin)).json())[0].name,'Renamed test phone');
  assert.equal((await req('/devices/'+paired.deviceId+'/disconnect',admin,{})).status,200);assert.equal(qrUpdates,1);
  assert.equal((await req('/health',paired.token)).status,401);
+ const other=await(await req('/devices/pair',registry.pairingToken,{name:'Synthetic tablet',platform:'android',version:'1',model:'Example X2',installation:'synthetic-installation-0003'})).json();
+ assert.equal((await req('/devices/self/forget',admin,{})).status,403);
+ assert.equal((await req('/devices/self/forget',other.token,{})).status,200);assert.equal((await req('/health',other.token)).status,401);assert.deepEqual(await(await req('/devices',admin)).json(),[]);
+ assert.equal((await req('/devices/pair',registry.pairingToken,{name:'Synthetic phone',platform:'android',version:'1',installation:'../escape'})).status,400);
  }finally{result.jobs.close();result.terminals.close();await result.queue?.close();await result.codexQueue?.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(root,{recursive:true,force:true});}
+});
+
+test('a phone pairing again keeps one entry, removals leave no trace and legacy revoked entries vanish',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'pocket-devices-dedupe-')),file=path.join(root,'devices.json');let now=100000;
+ try{const registry=await new DeviceRegistry(file,()=>now).load(),qr=registry.pairingToken,installation='synthetic-installation-0001';
+ const first=await registry.pair(qr,{name:'Synthetic phone',platform:'android',version:'1',model:'Example X1',installation});
+ await registry.rename(first.deviceId,'Synthetic kitchen tablet');now+=1000;
+ const again=await registry.pair(qr,{name:'Synthetic phone',platform:'android',version:'2',model:'Example X1',installation});
+ assert.equal(again.deviceId,first.deviceId);assert.equal(registry.list().length,1);
+ const [entry]=registry.list();assert.equal(entry.name,'Synthetic kitchen tablet');assert.equal(entry.version,'2');assert.equal(entry.model,'Example X1');
+ assert.equal(JSON.stringify(registry.list()).includes(installation),false);assert.equal((await readFile(file,'utf8')).includes(installation),false);
+ assert.equal(registry.authenticate(first.token),undefined);assert.equal(registry.authenticate(again.token),first.deviceId);
+ const other=await registry.pair(qr,{name:'Second synthetic phone',platform:'android',version:'1',installation:'synthetic-installation-0002'});assert.equal(registry.list().length,2);
+ await registry.forget(other.deviceId);assert.equal(registry.list().length,1);assert.equal(registry.isPairing(qr),true);assert.equal(registry.authenticate(other.token),undefined);
+ await registry.revoke(first.deviceId);assert.deepEqual(registry.list(),[]);assert.equal(registry.isPairing(qr),false);
+ await writeFile(file,JSON.stringify({pairing:'synthetic-legacy-pairing-key',devices:[{id:'legacy-1',name:'Revoked synthetic',platform:'android',version:'1',hash:'a',pairedAt:1,lastSeen:1,revokedAt:2},{id:'legacy-2',name:'Kept synthetic',platform:'android',version:'1',hash:'b',pairedAt:1,lastSeen:1}]}));
+ assert.deepEqual((await new DeviceRegistry(file,()=>now).load()).list().map(d=>d.name),['Kept synthetic']);
+ }finally{await rm(root,{recursive:true,force:true});}
 });

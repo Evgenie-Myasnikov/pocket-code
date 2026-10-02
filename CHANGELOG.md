@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-02 - One entry per device with recognisable names (0.22.5)
+- Fixed: Every QR scan added a new device entry, so the same phone appeared repeatedly. Phones now send a stable installation identity (a per-app hash of the Android ID, or a random browser id); pairing again, including after reinstalling, updates the existing entry and key and keeps a name set on the PC.
+- Fixed: Disconnected devices stayed in the list. Disconnect on the PC now removes the entry, leaving on the phone removes it too, and revoked entries from earlier versions are dropped when the PC host starts.
+- Changed: Phones report their Android device name, or maker and model when none is set, instead of a generic "Android device"; the list shows the model beside the version.
+- Files: server/devices.ts, app.ts; src/api.ts, App.tsx, DesktopDevices.tsx, native-update.ts; AppUpdatePlugin.java; desktop guide; device tests.
+- Validation: Registry tests cover re-pairing one installation (same id, new key, kept custom name, no installation id on disk or in the list), a second installation staying separate, leaving and disconnecting removing entries, QR rotation only on PC disconnect, and dropped legacy revoked entries. API tests cover self-removal being device-only and malformed installation ids being rejected; the browser pairing test checks the stable installation id. Server suite 235/235, JUnit 10/10, TypeScript/Vite and Android builds, desktop smoke and the related browser scenarios (11/11) passed.
+- Follow-up: Entries created by 0.22.0–0.22.4 have no installation identity and are not merged automatically; remove leftovers once with Disconnect. Android device names were not checked on a physical phone.
+
 ## 2026-10-02 - Phone updates itself without a PC (0.22.4)
 - Added: When the PC is not connected, does not answer or has updates disabled, Android checks the latest GitHub release itself at startup, on return and at most hourly while open, downloads the APK and opens the installer. The unpaired connection screen does this too. A reachable PC remains the update source, and Settings → Updates offers a direct check without a PC.
 - Security: The phone accepts the same manifest rules as the PC through a shared validator, downloads only this repository's release asset URL built natively from the validated version, follows HTTPS redirects only, and installs only after the size, SHA-256, package name, newer version code and signing certificate match. The PC path still sends its key on one direct connection without redirects.

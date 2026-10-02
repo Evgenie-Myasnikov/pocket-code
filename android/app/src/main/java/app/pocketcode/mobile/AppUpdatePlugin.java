@@ -52,6 +52,20 @@ public class AppUpdatePlugin extends Plugin {
             JSObject result = new JSObject(); result.put("version", current.versionName); result.put("versionCode", version(current)); call.resolve(result);
         } catch (Exception e) { call.reject("Could not read installed app version."); }
     }
+    @PluginMethod public void identity(PluginCall call) {
+        try {
+            String androidId = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            String name = Build.VERSION.SDK_INT >= 25 ? Settings.Global.getString(getContext().getContentResolver(), Settings.Global.DEVICE_NAME) : null;
+            String maker = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER.trim(), model = Build.MODEL == null ? "" : Build.MODEL.trim();
+            if (!maker.isEmpty()) maker = maker.substring(0, 1).toUpperCase() + maker.substring(1);
+            JSObject result = new JSObject();
+            // Only a per-app hash leaves the phone; it lets the PC recognise this installation when it pairs again.
+            if (androidId != null && !androidId.isEmpty()) result.put("installation", hex(MessageDigest.getInstance("SHA-256").digest((getContext().getPackageName() + ":" + androidId).getBytes("UTF-8"))));
+            result.put("name", name == null ? "" : name.trim());
+            result.put("model", model.toLowerCase().startsWith(maker.toLowerCase()) ? model : (maker + " " + model).trim());
+            call.resolve(result);
+        } catch (Exception e) { call.reject("Could not read device identity."); }
+    }
     @PluginMethod public void download(PluginCall call) {
         String address = call.getString("url", ""), token = call.getString("token", ""), expected = call.getString("sha256", "");
         Long release = UpdateNumbers.positiveInteger(call.getData().opt("releaseId")), expectedSize = UpdateNumbers.positiveInteger(call.getData().opt("size")), expectedCode = UpdateNumbers.positiveInteger(call.getData().opt("versionCode"));

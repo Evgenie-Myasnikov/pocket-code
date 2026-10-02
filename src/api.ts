@@ -3,11 +3,17 @@ import { networkFailure } from './connection-errors';
 import {desktopCall} from './desktop-bridge';
 export type Connection = {url: string;token: string;desktop?:boolean;pairing?:boolean;deviceId?:string;};
 let pairing:{key:string;promise:Promise<Connection>}|undefined;
+// A stable installation id lets the PC replace this device's entry when it pairs again; the name tells devices apart.
+async function deviceIdentity(platform:'android'|'browser'):Promise<{name:string;model?:string;installation?:string}>{
+  if(platform==='android'&&Capacitor.isNativePlatform())try{const {Installer}=await import('./native-update');const device=await Installer.identity();return {name:device.name||device.model||'Android device',...(device.model?{model:device.model}:{}),...(device.installation?{installation:device.installation}:{})};}catch{/* Older native builds pair without an identity. */}
+  let installation:string|undefined;try{installation=localStorage.getItem('pocket-code-installation')||undefined;if(!installation){installation=crypto.randomUUID().replace(/-/g,'');localStorage.setItem('pocket-code-installation',installation);}}catch{installation=undefined;}
+  return {name:platform==='android'?'Android device':'Browser',...(installation?{installation}:{})};
+}
 export function pairDevice(connection:Connection,version:string):Promise<Connection>{
   if(!connection.pairing)return Promise.resolve(connection);
   const key=connection.url+'|'+connection.token;if(pairing?.key===key)return pairing.promise;
   const platform=/Android/i.test(navigator.userAgent)?'android':'browser';
-  const promise=request<{deviceId:string;token:string}>(connection,'/devices/pair',{name:platform==='android'?'Android device':'Browser',platform,version}).then(paired=>({url:connection.url,...paired})).catch(error=>{if(pairing?.key===key)pairing=undefined;throw error;});
+  const promise=deviceIdentity(platform).then(identity=>request<{deviceId:string;token:string}>(connection,'/devices/pair',{...identity,platform,version})).then(paired=>({url:connection.url,...paired})).catch(error=>{if(pairing?.key===key)pairing=undefined;throw error;});
   pairing={key,promise};return promise;
 }
 export function providerRequest(provider:'claude'|'codex'|'copilot'){

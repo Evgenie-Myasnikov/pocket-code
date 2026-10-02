@@ -514,7 +514,8 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     } catch (e) {setError((e as Error).message);} finally {setUploading(false);if (fileInput.current) fileInput.current.value = '';}
   }
   function startDemo() {setDemo(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.10.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
-  async function disconnect() {try {await saveConnection(null);clearChatCache();persistPosition.current=()=>{};clearPositions();onDisconnect();}catch(e){setError((e as Error).message);}}
+  // Leaving on the phone also removes it from the PC's device list; an unreachable or older PC is not a blocker.
+  async function disconnect() {try {if(connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);clearChatCache();persistPosition.current=()=>{};clearPositions();onDisconnect();}catch(e){setError((e as Error).message);}}
   // Without a reachable PC the phone still checks, downloads and offers the latest release itself.
   if (!health) return <><Connect initial={saved} onConnect={connect} onDemo={startDemo} busy={busy} error={error} /><Updates connection={null} expanded={false} /></>;
   const visible = sessions.filter((s) => `${s.customTitle || ""} ${s.summary} ${s.cwd}`.toLowerCase().includes(search.toLowerCase()));
