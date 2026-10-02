@@ -390,7 +390,7 @@
 - Tasks replaces Jobs, with native Jira status-category, project, status and type filters. Filter changes clear selection; batch selection follows the active query.
 - Project opens an overview of Files, Rules and Changelog. Saved text/interface scaling is consistent on task and document cards.
 - Simplified headers and compact expandable command/file activity; removed the Normal/Plan selector from chats.
-- Added persisted Codex/Claude runtime change detection and one-time compatibility tasks in a shared Pocket Code source project. Configure automatic checks under Settings â†’ Updates. First observation establishes a baseline; publication and host restart remain separate.
+- Added persisted Codex/Claude runtime change detection and one-time compatibility tasks in a shared Pocket Code source project. Configure automatic checks under Settings → Updates. First observation establishes a baseline; publication and host restart remain separate.
 - Validation: 148 server tests, 64 responsive scenarios and focused interaction/typography tests passed; Android build and current Codex protocol initialization passed. Physical-phone installation and real automatic AI maintenance execution remain unverified.
 
 ## 2026-10-01 - 0.13.1
