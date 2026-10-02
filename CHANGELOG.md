@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-02 - Clean Windows build output
+- Fixed: scripts/build-desktop.ps1 copied the web build into artifacts/desktop/ui without removing earlier hashed assets, so every Setup installation and Windows package accumulated stale interface files (one package held 109 instead of 53 asset files). The folder is now emptied before copying.
+- Fixed: scripts/package-desktop.ps1 left a full staging copy (6-21 MB) in artifacts after each package; it is now removed even when packaging fails.
+- Files: scripts/build-desktop.ps1, package-desktop.ps1, test-desktop.ps1.
+- Validation: test-desktop.ps1 now plants a stale asset before building and requires the interface folder to match the web build exactly. It failed before the fix (78 instead of 53 files) and passes after it, together with the desktop smoke test. A package built over a planted stale asset contains exactly the 53 current assets, and no staging folder remains.
+- Follow-up: Ships with the next release. The published 0.21.3 and 0.22.2 packages were already cleaned manually before upload.
+
 ## 2026-10-02 - Faster host start, automatic cleanup of old builds and visible window after updates (0.22.2)
 - Fixed: Every host start re-applied data folder permissions recursively. With many stored host versions this took about a minute or more, which delayed the QR connection and could exceed the update health check, causing a rollback and a second restart. Permissions are now re-applied only when the folder is not already private.
 - Added: A background cleanup after host start removes old Windows application builds, superseded PC host versions, downloaded update archives and older cached APKs. Builds that are running, loaded, current, referenced by shortcuts or Windows startup, part of an unfinished update or created within the last hour are kept; a folder with open files is never partly deleted.

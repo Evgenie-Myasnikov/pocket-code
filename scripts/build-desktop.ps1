@@ -21,6 +21,8 @@ Copy-Item -LiteralPath (Join-Path $sdk 'runtimes/win-x64/native/WebView2Loader.d
 if($LASTEXITCODE -ne 0){throw 'Desktop build failed'}
 if(-not $SkipWebBuild){Push-Location $root;try{& npm.cmd run build;if($LASTEXITCODE -ne 0){throw 'Shared interface build failed'}}finally{Pop-Location}}
 $ui=Join-Path $output 'ui'
+# Vite emits new hashed asset names on every build; start empty so packages and installs carry only the current interface.
+if(Test-Path -LiteralPath $ui){Remove-Item -LiteralPath $ui -Recurse -Force}
 New-Item -ItemType Directory -Force -Path $ui | Out-Null
 Copy-Item -Path (Join-Path $root 'dist/*') -Destination $ui -Recurse -Force
 $version=(Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw|ConvertFrom-Json).version
