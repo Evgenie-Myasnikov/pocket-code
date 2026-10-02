@@ -1,6 +1,7 @@
 import { t } from "./i18n";import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { networkFailure } from './connection-errors';
-export type Connection = {url: string;token: string;};
+import {desktopCall} from './desktop-bridge';
+export type Connection = {url: string;token: string;desktop?:boolean;};
 export function providerRequest(provider:'claude'|'codex'|'copilot'){
   return <T,>(connection:Connection,endpoint:string,data?:unknown):Promise<T>=>{
     const [pathname,search]=endpoint.split('?');const params=new URLSearchParams(search);
@@ -31,6 +32,7 @@ export async function saveConnection(connection: Connection | null) {
   } else if (connection) sessionStorage.setItem('connection', JSON.stringify(connection));else sessionStorage.removeItem('connection');
 }
 export async function request<T>(connection: Connection, endpoint: string, data?: unknown): Promise<T> {
+  if(connection.desktop){if(data!==undefined)throw Error('Desktop chats are read-only.');return desktopCall<T>('read',{endpoint});}
   const timeout = endpoint.startsWith('/jira/workflow') ? 300000 : endpoint.startsWith('/jira/') || endpoint.startsWith('/updates/') || endpoint.startsWith('/providers') || endpoint.endsWith('/usage') || endpoint.includes('provider=codex') ? 95000 : 30000;
   const url = normalizeUrl(connection.url) + '/api' + endpoint;
   const headers = { Authorization: `Bearer ${connection.token}`, 'Content-Type': 'application/json' };

@@ -36,7 +36,7 @@ import { fileBase64, loadConnection, request, saveConnection, type Connection } 
 import { demoMessages, demoSessions } from './demo';
 import type { ChatMessage, JobView, SubagentView,ActivityItem } from '../server/types';
 
-type Session = {sessionId: string;summary: string;customTitle?: string;cwd?: string;lastModified: number;gitBranch?: string;source?: string;readOnly?: boolean;archived?: boolean;provider?: WorkspaceProvider;};
+import type {Session} from './session';
 type Health = {name: string;roots: string[];version: string;protocol: number;};
 type ProviderInfo = {id: WorkspaceProvider;name: string;available: boolean;authenticated?: boolean;models?: EffortModel[];error?: string;};
 type Attachment = DraftAttachment;

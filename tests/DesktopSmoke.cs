@@ -17,12 +17,12 @@ public static class DesktopSmoke {
         PocketCodeOwnedHost owned=null;
         try{
             using(var form=new PocketDesktop(new[]{"--preview"},true)){
-                form.Show();Application.DoEvents();Check(form.Visible,"Window opens");
+                form.Show();DateTime readyDeadline=DateTime.UtcNow.AddSeconds(20);while(!form.Ready.IsCompleted&&DateTime.UtcNow<readyDeadline){Application.DoEvents();Thread.Sleep(20);}Check(form.Ready.IsCompleted,"WebView loads");form.Ready.GetAwaiter().GetResult();Check(form.Visible,"Window opens");
                 form.Close();Application.DoEvents();Check(!form.Visible&&!form.IsDisposed,"Close hides without exiting");
                 form.RestoreWindow();Application.DoEvents();Check(form.Visible,"Tray open restores window");
                 form.WindowState=FormWindowState.Minimized;Application.DoEvents();Check(!form.Visible,"Minimize hides window");
                 form.RestoreWindow();Application.DoEvents();Check(form.WindowState==FormWindowState.Normal,"Restored window is normal");
-                if(args.Length>0)using(var capture=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(capture,new Rectangle(Point.Empty,form.Size));capture.Save(args[0]);}
+                if(args.Length>0){var view=(Microsoft.Web.WebView2.WinForms.WebView2)Field(form,"web");using(var stream=File.Create(args[0])){var capture=view.CoreWebView2.CapturePreviewAsync(Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png,stream);while(!capture.IsCompleted){Application.DoEvents();Thread.Sleep(10);}capture.GetAwaiter().GetResult();}}
                 string powershell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe");
                 owned=PocketCodeOwnedHost.Start(powershell,"-NoProfile -NonInteractive -Command \"Start-Sleep -Seconds 90\"",Environment.CurrentDirectory,true);
                 using(var child=Process.GetProcessById(owned.ProcessId)){
@@ -47,8 +47,8 @@ public static class DesktopSmoke {
                         File.WriteAllText(Path.Combine(temp,"pairing.html"),"<img src=\"data:image/png;base64,"+Convert.ToBase64String(image.ToArray())+"\" alt=\"Synthetic\"><code>https://example.invalid</code><a href=\"http://127.0.0.1:4318/setup/jira#synthetic\">Jira</a>");
                     }
                     typeof(PocketDesktop).GetMethod("LoadPairing",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(form,null);
-                    Check(((PictureBox)Field(form,"qr")).Image!=null,"Embedded pairing image loads");
-                    Check(((Button)Field(form,"jira")).Enabled,"Local Jira setup is available");
+                    Check(((object[])Field(form,"addresses")).Length==1,"Pairing image is available to shared UI");
+                    Check(Field(form,"jiraUrl")!=null,"Local Jira setup is available");
                     Call(form,"Poll");Check(Field(form,"owner")==null,"Explicitly disconnected setting does not auto-start");
                     Call(form,"Toggle");Check(Field(form,"owner")!=null,"Manual connect launches hidden host");
                     Check(File.ReadAllText(Path.Combine(temp,"desktop.json")).Contains("\"Connect\":true"),"Connect intent is saved");
@@ -72,7 +72,9 @@ public static class DesktopSmoke {
                 Check(Path.GetFullPath(temp).StartsWith(Path.GetFullPath(Path.GetTempPath()),StringComparison.OrdinalIgnoreCase),"Fixture cleanup stays in temp");
                 Directory.Delete(temp,true);
             }
-            Console.WriteLine("PASS: tray lifecycle, hidden child cleanup, saved disconnect and launch reconnection.");return 0;
+            foreach(string path in new[]{"/sessions","/sessions/synthetic/messages?provider=codex","/review?cwd=example","/project-artifact?path=example.md","/sessions/synthetic/subagents/child/messages"})Check(DesktopReadPolicy.Allows(path),"Read route allowed");
+            foreach(string path in new[]{"/runtime/stop","/jobs/example/stop","https://example.invalid","//example.invalid","/../runtime/stop","/sessions/x/messages#hidden","/jira/login"})Check(!DesktopReadPolicy.Allows(path),"Unsafe route denied");
+            Console.WriteLine("PASS: shared WebView UI, tray lifecycle, read-only bridge policy, nested child cleanup and saved reconnect.");return 0;
         }catch(Exception error){Console.Error.WriteLine(error);return 1;}finally{if(owned!=null)owned.Dispose();}
     }
 }

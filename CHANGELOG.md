@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-02 - Shared desktop workspace and read-only conversations
+- Changed: Replaced the native form layout with the shared TypeScript/React interface in WebView2. Added provider/project selection, searchable conversations, refreshing history, Review, AI results, image zoom and subagent context. Reused Android renderers, panels, language, appearance controls and session types.
+- Changed: Kept QR/Jira pairing, tray lifecycle and startup settings in the desktop shell. The native reader allows only approved GET routes; the TypeScript adapter rejects mutations. Desktop chat editing and agent approvals remain on the phone.
+- Changed: Added versioned desktop installation so an active older host is not interrupted. Installer validates its pinned WebView2 SDK and can install Microsoft's signed runtime. Excluded build/tool directories from the development watcher.
+- Files: src/DesktopApp.tsx, desktop-bridge.ts, desktop.css, session.ts, shared entry/API; desktop/DesktopWindow.cs; desktop build/start scripts, tests and desktop guide.
+- Validation: TypeScript/Vite and native builds passed; 12 distinct browser scenarios passed, with six desktop scenarios repeated after final changes. Checked 900/1440/1920px layouts, shared Review/results/image zoom, read-only request rejection and mobile connection regression. Native smoke passed WebView loading, tray behavior, read-only route policy, nested process cleanup and saved reconnection.
+- Follow-up: Active production work was left running; exit the old tray application after work completes and reopen the updated shortcut. Desktop appearance is saved per device, not synchronized with Android.
+
 ## 2026-10-02 - Native Windows tray application
 - Changed: Added a native Windows window with embedded pairing QR, Jira setup, connection controls, optional per-user Windows startup and saved reconnect preferences. Close/minimize hides to the tray; explicit Exit terminates the owned process tree. Explicit Disconnect persists across launches.
 - Changed: Setup installs Desktop/Start menu shortcuts; the standard start command opens the desktop application. The legacy internet console launcher remains available. Desktop mode suppresses the separate QR browser and console key output.

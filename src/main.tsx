@@ -1,6 +1,5 @@
-import React from 'react';
+import React,{lazy,Suspense} from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './App';
 import './styles.css';
 import './interface-sizing.css';
 import '@fontsource/golos-text/400.css';
@@ -8,4 +7,7 @@ import '@fontsource/golos-text/500.css';
 import '@fontsource/golos-text/600.css';
 import '@fontsource/manrope/500.css';
 import '@fontsource/manrope/700.css';
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
+import './desktop.css';
+const App=lazy(()=>import('./App').then(module=>({default:module.App})));
+const DesktopApp=lazy(()=>import('./DesktopApp').then(module=>({default:module.DesktopApp})));
+createRoot(document.getElementById('root')!).render(<React.StrictMode><Suspense fallback={<div role="status" style={{padding:32}}>Pocket Code…</div>}>{new URLSearchParams(location.search).get('desktop')==='1'?<DesktopApp/>:<App/>}</Suspense></React.StrictMode>);

@@ -4,7 +4,13 @@
 
 Run **Setup Pocket Code.cmd** from the extracted source package. Existing users can run **Install Pocket Code Desktop.cmd**. This builds a small native Windows application and adds **Pocket Code** shortcuts to the Desktop and Start menu. Administrator access is not required. Keep the source folder: the application uses its host scripts, Node.js and dependencies. Moving that folder requires running the installer again.
 
-The window shows pairing QR codes and a Jira setup button. **Подключение через интернет** selects an internet tunnel; clear it before connecting to use your trusted LAN. Initial preparation may take several minutes. The native window is currently in Russian; Android retains its English/Russian language setting.
+The desktop window uses the same TypeScript/React message renderer, Review, results gallery, image viewer, subagent viewer, themes and sizing controls as Android. Its wider layout has a left sidebar with provider, project and conversation selection. Chats are **read-only**: send messages and answer agent questions from your phone. The view refreshes automatically while open. Review uses the selected conversation's project folder; results scan that conversation's available history.
+
+**Connection** contains pairing QR codes, internet/LAN selection and Jira setup. **Settings** contains Windows startup/reconnection, English/Russian language selection and the shared appearance controls. Preferences are local to each device; changing your PC theme does not change the phone theme.
+
+Installation downloads a checksum-pinned Microsoft WebView2 SDK to build the Windows shell. If the WebView2 Runtime is missing, it installs Microsoft's signed bootstrapper. The window requires 64-bit Windows and uses a private local web origin. Its native bridge allows only approved read endpoints; chat requests cannot send commands or edit files. Provider credentials remain in host storage. The native layer owns the tray, startup, host lifecycle and QR pairing; it does not reimplement the chat widgets.
+
+![Desktop conversation with fictional sample content](images/desktop-chat.png)
 
 | Action | Result |
 | --- | --- |
@@ -24,6 +30,10 @@ The existing host updater updates the server. It does not replace the desktop ex
 
 <a id="russian"></a>
 ## Приложение для Windows
+
+На ПК используются те же компоненты TypeScript/React, что на Android: сообщения, Review, результаты, просмотр изображений с масштабированием, субагенты, темы и размеры. Слева выбираются провайдер, проект и чат. **Чаты доступны только для чтения**; сообщения и ответы на вопросы агента отправляются с телефона. Открытая переписка обновляется автоматически.
+
+QR-код и Jira находятся в **Подключении**, язык, оформление, автозапуск и восстановление связи — в **Настройках**. Настройки оформления сохраняются отдельно на каждом устройстве. Нужна 64-битная Windows; WebView2 при необходимости устанавливается автоматически.
 
 Для первой установки запустите **Setup Pocket Code.cmd**. Если сервер уже настроен — **Install Pocket Code Desktop.cmd**. Появится ярлык **Pocket Code** на рабочем столе и в меню «Пуск». Папку исходников оставьте на месте: приложение использует её сервер и зависимости. После переноса папки повторите установку.
 
