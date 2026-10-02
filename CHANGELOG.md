@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-02 - GitHub Copilot usage limits
+- Added: **Settings → Usage** shows GitHub Copilot premium requests, chat and completion quotas with remaining share and billing-period reset, instead of only a link. The composer ring now shows the remaining premium/chat share for Copilot chats.
+- Changed: The PC reads quota through the Copilot SDK account API with a 30-second cache. Unlimited chat and completion entitlements are hidden; an exhausted premium quota without allowed overage is reported as unavailable. Remaining share is calculated from used and included requests, with the reported percentage only as a fallback.
+- Files: server/copilot-usage.ts, copilot.ts, app.ts; src/CodexUsage.tsx, SettingsPanel.tsx, translations.ts; tests/copilot-usage.test.ts.
+- Validation: Unit tests cover limited, unlimited and exhausted quotas, reset dates, missing data and that editor completions never drive the composer ring. TypeScript passed. A live Copilot account was not available for checking real quota values.
+
 ## 2026-10-02 - Project page on Windows
 - Added: The Windows application has a **Project** page like the phone: project overview, rules, changelog and a read-only file browser for the selected folder. Its folder follows the chat project filter or the open chat, and choosing another folder there also filters the chat list.
 - Security: The desktop bridge additionally allows only the read routes /project-docs, /project-doc, /files and /file; the host still limits them to permitted project roots, and write routes remain rejected.

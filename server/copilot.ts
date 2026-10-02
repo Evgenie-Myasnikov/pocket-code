@@ -5,6 +5,8 @@ import {allowedPath,HttpError} from './security.js';
 import type {ChatMessage,JobView} from './types.js';
 import {Followups,type FollowupInput} from './followups.js';
 import {coalesceReads} from './read-coalescer.js';
+import {copilotUsage} from './copilot-usage.js';
+import type {CodexUsageSnapshot} from './codex-usage.js';
 
 export function copilotMessage(event:SessionEvent):ChatMessage|null{
  const data=event.data as any;
@@ -21,6 +23,14 @@ export class CopilotService{
  constructor(private roots:string[],client?:CopilotClient){this.client=client||new CopilotClient({workingDirectory:roots[0],useLoggedInUser:true});}
  private async connect(){if(this.closed)throw new HttpError(503,'Copilot host is stopping');if(!this.starting)this.starting=this.client.start().catch(error=>{this.starting=undefined;throw error;});await this.starting;return this.client;}
  async logout(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');await(await this.connect()).rpc.account.logout({});}
+ private quota?:{at:number;value:CodexUsageSnapshot};
+ // Account quota is shared by every chat; a short cache keeps per-minute polling from every device cheap.
+ async usage():Promise<CodexUsageSnapshot>{
+  if(this.quota&&Date.now()-this.quota.at<30_000)return this.quota.value;
+  const client=await this.connect(),auth=await client.getAuthStatus();
+  if(!auth.isAuthenticated)return{checkedAt:Date.now(),ordinaryUsageAllowed:null,buckets:[]};
+  const value=copilotUsage((await client.rpc.account.getQuota({})).quotaSnapshots,Date.now());this.quota={at:Date.now(),value};return value;
+ }
  async status(){
   try{
    const client=await this.connect(),auth=await client.getAuthStatus();

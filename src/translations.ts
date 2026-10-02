@@ -104,7 +104,7 @@ export const english: Record<string, string> = {
 "Не удалось обновить лимиты. Проверьте подключение и вход в {0} на ПК.":"Could not refresh limits. Check your connection and {0} sign-in on your PC.",
 "{0} сообщает, что включённое в подписку использование сейчас недоступно.":"{0} reports that included subscription usage is currently unavailable.",
 "{0} не передал данные о лимитах для этого аккаунта.":"{0} did not report usage limits for this account.",
-"Основное окно":"Primary window",
+"Основное окно":"Primary window","Расчётный период":"Billing period","Премиум-запросы Copilot":"Copilot premium requests","Чат Copilot":"Copilot chat","Автодополнения в редакторе":"Editor completions",
 "Дополнительное окно":"Additional window",
 "Осталось {0}%":"{0}% remaining",
 "Оставшийся лимит: {0}":"Remaining allowance: {0}",

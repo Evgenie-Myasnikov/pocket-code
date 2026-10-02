@@ -5,9 +5,10 @@ import { locale, t, useLanguage } from './i18n';
 import type { CodexUsageSnapshot, CodexUsageWindow } from '../server/codex-usage';
 import './codex-usage.css';
 
-function windowLabel(window: CodexUsageWindow) {
+function windowLabel(window: CodexUsageWindow, provider: 'claude' | 'codex' | 'copilot') {
   const minutes = window.windowDurationMins;
-  if (minutes === null) return t(window.id === 'primary' ? 'Основное окно' : 'Дополнительное окно');
+  // Copilot quotas run for the account's monthly billing period rather than a rolling window.
+  if (minutes === null) return t(provider === 'copilot' ? 'Расчётный период' : window.id === 'primary' ? 'Основное окно' : 'Дополнительное окно');
   const [unit, divisor] = minutes % 10080 === 0 ? ['week', 10080] : minutes % 1440 === 0 ? ['day', 1440] : minutes % 60 === 0 ? ['hour', 60] : ['minute', 1];
   return new Intl.NumberFormat(locale(), { style: 'unit', unit: unit as string, unitDisplay: 'long' }).format(minutes / Number(divisor));
 }
@@ -15,7 +16,7 @@ const dateLabel = (milliseconds: number) => new Date(milliseconds).toLocaleStrin
 
 export function CodexUsage({ connection, provider = 'codex' }: { connection: Connection | null; provider?: 'claude' | 'codex' | 'copilot' }) {
   useLanguage();
-  const providerName = provider === 'claude' ? 'Claude' : 'Codex';
+  const providerName = provider === 'claude' ? 'Claude' : provider === 'copilot' ? 'GitHub Copilot' : 'Codex';
   const [snapshot, setSnapshot] = useState<CodexUsageSnapshot | null>(null);
   const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false);
   const refresh = useRef<() => void>(() => {});
@@ -49,8 +50,8 @@ export function CodexUsage({ connection, provider = 'codex' }: { connection: Con
     {snapshot?.buckets.map(bucket => <div className="codex-usage-bucket" key={bucket.id}>
       <h4>{t(bucket.name)}</h4>
       <div className="codex-usage-windows">{bucket.windows.map(window => <div className="codex-usage-window" key={window.id}>
-        <div className="codex-usage-window-heading"><span>{windowLabel(window)}</span><strong>{window.remainingPercent === null ? t('Нет данных') : t('Осталось {0}%', new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(window.remainingPercent))}</strong></div>
-        {window.remainingPercent !== null && <progress max={100} value={window.remainingPercent} aria-label={t('Оставшийся лимит: {0}', windowLabel(window))}/>}
+        <div className="codex-usage-window-heading"><span>{windowLabel(window, provider)}</span><strong>{window.remainingPercent === null ? t('Нет данных') : t('Осталось {0}%', new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(window.remainingPercent))}</strong></div>
+        {window.remainingPercent !== null && <progress max={100} value={window.remainingPercent} aria-label={t('Оставшийся лимит: {0}', windowLabel(window, provider))}/>}
         <small>{window.resetsAt === null ? t('Время сброса неизвестно') : t('Сброс: {0}', dateLabel(window.resetsAt * 1000))}</small>
       </div>)}</div>
     </div>)}

@@ -295,6 +295,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/review', async (req, res) => { const query = z.object({cwd:text,mode:z.enum(['working','staged','branch']).default('working'),base:z.string().max(300).optional(),file:z.string().max(4096).optional()}).parse(req.query); res.json(await review(roots,query.cwd,query.mode,query.base,query.file)); });
   app.get('/api/review/availability', async (req, res) => { const { cwd } = z.object({ cwd: text }).parse(req.query); res.json(await reviewAvailability(roots, cwd)); });
   app.get('/api/codex/usage', async (_req, res) => res.json(await codex().usage()));
+  app.get('/api/copilot/usage', async (_req, res) => res.json(await copilot().usage()));
   app.get('/api/claude/usage', async (_req, res) => res.json(await readClaudeUsage()));
   app.get('/api/updates/latest', async (_req, res) => res.json(config.updater ? await config.updater.latest() : { enabled: false }));
   app.get('/api/updates/status',(_req,res)=>res.json(config.updater?config.updater.status():{enabled:false,state:'idle'}));
