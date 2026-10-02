@@ -1,5 +1,7 @@
 # Pocket Code
 
+[Workspaces, boards and QR roles](docs/WORKSPACES.md) · [Рабочие области, доски и роли QR](docs/WORKSPACES.ru.md)
+
 **Your coding workspace, within reach of your Android phone.**
 
 Read a reply, send a follow-up, review code or pick up a task while your AI works on your Windows PC. Pocket Code connects Android to **Claude Code**, **Codex** and **GitHub Copilot** through a small PC host.

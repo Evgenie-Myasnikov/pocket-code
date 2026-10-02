@@ -20,10 +20,15 @@ public sealed class DesktopPreferences {
     public string Source="";
 }
 public static class DesktopReadPolicy {
+    public static bool AllowsWrite(string endpoint){
+        if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
+        string path=endpoint.Split('?')[0];
+        return Regex.IsMatch(path,@"^/(jobs|uploads|task-notifications/read|workspaces|workspaces/[a-f0-9-]+/member|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
+    }
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/(health|devices|providers|provider-connections|projects|sessions|jobs|review|review/availability|project-artifact|project-docs|project-doc|files|file)$")||
+        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|workspaces|boards|codex/usage|claude/usage|copilot/usage|updates/status|updates/latest|review|review/availability|project-artifact|project-docs|project-doc|files|file)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");
@@ -154,12 +159,20 @@ public sealed class PocketDesktop:Form {
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"",method=message.ContainsKey("method")?message["method"] as string:"";
                 if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$")||!Regex.IsMatch(method??"",@"^(browser|console|sso|device|key|token|accessToken)$"))throw new InvalidOperationException("Invalid sign-in method.");
                 result=await Send(reader,"/provider-connections/"+provider+"/login/"+method,true);
+            }else if(action=="write"){
+                string endpoint=message.ContainsKey("endpoint")?message["endpoint"] as string:null;
+                if(preview||!DesktopReadPolicy.AllowsWrite(endpoint)||!message.ContainsKey("data"))throw new InvalidOperationException("This desktop action is not allowed.");
+                result=await Send(reader,endpoint,true,json.Serialize(message["data"]));
             }else if(action=="read"){
                 string endpoint=message.ContainsKey("endpoint")?message["endpoint"] as string:null;
-                if(preview||!DesktopReadPolicy.Allows(endpoint))throw new InvalidOperationException("Desktop chats are read-only. This request is not allowed.");
+                if(preview||!DesktopReadPolicy.Allows(endpoint))throw new InvalidOperationException("This desktop request is not allowed.");
                 await reads.WaitAsync();try{result=await Send(reader,endpoint,false);}finally{reads.Release();}
             }else{
-                if(action=="device-disconnect"||action=="device-rename"){
+                if(action=="pairing-role"){
+                      string role=message.ContainsKey("role")?message["role"] as string:"host";string workspaceId=message.ContainsKey("workspaceId")?message["workspaceId"] as string:null;
+                      if(preview||!Regex.IsMatch(role??"",@"^(host|viewer|developer|reviewer|qa)$"))throw new InvalidOperationException("Invalid invitation role.");
+                      await Send(reader,"/pairing-role",true,json.Serialize(new{role=role,workspaceId=workspaceId}));LoadPairing();
+                  }else if(action=="device-disconnect"||action=="device-rename"){
                     string deviceId=message.ContainsKey("deviceId")?message["deviceId"] as string:null;Guid parsed;
                     if(preview||!Guid.TryParse(deviceId,out parsed))throw new InvalidOperationException("Invalid device.");
                     if(action=="device-disconnect"){result=await Send(reader,"/devices/"+parsed+"/disconnect",true);LoadPairing();}

@@ -1,4 +1,23 @@
 import {test,expect,type Page} from '@playwright/test';
+test('pairing defaults to Host and sends an explicit role with a workspace',async({page})=>{
+ await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Synthetic team',roots:['C:\\Demo\\Atlas'],role:'host',members:[]}];});
+ await desktop(page);await page.getByRole('button',{name:'Connection',exact:true}).click();
+ await expect(page.getByLabel('QR role')).toHaveValue('host');
+ expect(await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='pairing-role').length)).toBe(0);
+ await page.getByLabel('QR role').selectOption('qa');
+ await expect(page.getByLabel('QR workspace')).toHaveValue('11111111-1111-4111-8111-111111111111');
+ expect(await page.evaluate(()=>(window as any).desktopCalls.find((c:any)=>c.action==='pairing-role'))).toMatchObject({role:'qa',workspaceId:'11111111-1111-4111-8111-111111111111'});
+});
+test('desktop keeps a draft across navigation and submits through the shared chat',async({page})=>{
+ await desktop(page);await page.getByRole('button',{name:'New chat',exact:true}).click();
+ await page.locator('textarea').fill('Synthetic planning request');
+ await page.getByRole('button',{name:'Settings',exact:true}).first().click();
+ await page.getByRole('button',{name:'Chats',exact:true}).first().click();
+ await expect(page.locator('textarea')).toHaveValue('Synthetic planning request');
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='write'&&/^\/jobs(?:\?|$)/.test(c.endpoint)&&c.data.text==='Synthetic planning request'))).toBe(true);
+ await expect(page.locator('textarea')).toHaveValue('');
+});
 test('provider status distinguishes login from server and launches only explicit sign-in',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();
  const panel=page.locator('.provider-connections');await expect(panel.getByText('Signed in',{exact:true})).toHaveCount(1);
@@ -17,9 +36,16 @@ async function desktop(page:Page){
   let state={online:true,busy:false,status:'Pocket Code · connected',startup:false,autoReconnect:true,internet:true,addresses:[],jira:true};
   const reply=(id:number,value:unknown)=>queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,value:structuredClone(value)}})));
   (window as any).chrome={...((window as any).chrome||{}),webview:{addEventListener(_type:string,fn:(event:{data:unknown})=>void){listeners.push(fn);},postMessage(message:any){
-   calls.push(message);const {id,action}=message;if(action==='state'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){(window as any).testDevices=(window as any).testDevices.filter((d:any)=>d.id!==message.deviceId);reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
+   calls.push(message);const {id,action}=message;if(action==='state'||action==='pairing-role'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){(window as any).testDevices=(window as any).testDevices.filter((d:any)=>d.id!==message.deviceId);reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
    const url=new URL('https://example.invalid'+message.endpoint),p=url.pathname,provider=url.searchParams.get('provider')||'claude';
    const messageBlock=(id:string,text:string)=>({id,role:'assistant',blocks:[{type:'text',text}]});
+   if(p==='/pairing-role'){reply(id,{role:'host'});return;}
+   if(p==='/health'){reply(id,{name:'Synthetic PC',roots:['C:\\Demo\\Atlas','C:\\Demo\\Garden'],version:'0.22.7',protocol:1});return;}
+   if(p==='/providers'){reply(id,[{id:'claude',available:true,models:[]},{id:'codex',available:true,authenticated:true,models:[]}]);return;}
+   if(p==='/workspaces'){reply(id,{host:true,workspaces:(window as any).testWorkspaces||[],boards:[]});return;}
+   if(p==='/activity'){reply(id,[]);return;}
+   if(p==='/task-notifications'){reply(id,{items:[],unread:0});return;}
+   if(p==='/jobs'&&action==='write'){const run={...message.data,provider:message.data.provider||'claude',sessionId:'alpha',status:'running',messages:[],partial:'Working on your request',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0};(window as any).testRuns=[run];reply(id,run);return;}
    if(p==='/sessions'){reply(id,[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}]);return;}
    if(p==='/provider-connections'){reply(id,{providers:['claude','codex','copilot'].map(id=>({id,installed:true,version:'1.0.0',server:id==='claude'?'on-demand':'ready',authenticated:id==='claude',busy:false,login:{state:'idle'},methods:id==='claude'?['browser','console','sso']:['browser','device']}))});return;}
    if(p==='/devices'){reply(id,(window as any).testDevices||[]);return;}
@@ -39,16 +65,16 @@ async function desktop(page:Page){
  await page.goto('http://127.0.0.1:5173/?desktop=1');
  await expect(page.getByRole('button',{name:/claude · Interface review/})).toBeVisible();
 }
-test('desktop shares read-only chat, review and results with provider/project selection',async({page})=>{
+test('desktop shares editable chat, review and results with provider/project selection',async({page})=>{
  await page.setViewportSize({width:1366,height:900});await desktop(page);
  await page.getByLabel('Provider',{exact:true}).selectOption('codex');await page.getByLabel('Project',{exact:true}).selectOption('C:\\Demo\\Atlas');
  await expect(page.getByRole('button',{name:/Documentation/})).toHaveCount(0);
  await page.getByRole('button',{name:/codex · Interface review/}).click();
- await expect(page.getByText('The responsive layout is ready.')).toBeVisible();await expect(page.locator('textarea')).toHaveCount(0);
+ await expect(page.getByText('The responsive layout is ready.')).toBeVisible();await expect(page.locator('textarea')).toBeVisible();
  await page.getByRole('button',{name:'Review',exact:true}).click();const review=page.getByRole('dialog',{name:'Review',exact:true});await expect(review).toContainText('src/layout.ts');await expect(review).toContainText('adaptive');await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'Results',exact:true}).click();const results=page.getByRole('dialog',{name:'Results',exact:true});await expect(results).toBeVisible();await results.getByRole('button',{name:/^Images/}).click();await expect(results.locator('.chat-output-image-item')).toHaveCount(1);await results.locator('.chat-output-image-card').click();const viewer=page.getByRole('dialog',{name:'Image',exact:true});await viewer.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(viewer.getByLabel('Zoom',{exact:true})).toContainText('1.5');await page.keyboard.press('Escape');await page.keyboard.press('Escape');
  await page.screenshot({path:'artifacts/screenshots/desktop-chat.png'});
- const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.every((call:any)=>['state','read'].includes(call.action))).toBeTruthy();expect(calls.find((call:any)=>call.endpoint?.startsWith('/review?'))?.endpoint).toContain('Atlas');
+ const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.every((call:any)=>['state','read','window-theme','write'].includes(call.action))).toBeTruthy();expect(calls.find((call:any)=>call.endpoint?.startsWith('/review?'))?.endpoint).toContain('Atlas');
 });
 test('desktop keeps the current chat while switching sections and persists appearance',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:/claude · Interface review/}).click();await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
@@ -57,10 +83,10 @@ test('desktop keeps the current chat while switching sections and persists appea
  await page.getByRole('button',{name:'Connection',exact:true}).click();await expect(page.getByRole('heading',{name:'Connect your phone'})).toBeVisible();
  const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.some((call:any)=>call.action==='settings'&&call.startup===true)).toBeTruthy();
 });
-test('desktop request adapter rejects mutations before reaching the native bridge',async({page})=>{
+test('desktop request adapter sends mutations to the native write allowlist',async({page})=>{
  await desktop(page);
- const result=await page.evaluate(async()=>{const api=await import('/src/api.ts' as string);try{await api.request({url:'http://127.0.0.1:4318',token:'',desktop:true},'/jobs',{text:'Must not run'});return 'unexpected';}catch(error){return (error as Error).message;}});
- expect(result).toContain('read-only');expect(await page.evaluate(()=>(window as any).desktopCalls.some((call:any)=>call.action==='read'&&call.endpoint==='/jobs'))).toBeFalsy();
+ await page.evaluate(async()=>{const api=await import('/src/api.ts' as string);await api.request({url:'http://127.0.0.1:4318',token:'',desktop:true},'/jobs',{text:'Synthetic request'});});
+ expect(await page.evaluate(()=>(window as any).desktopCalls.some((call:any)=>call.action==='write'&&call.endpoint==='/jobs'&&call.data.text==='Synthetic request'))).toBeTruthy();
 });
 for(const width of [900,1440,1920])test(`desktop layout fits ${width}px`,async({page})=>{
  await page.setViewportSize({width,height:800});await desktop(page);await page.getByRole('button',{name:/claude · Interface review/}).click();await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
@@ -82,16 +108,16 @@ test('desktop follows the newest run, streams partial text and shows question/er
  await page.evaluate(()=>{const base={cwd:'C:\\Demo\\Atlas',sessionId:'alpha',provider:'claude',messages:[],approvals:[],baseMessageCount:0,revision:1};(window as any).testRuns=[{...base,id:'old',startedAt:1,status:'done',partial:'Stale answer'},{...base,id:'new',startedAt:2,status:'running',partial:'Live response'}];});
  const row=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});
  await expect(row).toContainText('Working');await row.click();
- await expect(page.locator('.desktop-live-text')).toHaveText('Live response');
+ await expect(page.getByText('Live response',{exact:true})).toBeVisible();
  await expect(page.getByText('Stale answer',{exact:true})).toHaveCount(0);
- await page.evaluate(()=>{const run=(window as any).testRuns[1];run.partial='Live response continues';run.approvals=[{id:'question'}];run.revision++;});
- await expect(page.locator('.desktop-live-text')).toHaveText('Live response continues');await expect(row).toContainText('Needs your answer');
- await expect(page.locator('.desktop-chat-header')).toContainText('Needs your answer');
+ await page.evaluate(()=>{const run=(window as any).testRuns[1];run.partial='Live response continues';run.approvals=[{id:'question',tool:'Write',input:{file_path:'synthetic.txt'},createdAt:Date.now()}];run.revision++;});
+ await expect(page.getByText('Live response continues',{exact:true})).toBeVisible();await expect(row).toContainText('Needs your answer');
+ await expect(page.getByRole('button',{name:'Allow',exact:true})).toBeVisible();
  await page.evaluate(()=>{const run=(window as any).testRuns[1];run.status='error';run.error='Synthetic run failure';run.approvals=[];run.revision++;});
  await expect(row).toContainText('Error');await expect(page.getByText('Synthetic run failure')).toBeVisible();
  await page.evaluate(()=>{const run=(window as any).testRuns[1];run.status='done';delete run.error;run.revision++;});
  await expect(row).toContainText('Completed');
- const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.filter((c:any)=>c.endpoint?.includes('/messages?')).some((c:any)=>!c.endpoint.includes('&end='))).toBeTruthy();
+ const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.filter((c:any)=>c.endpoint?.includes('/messages?')).some((c:any)=>c.endpoint.includes('/sessions/alpha/messages?'))).toBeTruthy();
 });
 test('PC shows device presence and confirms individual revocation',async({page})=>{
  await desktop(page);await page.evaluate(()=>{(window as any).testDevices=[{id:'11111111-1111-4111-8111-111111111111',name:'Synthetic phone',platform:'android',version:'1',lastSeen:Date.now(),pairedAt:Date.now(),status:'online'},{id:'22222222-2222-4222-8222-222222222222',name:'Synthetic tablet',platform:'android',version:'1',lastSeen:Date.now()-60000,pairedAt:1,status:'offline'}];});

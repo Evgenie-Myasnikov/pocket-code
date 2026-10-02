@@ -13,6 +13,7 @@ export class DeviceRegistry{
  constructor(private file:string,private now=Date.now){}
  async load(){try{const state=JSON.parse(await readFile(this.file,'utf8'));if(!state||typeof state.pairing!=='string'||!Array.isArray(state.devices)||state.devices.length>100||state.devices.some((d:any)=>!d||typeof d.id!=='string'||typeof d.hash!=='string'||typeof d.name!=='string'||!Number.isFinite(d.lastSeen)))throw Error('Invalid device registry');this.state={...state,devices:state.devices.filter((d:Device)=>!d.revokedAt)};}catch(error:any){if(error.code!=='ENOENT')throw error;await this.save(this.state);}return this;}
  get pairingToken(){return this.state.pairing;}
+ async rotatePairing(){return this.change(async()=>{const next={...this.state,pairing:secret()};await this.save(next);this.state=next;});}
  isPairing(token:string){return validToken(token,this.state.pairing);}
  private async save(state:State){await mkdir(path.dirname(this.file),{recursive:true});const temp=this.file+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(state),{mode:0o600});await rename(temp,this.file);}
  private change<T>(fn:()=>Promise<T>):Promise<T>{const next=this.queue.then(fn);this.queue=next.catch(()=>{});return next;}

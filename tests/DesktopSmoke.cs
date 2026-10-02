@@ -104,7 +104,9 @@ public static class DesktopSmoke {
             }
             foreach(string path in new[]{"/sessions","/sessions/synthetic/messages?provider=codex","/review?cwd=example","/project-artifact?path=example.md","/project-docs?cwd=example","/project-doc?cwd=example&path=AGENTS.md","/files?path=example","/file?path=example/README.md","/sessions/synthetic/subagents/child/messages"})Check(DesktopReadPolicy.Allows(path),"Read route allowed");
             foreach(string path in new[]{"/runtime/stop","/jobs/example/stop","/files/upload","/file/write","https://example.invalid","//example.invalid","/../runtime/stop","/sessions/x/messages#hidden","/jira/login"})Check(!DesktopReadPolicy.Allows(path),"Unsafe route denied");
-            Console.WriteLine("PASS: shared WebView UI, tray lifecycle, read-only bridge policy, nested child cleanup and saved reconnect.");return 0;
+            foreach(string path in new[]{"/jobs","/uploads","/jobs/11111111-1111-4111-8111-111111111111/messages","/workspaces","/boards/11111111-1111-4111-8111-111111111111"})Check(DesktopReadPolicy.AllowsWrite(path),"Chat/board write allowed");
+            foreach(string path in new[]{"/runtime/stop","/file/write","/provider-connections/claude/logout","https://example.invalid","/../jobs","/jobs#hidden"})Check(!DesktopReadPolicy.AllowsWrite(path),"Unapproved write denied");
+            Console.WriteLine("PASS: shared WebView UI, tray lifecycle, scoped read/write bridge policy, nested child cleanup and saved reconnect.");return 0;
         }catch(Exception error){Console.Error.WriteLine(error);return 1;}finally{if(owned!=null)owned.Dispose();}
     }
 }

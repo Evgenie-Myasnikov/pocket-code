@@ -1,3 +1,4 @@
+import {mountBoards,createWorkspaceAccess,workspaceRequest} from './boards.js';
 import {DeviceRegistry} from './devices.js';
 import type {RunMonitor} from './run-monitor.js';
 import {GitProjects} from './git-projects.js';
@@ -42,6 +43,9 @@ const text = z.string().min(1).max(4096);
 const providerSchema = z.enum(['claude', 'codex','copilot']).default('claude');
 export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages }, terminals = new Terminals()) {
   const roots = await Promise.all(config.roots.map(p => realpath(p)));
+  const workspaceAccess=await createWorkspaceAccess(path.join(config.uploads,'.boards','workspaces.json'));
+  const accessRoots=()=>workspaceAccess.current()?.ws.roots||roots;
+  const visibleRoot=(cwd?:string)=>!workspaceAccess.current()||!!cwd&&accessRoots().some(root=>within(root,cwd));
   const codex = () => { if (!config.codex) throw new HttpError(503, 'Codex is unavailable. Update and restart the PC bridge.'); return config.codex; };
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
   const engineFor=(provider:string)=>provider==='copilot'?copilot():provider==='codex'?codex():jobs;
@@ -66,11 +70,14 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
   const origins = new Set(['http://localhost', 'https://localhost', 'capacitor://localhost', 'http://127.0.0.1:5173', 'http://localhost:5173']);
   app.use(cors({ origin(origin, callback) { callback(null, !origin || origins.has(origin)); } }));
+  app.use('/api/workspace-login',express.json({limit:'16kb'}));workspaceAccess.publicLogin(app);
   const failures = new Map<string, { count: number; reset: number }>();
   app.use('/api', (req, res, next) => {
     const ip = req.socket.remoteAddress || 'unknown', now = Date.now();
     if(config.pcJira&&['/jira/pc-login','/jira/pc-source'].includes(req.path)&&validToken((req.headers.authorization||'').replace(/^Bearer /,''),config.pcJira.key)){next();return;}
     const key=(req.headers.authorization||'').replace(/^Bearer /,'');
+    const guest=workspaceAccess.identity(key);
+    if(guest){workspaceRequest.run(guest,()=>{const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|workspaces|boards(?:\/[^/]+)?|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||req.path==='/workspace-logout');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
     if(config.devices){
       const admin=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')&&['127.0.0.1','localhost','[::1]'].includes(req.hostname)&&!req.headers['x-forwarded-for']&&!req.headers.forwarded&&!req.headers['cf-connecting-ip']&&validToken(key,config.token);
       if(admin){res.locals.deviceAdmin=true;next();return;}
@@ -91,7 +98,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.use(express.json({ limit: '15mb' }));
   const devices=()=>{if(!config.devices)throw new HttpError(404,'Device management is unavailable. Update the PC host.');return config.devices;};
-  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);res.json(await devices().pair((req.headers.authorization||'').replace(/^Bearer /,''),input));});
+  let pairingChange:Promise<unknown>=Promise.resolve();
+  app.get('/api/pairing-role',(_req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');res.json(workspaceAccess.store.invitation());});
+  app.post('/api/pairing-role',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');const invite=workspaceAccess.parseInvitation(req.body);const next=pairingChange.then(async()=>{await devices().rotatePairing();await workspaceAccess.store.mutate(data=>{data.invitation=invite;});await config.refreshPairing?.();return invite;});pairingChange=next.catch(()=>{});res.json(await next);});
+  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);await pairingChange;const key=(req.headers.authorization||'').replace(/^Bearer /,'');if(!devices().isPairing(key))throw new HttpError(401,'Pairing code expired');res.json(workspaceAccess.store.invitation().role==='host'?await devices().pair(key,input):await workspaceAccess.pairMember(input.name));});
   app.post('/api/devices/self/forget',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().forget(res.locals.deviceId);res.json({ok:true});});
   app.post('/api/devices/heartbeat',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().heartbeat();res.json({ok:true});});
   app.post('/api/devices/:id/rename',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');const {name}=z.object({name:z.string().trim().min(1).max(80)}).parse(req.body);await devices().rename(uuid.parse(req.params.id),name);res.json({ok:true});});
@@ -112,6 +122,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.end = function (this: express.Response, ...args: any[]) { try { return (end as any).apply(this, args); } finally { release(); } } as typeof res.end;
     res.once('finish', release); next();
   });
+  await mountBoards(app,roots,workspaceAccess);
   const sourceRoot = await pocketSource(roots);
   const engineStatus = async () => config.engineUpdates ? { supported: true, sourceRoot, ...(await config.engineUpdates.status()) } : { supported: false };
   app.get('/api/engine-updates', async (_req,res) => res.json(await engineStatus()));
@@ -177,7 +188,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const codexAccessSchema = z.enum(['full', 'ask', 'auto']).optional();
   const jiraStartSchema = z.object({ provider: providerSchema, id: uuid, site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i), cwd: text, mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5) });
   async function startJira(body: z.infer<typeof jiraStartSchema>) {
-    const cwd = await allowedPath(roots, body.cwd, true);
+    const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const issue = await jira(body.provider).issue(body.site, body.key);
     const engine = engineFor(body.provider);
     const existing = allJobs().find(j => j.id === body.id || (j.status === 'running' && j.jira?.site === body.site && j.jira.key === body.key));
@@ -192,9 +203,9 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const workflow = config.jira ? new JiraWorkflow(path.join(path.dirname(config.uploads), 'jira-workflow.json'), {
     jira: config.jira, jiraForProvider: jira,
     job: id => { try { return jobView(id); } catch { return undefined; } },
-    validate: async input => { const cwd = await allowedPath(roots, input.cwd, true); if (input.provider === 'codex') codex();if(input.provider==='copilot'&&!(await copilot().status()).authenticated)throw new HttpError(409,'Connect GitHub Copilot before starting this task.'); guardProject(cwd, input.id); return cwd; },
+    validate: async input => { const cwd = await allowedPath(accessRoots(), input.cwd, true); if (input.provider === 'codex') codex();if(input.provider==='copilot'&&!(await copilot().status()).authenticated)throw new HttpError(409,'Connect GitHub Copilot before starting this task.'); guardProject(cwd, input.id); return cwd; },
     start: async (input, issue, sessionId) => {
-      const cwd = await allowedPath(roots, input.cwd, true); guardProject(cwd, input.id);
+      const cwd = await allowedPath(accessRoots(), input.cwd, true); guardProject(cwd, input.id);
       const existing = allJobs().find(j => j.status === 'running' && j.jira?.site === input.site && j.jira.key === input.key && j.id !== input.id);
       if (existing) throw new HttpError(409, 'An agent is already working on this Jira task. Open its chat first.');
       const rolePrompt = input.role === 'developer'
@@ -215,7 +226,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.get('/api/jira/workflow/pr', async (req, res) => {
     const query = z.object({ cwd: text, key: jiraStartSchema.shape.key }).parse(req.query);
-    res.json(await flow().preview(await allowedPath(roots, query.cwd, true), query.key));
+    res.json(await flow().preview(await allowedPath(accessRoots(), query.cwd, true), query.key));
   });
   app.post('/api/jira/workflow/recover', async (req, res) => {
     const body = z.object({ site: z.string().min(1).max(100), key: jiraStartSchema.shape.key, provider: providerSchema, role: roleSchema.default('developer'), id: uuid, confirmed: z.literal(true) }).parse(req.body);
@@ -244,7 +255,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/jira/queue', async (req, res) => res.json(await queueFor(providerSchema.parse(req.query.provider)).view()));
   app.post('/api/jira/queue', async (req, res) => {
     const body = jiraStartSchema.omit({ id: true, key: true }).extend({ role: roleSchema.optional(), batchId: uuid, keys: z.array(z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i)).min(1).max(5000) }).parse(req.body);
-    const cwd = await allowedPath(roots, body.cwd, true);
+    const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const status = await jira().status();
     if (!status.connected || !status.sites.some(s => s.id === body.site)) throw new HttpError(400, 'Сначала подключите Jira и выберите сайт');
     res.json(await queueFor(body.provider).add({ ...body, cwd }));
@@ -270,26 +281,30 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   // Concurrent list/project/history requests share metadata only while loading.
   // Every later request sees Desktop renames, project removal and provider loss.
   const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
-  const sessions = (provider: 'claude' | 'codex' | 'copilot' = 'claude') => sessionReads(provider, () => loadSessions(provider));
+  const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
+    const list=await sessionReads(provider,()=>loadSessions(provider));if(!workspaceAccess.current())return list;
+    const scoped=await Promise.all(list.map(async s=>{if(!s.cwd||!visibleRoot(s.cwd))return null;try{await allowedPath(accessRoots(),s.cwd,true);return {...s,readOnly:true};}catch{return null;}}));
+    return scoped.filter((s):s is NonNullable<typeof s>=>s!==null);
+  };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {
     uuid.parse(id);
     const found = (await sessions(provider)).find(s => s.sessionId === id);
     if (!found) throw new HttpError(404, 'Чат не найден в разрешённых папках');
-    if (found.cwd && !found.readOnly) await allowedPath(roots, found.cwd, true);
+    if (found.cwd && (!found.readOnly||workspaceAccess.current())) await allowedPath(accessRoots(), found.cwd, true);
     return found;
   }
   app.get('/api/sessions/:id/subagents', async (req, res) => {
     const provider = providerSchema.parse(req.query.provider), parent = await session(String(req.params.id), provider);
     if (!parent.cwd) throw new HttpError(409, 'The parent chat has no local project folder.');
-    const cwd = await allowedPath(roots, parent.cwd, true);
+    const cwd = await allowedPath(accessRoots(), parent.cwd, true);
     res.json({ agents: provider==='copilot'?[]:provider === 'codex' ? await codex().subagents(parent.sessionId) : await claudeSubagents(parent.sessionId, cwd) });
   });
   app.get('/api/sessions/:id/subagents/:agent/messages', async (req, res) => {
     const provider = providerSchema.parse(req.query.provider), parent = await session(String(req.params.id), provider);
     const agent = z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/).parse(req.params.agent);
     if (!parent.cwd) throw new HttpError(409, 'The parent chat has no local project folder.');
-    const cwd = await allowedPath(roots, parent.cwd, true);
+    const cwd = await allowedPath(accessRoots(), parent.cwd, true);
     const messages = provider==='copilot'?[]:provider === 'codex' ? await codex().subagentMessages(parent.sessionId, agent) : await claudeSubagentMessages(parent.sessionId, agent, cwd);
     res.json({ messages });
   });
@@ -307,7 +322,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     activeMutations++;let released=false;const release=()=>{if(!released){released=true;activeMutations--;}};res.once('finish',release);res.once('close',release);
     try{const file=await config.updater.download(z.coerce.number().int().positive().parse(req.query.release));res.type('application/vnd.android.package-archive');res.sendFile(file,{dotfiles:'allow'});}catch(error){release();throw error;}
   });
-  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots, version: packageJson.version, protocol: 1, processId: process.pid }));
+  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots:accessRoots(), version: packageJson.version, protocol: 1, processId: process.pid }));
   app.get('/api/providers', async (_req, res) => {
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
     res.json([{ id: 'claude', name: 'Claude', available: true, models: [{ id: 'sonnet', name: 'Sonnet' }, { id: 'opus', name: 'Opus' }, { id: 'haiku', name: 'Haiku' }] }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
@@ -326,11 +341,11 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     for (const result of results) if (result.status === 'fulfilled') {
       for (const session of result.value) {
         if (!session.cwd || session.readOnly) continue;
-        try { projects.add(await allowedPath(roots, session.cwd, true)); }
+        try { projects.add(await allowedPath(accessRoots(), session.cwd, true)); }
         catch { /* Missing and out-of-scope folders cannot grant project access. */ }
       }
     }
-    res.json([...projects]);
+    res.json([...projects].filter(visibleRoot));
   });
   app.get('/api/sessions', async (req, res) => res.json(await sessions(providerSchema.parse(req.query.provider))));
   app.get('/api/sessions/:id/messages', async (req, res) => {
@@ -374,7 +389,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const uploads = new Map<string, { path: string; name: string; cwd: string; expires: number }>();
   app.post('/api/uploads', async (req, res) => {
     const body = z.object({ cwd: text, name: z.string().min(1).max(255), base64: z.string().max(14_000_000) }).parse(req.body);
-    const cwd = await allowedPath(roots, body.cwd, true);
+    const cwd = await allowedPath(accessRoots(), body.cwd, true);
     if (terminals.list().some(t => t.cwd === cwd && t.status === 'running')) throw new HttpError(409, 'В проекте открыт живой терминал. Завершите его перед загрузкой вложений для обычного чата.');
     if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.base64)) throw new HttpError(400, 'Неверный формат файла');
     const buffer = Buffer.from(body.base64, 'base64');
@@ -393,12 +408,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/activity', (_req, res) => {
     // In-memory jobs started by this bridge only. Reading activity must never
     // initialize a provider, inspect desktop history or request model output.
-    const recent = recentActivityJobs(allJobs());
+    const recent = recentActivityJobs(allJobs().filter(j=>visibleRoot(j.cwd)));
     res.json(recent.map(job => activityItem(jobView(job.id))));
   });
-  app.get('/api/jobs', (req, res) => res.json(engineFor(providerSchema.parse(req.query.provider)).list()));
+  app.get('/api/jobs', (req, res) => res.json(engineFor(providerSchema.parse(req.query.provider)).list().filter(j=>visibleRoot(j.cwd))));
   app.get('/api/jobs/:id', (req, res) => {
-    const job = jobView(uuid.parse(req.params.id));
+    const job = jobView(uuid.parse(req.params.id));if(!visibleRoot(job.cwd))throw new HttpError(404,"Chat not found");
     if (String(job.revision) === req.query.revision) { res.status(204).end(); return; }
     res.json(job);
   });
@@ -408,7 +423,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
       mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
       takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
-    const cwd = await allowedPath(roots, body.cwd, true);
+    const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const engine = engineFor(body.provider);
     if (body.provider === 'claude') z.enum(['', 'sonnet', 'opus', 'haiku']).parse(body.model);
     if (body.provider !== 'codex' && body.reasoningEffort) throw new HttpError(400, 'Reasoning effort is available for Codex chats only.');
@@ -435,7 +450,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.post('/api/jobs/:id/messages',async(req,res)=>{
     const id=uuid.parse(req.params.id),body=z.object({id:uuid,text:z.string().max(100000),attachments:z.array(uuid).max(10).default([])}).parse(req.body);
-    const engine=engineForJob(id),job=engine.get(id),cwd=await allowedPath(roots,job.cwd,true);
+    const engine=engineForJob(id),job=engine.get(id),cwd=await allowedPath(accessRoots(),job.cwd,true);
     const attached=body.attachments.map(id=>{const file=uploads.get(id);if(!file||file.cwd!==cwd||file.expires<Date.now())throw new HttpError(400,'Вложение недоступно. Прикрепите файл ещё раз.');return file;});
     if(!body.text.trim()&&!attached.length)throw new HttpError(400,'Введите сообщение или прикрепите файл');
     const prompt=body.text+(attached.length?'\n\nFiles attached by the user (read these local files as needed):\n'+attached.map(file=>JSON.stringify(file.path)).join('\n'):'');
@@ -449,7 +464,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/terminals', (_req, res) => res.json(terminals.list()));
   app.post('/api/terminals', async (req, res) => {
     const body = z.object({ id: uuid, cwd: text, sessionId: uuid.optional(), takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
-    const cwd = await allowedPath(roots, body.cwd, true);
+    const cwd = await allowedPath(accessRoots(), body.cwd, true);
     guardProject(cwd, body.id);
     if (body.sessionId) {
       const s = await session(body.sessionId);
@@ -474,26 +489,26 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({ name, reference: JSON.stringify(file), cwd: t.cwd });
   });
   app.get('/api/project-docs', async (req, res) => {
-    const cwd=await allowedPath(roots,text.parse(req.query.cwd),true);
+    const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);
     res.json(await projectDocuments(cwd));
   });
   app.get('/api/project-artifact', async (req, res) => {
-    const cwd=await allowedPath(roots,text.parse(req.query.cwd),true);
+    const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);
     res.json(await projectArtifact(cwd,text.parse(req.query.path)));
   });
   app.get('/api/project-doc', async (req, res) => {
-    const cwd=await allowedPath(roots,text.parse(req.query.cwd),true);
+    const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);
     res.json(await readProjectDocument(cwd,text.parse(req.query.path)));
   });
   app.get('/api/files', async (req, res) => {
-    const dir = await allowedPath(roots, text.parse(req.query.path), true);
+    const dir = await allowedPath(accessRoots(), text.parse(req.query.path), true);
     const entries = await readdir(dir, { withFileTypes: true });
-    res.json({ path: dir, parent: roots.some(r => within(r, path.dirname(dir))) ? path.dirname(dir) : null,
+    res.json({ path: dir, parent: accessRoots().some(r => within(r, path.dirname(dir))) ? path.dirname(dir) : null,
       entries: entries.filter(e => !e.isSymbolicLink()).map(e => ({ name: e.name, directory: e.isDirectory(), path: path.join(dir, e.name) }))
         .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name)) });
   });
   app.get('/api/file', async (req, res) => {
-    const file = await allowedPath(roots, text.parse(req.query.path));
+    const file = await allowedPath(accessRoots(), text.parse(req.query.path));
     const info = await stat(file);
     if (!info.isFile()) throw new HttpError(400, 'Выберите файл');
     if (info.size > 2 * 1024 * 1024) throw new HttpError(413, 'Предпросмотр доступен для файлов до 2 МБ');

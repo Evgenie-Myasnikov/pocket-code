@@ -1,7 +1,7 @@
 import { t } from "./i18n";import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { networkFailure } from './connection-errors';
 import {desktopCall} from './desktop-bridge';
-export type Connection = {url: string;token: string;desktop?:boolean;pairing?:boolean;deviceId?:string;};
+export type Connection = {url: string;token: string;desktop?:boolean;pairing?:boolean;deviceId?:string;workspaceId?:string;};
 let pairing:{key:string;promise:Promise<Connection>}|undefined;
 // A stable installation id lets the PC replace this device's entry when it pairs again; the name tells devices apart.
 async function deviceIdentity(platform:'android'|'browser'):Promise<{name:string;model?:string;installation?:string}>{
@@ -13,7 +13,7 @@ export function pairDevice(connection:Connection,version:string):Promise<Connect
   if(!connection.pairing)return Promise.resolve(connection);
   const key=connection.url+'|'+connection.token;if(pairing?.key===key)return pairing.promise;
   const platform=/Android/i.test(navigator.userAgent)?'android':'browser';
-  const promise=deviceIdentity(platform).then(identity=>request<{deviceId:string;token:string}>(connection,'/devices/pair',{...identity,platform,version})).then(paired=>({url:connection.url,...paired})).catch(error=>{if(pairing?.key===key)pairing=undefined;throw error;});
+  const promise=deviceIdentity(platform).then(identity=>request<{deviceId?:string;token:string;workspaceId?:string}>(connection,'/devices/pair',{...identity,platform,version})).then(paired=>({url:connection.url,...paired})).catch(error=>{if(pairing?.key===key)pairing=undefined;throw error;});
   pairing={key,promise};return promise;
 }
 export function providerRequest(provider:'claude'|'codex'|'copilot'){
@@ -47,7 +47,7 @@ export async function saveConnection(connection: Connection | null) {
   } else if (connection) sessionStorage.setItem('connection', JSON.stringify(connection));else sessionStorage.removeItem('connection');
 }
 export async function request<T>(connection: Connection, endpoint: string, data?: unknown): Promise<T> {
-  if(connection.desktop){if(data!==undefined)throw Error('Desktop chats are read-only.');return desktopCall<T>('read',{endpoint});}
+  if(connection.desktop)return desktopCall<T>(data===undefined?'read':'write',{endpoint,...(data===undefined?{}:{data})});
   const timeout = endpoint.startsWith('/jira/workflow') ? 300000 : endpoint.startsWith('/jira/') || endpoint.startsWith('/updates/') || endpoint.startsWith('/providers') || endpoint.endsWith('/usage') || endpoint.includes('provider=codex') ? 95000 : 30000;
   const url = normalizeUrl(connection.url) + '/api' + endpoint;
   const headers = { Authorization: `Bearer ${connection.token}`, 'Content-Type': 'application/json' };

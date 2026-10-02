@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-02 - Host workspaces, visual boards and shared desktop chat (0.23.0)
+- Added: Host-owned workspaces group project folders, boards and chat lists. Participants sign in with host address, workspace name and password; the host assigns Viewer, Developer, Reviewer or QA roles and can revoke sessions. Passwords and participant tokens are hashed in private host storage.
+- Added: The desktop pairing screen selects the invitation role beside the QR, initially Host for testing. Non-host invitations select one workspace. Changing the invitation rotates the QR; the server ignores client-supplied roles.
+- Added: Work replaces the Jira task list with project boards, Git-branch roadmap lanes, draggable notes, parameters, dependencies, zoom and durable saves with revision conflict checks. Note discussions prepare a chat draft and link the resulting session. Jira task polling is parked; integration modules are retained.
+- Changed: Desktop embeds the shared interactive chat, including sending, attachments, steering, approvals, results and Review; switching sections preserves the draft. The native bridge permits only specific chat/board writes.
+- Files: server/boards.ts, app.ts, devices.ts; src/WorkBoards.tsx, project-workspaces.tsx, WorkspaceLogin.tsx, WorkspaceMembers.tsx, PairingRole.tsx, App.tsx, DesktopApp.tsx; desktop/DesktopWindow.cs; docs/WORKSPACES.md.
+- Validation: TypeScript, web/Android builds and native desktop smoke passed; 15 desktop/board browser scenarios passed. Server suite passed 243/243 sequentially; its first concurrent run had a transient Jira workflow failure which passed in isolation. Targeted access/device/server tests passed after the final scope check.
+- Follow-up: This is the visual workflow foundation, not autonomous delivery: AI-created board updates, human routing, approval gates and target delivery remain unimplemented. Member AI execution stays blocked until provider execution is isolated. Physical Android and multi-user deployment testing remain outstanding.
+
+
 ## 2026-10-02 - Notifications for every PC chat (0.22.7)
 - Added: The phone notifies when any chat on the PC finishes or is stopped, including chats started in Codex, Claude Code or Copilot CLI on the PC and never opened on the phone. The PC reads the end of each turn from provider session files (Codex task events, Claude end of turn, Copilot turn end after a quiet period) every 10 seconds and serves the transitions at /api/activity/events; existing history never notifies.
 - Added: While paired, an Android foreground service polls that feed every 20 seconds with a silent tracking notification, using the specialUse type on Android 14+ so it is not stopped after Android 15's six-hour dataSync limit. Each chat has one alert that later results replace; the chat watched from its own screen is skipped to avoid a duplicate. Settings → Connection can turn it off.

@@ -1,5 +1,7 @@
 # Windows desktop application
 
+See [Workspaces and project boards](WORKSPACES.md) for host-owned areas, password sign-in, QR invitation roles and the visual roadmap.
+
 ## Window appearance
 
 The app icon is shared by Android, the Windows executable, taskbar and tray. **Settings → Appearance** updates the interface and native caption colors together, including system-theme changes. Windows keeps its standard drag, resize, maximize and close controls. Caption/border colors and rounded corners use [Windows DWM attributes](https://learn.microsoft.com/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute); unsupported attributes retain the operating system defaults. Launcher assets can be regenerated from `public/pocket-code.svg` with `node scripts/build-icons.mjs` (Chrome, or the executable specified by `POCKET_TEST_BROWSER`).
@@ -30,11 +32,11 @@ See [Provider sign-in and status](PROVIDER-SIGN-IN.md) for manual login, device 
 
 Run **Setup Pocket Code.cmd** from the extracted source package to install or update. Setup automatically detects Node.js, downloads a checksum-verified private Node.js 24 LTS copy if needed, and installs npm dependencies before building. It does not require winget, administrator rights or restarting PowerShell after an existing Node installation. It adds **Pocket Code** shortcuts to Desktop and Start menu. Keep the source folder: the application uses its host scripts and dependencies. Moving that folder requires running setup again. **Start Pocket Code.cmd** opens the app and installs it if missing; internet mode and Exit are inside the app instead of separate batch files.
 
-The desktop window uses the same TypeScript/React message renderer, Review, results gallery, image viewer, subagent viewer, themes and sizing controls as Android. Its wider layout has a left sidebar with provider, project and conversation selection. Chats are **read-only**: send messages and answer agent questions from your phone. The view refreshes automatically while open. Review uses the selected conversation's project folder; results scan that conversation's available history.
+The desktop window uses the same TypeScript/React message renderer, Review, results gallery, image viewer, subagent viewer, themes and sizing controls as Android. Its wider layout has a left sidebar with provider, project and conversation selection. Chats use the shared interactive mobile component: send messages, attach files, steer active work and answer agent questions on either device. The view refreshes automatically while open. Review uses the selected conversation's project folder; results scan that conversation's available history.
 
 **Connection** contains pairing QR codes, internet/LAN selection and Jira setup. **Settings** contains Windows startup/reconnection, English/Russian language selection and the shared appearance controls. Preferences are local to each device; changing your PC theme does not change the phone theme.
 
-Installation downloads a checksum-pinned Microsoft WebView2 SDK to build the Windows shell. If the WebView2 Runtime is missing, it installs Microsoft's signed bootstrapper. The window requires 64-bit Windows and uses a private local web origin. Its native bridge allows only approved read endpoints; chat requests cannot send commands or edit files. Provider credentials remain in host storage. The native layer owns the tray, startup, host lifecycle and QR pairing; it does not reimplement the chat widgets.
+Installation downloads a checksum-pinned Microsoft WebView2 SDK to build the Windows shell. If the WebView2 Runtime is missing, it installs Microsoft's signed bootstrapper. The window requires 64-bit Windows and uses a private local web origin. Its native bridge allows explicitly approved read and chat/board write endpoints; arbitrary HTTP endpoints remain unavailable. Provider credentials remain in host storage. The native layer owns the tray, startup, host lifecycle and QR pairing; it does not reimplement the chat widgets.
 
 ![Desktop conversation with fictional sample content](images/desktop-chat.png)
 
