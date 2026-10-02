@@ -9,6 +9,7 @@ using System.Windows.Forms;
 
 // Preview mode never reads pairing data, changes startup settings or contacts a host.
 public static class DesktopSmoke {
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags);
     static void Check(bool value,string message){if(!value)throw new Exception(message);}
     static object Field(object target,string name){return target.GetType().GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).GetValue(target);}
     static void Call(object target,string name){var task=(Task)target.GetType().GetMethod(name,BindingFlags.NonPublic|BindingFlags.Instance).Invoke(target,null);while(!task.IsCompleted){Application.DoEvents();Thread.Sleep(10);}task.GetAwaiter().GetResult();}
@@ -18,11 +19,17 @@ public static class DesktopSmoke {
         try{
             using(var form=new PocketDesktop(new[]{"--preview"},true)){
                 form.Show();DateTime readyDeadline=DateTime.UtcNow.AddSeconds(20);while(!form.Ready.IsCompleted&&DateTime.UtcNow<readyDeadline){Application.DoEvents();Thread.Sleep(20);}Check(form.Ready.IsCompleted,"WebView loads");form.Ready.GetAwaiter().GetResult();Check(form.Visible,"Window opens");
+                var ui=(Microsoft.Web.WebView2.WinForms.WebView2)Field(form,"web");bool rendered=false;var renderDeadline=DateTime.UtcNow.AddSeconds(15);
+                while(!rendered&&DateTime.UtcNow<renderDeadline){var ready=ui.CoreWebView2.ExecuteScriptAsync("!!document.querySelector('.desktop-app')");while(!ready.IsCompleted){Application.DoEvents();Thread.Sleep(10);}rendered=ready.Result=="true";Application.DoEvents();Thread.Sleep(50);}Check(rendered,"Shared desktop interface renders");
                 form.Close();Application.DoEvents();Check(!form.Visible&&!form.IsDisposed,"Close hides without exiting");
                 form.RestoreWindow();Application.DoEvents();Check(form.Visible,"Tray open restores window");
                 form.WindowState=FormWindowState.Minimized;Application.DoEvents();Check(!form.Visible,"Minimize hides window");
                 form.RestoreWindow();Application.DoEvents();Check(form.WindowState==FormWindowState.Normal,"Restored window is normal");
-                if(args.Length>0){var view=(Microsoft.Web.WebView2.WinForms.WebView2)Field(form,"web");using(var stream=File.Create(args[0])){var capture=view.CoreWebView2.CapturePreviewAsync(Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png,stream);while(!capture.IsCompleted){Application.DoEvents();Thread.Sleep(10);}capture.GetAwaiter().GetResult();}}
+                var themeMethod=typeof(PocketDesktop).GetMethod("ApplyWindowTheme",BindingFlags.NonPublic|BindingFlags.Instance);
+                themeMethod.Invoke(form,new object[]{false,Color.FromArgb(247,246,249),Color.FromArgb(30,26,40),Color.FromArgb(185,176,202)});
+                Check(form.BackColor==Color.FromArgb(247,246,249),"Native window accepts light palette");
+                themeMethod.Invoke(form,new object[]{true,Color.FromArgb(17,21,18),Color.FromArgb(230,232,227),Color.FromArgb(42,48,43)});
+                if(args.Length>0){using(var bitmap=new Bitmap(form.Width,form.Height))using(var graphics=Graphics.FromImage(bitmap)){IntPtr dc=graphics.GetHdc();try{Check(PrintWindow(form.Handle,dc,2),"Native frame captured");}finally{graphics.ReleaseHdc(dc);}bitmap.Save(args[0],System.Drawing.Imaging.ImageFormat.Png);}}
                 string powershell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe");
                 owned=PocketCodeOwnedHost.Start(powershell,"-NoProfile -NonInteractive -Command \"Start-Sleep -Seconds 90\"",Environment.CurrentDirectory,true);
                 using(var child=Process.GetProcessById(owned.ProcessId)){

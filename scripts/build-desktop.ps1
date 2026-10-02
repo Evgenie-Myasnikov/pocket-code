@@ -17,7 +17,7 @@ $sdk=Join-Path $sdkRoot 'sdk'
 Expand-Archive -LiteralPath $archive -DestinationPath $sdk -Force
 foreach($library in @('Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.WinForms.dll')){Copy-Item -LiteralPath (Join-Path $sdk ('lib/net462/'+$library)) -Destination (Join-Path $output $library) -Force}
 Copy-Item -LiteralPath (Join-Path $sdk 'runtimes/win-x64/native/WebView2Loader.dll') -Destination $output -Force
-& $compiler /nologo /target:winexe /platform:x64 /optimize+ /utf8output "/out:$exe" ("/win32manifest:"+(Join-Path $root 'desktop/PocketCode.manifest')) /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Net.Http.dll /r:System.Web.Extensions.dll ("/r:"+(Join-Path $output 'Microsoft.Web.WebView2.Core.dll')) ("/r:"+(Join-Path $output 'Microsoft.Web.WebView2.WinForms.dll')) (Join-Path $root 'desktop/DesktopWindow.cs') (Join-Path $root 'scripts/OwnedHost.cs')
+& $compiler /nologo /target:winexe /platform:x64 /optimize+ /utf8output ("/win32icon:"+(Join-Path $root 'desktop/PocketCode.ico')) "/out:$exe" ("/win32manifest:"+(Join-Path $root 'desktop/PocketCode.manifest')) /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Net.Http.dll /r:System.Web.Extensions.dll ("/r:"+(Join-Path $output 'Microsoft.Web.WebView2.Core.dll')) ("/r:"+(Join-Path $output 'Microsoft.Web.WebView2.WinForms.dll')) (Join-Path $root 'desktop/DesktopWindow.cs') (Join-Path $root 'scripts/OwnedHost.cs')
 if($LASTEXITCODE -ne 0){throw 'Desktop build failed'}
 if(-not $SkipWebBuild){Push-Location $root;try{& npm.cmd run build;if($LASTEXITCODE -ne 0){throw 'Shared interface build failed'}}finally{Pop-Location}}
 $ui=Join-Path $output 'ui'

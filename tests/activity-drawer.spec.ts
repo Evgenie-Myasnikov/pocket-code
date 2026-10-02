@@ -54,7 +54,7 @@ test('a completed result is acknowledged only after loading and stays viewed aft
     expect(await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('pocket-code-activity-seen-v1:')).flatMap(key=>JSON.parse(localStorage.getItem(key)||'[]')))).toEqual([]);
     state.jobDelay.resolve();await expect(page.getByText('Visible result for result',{exact:true})).toBeVisible();await openDrawer(page);
     await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toHaveCount(0);await expect(drawer(page).getByRole('button',{name:'claude question',exact:true})).toBeVisible();await drawer(page).getByRole('button',{name:'Close activity',exact:true}).click();
-    await page.locator('.workspace-picker-header select').selectOption('claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Unsent Claude draft');
+    await page.getByRole('button',{name:'Back to chats',exact:true}).click();await page.locator('.workspace-picker-sidebar select').selectOption('claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Unsent Claude draft');
     const stored=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('pocket-code-activity-seen-v1:')).map(key=>localStorage.getItem(key)).join(''));
     expect(stored).not.toContain('test-only');expect(stored).not.toContain(root);expect(stored).toContain('result');
     await page.reload();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toHaveCount(0);await expect(drawer(page).getByRole('button',{name:'codex working',exact:true})).toBeVisible();

@@ -34,6 +34,7 @@ async function openChat(page:Page,language:string,textSize:number){
 for(const profile of [{width:320,language:'en',textSize:8},{width:360,language:'ru',textSize:22},{width:412,language:'en',textSize:14}]){
   test(`quiet user and subagent surfaces fit ${profile.width}px ${profile.language} ${profile.textSize}px`,async({page})=>{
     await page.setViewportSize({width:profile.width,height:820});await openChat(page,profile.language,profile.textSize);
+    await expect(page.locator('.chat-header select')).toHaveCount(0);
     const user=page.locator('[data-message-id="user-short"]'),agents=page.locator('[data-message-id="agents-only"]');
     await expect(user.locator('.message-label')).toHaveCount(0);await expect(agents.locator('.message-label')).toHaveCount(0);
     await user.locator('.copy-button').click();await expect.poll(()=>page.evaluate(()=>(window as any).__copied)).toBe('Thanks!');

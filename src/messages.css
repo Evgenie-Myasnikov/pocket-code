@@ -29,3 +29,7 @@
 }
 :root[data-theme] :is(.subagent-card,.subagent-activity>button,.subagent-inline>summary){padding-inline:0}
 :root[data-theme] .tool-card summary,:root[data-theme] .tool-card summary :is(span,strong){font-size:inherit;font-weight:400}
+:root[data-theme] .tool-card summary{color:var(--muted);padding:6px 0;min-height:48px;font-family:inherit}
+:root[data-theme] .tool-card summary :is(span,strong,svg){color:inherit;font-family:inherit}
+:root[data-theme] .tool-card pre{color:var(--text);border-color:var(--line)}
+:root[data-theme] .tool-card.failed summary{color:var(--activity-error)}

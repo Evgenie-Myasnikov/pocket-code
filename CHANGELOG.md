@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-02 - Shared app icon and theme-aware window controls (0.22.1)
+- Changed: Added a pocket-and-code vector identity, Windows executable/tray icon at seven sizes, Android adaptive/legacy launcher assets and browser favicon. Assets are reproducible through scripts/build-icons.mjs.
+- Changed: Native Windows caption, border and background follow the selected palette and light/dark/system theme. Standard window controls remain native; unsupported DWM attributes retain OS defaults.
+- Fixed: Fixed green colors inside command summaries and output ignored theme settings. Activity text now uses theme colors, including live commands and error summaries.
+- Changed: Appearance sliders share a flat track and compact thumb, with 44px interaction height and keyboard focus.
+- Changed: Existing and running chats no longer show project/provider selectors in their header. Selection remains available in the chat library and before starting a new chat.
+- Files: public/pocket-code.svg, launcher assets, desktop/DesktopWindow.cs, src/window-theme.ts, appearance.css, messages.css and build scripts.
+- Validation: Browser theme/slider test, command contrast test and 19 chat/activity scenarios passed; native desktop rendering/tray/process smoke passed. TypeScript/Vite and Android build passed. Inspected icon, both theme screenshots and native window capture. Physical Android launcher rendering was not tested.
+
 ## 2026-10-02 - Individual device access and plain chat activity (0.22.0)
 - Changed: Windows Connection lists paired devices with online/offline/disconnected state, version, last contact, renaming and confirmed individual disconnection. Device credentials are hashed on the PC; revocation persists, closes active responses and rotates the QR without interrupting other devices or AI work.
 - Security: QR v2 exchanges a pairing secret for an individual credential. The administrative key is restricted to direct loopback requests and is no longer placed in QR codes; device management is PC-only. Online presence expires after 45 seconds without authenticated requests.

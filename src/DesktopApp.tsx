@@ -1,4 +1,5 @@
 import {DesktopDevices} from './DesktopDevices';
+import {watchWindowTheme} from './window-theme';
 import {DesktopUpdates} from './DesktopUpdates';
 import {ProviderConnections,HostStatus} from './ProviderConnections';
 import {useEffect,useMemo,useRef,useState} from 'react';
@@ -26,6 +27,7 @@ const unique=(messages:ChatMessage[])=>Array.from(new Map(messages.map(message=>
 function saved(key:string,fallback:string){try{return localStorage.getItem('pocket-desktop-'+key)||fallback;}catch{return fallback;}}
 function persist(key:string,value:string){try{localStorage.setItem('pocket-desktop-'+key,value);}catch{}}
 export function DesktopApp(){
+  useEffect(watchWindowTheme,[]);
   useBackNavigation();
   const language=useLanguage(),appearance=useAppearance(),label=(en:string,ru:string)=>language==='ru'?ru:en;
   const [state,setState]=useState(initial),[error,setError]=useState(''),[page,setPage]=useState<'chats'|'connection'|'settings'>('chats');

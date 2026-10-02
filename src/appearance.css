@@ -31,6 +31,14 @@
 .appearance-settings{display:flow-root;}
 .appearance-settings output{float:right;color:var(--accent)}
 .appearance-settings input[type=range]{accent-color:var(--accent);padding:0;min-height:40px;cursor:pointer;border:0;background:transparent}
+/* A single flat control on Android WebView and Windows WebView2. */
+:root[data-theme] .appearance-settings input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:44px;min-height:44px;padding:0;border:0;background:transparent;border-radius:0;cursor:pointer;touch-action:pan-y;accent-color:var(--accent)}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;margin-top:-8px;border:3px solid var(--bg);border-radius:50%;background:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border:3px solid var(--bg);border-radius:50%;background:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+:root[data-theme]{--activity-error:#e6a597}
+:root[data-theme=light]{--activity-error:#a33728}
 .palette-field{border:0;padding:0;margin:24px 0}.palette-field legend{font-size:13px;margin-bottom:12px;color:var(--muted)}
 .palette-options{display:flex;flex-wrap:wrap;gap:8px}.palette-options button{display:flex;align-items:center;gap:7px;padding:10px 12px;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;min-height:44px}.palette-options button[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.palette-options button>span{width:18px;height:18px;border-radius:50%;flex-shrink:0}.palette-options b{color:var(--accent)}
 .appearance-settings .compact-toggle{display:flex;align-items:center;gap:12px;min-height:44px}.compact-toggle input{width:20px;height:20px;margin:0;accent-color:var(--accent)}

@@ -13,6 +13,7 @@ using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 public sealed class DesktopPreferences {
     public bool Connect=true, Internet=true, AutoReconnect=true, AutoUpdate=true;
@@ -29,6 +30,14 @@ public static class DesktopReadPolicy {
     }
 }
 public sealed class PocketDesktop:Form {
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
+    void WindowAttribute(int attribute,int value){try{DwmSetWindowAttribute(Handle,attribute,ref value,4);}catch(DllNotFoundException){}catch(EntryPointNotFoundException){}}
+    void ApplyWindowTheme(bool dark,Color background,Color foreground,Color border){
+        BackColor=background;web.DefaultBackgroundColor=background;
+        WindowAttribute(20,dark?1:0);WindowAttribute(33,2);
+        WindowAttribute(35,ColorTranslator.ToWin32(background));WindowAttribute(36,ColorTranslator.ToWin32(foreground));WindowAttribute(34,ColorTranslator.ToWin32(border));
+    }
+    static Color ThemeColor(Dictionary<string,object> message,string key){object value;if(!message.TryGetValue(key,out value)||!(value is string)||!Regex.IsMatch((string)value,@"^#[0-9a-fA-F]{6}$"))throw new InvalidOperationException("Invalid theme color");return ColorTranslator.FromHtml((string)value);}
     long lastRequestedUpdate=0;
     DateTime nextUpdate=DateTime.UtcNow.AddMinutes(1);Process updater;string updateState="idle",updateVersion="",updateTicket="";
     string AppVersion(){try{return (string)json.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"desktop-version.json")))["version"];}catch{return "0.0.0";}}
@@ -98,7 +107,8 @@ public sealed class PocketDesktop:Form {
         else if(File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"host","package.json")))preferences.Source=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"host");
         if(String.IsNullOrEmpty(preferences.Source))preferences.Source=AppDomain.CurrentDomain.BaseDirectory;
         Text="Pocket Code";ClientSize=new Size(1280,850);MinimumSize=new Size(900,640);StartPosition=FormStartPosition.CenterScreen;
-        BackColor=Color.FromArgb(17,21,18);AutoScaleMode=AutoScaleMode.Dpi;Icon=SystemIcons.Application;Controls.Add(web);
+        BackColor=Color.FromArgb(17,21,18);AutoScaleMode=AutoScaleMode.Dpi;Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath)??SystemIcons.Application;Controls.Add(web);
+        HandleCreated+=(_,e)=>ApplyWindowTheme(true,Color.FromArgb(17,21,18),Color.FromArgb(230,232,227),Color.FromArgb(42,48,43));
         var menu=new ContextMenuStrip();menu.Items.Add("Открыть",null,(_,e)=>RestoreWindow());menu.Items.Add("Подключить / отключить",null,async(_,e)=>await Toggle());menu.Items.Add(new ToolStripSeparator());menu.Items.Add("Выход",null,async(_,e)=>await ExitApp());
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
@@ -130,7 +140,9 @@ public sealed class PocketDesktop:Form {
         object id=null;try{
             var message=json.Deserialize<Dictionary<string,object>>(payload);if(!message.TryGetValue("id",out id)||!message.ContainsKey("action"))return;
             string action=message["action"] as string;object result;
-            if(action=="provider-logout"){
+            if(action=="window-theme"){
+                ApplyWindowTheme(message.ContainsKey("dark")&&message["dark"] is bool&&(bool)message["dark"],ThemeColor(message,"background"),ThemeColor(message,"foreground"),ThemeColor(message,"border"));result=true;
+            }else if(action=="provider-logout"){
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"";
                 if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$"))throw new InvalidOperationException("Invalid provider.");
                 result=await Send(reader,"/provider-connections/"+provider+"/logout",true);

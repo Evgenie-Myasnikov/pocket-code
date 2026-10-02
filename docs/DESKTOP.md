@@ -1,5 +1,9 @@
 # Windows desktop application
 
+## Window appearance
+
+The app icon is shared by Android, the Windows executable, taskbar and tray. **Settings → Appearance** updates the interface and native caption colors together, including system-theme changes. Windows keeps its standard drag, resize, maximize and close controls. Caption/border colors and rounded corners use [Windows DWM attributes](https://learn.microsoft.com/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute); unsupported attributes retain the operating system defaults. Launcher assets can be regenerated from `public/pocket-code.svg` with `node scripts/build-icons.mjs` (Chrome, or the executable specified by `POCKET_TEST_BROWSER`).
+
 ## Connected devices
 
 From **0.22.0**, open **Connection → Connected devices** to see paired phones/browsers, their app version and last contact. **Online** means contact within 45 seconds; **Offline** means no recent contact, not necessarily a powered-off device. Rename devices to distinguish them. **Disconnect** asks for confirmation and revokes only that device's credential, closes its active responses and refreshes the pairing QR. Other devices and running AI tasks are unaffected. A disconnected device must scan the current QR to regain access.
