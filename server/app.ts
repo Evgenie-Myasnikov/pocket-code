@@ -1,4 +1,5 @@
 import {DeviceRegistry} from './devices.js';
+import type {RunMonitor} from './run-monitor.js';
 import {GitProjects} from './git-projects.js';
 import {ProviderConnections} from './provider-connections.js';
 import {CopilotService} from './copilot.js';
@@ -34,7 +35,7 @@ import { coalesceReads } from './read-coalescer.js';
 import {jiraLoginPage,type JiraLogin} from './jira-login.js';
 import type {JiraConnection} from './jira-connection.js';
 
-export type Config = { devices?:DeviceRegistry;refreshPairing?():Promise<void>; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -387,6 +388,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     uploads.set(id, { path: file, name, cwd, expires: Date.now() + 86400000 });
     res.json({ id, name, size: buffer.length });
   });
+  // Completions of every PC chat, including ones started outside Pocket Code, for phone notifications.
+  app.get('/api/activity/events', (req, res) => {const since=Number(req.query.since);res.json({now:Date.now(),events:config.runs?config.runs.events(Number.isFinite(since)?since:Date.now()):[]});});
   app.get('/api/activity', (_req, res) => {
     // In-memory jobs started by this bridge only. Reading activity must never
     // initialize a provider, inspect desktop history or request model output.

@@ -6,6 +6,9 @@ import {LanguageSelector} from './Language';
 import {AppearanceSettings,useAppearance} from './Appearance';
 import {CodexAccessSettings} from './CodexAccessSettings';
 import {CodexUsage} from './CodexUsage';
+import {Capacitor} from '@capacitor/core';
+import {useState} from 'react';
+import {runAlertsEnabled,setRunAlerts} from './chat-notifications';
 import {EngineUpdates} from './EngineUpdates';
 import {JiraSettings} from './Jira';
 import type {Connection} from './api';
@@ -41,8 +44,12 @@ export function SettingsPanel({workspaceSelector,page,onPage,provider,connection
       {page==='usage'&&<>{workspaceSelector}<CodexUsage connection={connection} provider={provider}/></>}
       {page==='jira'&&<JiraSettings key={provider} connection={connection} provider={provider}/>}
       {page==='updates'&&<><div id="settings-updates"/>{provider!=='copilot'&&<EngineUpdates connection={connection} provider={provider}/>}</>}
-      {page==='connection'&&<><div className="settings-computer"><Laptop size={24}/><div><strong>{computerName}</strong><span>{connection?networkError?t('Нет связи'):t('Компьютер подключён'):t('Демонстрационный режим')}</span></div></div><p className="settings-host-address">{connection?.url||t('Демонстрационный режим')}</p><p className="muted">{t('Для интернета используйте Tailscale на ПК и телефоне или HTTPS. В домашнем Wi-Fi HTTP не шифрует трафик; Tailscale шифрует соединение в обеих сетях.')}</p><p className="muted">{t('Действующие задачи продолжаются на ПК после отключения телефона.')}</p></>}
+      {page==='connection'&&<>{Capacitor.getPlatform()==='android'&&<RunAlertsToggle/>}<div className="settings-computer"><Laptop size={24}/><div><strong>{computerName}</strong><span>{connection?networkError?t('Нет связи'):t('Компьютер подключён'):t('Демонстрационный режим')}</span></div></div><p className="settings-host-address">{connection?.url||t('Демонстрационный режим')}</p><p className="muted">{t('Для интернета используйте Tailscale на ПК и телефоне или HTTPS. В домашнем Wi-Fi HTTP не шифрует трафик; Tailscale шифрует соединение в обеих сетях.')}</p><p className="muted">{t('Действующие задачи продолжаются на ПК после отключения телефона.')}</p></>}
       {page==='about'&&<div className="settings-about"><span className="logo"><Terminal size={24}/></span><h3>Pocket Code</h3><span className="version">BETA</span><p>{t('Версия {0}',pkg.version)}</p><p className="muted">{t('Claude Code и Codex с вашего ПК — на телефоне.')}</p></div>}
     </>}{page==='index'&&<footer className="settings-exit"><button className="settings-category settings-disconnect" onClick={onDisconnect}><LogOut size={21}/><span><strong>{t('Отключить и забыть')}</strong></span></button></footer>}</div>
   </section>;
+}
+function RunAlertsToggle(){
+  const [enabled,setEnabled]=useState(runAlertsEnabled);
+  return <div className="settings-run-alerts"><label className="checkbox-label"><input type="checkbox" checked={enabled} onChange={event=>{setEnabled(event.target.checked);setRunAlerts(event.target.checked);}}/>{t('Уведомлять о завершении любых чатов на ПК')}</label><p className="muted">{t('Включая чаты, запущенные на ПК и не открытые на телефоне. Пока ПК подключён, Android показывает тихое уведомление о слежении.')}</p></div>;
 }

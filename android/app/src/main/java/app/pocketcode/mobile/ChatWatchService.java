@@ -23,6 +23,8 @@ public class ChatWatchService extends Service {
     private volatile int generation;
     private Intent selection;
     private static volatile ChatWatchService active;
+    /** The chat this screen watches; the all-chats feed skips it to avoid a second alert. */
+    static volatile String watchedSession="";
     private boolean keepNotification;
     private String lastState="";
     private long started;
@@ -42,7 +44,7 @@ public class ChatWatchService extends Service {
     @Override public int onStartCommand(Intent intent,int flags,int startId){
         if(intent==null){stopSelf();return START_NOT_STICKY;}
         boolean same=selection!=null&&key(selection).equals(key(intent));
-        selection=new Intent(intent);
+        selection=new Intent(intent);watchedSession=value(intent,"sessionId");
         if(same)return START_NOT_STICKY;
         int epoch=++generation;started=System.currentTimeMillis();lastState="";alerts.reset();keepNotification=false;
         if(scheduled!=null)scheduled.cancel(true);
@@ -166,5 +168,5 @@ public class ChatWatchService extends Service {
         keepNotification=true;stopForeground(STOP_FOREGROUND_DETACH);stopSelf();
     }
     static void cancelActive(){if(active!=null){active.generation++;active.keepNotification=false;}}
-    @Override public void onDestroy(){generation++;if(scheduled!=null)scheduled.cancel(true);if(request!=null)request.disconnect();worker.shutdownNow();main.removeCallbacksAndMessages(null);if(!keepNotification)getSystemService(NotificationManager.class).cancel(NOTIFICATION_ID);selection=null;if(active==this)active=null;super.onDestroy();}
+    @Override public void onDestroy(){watchedSession="";generation++;if(scheduled!=null)scheduled.cancel(true);if(request!=null)request.disconnect();worker.shutdownNow();main.removeCallbacksAndMessages(null);if(!keepNotification)getSystemService(NotificationManager.class).cancel(NOTIFICATION_ID);selection=null;if(active==this)active=null;super.onDestroy();}
 }

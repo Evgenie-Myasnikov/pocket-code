@@ -98,6 +98,8 @@ Open the right-edge activity drawer for running chats, errors, and questions nee
 
 On Android, allow notifications to follow the last open chat while the app is minimized. **Chat results and questions** is a separate Android notification channel for completion, errors and requests for an answer. Tap an alert to return to its chat. Reopening old completed history does not send another alert. Tracking ends when you explicitly leave the chat; background delivery still requires a reachable PC and Android allowing the service to run.
 
+From 0.22.7, Pocket Code also notifies you when **any** chat on the PC finishes or is stopped, including chats started in Codex, Claude Code or Copilot CLI on the PC and never opened on the phone. The PC detects the end of each turn from the providers' session files; while the phone is paired, Android shows a silent **PC chat tracking** notification. Each chat has one alert that a later result replaces. Turn this off in **Settings → Connection → Notify when any PC chat finishes**. If Android closes the app, tracking resumes the next time you open it.
+
 <a id="project"></a>
 ## Project files, rules and changelog
 

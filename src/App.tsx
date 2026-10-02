@@ -13,7 +13,7 @@ import {ActivityDrawer} from './ActivityDrawer';
 import {ActivityHandle} from './ActivityHandle';
 import {useJiraRole,jiraRoleLabel} from './jira-preferences';
 import {useActivity} from './useActivity';
-import {useChatNotifications,type WatchedChat} from './chat-notifications';
+import {useChatNotifications,useRunNotifications,type WatchedChat} from './chat-notifications';
 import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
 import { Subagents } from './Subagents';
 import { ChatOutputs } from './ChatOutputs';
@@ -101,6 +101,7 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
   const [activityDragging,setActivityDragging]=useState(false);
   const [activityOpen,setActivityOpen]=useState(false),[activityTarget,setActivityTarget]=useState<{item:ActivityItem;connection:Connection}|null>(null);
   const [notificationTarget,setNotificationTarget]=useState<WatchedChat|null>(null);
+  useRunNotifications(demo?null:connection,locale().startsWith('ru')?'ru':'en');
   useChatNotifications(connection,demo?null:tab==='chats'?(mobileChat&&(selected||job)?{provider,sessionId:job?.sessionId||selected?.sessionId,jobId:job?.id,cwd,title:selected?.customTitle||selected?.summary||engineName}:null):undefined,locale().startsWith('ru')?'ru':'en',chat=>{
     if(chat.provider!=='claude'&&chat.provider!=='codex'&&chat.provider!=='copilot')return;
     setNotificationTarget(chat);setProvider(chat.provider);

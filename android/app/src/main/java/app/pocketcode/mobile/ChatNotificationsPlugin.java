@@ -15,7 +15,8 @@ import com.getcapacitor.annotation.PermissionCallback;
 @CapacitorPlugin(name="ChatNotifications",permissions={@Permission(alias="notifications",strings={Manifest.permission.POST_NOTIFICATIONS})})
 public class ChatNotificationsPlugin extends Plugin {
     private boolean asked;
-    private Intent latest;
+    private Intent latest,feed;
+    private boolean askedFeed;
     @PluginMethod public void watch(PluginCall call) {
         try{latest=configuration(call);}catch(Exception error){call.reject("Invalid chat notification configuration");return;}
         if(Build.VERSION.SDK_INT>=33&&getPermissionState("notifications")!=PermissionState.GRANTED){
@@ -46,6 +47,24 @@ public class ChatNotificationsPlugin extends Plugin {
             call.resolve();
         }catch(Exception error){call.reject("Chat notification could not start");}
     }
+    @PluginMethod public void watchAll(PluginCall call){
+        try{feed=configuration(call);feed.setClass(getContext(),RunFeedService.class);}catch(Exception error){call.reject("Invalid chat notification configuration");return;}
+        if(Build.VERSION.SDK_INT>=33&&getPermissionState("notifications")!=PermissionState.GRANTED){
+            if(!askedFeed){askedFeed=true;requestPermissionForAlias("notifications",call,"feedPermissionResult");}
+            else call.resolve();
+            return;
+        }
+        startFeed(call);
+    }
+    @PermissionCallback private void feedPermissionResult(PluginCall call){
+        if(feed!=null&&getPermissionState("notifications")==PermissionState.GRANTED)startFeed(call);
+        else call.resolve();
+    }
+    private void startFeed(PluginCall call){
+        try{if(feed!=null){if(Build.VERSION.SDK_INT>=26)getContext().startForegroundService(feed);else getContext().startService(feed);}call.resolve();}
+        catch(Exception error){call.reject("Chat tracking could not start");}
+    }
+    @PluginMethod public void stopAll(PluginCall call){feed=null;getContext().stopService(new Intent(getContext(),RunFeedService.class));call.resolve();}
     @PluginMethod public void clear(PluginCall call){
         latest=null;
         getActivity().runOnUiThread(()->{

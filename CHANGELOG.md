@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-02 - Notifications for every PC chat (0.22.7)
+- Added: The phone notifies when any chat on the PC finishes or is stopped, including chats started in Codex, Claude Code or Copilot CLI on the PC and never opened on the phone. The PC reads the end of each turn from provider session files (Codex task events, Claude end of turn, Copilot turn end after a quiet period) every 10 seconds and serves the transitions at /api/activity/events; existing history never notifies.
+- Added: While paired, an Android foreground service polls that feed every 20 seconds with a silent tracking notification, using the specialUse type on Android 14+ so it is not stopped after Android 15's six-hour dataSync limit. Each chat has one alert that later results replace; the chat watched from its own screen is skipped to avoid a duplicate. Settings → Connection can turn it off.
+- Also in this release: the Windows Project page and GitHub Copilot usage limits described below.
+- Files: server/run-monitor.ts, app.ts, index.ts; RunFeedService.java, ChatWatchService.java, ChatNotificationsPlugin.java, AndroidManifest.xml; src/chat-notifications.ts, App.tsx, SettingsPanel.tsx, translations.ts; user guides; tests/run-monitor.test.ts.
+- Validation: Unit tests cover turn boundaries for all three providers, quiet history on the first scan, transitions with session id and folder title, Copilot's quiet period and feed cursors; an API test covers authentication and cursors. Scanning this PC's real session folders took 8-18 ms. Server suite 241/241, Android and TypeScript builds, desktop smoke and related browser scenarios passed (22/24; the Copilot provider and desktop chat/review scenarios already failed before).
+- Follow-up: Android delivery was not tested on a physical phone. Credentials stay in memory, so tracking resumes when the app is opened again after Android closes it.
+
 ## 2026-10-02 - GitHub Copilot usage limits
 - Added: **Settings → Usage** shows GitHub Copilot premium requests, chat and completion quotas with remaining share and billing-period reset, instead of only a link. The composer ring now shows the remaining premium/chat share for Copilot chats.
 - Changed: The PC reads quota through the Copilot SDK account API with a 30-second cache. Unlimited chat and completion entitlements are hidden; an exhausted premium quota without allowed overage is reported as unavailable. Remaining share is calculated from used and included requests, with the reported percentage only as a fallback.
