@@ -23,7 +23,7 @@ public static class DesktopReadPolicy {
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/(health|devices|providers|provider-connections|projects|sessions|jobs|review|review/availability|project-artifact)$")||
+        return Regex.IsMatch(path,@"^/(health|devices|providers|provider-connections|projects|sessions|jobs|review|review/availability|project-artifact|project-docs|project-doc|files|file)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");

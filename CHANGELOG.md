@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-02 - Project page on Windows
+- Added: The Windows application has a **Project** page like the phone: project overview, rules, changelog and a read-only file browser for the selected folder. Its folder follows the chat project filter or the open chat, and choosing another folder there also filters the chat list.
+- Security: The desktop bridge additionally allows only the read routes /project-docs, /project-doc, /files and /file; the host still limits them to permitted project roots, and write routes remain rejected.
+- Files: src/DesktopApp.tsx; desktop/DesktopWindow.cs; tests/desktop-ui.spec.ts, DesktopSmoke.cs.
+- Validation: A desktop browser scenario opens the page, reads the rule document and lists files using only read calls besides window theme sync. The desktop smoke test checks the new routes are allowed and write-style routes stay denied. Desktop scenarios 11/12; the remaining chat/review scenario already failed before this change.
+
 ## 2026-10-02 - Resizable desktop sidebar and themed scrollbars (0.22.6)
 - Added: The Windows sidebar can be resized by dragging its divider (220-560 px, keeping at least 480 px for the conversation). The width is remembered; double-click or Home resets it, and the arrow keys adjust it when the divider has focus.
 - Fixed: Lists outside the conversation used grey classic Windows scrollbars with arrow buttons in the desktop window. All scroll areas now use thin scrollbars in the current palette.

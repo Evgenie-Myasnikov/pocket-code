@@ -23,6 +23,10 @@ async function desktop(page:Page){
    if(p==='/sessions'){reply(id,[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}]);return;}
    if(p==='/provider-connections'){reply(id,{providers:['claude','codex','copilot'].map(id=>({id,installed:true,version:'1.0.0',server:id==='claude'?'on-demand':'ready',authenticated:id==='claude',busy:false,login:{state:'idle'},methods:id==='claude'?['browser','console','sso']:['browser','device']}))});return;}
    if(p==='/devices'){reply(id,(window as any).testDevices||[]);return;}
+   if(p==='/project-docs'){reply(id,{project:url.searchParams.get('cwd'),truncated:false,documents:[{path:'AGENTS.md',name:'AGENTS.md',kind:'rules',source:'project',appliesTo:'all',bytes:40},{path:'CHANGELOG.md',name:'CHANGELOG.md',kind:'changelog',source:'project',appliesTo:'all',bytes:40}]});return;}
+   if(p==='/project-doc'){const path=url.searchParams.get('path');reply(id,{path,name:path,kind:path==='AGENTS.md'?'rules':'changelog',source:'project',appliesTo:'all',bytes:40,content:path==='AGENTS.md'?'# Synthetic rules\n\nUse synthetic data.':'# Changelog\n\n- Synthetic entry'});return;}
+   if(p==='/files'){const folder=url.searchParams.get('path')||'C:\Demo\Atlas';reply(id,{path:folder,parent:null,entries:[{name:'README.md',directory:false,path:folder+'\README.md'}]});return;}
+   if(p==='/file'){reply(id,{name:'README.md',text:'Synthetic readme'});return;}
    if(p==='/projects'){reply(id,['C:\\Demo\\Atlas','C:\\Demo\\Garden']);return;}
    if(p==='/jobs'){reply(id,(window as any).testRuns||[]);return;}
    if(p.startsWith('/jobs/')){reply(id,((window as any).testRuns||[]).find((run:any)=>run.id===p.split('/').pop()));return;}
@@ -109,4 +113,16 @@ test('sidebar divider resizes the rail with mouse and keyboard, persists and res
  await handle.focus();await page.keyboard.press('ArrowLeft');expect(await width()).toBe(544);
  await handle.dblclick();expect(await width()).toBe(initial);
  expect(await page.evaluate(()=>localStorage.getItem('pocket-desktop-rail-width'))).toBe('');
+});
+
+test('desktop Project page shows rules, changelog and files of the selected project',async({page})=>{
+ await desktop(page);await page.getByRole('button',{name:'Project',exact:true}).click();
+ const overview=page.locator('.desktop-project');await expect(overview.getByLabel('Project folder')).toHaveValue('C:\\Demo\\Atlas');
+ // A single rule file opens directly, as on the phone.
+ await overview.getByRole('button',{name:/Rules/}).click();await expect(overview).toContainText('Use synthetic data.');
+ await overview.getByRole('button',{name:'Project overview',exact:true}).click();
+ await overview.getByRole('button',{name:/^Files/}).click();await expect(overview).toContainText('README.md');
+ const reads=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='read').map((c:any)=>c.endpoint.split('?')[0]));
+ expect(reads).toEqual(expect.arrayContaining(['/project-docs','/project-doc']));
+ expect(await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>!['read','state','settings','window-theme'].includes(c.action)).map((c:any)=>c.action))).toEqual([]);
 });

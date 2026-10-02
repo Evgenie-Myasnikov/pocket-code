@@ -102,8 +102,8 @@ public static class DesktopSmoke {
                 Check(Path.GetFullPath(temp).StartsWith(Path.GetFullPath(Path.GetTempPath()),StringComparison.OrdinalIgnoreCase),"Fixture cleanup stays in temp");
                 Directory.Delete(temp,true);
             }
-            foreach(string path in new[]{"/sessions","/sessions/synthetic/messages?provider=codex","/review?cwd=example","/project-artifact?path=example.md","/sessions/synthetic/subagents/child/messages"})Check(DesktopReadPolicy.Allows(path),"Read route allowed");
-            foreach(string path in new[]{"/runtime/stop","/jobs/example/stop","https://example.invalid","//example.invalid","/../runtime/stop","/sessions/x/messages#hidden","/jira/login"})Check(!DesktopReadPolicy.Allows(path),"Unsafe route denied");
+            foreach(string path in new[]{"/sessions","/sessions/synthetic/messages?provider=codex","/review?cwd=example","/project-artifact?path=example.md","/project-docs?cwd=example","/project-doc?cwd=example&path=AGENTS.md","/files?path=example","/file?path=example/README.md","/sessions/synthetic/subagents/child/messages"})Check(DesktopReadPolicy.Allows(path),"Read route allowed");
+            foreach(string path in new[]{"/runtime/stop","/jobs/example/stop","/files/upload","/file/write","https://example.invalid","//example.invalid","/../runtime/stop","/sessions/x/messages#hidden","/jira/login"})Check(!DesktopReadPolicy.Allows(path),"Unsafe route denied");
             Console.WriteLine("PASS: shared WebView UI, tray lifecycle, read-only bridge policy, nested child cleanup and saved reconnect.");return 0;
         }catch(Exception error){Console.Error.WriteLine(error);return 1;}finally{if(owned!=null)owned.Dispose();}
     }
