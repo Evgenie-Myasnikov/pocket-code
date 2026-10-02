@@ -28,26 +28,24 @@ test('a newer release invalidates a previously downloaded APK and install is bou
       },
     };
   });
-  await page.route('**/api/updates/latest', route => route.fulfill({ json: { enabled: true, update: release } }));
+  const checks:string[]=[];await page.route('**/api/updates/**',route=>{checks.push(route.request().url());return route.fulfill({json:{enabled:true,state:'ready',update:release}});});
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('http://127.0.0.1:5173');
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();await page.getByRole('button',{name:'Updates',exact:true}).click();
-  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
-  await page.getByRole('button', { name: 'Download update', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Install update', exact: true })).toBeVisible();
+  expect(checks.some(url=>url.endsWith('/latest')||url.endsWith('/check'))).toBe(false);
   expect(await page.evaluate(() => (window as any).nativeCalls.filter((call: any) => call.method === 'install').at(-1).options)).toEqual({ versionCode: 99001, sha256: 'a'.repeat(64) });
 
   release = { ...release, version: '99.0.2', versionCode: 99002, sha256: 'b'.repeat(64), apk: 'Pocket-Code-99.0.2.apk', releaseId: 102, tag: 'v99.0.2' };
-  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Install update', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Download update', exact: true })).toBeVisible();
   await page.evaluate(() => { (window as any).failDownload = true; });
-  await page.getByRole('button', { name: 'Download update', exact: true }).click();
-  await expect(page.getByText('Synthetic download failure')).toBeVisible();
+  await page.getByRole('button', { name: 'Check for updates on PC', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Install update', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Receive APK from PC', exact: true })).toBeVisible();
+  await expect(page.getByText('Could not receive the APK from the PC. Check the connection and retry.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Install update', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).nativeCalls.filter((call: any) => call.method === 'install').length)).toBe(1);
   await page.evaluate(() => { (window as any).failDownload = false; });
-  await page.getByRole('button', { name: 'Download update', exact: true }).click();
+  await page.getByRole('button', { name: 'Receive APK from PC', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Install update', exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).nativeCalls.filter((call: any) => call.method === 'install').at(-1).options)).toEqual({ versionCode: 99002, sha256: 'b'.repeat(64) });
 });

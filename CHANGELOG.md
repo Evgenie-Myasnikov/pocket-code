@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-02 - PC-managed APK delivery, aligned diff modes and live desktop chats (0.21.1)
+- Changed: PC checks public releases at startup and every six hours, verifies/caches the APK and supplies it to connected phones. Mobile settings request a PC check; Android still confirms installation. Public downloads no longer depend on GitHub CLI login. Phone requests also signal the Windows updater; APK transfers block host shutdown.
+- Fixed: Diff gutter width rules affected spanning hunk rows and displaced code columns. Explicit shared column measurements now keep split panes aligned; visible Unified/Split buttons retain the selected layout.
+- Fixed: Desktop selects the latest run for each chat, polls live output independently of slow history, follows partial text at the bottom and shows working/question/completed/error states. Newly assigned sessions appear before the history index refreshes; completed runs no longer freeze history at their original starting offset.
+- Files: server/updates.ts, app.ts, index.ts; desktop/DesktopWindow.cs; src/Updates.tsx, DiffTable.tsx, Review.tsx, DesktopApp.tsx and styles; update/desktop/review tests and guides.
+- Validation: 15 update/host server tests, 12 desktop/update browser scenarios, four large/Unicode diff scenarios and both file-list/layout cases passed. TypeScript/Vite, Windows native WebView/tray/process smoke passed. Android APK build passed.
+- Follow-up: Android installation on a physical phone was not tested. Older PC hosts need upgrading to support APK delivery; external provider applications do not expose all live run states through Pocket Code.
+
+
 ## 2026-10-02 - Provider sign-out and Windows automatic updates (0.21.0)
 - Changed: Added confirmed sign-out for Claude, Codex and Copilot in shared Windows/Android provider settings; active work blocks authentication changes. Preserves chats/preferences and reports remaining environment/account credentials.
 - Fixed: Copilot model-list failures no longer overwrite confirmed authentication. Login failure messages distinguish incomplete login from server verification failures.

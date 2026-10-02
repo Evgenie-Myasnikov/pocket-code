@@ -81,13 +81,13 @@ PR publication requires GitHub CLI sign-in, the exact repository root, a clean w
 
 ## Updates
 
-Install the first updater-capable APK manually. Subsequent checks run when connected and every six hours while the app is active, with a manual check in Settings. Auto-download can be disabled. The PC needs GitHub CLI (`gh`) and access to the release repository.
+Install the first APK manually. From 0.21.1 the PC checks public releases at startup and every six hours, downloads and verifies the APK, then makes it available to connected phones. The phone reads the PC's update status and receives its prepared APK; it does not check GitHub independently. **Settings → Updates → Check for updates on PC** explicitly requests a new PC check. GitHub CLI and GitHub login are not required for updates.
 
-Set `POCKET_UPDATE_REPO=owner/repository`, or create `%USERPROFILE%/.pocket-code/updates.json` containing `{"repository":"owner/repository"}`. Restart the bridge after configuring it. GitHub authentication stays on the PC; the phone never receives a GitHub token.
+The official public release repository is configured by default. For a custom distribution, set `POCKET_UPDATE_REPO=owner/repository`, or create `%USERPROFILE%/.pocket-code/updates.json` containing `{"repository":"owner/repository"}`. Restart the bridge after configuring it. The phone never receives a GitHub token.
 
 A stable release contains `Pocket-Code-VERSION.apk` and `update.json`. The PC and phone verify SHA-256 and size. Android additionally checks package identity, a greater version code, and the same signer as the installed app. Keep the original signing keystore private and backed up: APKs signed with a different key cannot update existing installations. Current development packages use the local Android debug signer and are not Play Store releases.
 
-Compatible releases update the Android app and PC host separately. After installing the APK, reconnect to request the matching host update; the host waits for active work to finish. For permission prompts or a cancelled install, use Settings → App updates → Install update.
+Windows manages its own desktop/host update, waits for active work and APK transfers, and restores the previous version if startup fails. It does not wait for the phone to upgrade first. A check requested from the phone also triggers the running Windows updater. Android requires installation confirmation; for a cancelled install, use **Install update** in phone settings. Older hosts need updating before supporting this flow.
 
 ## Development and release
 

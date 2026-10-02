@@ -29,6 +29,7 @@ public static class DesktopReadPolicy {
     }
 }
 public sealed class PocketDesktop:Form {
+    long lastRequestedUpdate=0;
     DateTime nextUpdate=DateTime.UtcNow.AddMinutes(1);Process updater;string updateState="idle",updateVersion="",updateTicket="";
     string AppVersion(){try{return (string)json.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"desktop-version.json")))["version"];}catch{return "0.0.0";}}
     void StartUpdate(){
@@ -140,7 +141,7 @@ public sealed class PocketDesktop:Form {
             }else{
                 if(action=="toggle")await Toggle();
                 else if(action=="jira"){if(!preview&&jiraUrl!=null)OpenUrl(jiraUrl);}
-                else if(action=="check-update"){StartUpdate();}
+                else if(action=="check-update"){await Send(reader,"/updates/check",true);StartUpdate();}
                 else if(action=="settings"){
                     if(preview)throw new InvalidOperationException("Preview settings are not saved.");
                     if(message.ContainsKey("autoUpdate"))preferences.AutoUpdate=(bool)message["autoUpdate"];
@@ -170,7 +171,7 @@ public sealed class PocketDesktop:Form {
         }
     }
     Task<object> Request(string endpoint,bool post=false){return Send(http,"/"+endpoint,post);}
-    async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
+    async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;if(runtime.ContainsKey("desktopCheckRequestedAt")){long requested=Convert.ToInt64(runtime["desktopCheckRequestedAt"]);if(requested>lastRequestedUpdate){lastRequestedUpdate=requested;StartUpdate();}}hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
     async Task Poll(){
         if(preview||polling||changing||exiting)return;polling=true;
         try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();tray.Text="Pocket Code · connected";return;}

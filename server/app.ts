@@ -104,7 +104,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(config.engineUpdates){const state=await config.engineUpdates.status();await config.engineUpdates.configure(body.enabled??state.enabled,body.provider==='copilot'?state.provider:body.provider);}
     res.json(await engineStatus());
   });
-  app.get('/api/runtime', (_req, res) => res.json({ applicationId: 'app.pocketcode.host', processId: process.pid, version: packageJson.version, busy: isBusy(), internet: config.runtime?.internet() ?? false }));
+  app.get('/api/runtime', (_req, res) => res.json({ applicationId: 'app.pocketcode.host', processId: process.pid, version: packageJson.version, desktopCheckRequestedAt:config.updater?.desktopCheckRequestedAt||0, busy: isBusy(), internet: config.runtime?.internet() ?? false }));
   app.post('/api/runtime/stop', (_req, res) => {
     if (!config.runtime) throw new HttpError(404, 'Runtime control is unavailable.');
     if (config.hostUpdater?.draining) throw new HttpError(409, 'The PC is handing off an update. Wait for it to finish.');
@@ -281,7 +281,14 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/codex/usage', async (_req, res) => res.json(await codex().usage()));
   app.get('/api/claude/usage', async (_req, res) => res.json(await readClaudeUsage()));
   app.get('/api/updates/latest', async (_req, res) => res.json(config.updater ? await config.updater.latest() : { enabled: false }));
-  app.get('/api/updates/download', async (req, res) => { if (!config.updater) throw new HttpError(404, 'Updates are not configured'); const file = await config.updater.download(z.coerce.number().int().positive().parse(req.query.release)); res.type('application/vnd.android.package-archive'); res.sendFile(file, { dotfiles: 'allow' }); });
+  app.get('/api/updates/status',(_req,res)=>res.json(config.updater?config.updater.status():{enabled:false,state:'idle'}));
+  app.post('/api/updates/check',(_req,res)=>res.json(config.updater?config.updater.check():{enabled:false,state:'idle'}));
+  app.get('/api/updates/download', async (req, res) => {
+    if (!config.updater) throw new HttpError(404, 'Updates are not configured');
+    if(runtimeStopping||config.hostUpdater?.draining)throw new HttpError(503,'PC is restarting; retry after reconnecting.');
+    activeMutations++;let released=false;const release=()=>{if(!released){released=true;activeMutations--;}};res.once('finish',release);res.once('close',release);
+    try{const file=await config.updater.download(z.coerce.number().int().positive().parse(req.query.release));res.type('application/vnd.android.package-archive');res.sendFile(file,{dotfiles:'allow'});}catch(error){release();throw error;}
+  });
   app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots, version: packageJson.version, protocol: 1, processId: process.pid }));
   app.get('/api/providers', async (_req, res) => {
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };

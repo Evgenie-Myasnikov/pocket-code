@@ -33,6 +33,7 @@ const host = process.env.POCKET_HOST || '127.0.0.1', port = Number(process.env.P
 const jira = process.env.POCKET_JIRA_MODE === 'oauth' ? new AtlassianJira(new WindowsJiraStore(path.join(local, 'jira-auth.dat'))) : new ExistingClaudeJira(path.join(local, 'jira-existing.json'));
 let updateRepo = process.env.POCKET_UPDATE_REPO;
 if (!updateRepo) { try { updateRepo = JSON.parse(await readFile(path.join(local, 'updates.json'), 'utf8')).repository; } catch {} }
+updateRepo ||= 'Evgenie-Myasnikov/pocket-code';
 const updater = new ReleaseUpdater(updateRepo, path.join(local, 'updates'));
 const codexJiraTools = new CodexJiraTools(roots[0]);
 const codexJira = process.env.POCKET_JIRA_MODE === 'oauth' ? jira : new ExistingClaudeJira(path.join(local, 'jira-existing-codex.json'), codexJiraTools.call, codexJiraTools.call, 'codex');
@@ -46,7 +47,7 @@ let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
 const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines } = await createApp({ copilot,pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
-runtimeReady = true;
+runtimeReady = true;updater.start();
 const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
 void maintainEngines().catch(()=>{});
 const workflowTimer = setInterval(() => void workflow?.sync().catch(() => {}), 2000); workflowTimer.unref();
@@ -90,7 +91,7 @@ const server = app.listen(port, host, () => {
 let shutdownPromise: Promise<void> | undefined;
 function shutdown(preserveTunnel = false): Promise<void> {
   if (shutdownPromise) return shutdownPromise;
-  closing = true; runtimeReady = false; hostUpdater.close(); clearInterval(workflowTimer); clearInterval(engineTimer);
+  closing = true; runtimeReady = false; hostUpdater.close(); updater.close(); clearInterval(workflowTimer); clearInterval(engineTimer);
   app.locals.providerConnections?.close();
   const stopped = new Promise<void>(resolve => server.close(() => resolve()));
   const queues = [queue?.close(), codexQueue?.close(),copilotQueue?.close(),copilot.close()];

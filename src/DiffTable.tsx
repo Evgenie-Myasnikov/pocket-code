@@ -33,7 +33,7 @@ export const DiffTable=memo(function DiffTable({patch,layout,fontSize,fitWidth=f
       ...(row.right===undefined?[]:[{kind:'change' as const,right:row.right,next:row.next,sign:'+'}]),
     ]);
   },[patch,layout]);
-  const [font,setFont]=useState(''),[scale,setScale]=useState(1);
+  const [font,setFont]=useState(''),[scale,setScale]=useState(1),[viewportWidth,setViewportWidth]=useState(0);
   const measureColumns=useMemo(()=>columnMeasure(font),[font]);
   const widths=useMemo(()=>{
     let left=0,right=0,hunk=0,digits=1;
@@ -47,14 +47,15 @@ export const DiffTable=memo(function DiffTable({patch,layout,fontSize,fitWidth=f
     const canvas=document.createElement("canvas").getContext("2d");
     const measure=()=>{
       frame=0;
+      setViewportWidth(old=>old===scroller.clientWidth?old:scroller.clientWidth);
       const style=getComputedStyle(element),baseHeight=Number.parseFloat(style.fontSize)*1.6+2;
       const currentFont=`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
       if(currentFont!==measuredFont){
         measuredFont=currentFont;if(canvas)canvas.font=currentFont;
         unit=canvas?.measureText('0').width||Number.parseFloat(style.fontSize)*.61;
       }
-      const gutter=Math.max(30,widths.digits*unit+16);
-      const natural=4+Math.max(widths.hunk*unit+16,layout==='split'?Math.max(250,widths.left*unit+16)+Math.max(250,widths.right*unit+16)+2*gutter:(Math.max(widths.left,widths.right)+2)*unit+16+2*gutter);
+      const gutter=Math.max(30,Math.max(6,widths.digits)*unit+16);
+      const natural=4+Math.max(widths.hunk*unit+16,layout==='split'?2*Math.max(250,Math.max(widths.left,widths.right)*unit+18)+2*gutter:(Math.max(widths.left,widths.right)+2)*unit+16+2*gutter);
       const nextScale=fitWidth?Math.min(1,Math.max(1,scroller.clientWidth-2)/natural):1;
       setScale(old=>Math.abs(old-nextScale)<.000001?old:nextScale);
       const height=baseHeight*scale;
@@ -74,12 +75,13 @@ export const DiffTable=memo(function DiffTable({patch,layout,fontSize,fitWidth=f
   const start=Math.min(window.start,lines.length),end=Math.min(Math.max(start,window.end),lines.length);
   const split=layout==='split',span=split?4:3;
   const spacer=(height:number,key:string)=>height>0?<tr key={key} aria-hidden="true" className="diff-spacer"><td colSpan={span} style={{height:height/scale,padding:0,border:0}}/></tr>:null;
-  const gutter=`max(30px, calc(${widths.digits}ch + 16px))`;
-  const leftWidth=`max(250px, calc(${widths.left}ch + 16px))`,rightWidth=`max(250px, calc(${widths.right}ch + 16px))`;
-  const codeWidth=`calc(${Math.max(widths.left,widths.right)+2}ch + 16px)`;
-  const totalWidth=split?`max(100%, calc(${leftWidth} + ${rightWidth} + ${gutter} + ${gutter}), calc(${widths.hunk}ch + 16px))`:`max(100%, calc(${Math.max(widths.left,widths.right)+2}ch + 16px + ${gutter} + ${gutter}), calc(${widths.hunk}ch + 16px))`;
-  return <table ref={table} className={'diff-table '+layout} aria-rowcount={lines.length} style={{zoom:scale,fontSize:fontSize?`${fontSize}px`:'max(14px, var(--chat-font-size,14px))',tableLayout:'fixed',width:totalWidth}}>
-    <colgroup><col style={{width:gutter}}/>{split?<><col style={{width:leftWidth}}/><col style={{width:gutter}}/><col style={{width:rightWidth}}/></>:<><col style={{width:gutter}}/><col style={{width:codeWidth}}/></>}</colgroup>
+  const canvas=font?document.createElement('canvas').getContext('2d'):null;if(canvas)canvas.font=font;
+  const unit=canvas?.measureText('0').width||8.4;
+  const gutter=Math.max(30,Math.max(6,widths.digits)*unit+16);
+  const side=Math.max(250,Math.max(widths.left,widths.right)*unit+18);
+  const natural=4+Math.max(widths.hunk*unit+16,split?2*side+2*gutter:(Math.max(widths.left,widths.right)+2)*unit+16+2*gutter);
+  return <table ref={table} className={'diff-table '+layout} aria-rowcount={lines.length} style={{zoom:scale,fontSize:fontSize?`${fontSize}px`:'max(14px, var(--chat-font-size,14px))',tableLayout:'fixed',width:Math.max(viewportWidth,natural)}}>
+    <colgroup><col style={{width:gutter}}/>{split?<><col/><col style={{width:gutter}}/><col/></>:<><col style={{width:gutter}}/><col/></>}</colgroup>
     <tbody>{spacer(start*window.height,'before')}{lines.slice(start,end).map((row,index)=>{
       const props={'aria-rowindex':start+index+1,style:{height:window.height/scale,lineHeight:`${window.height/scale-2}px`}};
       if(row.kind==='hunk')return <tr key={start+index} {...props} className="hunk diff-line"><td colSpan={span}>{row.left}</td></tr>;

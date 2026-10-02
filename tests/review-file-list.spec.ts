@@ -23,3 +23,17 @@ test('review scrolls through collapsible files and filters detected extensions',
  await page.screenshot({path:'artifacts/screenshots/review-file-list.png',fullPage:true});
  expect(calls).toContain('src/second.ts');
 });
+
+test('split gutters remain fixed across unequal files and layout modes are visible',async({page})=>{
+ await page.setViewportSize({width:1600,height:1000});
+ await page.route('**/api/review/availability?*',route=>route.fulfill({json:{available:true,mode:'working'}}));
+ await page.route('**/api/review?*',route=>{const file=new URL(route.request().url()).searchParams.get('file');return route.fulfill({json:{files:['short.ts','long.ts'].map(path=>({path,added:1,removed:0})),current:'main',base:'main',branches:['main'],binary:false,patch:file?'@@ -0,0 +1 @@\n+'+(file==='short.ts'?'short':'a longer synthetic example for the other file'):''}});});
+ await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
+ const panel=page.getByRole('dialog',{name:'Review',exact:true});await panel.getByRole('button',{name:'Split',exact:true}).click();await expect(panel.locator('.diff-table.split')).toHaveCount(2);
+ await expect(panel).toContainText('a longer synthetic example');
+ const positions=await panel.locator('.diff-table.split').evaluateAll(tables=>tables.map(table=>{const cells=table.querySelector('tr:not(.hunk):not(.diff-spacer)')!.children;return {gutter:cells[0].getBoundingClientRect().width,right:cells[2].getBoundingClientRect().left,left:cells[1].getBoundingClientRect().width,other:cells[3].getBoundingClientRect().width};}));
+ expect(positions[0].right).toBeCloseTo(positions[1].right,0);for(const p of positions){expect(p.gutter).toBeLessThan(90);expect(p.left).toBeCloseTo(p.other,0);}
+ await panel.getByRole('button',{name:'Unified',exact:true}).click();await expect(panel.locator('.diff-table.unified')).toHaveCount(2);
+ expect(await page.evaluate(()=>localStorage.getItem('pocket-code-diff-layout'))).toBe('unified');
+ await page.screenshot({path:'artifacts/screenshots/diff-alignment-unified.png'});
+});

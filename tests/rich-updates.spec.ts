@@ -4,7 +4,7 @@ import {test,expect} from '@playwright/test';
 test('connected host advertises releases and chat renders image tool results, PDFs and unknown blocks',async({page})=>{
   const session='12345678-1234-4234-8234-123456789abc';
   const image='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=';
-  await page.route('**/api/updates/latest',r=>r.fulfill({json:{enabled:true,update:{version:'99.0.0',versionCode:99000,sha256:'a'.repeat(64),size:100,apk:'Pocket-Code-99.0.0.apk',releaseId:10,tag:'v99.0.0'}}}));
+  await page.route('**/api/updates/status',r=>r.fulfill({json:{enabled:true,state:'ready',update:{version:'99.0.0',versionCode:99000,sha256:'a'.repeat(64),size:100,apk:'Pocket-Code-99.0.0.apk',releaseId:10,tag:'v99.0.0'}}}));
   await page.route('**/api/sessions?*',r=>r.fulfill({json:[{sessionId:session,summary:'Media test',cwd:'C:\\Test',lastModified:1}]}));
   await page.route(`**/api/sessions/${session}/messages?*`,r=>r.fulfill({json:{messages:[{id:'one',role:'assistant',blocks:[{type:'image',source:{type:'base64',media_type:'image/png',data:image}},{type:'tool_result',is_error:true,content:[{type:'text',text:'Tool failure detail'},{type:'image',data:image,mimeType:'image/png'}]},{type:'document',title:'Example PDF',source:{type:'base64',media_type:'application/pdf',data:'JVBERi0xLjQK'}},{type:'custom_result',value:'Extra data'}]}],previous:null,next:null}}));
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
@@ -15,6 +15,6 @@ test('connected host advertises releases and chat renders image tool results, PD
   await expect(page.getByRole('link',{name:'Download PDF'})).toBeVisible();
   await page.getByText('Additional data · custom_result').click();await expect(page.getByText(/Extra data/)).toBeVisible();
   await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Updates',exact:true}).click();
-  await expect(page.getByText(`Pocket Code ${pkg.version} → 99.0.0`)).toBeVisible();
+  await expect(page.getByText(`Pocket Code ${pkg.version}`,{exact:true})).toBeVisible();
   await page.screenshot({path:'artifacts/screenshots/update-settings.png',fullPage:true});
 });

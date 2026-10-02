@@ -1,74 +1,48 @@
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Capacitor } from '@capacitor/core';
-import { request, type Connection } from './api';
-import { t } from './i18n';
-import type { Update } from '../server/updates';
+import {useEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
+import {Capacitor} from '@capacitor/core';
+import {request,type Connection} from './api';
+import {useLanguage} from './i18n';
+import {Installer} from './native-update';
+import {startVisiblePoll} from './visible-poll';
+import type {Update} from '../server/updates';
 import pkg from '../package.json';
 
-import { Installer } from './native-update';
-import {HostUpdates,useHostUpdate} from './HostUpdates';
-export function Updates({ connection, expanded }: {connection:Connection|null;expanded:boolean}) {
-  const hostUpdate=useHostUpdate(connection);
-  const [auto, setAuto] = useState(() => {try{return localStorage.getItem('pocket-code-auto-updates-v1') !== 'false';}catch{return true;}});
-  const [current, setCurrent] = useState({version:pkg.version,versionCode:15});
-  const [settingsSlot,setSettingsSlot] = useState<HTMLElement|null>(null);
-  const [update, setUpdate] = useState<Update|null>(null), [busy, setBusy] = useState(''), [error,setError] = useState('');
-  const [ready,setReady] = useState<Update|null>(null), [permission,setPermission] = useState(false), [checked,setChecked] = useState(false), [enabled,setEnabled] = useState(true);
-  const generation = useRef(0), checking = useRef(false), downloading = useRef(false), attempted = useRef(new Set<string>());
-  useEffect(() => {if(Capacitor.isNativePlatform()) void Installer.info().then(setCurrent).catch(()=>{});},[]);
-  useEffect(() => {setSettingsSlot(expanded ? document.getElementById('settings-updates') : null);},[expanded]);
-  async function check() {
-    if(!connection || checking.current || downloading.current) return;
-    const epoch = generation.current; checking.current = true;setBusy('check');setError('');
-    try {const result = await request<{enabled:boolean;update?:Update}>(connection,'/updates/latest');
-      if(epoch !== generation.current) return;
-      const next = result.update && result.update.versionCode > current.versionCode ? result.update : null;
-      setEnabled(result.enabled);setChecked(true);setUpdate(next);
-      setReady(previous => previous && next && previous.sha256 === next.sha256 && previous.versionCode === next.versionCode ? previous : null);
-    } catch(e) {if(epoch === generation.current) setError((e as Error).message);}
-    finally {checking.current=false;if(epoch === generation.current)setBusy('');}
-  }
-  useEffect(() => {
-    generation.current++;setUpdate(null);setReady(null);setPermission(false);setChecked(false);setError('');setBusy('');
-    if(!connection)return;
-    const timer = setTimeout(()=>void check(),3000);
-    const interval = setInterval(()=>{if(document.visibilityState==='visible')void check();},6*60*60*1000);
-    return ()=>{generation.current++;clearTimeout(timer);clearInterval(interval);};
-  },[connection,current.versionCode]);
-  async function install(target = ready) {
-    if(!target)return;
-    const epoch = generation.current;
-    try {const result = await Installer.install({sha256:target.sha256,versionCode:target.versionCode});if(epoch === generation.current)setPermission(result.needsPermission);}
-    catch(e){if(epoch === generation.current)setError((e as Error).message);}
-  }
-  async function download() {
-    if(!connection || !update || busy || downloading.current)return;
-    const epoch = generation.current;downloading.current=true;setReady(null);setPermission(false);setBusy('download');setError('');
-    try {await Installer.download({...update,...connection});if(epoch !== generation.current)return;setReady(update);await install(update);}
-    catch(e){if(epoch === generation.current)setError((e as Error).message);}
-    finally {downloading.current=false;if(epoch === generation.current)setBusy('');}
-  }
-  useEffect(()=>{
-    if(!auto || !update || busy || ready || !connection || !Capacitor.isNativePlatform())return;
-    const key=connection.url+update.sha256;
-    if(attempted.current.has(key))return;
-    attempted.current.add(key);void download();
-  },[auto,update,busy,ready,connection]);
-  if(!expanded && !update)return null;
-  const content = <section className={`update-panel${expanded?' expanded':''}`} aria-label={t('Обновления приложения')}>
-    <h3>{t('Обновления приложения')}</h3>
-    <p className="muted">Pocket Code {current.version}{update ? ` → ${update.version}` : ''}</p>
-    {expanded && <label className="checkbox-label"><input type="checkbox" checked={auto} onChange={e=>{setAuto(e.target.checked);try{localStorage.setItem('pocket-code-auto-updates-v1',String(e.target.checked));}catch{}}}/>{t('Автоматически скачивать обновления при подключении к ПК')}</label>}
-    {busy && <p role="status">{busy==='download'?t('Скачиваем и проверяем APK…'):t('Проверяем GitHub…')}</p>}
-    {error && <p className="error" role="alert">{t(error)}</p>}
-    {!update && checked && !error && !busy && <p>{enabled?t('Установлена актуальная версия'):t('Обновления не настроены на ПК')}</p>}
-    {update && !Capacitor.isNativePlatform() && <p>{t('Обновление доступно. Установите APK на Android.')}</p>}
-    {update && Capacitor.isNativePlatform() && !ready && <button className="primary" disabled={!!busy} onClick={()=>void download()}>{t('Скачать обновление')}</button>}
-    {ready && <><p>{t('APK проверен. Подтвердите установку в Android.')}</p>{permission && <button className="secondary" onClick={()=>void Installer.allowInstall().catch(e=>setError(e.message))}>{t('Разрешить установку обновлений')}</button>}<button className="primary" onClick={()=>void install()}>{t('Установить обновление')}</button></>}
-    {expanded && <><button className="secondary" disabled={!connection||!!busy} onClick={()=>void check()}>{t('Проверить обновления')}</button><p className="muted">{t('Проверяем GitHub через ваш ПК. Android попросит подтвердить установку; ключи и чаты сохраняются.')}</p></>}
-    {expanded&&<HostUpdates update={hostUpdate}/>}
-  </section>;
-  // Keep one updater mounted while its settings surface joins the normal scroll flow.
-  return expanded ? settingsSlot ? createPortal(content,settingsSlot) : null : content;
+type PCStatus={enabled:boolean;state:'idle'|'checking'|'downloading'|'ready'|'error';update?:Update};
+/** Receives the PC's prepared APK. No mobile release checks or PC version upgrades. */
+export function Updates({connection,expanded}:{connection:Connection|null;expanded:boolean}){
+ const ru=useLanguage()==='ru',l=(en:string,ruText:string)=>ru?ruText:en;
+ const [current,setCurrent]=useState<{version:string;versionCode:number}|null>(null),[slot,setSlot]=useState<HTMLElement|null>(null);
+ const [pc,setPC]=useState<PCStatus|null>(null),[ready,setReady]=useState<Update|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[permission,setPermission]=useState(false);
+ const generation=useRef(0),receiving=useRef(false),attempted=useRef(new Set<string>());
+ useEffect(()=>{if(Capacitor.isNativePlatform())void Installer.info().then(setCurrent).catch(()=>setError('Cannot read installed app version.'));},[]);
+ useEffect(()=>setSlot(expanded?document.getElementById('settings-updates'):null),[expanded]);
+ useEffect(()=>{
+  const epoch=++generation.current;setPC(null);setReady(null);setError('');setBusy(false);setPermission(false);
+  if(!connection)return;
+  const stop=startVisiblePoll(async()=>{try{const value=await request<PCStatus>(connection,'/updates/status');if(!value||typeof value.enabled!=='boolean'||!['idle','checking','downloading','ready','error'].includes(value.state))throw Error();if(epoch===generation.current)setPC(value);}catch{if(epoch===generation.current)setPC(null);}},5000);
+  return()=>{generation.current++;stop();};
+ },[connection]);
+ const update=pc?.state==='ready'&&pc.update&&current&&pc.update.versionCode>current.versionCode?pc.update:null;
+ const wanted=useRef<string|null>(null);wanted.current=update?.sha256||null;
+ useEffect(()=>{if(update&&ready&&update.sha256!==ready.sha256)setReady(null);},[update?.sha256,ready]);
+ async function install(target=ready){if(!target)return;const epoch=generation.current;try{const result=await Installer.install({sha256:target.sha256,versionCode:target.versionCode});if(epoch===generation.current)setPermission(result.needsPermission);}catch{if(epoch===generation.current)setError(l('Android could not open the installer. Retry.','Android не смог открыть установку. Повторите.'));}}
+ async function receive(target=update){
+  if(!connection||!target||receiving.current)return;const epoch=generation.current;receiving.current=true;setBusy(true);setError('');
+  try{await Installer.download({...target,...connection});if(epoch!==generation.current||wanted.current!==target.sha256)return;setReady(target);await install(target);}
+  catch{if(epoch===generation.current)setError(l('Could not receive the APK from the PC. Check the connection and retry.','Не удалось получить APK от ПК. Проверьте соединение и повторите.'));}
+  finally{receiving.current=false;if(epoch===generation.current)setBusy(false);}
+ }
+ useEffect(()=>{if(!update||!connection||ready||busy||!Capacitor.isNativePlatform())return;const key=connection.url+'|'+update.sha256;if(attempted.current.has(key))return;attempted.current.add(key);void receive(update);},[update?.sha256,connection,ready,busy]);
+ async function check(){if(!connection||busy)return;const epoch=generation.current;setBusy(true);setError('');try{const value=await request<PCStatus>(connection,'/updates/check',{});if(epoch===generation.current)setPC(value);}catch{if(epoch===generation.current)setError(l('Could not ask the PC to check. Update or reconnect the PC app.','Не удалось запустить проверку на ПК. Обновите или подключите приложение ПК.'));}finally{if(epoch===generation.current)setBusy(false);}}
+ if(!expanded&&!update&&!ready)return null;
+ const content=<section className={`update-panel${expanded?' expanded':''}`} aria-label={l('Updates from PC','Обновления от ПК')}>
+  <h3>{l('Updates from PC','Обновления от ПК')}</h3><p className="muted">Pocket Code {current?.version||pkg.version}</p>
+  {expanded&&<><p>{l('Your PC checks for updates and sends the APK here. Android asks you to confirm installation.','ПК проверяет обновления и передаёт APK сюда. Android попросит подтвердить установку.')}</p><button className="secondary" disabled={!connection||busy||pc?.state==='checking'||pc?.state==='downloading'} onClick={()=>void check()}>{l('Check for updates on PC','Проверить обновления на ПК')}</button></>}
+  <p role="status">{busy&&receiving.current?l('Receiving update from PC…','Получаем обновление от ПК…'):!connection?l('Connect your PC to receive updates.','Подключите ПК для получения обновлений.'):!pc?l('Waiting for the PC. An older host may need updating.','Ожидаем ПК. Старую версию сервера может потребоваться обновить.'):!pc.enabled?l('Updates are not configured on the PC.','Обновления не настроены на ПК.'):pc.state==='checking'?l('The PC is checking for updates…','ПК проверяет обновления…'):pc.state==='downloading'?l('The PC is downloading and verifying the APK…','ПК скачивает и проверяет APK…'):pc.state==='error'?l('The PC could not prepare the update. Retry the check.','ПК не смог подготовить обновление. Повторите проверку.'):update?l('An update is ready on your PC.','Обновление готово на ПК.'):pc.state==='ready'&&!current?l('An update is ready on your PC.','APK готов на ПК.'):pc.state==='ready'?l('Your app is up to date.','Установлена актуальная версия.'):l('The PC has not prepared an update yet.','ПК ещё не подготовил обновление.')}</p>
+  {error&&<p className="error" role="alert">{error}</p>}
+  {update&&!ready&&<button className="primary" disabled={busy||!Capacitor.isNativePlatform()} onClick={()=>void receive()}>{l('Receive APK from PC','Получить APK от ПК')}</button>}
+  {ready&&<>{permission&&<button className="secondary" onClick={()=>void Installer.allowInstall().catch(()=>setError(l('Allow installation in Android settings.','Разрешите установку в настройках Android.')))}>{l('Allow installation','Разрешить установку')}</button>}<button className="primary" onClick={()=>void install()}>{l('Install update','Установить обновление')}</button></>}
+ </section>;
+ return expanded?slot?createPortal(content,slot):null:content;
 }

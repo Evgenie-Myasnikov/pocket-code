@@ -25,10 +25,18 @@ test('update manifest rejects mismatches, traversal, drafts and alternate apps',
   assert.throws(()=>validateUpdate(manifest,{...release,draft:true}));
   assert.throws(()=>new ReleaseUpdater('owner/repo --evil','unused'));
 });
+test('APK transfer reserves the runtime until the response completes',async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-transfer-')),apk=path.join(dir,'verified.apk');await writeFile(apk,bytes);
+ let finish!:()=>void,started!:()=>void;const entered=new Promise<void>(resolve=>{started=resolve;});const waiting=new Promise<void>(resolve=>{finish=resolve;});
+ const service={download:async()=>{started();await waiting;return apk;}} as any;
+ const {app,jobs,terminals,queue}=await createApp({roots:[dir],token:'test-only-'.repeat(5),hostName:'Fixture',uploads:path.join(dir,'uploads'),desktopSessionIndexes:[],updater:service,runtime:{internet:()=>false,stop:()=>{}}});
+ const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));const url=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api`,headers={Authorization:'Bearer '+'test-only-'.repeat(5)};
+ try{const download=fetch(url+'/updates/download?release=23',{headers});await entered;assert.equal((await fetch(url+'/runtime/stop',{method:'POST',headers})).status,409);finish();assert.deepEqual(Buffer.from(await(await download).arrayBuffer()),bytes);assert.equal((await fetch(url+'/runtime/stop',{method:'POST',headers})).status,200);}finally{finish();jobs.close();terminals.close();queue?.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(dir,{recursive:true,force:true});}
+});
 test('host caches release checks, pins download to checked release and verifies APK hash',async()=>{
   const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-update-'));
   const service=new ReleaseUpdater('example/pocket-code',dir);let calls=0;
-  (service as any).gh=async(args:string[])=>{calls++;if(args[0]==='release'){await writeFile(path.join(args[args.indexOf('--dir')+1],manifest.apk),bytes);return '';}return JSON.stringify(args[1].endsWith('/latest')?release:manifest);};
+  (service as any).publicGet=async(url:string)=>{calls++;return url.endsWith('.apk')?bytes:Buffer.from(JSON.stringify(url.endsWith('/latest')?release:manifest));};
   try{
     const [a,b]=await Promise.all([service.latest(),service.latest()]);assert.deepEqual(a,b);assert.equal(calls,2);
     await assert.rejects(service.download(24),/release changed/);
@@ -36,4 +44,9 @@ test('host caches release checks, pins download to checked release and verifies 
     assert.equal(first,second);assert.deepEqual(await readFile(first),bytes);assert.equal(calls,3);
     await service.download(23);assert.equal(calls,3);
   }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('PC preparation coalesces work and mobile status reads never contact GitHub',async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-pc-update-'));const service=new ReleaseUpdater('example/pocket-code',dir);let calls=0;
+ (service as any).publicGet=async(url:string)=>{calls++;return url.endsWith('.apk')?bytes:Buffer.from(JSON.stringify(url.endsWith('/latest')?release:manifest));};
+ try{assert.equal(service.status().state,'idle');assert.equal(calls,0);await Promise.all([service.prepare(),service.prepare()]);assert.equal(calls,3);assert.equal(service.status().state,'ready');assert.equal(service.status().update?.sha256,hash);for(let i=0;i<10;i++)service.status();assert.equal(calls,3);assert.deepEqual(await readFile(await service.download(23)),bytes);assert.equal(calls,3);service.close();await service.prepare(true);assert.equal(calls,3);}finally{service.close();await rm(dir,{recursive:true,force:true});}
 });

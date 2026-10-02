@@ -36,7 +36,7 @@ The application recognizes an existing authenticated Pocket Code host and does n
 
 The PC must stay awake. A temporary internet tunnel can receive a different URL after restart; the phone then needs the new QR. This does not provide a permanent address or remote wake-up. Connection keys stay in the existing private host storage; the desktop settings file stores preferences, not a second copy of the key.
 
-The existing host updater updates the server. It does not replace the desktop executable: after downloading updated sources, exit the tray app and rerun **Setup Pocket Code.cmd**. To remove the desktop app, disable Windows startup, exit it, then remove its shortcuts and installed application folder. This leaves host data intact.
+The Windows updater replaces both the desktop application and its bundled host. Versions before 0.21.0 need one manual installation using **Setup Pocket Code.cmd**. From 0.21.1 the PC also prepares verified APKs for connected phones; the phone can request a PC check and Android confirms installation. To remove the desktop app, disable Windows startup, exit it, then remove its shortcuts and installed application folder. This leaves host data intact.
 
 <a id="russian"></a>
 ## Приложение для Windows

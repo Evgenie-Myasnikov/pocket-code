@@ -63,15 +63,14 @@ Review includes manual edits and edits by other tools in the project, not just t
 
 This screenshot shows the browser presentation. APK downloading and the Android installation prompt are available in the native app.
 
-1. On connection, the app checks GitHub through your PC. It also checks periodically while open.
-2. With automatic download enabled, a new APK is downloaded and verified.
-3. **Android asks you to confirm installation.** If prompted, allow Pocket Code to install updates, return to the app, and choose **Install update**. Install over the existing app to preserve settings.
-4. After the updated app reconnects, it checks for a compatible host package.
-5. A supported host downloads it, waits for running jobs and terminals to finish, applies it, and restarts. Wait for reconnection.
+1. The PC checks releases at startup and every six hours, then downloads and verifies the APK.
+2. The connected phone receives that APK from the PC. It does not check GitHub itself.
+3. **Android asks you to confirm installation.** If prompted, allow Pocket Code to install updates, return, and choose **Install update**. Install over the existing app to preserve settings.
+4. Windows updates its desktop application and host together when idle, with rollback if the new host fails to start. APK transfers block a restart.
 
-Use **Settings → Updates → Check for updates** to check manually. If automatic download is off, choose **Download update**. A verified APK can be installed from the same section after cancelling an installation.
+Use **Settings ? Updates ? Check for updates on PC** to request a check from the phone. After a transfer failure, choose **Receive APK from PC** to retry. A cancelled installation can be reopened with **Install update**.
 
-The PC needs GitHub/npm access. The host does not update beyond the phone's version. Older hosts may need a manual PC update. A normal host update keeps pairing; restarting the temporary tunnel separately requires a fresh QR.
+The PC needs public GitHub/npm access, but updates do not require GitHub CLI or GitHub login. Older hosts may need a manual PC update. Restarting a temporary tunnel may require a fresh QR.
 
 | Problem | Next step |
 | --- | --- |

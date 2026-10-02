@@ -39,7 +39,7 @@ The standard Windows launcher currently requires Claude or Codex detection. Copi
 | Task bell | Periodically detected issue changes; baseline and read state; not Jira's full inbox |
 | Project documents | Read-only Markdown rules/changelogs and file browsing |
 | Appearance | English/Russian, themes/palettes, chat size, interface scale, spacing and compact mode |
-| Updates | Verified APK download with Android confirmation; compatible idle PC-host update and restart |
+| Updates | PC prepares verified APKs for phones; Android confirms installation; Windows desktop/host updates when idle with failed-start rollback |
 | Compatibility | Effective AI runtime version tracking and a separate source-project compatibility task |
 
 ## Boundaries that matter

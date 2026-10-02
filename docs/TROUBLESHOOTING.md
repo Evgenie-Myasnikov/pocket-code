@@ -65,7 +65,7 @@ After an interrupted write, inspect the issue/PR and the recorded link before re
 
 An old APK that rejects **Invalid update source** needs one manual installation of the current APK over the existing app. Use the same package/signer; uninstalling first can remove local preferences. Android requires installation permission and confirmation, so completely silent APK updates are not supported.
 
-Host updates wait for active work, verify the package and attempt a restart. A failed startup can trigger rollback. Check the update status instead of force-stopping a handoff. A host cannot automatically advance beyond the phone's compatible version. PC GitHub/npm access is required.
+Host updates wait for active work, verify the package and attempt a restart. A failed startup can trigger rollback. Check the update status instead of force-stopping a handoff. From 0.21.1 the PC owns update checks and APK delivery; it does not wait for the phone to update first. Use Check for updates on PC on the phone, or the Windows update settings. PC GitHub/npm access is required.
 
 For chat alerts, check Android notification permission and the **Chat results and questions** channel, whether the last chat was explicitly left, PC connectivity and Android background restrictions. The Jira bell is a separate feature. Browser use does not provide the Android native background service.
 
