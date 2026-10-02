@@ -27,6 +27,8 @@
 :root[data-theme] .message pre code{font-size:inherit}
 :root[data-theme] .composer textarea{font-size:var(--chat-font-size,14px)}
 :root[data-theme] .conversation{scrollbar-color:var(--line) transparent;min-height:0}
+/* Without this the Windows WebView draws grey classic scrollbars with arrow buttons in every list. */
+:root[data-theme] *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent}
 .appearance-settings{padding-bottom:30px;margin-bottom:32px;border-bottom:1px solid var(--line)}
 .appearance-settings{display:flow-root;}
 .appearance-settings output{float:right;color:var(--accent)}

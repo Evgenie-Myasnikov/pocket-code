@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-02 - Resizable desktop sidebar and themed scrollbars (0.22.6)
+- Added: The Windows sidebar can be resized by dragging its divider (220-560 px, keeping at least 480 px for the conversation). The width is remembered; double-click or Home resets it, and the arrow keys adjust it when the divider has focus.
+- Fixed: Lists outside the conversation used grey classic Windows scrollbars with arrow buttons in the desktop window. All scroll areas now use thin scrollbars in the current palette.
+- Fixed: The device list test still expected a "Disconnected" entry after 0.22.5 removed disconnected devices.
+- Files: src/DesktopApp.tsx, desktop.css, appearance.css; tests/desktop-ui.spec.ts.
+- Validation: A new desktop browser scenario drags the divider, checks persistence after reload, both limits, keyboard steps and double-click reset. Chromium reports thin palette-colored scrollbars on the chat list. Desktop, appearance and chat surface scenarios passed except the desktop chat/review scenario that already failed before this change.
+
 ## 2026-10-02 - One entry per device with recognisable names (0.22.5)
 - Fixed: Every QR scan added a new device entry, so the same phone appeared repeatedly. Phones now send a stable installation identity (a per-app hash of the Android ID, or a random browser id); pairing again, including after reinstalling, updates the existing entry and key and keeps a name set on the PC.
 - Fixed: Disconnected devices stayed in the list. Disconnect on the PC now removes the entry, leaving on the phone removes it too, and revoked entries from earlier versions are dropped when the PC host starts.

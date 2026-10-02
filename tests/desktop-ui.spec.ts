@@ -17,7 +17,7 @@ async function desktop(page:Page){
   let state={online:true,busy:false,status:'Pocket Code · connected',startup:false,autoReconnect:true,internet:true,addresses:[],jira:true};
   const reply=(id:number,value:unknown)=>queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,value:structuredClone(value)}})));
   (window as any).chrome={...((window as any).chrome||{}),webview:{addEventListener(_type:string,fn:(event:{data:unknown})=>void){listeners.push(fn);},postMessage(message:any){
-   calls.push(message);const {id,action}=message;if(action==='state'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.status='disconnected';reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
+   calls.push(message);const {id,action}=message;if(action==='state'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){(window as any).testDevices=(window as any).testDevices.filter((d:any)=>d.id!==message.deviceId);reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
    const url=new URL('https://example.invalid'+message.endpoint),p=url.pathname,provider=url.searchParams.get('provider')||'claude';
    const messageBlock=(id:string,text:string)=>({id,role:'assistant',blocks:[{type:'text',text}]});
    if(p==='/sessions'){reply(id,[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}]);return;}
@@ -94,6 +94,19 @@ test('PC shows device presence and confirms individual revocation',async({page})
  await page.getByRole('button',{name:'Connection',exact:true}).click();const devices=page.locator('.desktop-devices');await expect(devices).toContainText('Synthetic phone');await expect(devices).toContainText('Online');await expect(devices).toContainText('Offline');
  const phone=devices.getByRole('listitem').filter({hasText:'Synthetic phone'});await phone.getByRole('button',{name:'Rename',exact:true}).click();await phone.getByLabel('Device name').fill('Renamed phone');await phone.getByRole('button',{name:'Save',exact:true}).click();await expect(devices).toContainText('Renamed phone');
  const renamed=devices.getByRole('listitem').filter({hasText:'Renamed phone'});await renamed.getByRole('button',{name:'Disconnect',exact:true}).click();expect(await page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='device-disconnect'))).toBeFalsy();await renamed.getByRole('button',{name:'Cancel',exact:true}).click();
- await renamed.getByRole('button',{name:'Disconnect',exact:true}).click();await renamed.getByRole('button',{name:'Disconnect device',exact:true}).click();await expect(renamed).toContainText('Disconnected');await expect(devices.getByRole('listitem').filter({hasText:'Synthetic tablet'})).toContainText('Offline');
+ await renamed.getByRole('button',{name:'Disconnect',exact:true}).click();await renamed.getByRole('button',{name:'Disconnect device',exact:true}).click();await expect(devices.getByRole('listitem').filter({hasText:'Renamed phone'})).toHaveCount(0);await expect(devices.getByRole('listitem').filter({hasText:'Synthetic tablet'})).toContainText('Offline');
  await page.screenshot({path:'artifacts/screenshots/desktop-devices.png'});
+});
+test('sidebar divider resizes the rail with mouse and keyboard, persists and resets',async({page})=>{
+ await page.setViewportSize({width:1280,height:800});await desktop(page);
+ const rail=page.locator('.desktop-rail'),handle=page.getByRole('separator',{name:'Sidebar width'});
+ const width=async()=>Math.round((await rail.boundingBox())!.width);const initial=await width();
+ const box=(await handle.boundingBox())!;await page.mouse.move(box.x+box.width/2,box.y+200);await page.mouse.down();await page.mouse.move(box.x+box.width/2+120,box.y+200,{steps:6});await page.mouse.up();
+ expect(Math.abs(await width()-(initial+120))).toBeLessThanOrEqual(2);
+ await page.reload();await expect(page.getByRole('button',{name:/claude · Interface review/})).toBeVisible();expect(Math.abs(await width()-(initial+120))).toBeLessThanOrEqual(2);
+ const moved=(await handle.boundingBox())!;await page.mouse.move(moved.x+4,moved.y+200);await page.mouse.down();await page.mouse.move(moved.x+900,moved.y+200,{steps:6});await page.mouse.up();
+ expect(await width()).toBe(560);expect(1280-await width()).toBeGreaterThanOrEqual(480);
+ await handle.focus();await page.keyboard.press('ArrowLeft');expect(await width()).toBe(544);
+ await handle.dblclick();expect(await width()).toBe(initial);
+ expect(await page.evaluate(()=>localStorage.getItem('pocket-desktop-rail-width'))).toBe('');
 });

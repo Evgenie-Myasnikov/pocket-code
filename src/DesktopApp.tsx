@@ -26,8 +26,25 @@ const name=(path:string)=>path.split(/[\\/]/).filter(Boolean).at(-1)||path;
 const unique=(messages:ChatMessage[])=>Array.from(new Map(messages.map(message=>[message.id,message])).values());
 function saved(key:string,fallback:string){try{return localStorage.getItem('pocket-desktop-'+key)||fallback;}catch{return fallback;}}
 function persist(key:string,value:string){try{localStorage.setItem('pocket-desktop-'+key,value);}catch{}}
+// The conversation keeps at least 480px; the rail stays readable at 220px.
+const railLimits=(width:number)=>Math.round(Math.min(Math.max(width,220),Math.max(220,Math.min(560,window.innerWidth-480))));
+function RailResizer({width,onChange}:{width:number|null;onChange:(width:number|null)=>void}){
+  const ru=useLanguage()==='ru';
+  const current=()=>width??(document.querySelector('.desktop-rail') as HTMLElement|null)?.getBoundingClientRect().width??290;
+  const commit=(next:number|null)=>{onChange(next);persist('rail-width',next===null?'':String(next));};
+  return <div className="desktop-rail-resizer" role="separator" aria-orientation="vertical" aria-label={ru?'Ширина боковой панели':'Sidebar width'} aria-valuenow={Math.round(current())} aria-valuemin={220} aria-valuemax={560} tabIndex={0}
+    title={ru?'Перетащите, чтобы изменить ширину. Двойной щелчок — по умолчанию.':'Drag to resize. Double-click to reset.'}
+    onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();const handle=event.currentTarget;handle.setPointerCapture(event.pointerId);const start=event.clientX,origin=current();let next=origin;document.body.classList.add('desktop-resizing');
+      const move=(e:PointerEvent)=>{next=railLimits(origin+e.clientX-start);onChange(next);};
+      const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);handle.removeEventListener('pointercancel',end);document.body.classList.remove('desktop-resizing');commit(next);};
+      handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);}}
+    onDoubleClick={()=>commit(null)}
+    onKeyDown={event=>{const step=event.shiftKey?64:16;if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();commit(railLimits(current()+(event.key==='ArrowRight'?step:-step)));}else if(event.key==='Home'){event.preventDefault();commit(null);}}}/>;
+}
 export function DesktopApp(){
   useEffect(watchWindowTheme,[]);
+  const [railWidth,setRailWidth]=useState<number|null>(()=>{const value=Number(saved('rail-width',''));return value>0?railLimits(value):null;});
+  useEffect(()=>{if(railWidth===null)return;const fit=()=>setRailWidth(width=>width===null?null:railLimits(width));window.addEventListener('resize',fit);return()=>window.removeEventListener('resize',fit);},[railWidth===null]);
   useBackNavigation();
   const language=useLanguage(),appearance=useAppearance(),label=(en:string,ru:string)=>language==='ru'?ru:en;
   const [state,setState]=useState(initial),[error,setError]=useState(''),[page,setPage]=useState<'chats'|'connection'|'settings'>('chats');
@@ -47,8 +64,8 @@ export function DesktopApp(){
   const visible=chatSessions.filter(item=>(!project||item.cwd===project)&&`${item.customTitle||item.summary} ${item.cwd}`.toLowerCase().includes(search.toLowerCase()));
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
   const pairing=state.addresses[Math.min(address,state.addresses.length-1)];
-  return <div className="desktop-app">
-    <aside className="desktop-rail"><div className="desktop-brand"><span><Monitor size={21}/></span><strong>Pocket Code</strong></div>
+  return <div className="desktop-app" style={railWidth===null?undefined:{['--desktop-rail-width' as string]:railWidth+'px'}}>
+    <aside className="desktop-rail"><RailResizer width={railWidth} onChange={setRailWidth}/><div className="desktop-brand"><span><Monitor size={21}/></span><strong>Pocket Code</strong></div>
       <nav aria-label={label('Navigation','Навигация')}>{([['chats',MessageSquare,label('Chats','Чаты')],['connection',Smartphone,label('Connection','Подключение')],['settings',Settings,label('Settings','Настройки')]] as const).map(([id,Icon,title])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={19}/>{title}</button>)}</nav>
       <div className="desktop-library"><label>{label('Provider','Провайдер')}<select aria-label={label('Provider','Провайдер')} value={provider} onChange={event=>setProvider(event.target.value as Provider)}><option value="claude">Claude</option><option value="codex">Codex</option><option value="copilot">GitHub Copilot</option></select></label>
       <label>{label('Project','Проект')}<select aria-label={label('Project','Проект')} value={project} onChange={event=>{setProject(event.target.value);persist('project-'+provider,event.target.value);setSelected(null);}}><option value="">{label('All projects','Все проекты')}</option>{folders.map(folder=><option key={folder} value={folder}>{name(folder)}</option>)}</select></label>
