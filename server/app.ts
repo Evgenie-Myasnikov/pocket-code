@@ -45,7 +45,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const roots = await Promise.all(config.roots.map(p => realpath(p)));
   const workspaceAccess=await createWorkspaceAccess(path.join(config.uploads,'.boards','workspaces.json'));
   const accessRoots=()=>workspaceAccess.current()?.ws.roots||roots;
-  const visibleRoot=(cwd?:string)=>!workspaceAccess.current()||!!cwd&&accessRoots().some(root=>within(root,cwd));
+  const visibleRoot=(_cwd?:string)=>!workspaceAccess.current();
   const codex = () => { if (!config.codex) throw new HttpError(503, 'Codex is unavailable. Update and restart the PC bridge.'); return config.codex; };
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
   const engineFor=(provider:string)=>provider==='copilot'?copilot():provider==='codex'?codex():jobs;
@@ -77,13 +77,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(config.pcJira&&['/jira/pc-login','/jira/pc-source'].includes(req.path)&&validToken((req.headers.authorization||'').replace(/^Bearer /,''),config.pcJira.key)){next();return;}
     const key=(req.headers.authorization||'').replace(/^Bearer /,'');
     const guest=workspaceAccess.identity(key);
-    if(guest){workspaceRequest.run(guest,()=>{const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|workspaces|boards(?:\/[^/]+)?|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||req.path==='/workspace-logout');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
+    if(guest){workspaceRequest.run(guest,()=>{const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|workspaces|boards(?:\/[^/]+)?|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
     if(config.devices){
       const admin=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')&&['127.0.0.1','localhost','[::1]'].includes(req.hostname)&&!req.headers['x-forwarded-for']&&!req.headers.forwarded&&!req.headers['cf-connecting-ip']&&validToken(key,config.token);
       if(admin){res.locals.deviceAdmin=true;next();return;}
       if(req.method==='POST'&&req.path==='/devices/pair'&&config.devices.isPairing(key)){next();return;}
       const deviceId=config.devices.authenticate(key);
-      if(deviceId){res.locals.deviceId=deviceId;const release=config.devices.track(deviceId,()=>res.destroy());res.once('finish',release);res.once('close',release);next();return;}
+      if(deviceId){res.locals.deviceId=deviceId;res.locals.deviceWorkspaceId=config.devices.workspaceFor(deviceId);const release=config.devices.track(deviceId,()=>res.destroy());res.once('finish',release);res.once('close',release);next();return;}
     }
     // A noisy public tunnel peer must not lock out a client with the valid key.
     if (!config.devices&&validToken(key, config.token)) { res.locals.deviceAdmin=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')&&['127.0.0.1','localhost','[::1]'].includes(req.hostname)&&!req.headers['x-forwarded-for']&&!req.headers.forwarded&&!req.headers['cf-connecting-ip']; next(); return; }
@@ -101,7 +101,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   let pairingChange:Promise<unknown>=Promise.resolve();
   app.get('/api/pairing-role',(_req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');res.json(workspaceAccess.store.invitation());});
   app.post('/api/pairing-role',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');const invite=workspaceAccess.parseInvitation(req.body);const next=pairingChange.then(async()=>{await devices().rotatePairing();await workspaceAccess.store.mutate(data=>{data.invitation=invite;});await config.refreshPairing?.();return invite;});pairingChange=next.catch(()=>{});res.json(await next);});
-  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);await pairingChange;const key=(req.headers.authorization||'').replace(/^Bearer /,'');if(!devices().isPairing(key))throw new HttpError(401,'Pairing code expired');res.json(workspaceAccess.store.invitation().role==='host'?await devices().pair(key,input):await workspaceAccess.pairMember(input.name));});
+  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);await pairingChange;const key=(req.headers.authorization||'').replace(/^Bearer /,'');if(!devices().isPairing(key))throw new HttpError(401,'Pairing code expired');res.json(workspaceAccess.store.invitation().role==='host'?await devices().pair(key,{...input,workspaceId:workspaceAccess.store.invitation().workspaceId}):await workspaceAccess.pairMember(input.name));});
   app.post('/api/devices/self/forget',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().forget(res.locals.deviceId);res.json({ok:true});});
   app.post('/api/devices/heartbeat',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().heartbeat();res.json({ok:true});});
   app.post('/api/devices/:id/rename',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');const {name}=z.object({name:z.string().trim().min(1).max(80)}).parse(req.body);await devices().rename(uuid.parse(req.params.id),name);res.json({ok:true});});
@@ -122,7 +122,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.end = function (this: express.Response, ...args: any[]) { try { return (end as any).apply(this, args); } finally { release(); } } as typeof res.end;
     res.once('finish', release); next();
   });
-  await mountBoards(app,roots,workspaceAccess);
+  await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}});
   const sourceRoot = await pocketSource(roots);
   const engineStatus = async () => config.engineUpdates ? { supported: true, sourceRoot, ...(await config.engineUpdates.status()) } : { supported: false };
   app.get('/api/engine-updates', async (_req,res) => res.json(await engineStatus()));
@@ -282,9 +282,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   // Every later request sees Desktop renames, project removal and provider loss.
   const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
   const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
-    const list=await sessionReads(provider,()=>loadSessions(provider));if(!workspaceAccess.current())return list;
-    const scoped=await Promise.all(list.map(async s=>{if(!s.cwd||!visibleRoot(s.cwd))return null;try{await allowedPath(accessRoots(),s.cwd,true);return {...s,readOnly:true};}catch{return null;}}));
-    return scoped.filter((s):s is NonNullable<typeof s>=>s!==null);
+    if(workspaceAccess.current())return [];
+    return sessionReads(provider,()=>loadSessions(provider));
   };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {

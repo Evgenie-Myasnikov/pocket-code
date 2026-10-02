@@ -1,6 +1,7 @@
+import {WorkspaceIdentity} from './WorkspaceIdentity';
 import {PairingRole} from './PairingRole';
 import {WorkBoards,type BoardChat} from './WorkBoards';
-import {useProjectWorkspaces,ProjectWorkspacePicker,inWorkspace} from './project-workspaces';
+import {useProjectWorkspaces} from './project-workspaces';
 import {App as SharedChat} from './App';
 import {DesktopDevices} from './DesktopDevices';
 import {ProjectDocs} from './ProjectDocs';
@@ -68,18 +69,18 @@ export function DesktopApp(){
   const latestJobs=useMemo(()=>{const map=new Map<string,JobView>();for(const job of [...jobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[jobs]);
   const chatSessions=useMemo(()=>{const map=new Map(sessions.map(item=>[item.sessionId,item]));for(const job of latestJobs.values())if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,{sessionId:job.sessionId,cwd:job.cwd,summary:name(job.cwd),lastModified:job.startedAt});return [...map.values()].sort((a,b)=>Number(latestJobs.get(b.sessionId)?.status==='running')-Number(latestJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[sessions,latestJobs]);
   const allFolders=useMemo(()=>Array.from(new Set([...projects,...sessions.map(item=>item.cwd||'').filter(Boolean)])).sort(),[projects,sessions]);
-  const folders=allFolders.filter(folder=>inWorkspace(folder,projectSpaces.workspace));
-  useEffect(()=>{if(projectSpaces.workspace&&selected&&!inWorkspace(selected.cwd,projectSpaces.workspace)){setSelected(null);setCreating(false);}if(projectSpaces.workspace&&project&&!inWorkspace(project,projectSpaces.workspace))setProject('');},[projectSpaces.workspace?.id]);
+  const folders=allFolders;
   // The Project page follows the chat filter, then the open chat, so both views stay on one folder.
   const projectRoot=project||selected?.cwd||folders[0]||'';
-  const visible=chatSessions.filter(item=>inWorkspace(item.cwd,projectSpaces.workspace)&&(!project||item.cwd===project)&&`${item.customTitle||item.summary} ${item.cwd}`.toLowerCase().includes(search.toLowerCase()));
+  const visible=chatSessions.filter(item=>(!project||item.cwd===project)&&`${item.customTitle||item.summary} ${item.cwd}`.toLowerCase().includes(search.toLowerCase()));
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
   const [pairingBusy,setPairingBusy]=useState(false);
   const pairing=state.addresses[Math.min(address,state.addresses.length-1)];
   return <div className="desktop-app" style={railWidth===null?undefined:{['--desktop-rail-width' as string]:railWidth+'px'}}>
+    <WorkspaceIdentity connection={state.online?connection:null} value={projectSpaces}/>
     <aside className="desktop-rail"><RailResizer width={railWidth} onChange={setRailWidth}/><div className="desktop-brand"><span><Monitor size={21}/></span><strong>Pocket Code</strong></div>
       <nav aria-label={label('Navigation','Навигация')}>{([['work',Folder,label('Board','\u0414\u043e\u0441\u043a\u0430')],['project',Folder,label('Project','Проект')],['connection',Smartphone,label('Connection','Подключение')],['settings',Settings,label('Settings','Настройки')]] as const).map(([id,Icon,title])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={19}/>{title}</button>)}</nav>
-      <div className="desktop-library"><ProjectWorkspacePicker value={projectSpaces}/><label>{label('Provider','Провайдер')}<select aria-label={label('Provider','Провайдер')} value={provider} onChange={event=>setProvider(event.target.value as Provider)}><option value="claude">Claude</option><option value="codex">Codex</option><option value="copilot">GitHub Copilot</option></select></label>
+      <div className="desktop-library"><label>{label('Provider','Провайдер')}<select aria-label={label('Provider','Провайдер')} value={provider} onChange={event=>setProvider(event.target.value as Provider)}><option value="claude">Claude</option><option value="codex">Codex</option><option value="copilot">GitHub Copilot</option></select></label>
       <label>{label('Project','Проект')}<select aria-label={label('Project','Проект')} value={project} onChange={event=>{setProject(event.target.value);persist('project-'+provider,event.target.value);setSelected(null);}}><option value="">{label('All projects','Все проекты')}</option>{folders.map(folder=><option key={folder} value={folder}>{name(folder)}</option>)}</select></label>
       <button className="primary desktop-new-chat" disabled={!state.online||!projectRoot} onClick={()=>{setBoardChat(undefined);setCreating(true);setSelected(null);setPage('chats');}}>{label('New chat','Новый чат')}</button><div className="desktop-search"><Search size={16}/><input aria-label={label('Find a chat','Найти чат')} placeholder={label('Find a chat','Найти чат')} value={search} onChange={event=>setSearch(event.target.value)}/></div>
       <div className="desktop-list-caption"><span>{label('Conversations','Переписки')} · {visible.length}</span><button className="icon-button" aria-label={label('Refresh','Обновить')} onClick={()=>setRevision(value=>value+1)}><RefreshCw size={15}/></button></div>

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-02 - Named participants and QR-bound shared boards (0.24.1)
+- Changed: Notes support multiple participants through initial avatars, an add button and an upper-right remove control. Stable ID-based colors and legacy single-assignee migration preserve assignments; People view uses the same notes.
+- Changed: Workspace entry asks for a personal name, stored separately from role. Host profiles are per connection; QR members choose their name after pairing.
+- Changed: Workspace name/count and Board/People views share the header. Removed duplicate titles, saved-on-PC text and workspace switchers; board creation is one button.
+- Privacy: Personal chats remain independent of boards. Ordinary workspace members cannot read host sessions/jobs or note chat links; shared-note edits preserve private links on the host. Trusted Host retains full provider access.
+- Pairing: QR bindings persist with the device; new workspaces rotate invitations. Older unbound device connections require a fresh QR scan. Manual workspace sign-in UI is removed; legacy API remains compatible.
+- Validation: 19 browser scenarios passed across board, desktop and device pairing (18 together, board rechecked separately). Full server run: 242/243 passed; the single Jira workflow failure passed on an isolated four-test rerun. Board privacy/profile and device checks passed; TypeScript/Vite, Android and native desktop smoke/build/package passed.
+- Follow-up: Physical Android testing and isolated AI execution for ordinary workspace members remain outstanding. Publication pending artifact audit.
+
 ## 2026-10-02 - Board interaction and shared chat header (0.24.0)
 - Changed: Board and People views share priority, status and assignee metadata. Columns determine note branches; branch and dependency selectors are removed from note details. Existing dependency data is retained.
 - Added: Pinch/wheel zoom, hold-to-create notes, branch creation/rename from column headings, and optimistic note dragging without a release jump.

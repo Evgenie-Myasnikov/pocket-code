@@ -5,7 +5,7 @@ test('pairing defaults to Host and sends an explicit role with a workspace',asyn
  await expect(page.getByLabel('QR role')).toHaveValue('host');
  expect(await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='pairing-role').length)).toBe(0);
  await page.getByLabel('QR role').selectOption('qa');
- await expect(page.getByLabel('QR workspace')).toHaveValue('11111111-1111-4111-8111-111111111111');
+ await expect(page.locator('.qr-workspace-name')).toHaveText('Synthetic team');await expect(page.getByRole('combobox',{name:'QR workspace'})).toHaveCount(0);
  expect(await page.evaluate(()=>(window as any).desktopCalls.find((c:any)=>c.action==='pairing-role'))).toMatchObject({role:'qa',workspaceId:'11111111-1111-4111-8111-111111111111'});
 });
 test('desktop keeps a draft across navigation and submits through the shared chat',async({page})=>{
@@ -42,7 +42,7 @@ async function desktop(page:Page){
    if(p==='/pairing-role'){reply(id,{role:'host'});return;}
    if(p==='/health'){reply(id,{name:'Synthetic PC',roots:['C:\\Demo\\Atlas','C:\\Demo\\Garden'],version:'0.22.7',protocol:1});return;}
    if(p==='/providers'){reply(id,[{id:'claude',available:true,models:[]},{id:'codex',available:true,authenticated:true,models:[]}]);return;}
-   if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,workspaces:(window as any).testWorkspaces||[],boards:[]});return;}
+   if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:[]});return;}
    if(p==='/activity'){reply(id,[]);return;}
    if(p==='/task-notifications'){reply(id,{items:[],unread:0});return;}
    if(p==='/jobs'&&action==='write'){const run={...message.data,provider:message.data.provider||'claude',sessionId:'alpha',status:'running',messages:[],partial:'Working on your request',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0};(window as any).testRuns=[run];reply(id,run);return;}
@@ -157,7 +157,7 @@ for(const width of [900,1440])test('workspace repository choices keep their layo
  await desktop(page);await page.setViewportSize({width,height:800});
  await expect(page.getByRole('navigation').getByRole('button',{name:'Chats',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Board',exact:true}).click();
- await page.locator('.board-toolbar').getByRole('button',{name:'Workspace',exact:true}).click();
+ await page.locator('.board-header').getByRole('button',{name:'Workspace',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'Workspace settings'});
  await expect(dialog).toBeVisible();
  const checks=dialog.locator('.board-check');await expect(checks).toHaveCount(2);
@@ -173,4 +173,11 @@ for(const width of [900,1440])test('workspace repository choices keep their layo
  await expect(dialog.locator('input[type=radio]').first()).not.toBeChecked();
  await expect(dialog.locator('input[type=radio]').last()).toBeChecked();
  await page.screenshot({path:'.local/workspace-layout-'+width+'.png'});
+});
+
+test('personal chats stay visible independently of the shared board workspace',async({page})=>{
+ await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Shared board',roots:['C:\\Other\\Repository'],role:'host',members:[]}];});
+ await desktop(page);await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toHaveCount(0);await page.getByRole('button',{name:/claude \u00b7 Interface review/}).click();await expect(page.locator('.embedded-chat')).toBeVisible();
+ await page.getByRole('navigation').getByRole('button',{name:'Board',exact:true}).click();await expect(page.locator('.board-header h1')).toHaveText('Shared board');await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:/claude \u00b7 Interface review/}).click();await expect(page.locator('.embedded-chat')).toBeVisible();
 });

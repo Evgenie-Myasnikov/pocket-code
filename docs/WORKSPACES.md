@@ -1,38 +1,26 @@
 # Workspaces and project boards
 
-Create and edit workspace settings only in the Windows application on the host PC. A phone paired as Host can use the workspace, but cannot create it or change its name, password or project folders. The server enforces this restriction, including role changes and access revocation. On a phone, only joining/selecting a workspace is available. The header shows a participants icon and count; tapping it opens a read-only roster. The host PC can manage roles and access from this header dialog.
-
-The host PC stores workspaces, boards, invitations and member roles. A workspace groups selected local project folders; its boards and conversation list use those folders. Claude, Codex and Copilot remain separate AI providers inside the workspace.
-
-<img src="images/workspace-board-mobile.png" width="340" alt="Synthetic project notes linked by a dependency on a mobile board">
+A workspace shares a board for one repository. Chats are personal: choosing or joining a board does not filter, reset or share the host's provider conversations. Workspace members cannot read the host's chat history or run its AI in this version. Host access is a trusted full-access role, not a restricted member account.
 
 ## Create and join
 
-1. Open **Work → Workspace** on the PC or a device paired as Host.
-2. Enter a unique workspace name, a password of at least 10 characters, and select project folders.
-3. Add a **Project board** for one of those folders.
-4. Participants can use **Join a workspace** on the connection screen: host address, workspace name, display name and password. The host must be online and reachable. New password sessions start as Viewer.
-5. The host assigns roles or revokes individual sessions under **Work → Members and roles**. A display name identifies the session; it is not a verified organizational identity. A fresh password login creates a new session that needs its own role assignment.
+1. On the host PC, open **Board ? Workspace** and create an area for one repository. Creation and member administration are only available on the PC.
+2. Use the single **Create board** button. The header shows the workspace name and participant count; inside a board, **Board / People** switches views in the header.
+3. Open **Connection** on the PC and share its QR. The workspace is attached to the invitation; there is no workspace switcher in the app. Creating a new workspace rotates the QR. Existing paired devices keep their workspace.
+4. Scan the QR on the phone and enter your name. The name is separate from your role, including Host. It is saved on the PC for that workspace and connection.
+5. The header participant count opens the roster. The desktop host can manage member roles and revoke access there.
 
-The connection screen keeps QR scanning as its primary action. Manual workspace credentials appear only after choosing workspace sign-in.
+An older phone connection without a workspace binding needs a fresh QR scan. There are no manual workspace login fields on the connection screen. The legacy password endpoint remains for compatibility.
 
-## Role on the pairing QR
+## Participants on notes
 
-In the Windows **Connection** page, choose **Role for this QR** next to the code. **Host is the initial default for testing.** Host grants management and AI execution permissions on this PC. For Viewer, Developer, Reviewer or QA, also select a workspace. Non-host choices become available after creating a workspace.
+Use the round **+** at the bottom of a note to find and attach participants. Each avatar uses the first letter of the person's name and a stable, randomly distributed color derived from its ID. Remove a person with the small **?** at the avatar's upper-right corner. Multiple people can share a note; People view shows that same note under each assignee. Unassigned notes have their own column. Old single-person assignments remain readable.
 
-Changing the role or workspace rotates the pairing secret and replaces the QR. A previous QR can no longer establish a new connection. Existing connections keep their assigned access; changing the invitation does not silently change another user's role. The server determines the role, never a role supplied by the joining client.
+## Roles and privacy
 
-| Role | Read its boards and project chats | Edit notes and dependencies | Run AI on host / manage areas and roles |
-|---|---|---|---|
-| Host | All permitted projects | Yes | Yes |
-| Developer / Reviewer / QA | Assigned workspace | Yes | No in this initial version |
-| Viewer | Assigned workspace | No | No |
+The PC chooses the invitation role beside the QR. Host remains the default for testing and grants full access to the host's provider account; only give it to trusted users. Developer, Reviewer and QA members can edit their board. Viewer members can read it. Membership alone does not grant the host's personal conversations. Links to the host's chats are omitted from member board responses.
 
-Member execution is intentionally not enabled until isolated provider execution is available. An application folder filter alone cannot isolate an unrestricted AI process from the rest of a PC. The developer/reviewer/QA labels are recorded now; automatic routing and approval gates are not implemented yet.
-
-Passwords are stored as salted scrypt hashes. Member credentials are random tokens stored only as hashes on the host. Authentication, project-file reads, chat lists and board writes are checked on the server. Revocation takes effect on subsequent requests. Workspace data stays in the private host data directory, not in the project repository. Changing a password affects future password logins; revoke existing sessions separately when needed.
-
-Each workspace selects exactly one repository. Its boards use that repository and its chats are filtered to that folder. The host selects one repository when creating or editing the workspace; the server rejects multiple roots. Existing multi-folder workspace data is retained for compatibility rather than silently deleting boards; a folder containing a board cannot be removed.
+Provider execution for ordinary members is not yet enabled: it needs separate provider accounts and process isolation. Automatic AI task routing and approval gates are not implemented yet. Display names identify sessions, not verified organizational identities. Member credentials are random tokens stored as hashes; private workspace data is stored outside the public repository.
 
 ## Visual roadmap
 

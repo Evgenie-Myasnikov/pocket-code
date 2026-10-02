@@ -31,9 +31,15 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   const renamed=await (await call('/boards/'+board.id+'/branch',{name:'release/beta',previous:'release/alpha',revision:1})).json();assert.equal(renamed.revision,2);assert.deepEqual(renamed.versions,['release/beta']);
   assert.ok((await boardBranches(a)).branches.includes('release/beta'));assert.ok(!(await boardBranches(a)).branches.includes('release/alpha'));
   assert.equal((await (await call('/pairing-role')).json()).role,'host');
-  const originalQr=devices.pairingToken;
+  await call('/pairing-role',{role:'host',workspaceId:ws.id});const originalQr=devices.pairingToken;
   const owner=await (await call('/devices/pair',{name:'Host phone',platform:'android',version:'test'},originalQr)).json();
-  const phoneCatalog=await (await call('/workspaces',undefined,owner.token)).json();assert.equal(phoneCatalog.host,true);assert.equal(phoneCatalog.canManageWorkspaces,false);
+  const phoneCatalog=await (await call('/workspaces',undefined,owner.token)).json();assert.equal(owner.workspaceId,ws.id);assert.equal(phoneCatalog.activeWorkspaceId,ws.id);assert.equal(phoneCatalog.workspaces.length,1);assert.equal(phoneCatalog.host,true);assert.equal(phoneCatalog.canManageWorkspaces,false);
+  assert.equal(phoneCatalog.workspaces.find((w:any)=>w.id===ws.id).me.needsName,true);
+  assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'Alex'})).status,200);
+  assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'Sam'},owner.token)).status,200);
+  assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'   '},owner.token)).status,400);
+  const named=await (await call('/workspaces',undefined,owner.token)).json();const namedWorkspace=named.workspaces.find((w:any)=>w.id===ws.id);assert.equal(namedWorkspace.me.name,'Sam');assert.equal(namedWorkspace.me.needsName,false);assert.deepEqual(namedWorkspace.people.map((p:any)=>p.name),['Alex','Sam']);assert.equal(namedWorkspace.people.some((p:any)=>p.name==='Host'),false);
+  assert.equal((await (await call('/workspaces')).json()).workspaces.find((w:any)=>w.id===ws.id).me.name,'Alex');
   assert.equal((await (await call('/workspaces')).json()).canManageWorkspaces,true);
   assert.equal((await call('/workspaces',{name:'Phone area',password,roots:[a]},owner.token)).status,403);
   assert.equal((await call('/workspaces',{id:ws.id,name:'Changed',roots:[a]},owner.token)).status,403);
@@ -42,6 +48,10 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   assert.notEqual(devices.pairingToken,originalQr);
   assert.equal((await call('/devices/pair',{name:'Old invitation',platform:'android',version:'test'},originalQr)).status,401);
   const invited=await (await call('/devices/pair',{name:'Invited viewer',platform:'android',version:'test',role:'host'},devices.pairingToken)).json();
+  assert.equal((await (await call('/workspaces',undefined,invited.token)).json()).workspaces[0].me.needsName,true);
+  assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'Morgan'},invited.token)).status,200);
+  assert.equal((await (await call('/workspaces',undefined,invited.token)).json()).workspaces[0].me.name,'Morgan');
+  const otherWorkspace=(await (await call('/workspaces')).json()).workspaces.find((w:any)=>w.id!==ws.id);assert.equal((await call('/workspaces/'+otherWorkspace.id+'/profile',{name:'Escape'},invited.token)).status,403);
   assert.equal(invited.role,'viewer');assert.equal(invited.workspaceId,ws.id);
   assert.equal((await (await call('/workspaces',undefined,invited.token)).json()).host,false);
   assert.equal((await call('/pairing-role',{role:'host'},invited.token)).status,403);
@@ -50,7 +60,7 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,role:'developer'},owner.token)).status,403);
   assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,remove:true},owner.token)).status,403);
   const catalog=await (await call('/workspaces',undefined,guest.token)).json();assert.equal(catalog.host,false);assert.ok(catalog.workspaces[0].people.some((p:any)=>p.name==='Reader'));assert.equal(JSON.stringify(catalog.workspaces[0].people).includes('tokenHash'),false);assert.equal(catalog.workspaces.length,1);assert.equal(catalog.workspaces[0].role,'viewer');assert.equal(JSON.stringify(catalog).includes(password),false);assert.equal(JSON.stringify(catalog).includes('tokenHash'),false);
-  const list=await (await call('/sessions',undefined,guest.token)).json();assert.deepEqual(list.map((s:any)=>s.sessionId),[aId]);assert.equal(list[0].readOnly,true);
+  const list=await (await call('/sessions',undefined,guest.token)).json();assert.deepEqual(list,[]);assert.equal((await call('/sessions/'+aId+'/messages',undefined,guest.token)).status,404);assert.deepEqual(await (await call('/jobs',undefined,guest.token)).json(),[]);
   assert.equal((await call('/sessions/'+bId+'/messages',undefined,guest.token)).status,404);
   assert.equal((await call('/file?path='+encodeURIComponent(path.join(b,'private.txt')),undefined,guest.token)).status,403);
   assert.deepEqual((await (await call('/health',undefined,guest.token)).json()).roots,[a]);
@@ -61,10 +71,13 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   assert.equal((await call('/boards/'+board.id,{revision:2,versions:['release/1.0'],notes:[]},guest.token)).status,200);
   assert.equal((await call('/boards/'+board.id,{revision:0,versions:[],notes:[]},guest.token)).status,409);
   const disk=await readFile(path.join(dir,'uploads','.boards','workspaces.json'),'utf8');assert.equal(disk.includes(password),false);assert.equal(disk.includes(guest.token),false);
-  const savedNote:BoardNote={id:randomUUID(),title:'Assigned task',description:'',branch:'release/1.0',status:'working',owner:'Reader',assigneeId:guest.memberId,priority:'high',x:20,y:70,dependencies:[]};
+  const savedNote:BoardNote={id:randomUUID(),title:'Assigned task',description:'',branch:'release/1.0',status:'working',owner:'Reader',assigneeId:guest.memberId,assigneeIds:[guest.memberId,'host'],priority:'high',x:20,y:70,dependencies:[]};
   assert.equal((await call('/boards/'+board.id,{revision:3,versions:['release/1.0'],notes:[savedNote]},guest.token)).status,200);
   assert.equal((await call('/boards/'+board.id,{revision:4,versions:[],notes:[{...savedNote,priority:'invalid'}]},guest.token)).status,400);
-  const loaded=await new BoardStore(path.join(dir,'uploads','.boards','workspaces.json')).load();assert.equal(loaded.snapshot().boards[0].versions[0],'release/1.0');assert.equal(loaded.snapshot().boards[0].notes[0].priority,'high');assert.equal(loaded.snapshot().boards[0].notes[0].assigneeId,guest.memberId);
+  const loaded=await new BoardStore(path.join(dir,'uploads','.boards','workspaces.json')).load();assert.equal(loaded.snapshot().boards[0].versions[0],'release/1.0');assert.equal(loaded.snapshot().boards[0].notes[0].priority,'high');assert.equal(loaded.snapshot().boards[0].notes[0].assigneeId,guest.memberId);assert.deepEqual(loaded.snapshot().boards[0].notes[0].assigneeIds,[guest.memberId,'host']);assert.equal(loaded.snapshot().workspaces[0].hostPeople[0].name,'Alex');
+  const privateChat={provider:'claude',sessionId:randomUUID()};assert.equal((await call('/boards/'+board.id,{revision:4,versions:['release/1.0'],notes:[{...savedNote,chat:privateChat}]})).status,200);
+  const memberBoard=await (await call('/boards/'+board.id,undefined,guest.token)).json();assert.equal(memberBoard.notes[0].chat,undefined);
+  const memberSave=await (await call('/boards/'+board.id,{revision:5,versions:['release/1.0'],notes:[{...memberBoard.notes[0],title:'Updated board note'}]},guest.token)).json();assert.equal(memberSave.notes[0].chat,undefined);assert.deepEqual((await (await call('/boards/'+board.id)).json()).notes[0].chat,privateChat);
   await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,remove:true});assert.equal((await call('/workspaces',undefined,guest.token)).status,401);
  }finally{jobs.close();terminals.close();await new Promise<void>(r=>server.close(()=>r()));await rm(dir,{recursive:true,force:true});}
 });
