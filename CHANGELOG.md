@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-02 - Desktop host polling survives locked settings (0.21.3)
+- Fixed: Right after an automatic update, the Windows application could fail to replace desktop.json while another process briefly held it. The error stopped window startup before host polling began, so the application never detected its own running host, showed no pairing QR and remained on "Starting the host" after a manual connect. A misleading WebView2 installation message was shown instead.
+- Changed: Settings writes retry briefly; a failed startup write no longer blocks polling or shows the WebView2 message.
+- Fixed: The runtime API test now expects the desktopCheckRequestedAt field returned since 0.21.1.
+- Files: desktop/DesktopWindow.cs; tests/DesktopSmoke.cs, runtime-api.test.ts.
+- Validation: A new desktop smoke scenario holds desktop.json without delete sharing. Before the fix it stopped on the WebView2 message without polling; after the fix polling starts and the full desktop smoke test passes. TypeScript/Vite build passed. Full server suite: 228/229; the remaining Copilot streaming test is timing-sensitive in the full run and passed three isolated reruns with the update-worker tests.
+- Follow-up: A window already stuck this way does not poll, so it cannot detect this update; exit it from the tray once and start Pocket Code again. The update to this version runs the corrected startup code.
+
 ## 2026-10-02 - Full-width new files and inline replacement blocks (0.21.2)
 - Changed: New and wholly deleted text files use a single full-width code column in either diff mode, without an empty opposite pane or line-number gutter. Normal insertions in existing files retain split comparison.
 - Fixed: Unified mode keeps each removed block followed by its added replacement, preserving surrounding context instead of alternating paired lines.

@@ -21,7 +21,7 @@ test('runtime identity and stop require authentication and expose no local paths
     assert.equal((await f.req('/runtime',undefined,'wrong')).status,401);
     assert.equal((await f.req('/runtime/stop',{},'wrong')).status,401);assert.equal(stops,0);
     const pkg=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
-    assert.deepEqual(await(await f.req('/runtime')).json(),{applicationId:'app.pocketcode.host',processId:process.pid,version:pkg.version,busy:false,internet:true});
+    assert.deepEqual(await(await f.req('/runtime')).json(),{applicationId:'app.pocketcode.host',processId:process.pid,version:pkg.version,desktopCheckRequestedAt:0,busy:false,internet:true});
     assert.equal(f.isBusy(),false);
   }finally{await f.close();}
 });

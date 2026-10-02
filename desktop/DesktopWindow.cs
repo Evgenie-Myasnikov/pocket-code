@@ -103,7 +103,11 @@ public sealed class PocketDesktop:Form {
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
         Resize+=(_,e)=>{if(WindowState==FormWindowState.Minimized)Hide();};timer.Tick+=async(_,e)=>await Poll();autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
-        Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0)Hide();await InitializeWeb();if(!preview){Save();timer.Start();await Poll();}}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);}};
+        Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0)Hide();await InitializeWeb();}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);return;}
+            if(preview)return;
+            // Host polling must not depend on this write; the next Toggle or settings change saves again.
+            try{Save();}catch(IOException){}catch(UnauthorizedAccessException){}
+            timer.Start();await Poll();};
     }
     async Task InitializeWeb(){
         string ui=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ui");if(!File.Exists(Path.Combine(ui,"index.html")))throw new FileNotFoundException("Desktop interface is missing.");
@@ -157,7 +161,9 @@ public sealed class PocketDesktop:Form {
     void Push(){if(webReady&&!exiting)Reply(new{state=Snapshot()});}
     object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
     public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();}
-    void Save(){if(preview)return;Directory.CreateDirectory(storage);string temp=settingsFile+".tmp";File.WriteAllText(temp,json.Serialize(preferences),Encoding.UTF8);if(File.Exists(settingsFile))File.Replace(temp,settingsFile,null);else File.Move(temp,settingsFile);}
+    void Save(){if(preview)return;Directory.CreateDirectory(storage);string temp=settingsFile+".tmp";File.WriteAllText(temp,json.Serialize(preferences),Encoding.UTF8);
+        // Right after an update handoff another process can briefly hold desktop.json without delete sharing.
+        for(int attempt=1;;attempt++){try{if(File.Exists(settingsFile))File.Replace(temp,settingsFile,null);else File.Move(temp,settingsFile);return;}catch(IOException){if(attempt==5)throw;Thread.Sleep(100);}}}
     bool StartupEnabled(){using(var key=Registry.CurrentUser.OpenSubKey(RunKey))return key!=null&&key.GetValue("PocketCode")!=null;}
     void SetStartup(bool enabled){using(var key=Registry.CurrentUser.CreateSubKey(RunKey)){if(enabled)key.SetValue("PocketCode","\""+Application.ExecutablePath+"\" --background --source \""+preferences.Source+"\"");else key.DeleteValue("PocketCode",false);}}
     async Task<object> Send(HttpClient client,string endpoint,bool post){

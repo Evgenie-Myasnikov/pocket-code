@@ -41,6 +41,16 @@ public static class DesktopSmoke {
                 Environment.SetEnvironmentVariable("POCKET_DATA_DIR",temp);
                 File.WriteAllText(Path.Combine(temp,"scripts","start.ps1"),"param([switch]$Desktop,[switch]$Internet)\n[Reflection.Assembly]::LoadFrom('"+typeof(PocketCodeOwnedHost).Assembly.Location.Replace("'","''")+"') | Out-Null\n$nested=[PocketCodeOwnedHost]::Start((Join-Path $PSHOME 'powershell.exe'),'-NoProfile -NonInteractive -Command \"Start-Sleep -Seconds 90\"',$PWD.Path,$true)\nSet-Content -LiteralPath (Join-Path $env:POCKET_DATA_DIR 'nested.pid') -Value $nested.ProcessId\ntry{Start-Sleep -Seconds 90}finally{$nested.Dispose()}");
                 File.WriteAllText(Path.Combine(temp,"desktop.json"),"{\"Connect\":false,\"Internet\":false,\"AutoReconnect\":true}");
+                // A handle without delete sharing makes File.Replace fail, as seen right after an update handoff.
+                using(var locked=new FileStream(Path.Combine(temp,"desktop.json"),FileMode.Open,FileAccess.Read,FileShare.ReadWrite))
+                using(var form=new PocketDesktop(new[]{"--source",temp},false)){
+                    form.Show();var timer=(System.Windows.Forms.Timer)Field(form,"timer");DateTime deadline=DateTime.UtcNow.AddSeconds(20);
+                    while(!timer.Enabled&&DateTime.UtcNow<deadline){Application.DoEvents();Thread.Sleep(20);}
+                    Check(timer.Enabled,"Host polling starts when settings cannot be saved");
+                    uint browser=((Microsoft.Web.WebView2.WinForms.WebView2)Field(form,"web")).CoreWebView2.BrowserProcessId;
+                    Call(form,"ExitApp");
+                    try{using(var process=Process.GetProcessById((int)browser))process.WaitForExit(10000);}catch(ArgumentException){/* Already exited. */}
+                }
                 using(var form=new PocketDesktop(new[]{"--source",temp},false)){
                     using(var bitmap=new Bitmap(2,2))using(var image=new MemoryStream()){
                         bitmap.Save(image,System.Drawing.Imaging.ImageFormat.Png);
