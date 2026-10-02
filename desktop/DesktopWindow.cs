@@ -15,7 +15,7 @@ using Microsoft.Web.WebView2.WinForms;
 using System.Collections.Generic;
 
 public sealed class DesktopPreferences {
-    public bool Connect=true, Internet=true, AutoReconnect=true;
+    public bool Connect=true, Internet=true, AutoReconnect=true, AutoUpdate=true;
     public string Source="";
 }
 public static class DesktopReadPolicy {
@@ -29,6 +29,32 @@ public static class DesktopReadPolicy {
     }
 }
 public sealed class PocketDesktop:Form {
+    DateTime nextUpdate=DateTime.UtcNow.AddMinutes(1);Process updater;string updateState="idle",updateVersion="",updateTicket="";
+    string AppVersion(){try{return (string)json.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"desktop-version.json")))["version"];}catch{return "0.0.0";}}
+    void StartUpdate(){
+        if(preview||exiting||updater!=null&&!updater.HasExited)return;
+        string script=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"desktop-update.ps1");
+        if(!File.Exists(script)){updateState="error";return;}
+        var info=new ProcessStartInfo("powershell.exe","-NoProfile -ExecutionPolicy Bypass -File \""+script+"\" -Storage \""+storage+"\" -CurrentExe \""+Application.ExecutablePath+"\" -Source \""+preferences.Source+"\" -ParentId "+Process.GetCurrentProcess().Id+" -Version "+AppVersion());
+        info.UseShellExecute=false;info.CreateNoWindow=true;info.WindowStyle=ProcessWindowStyle.Hidden;
+        if(updater!=null)updater.Dispose();updater=Process.Start(info);updateState="checking";nextUpdate=DateTime.UtcNow.AddHours(6);
+    }
+    async Task PollUpdate(){
+        if(preferences.AutoUpdate&&online&&DateTime.UtcNow>=nextUpdate)StartUpdate();
+        try{
+            string file=Path.Combine(storage,"desktop-update","state.json");if(!File.Exists(file))return;
+            var state=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(file));
+            updateState=(string)state["state"];updateVersion=(string)state["version"];updateTicket=(string)state["ticket"];
+            if(updateState!="ready"||!online||hostBusy||changing||Convert.ToInt32(state["parentId"])!=Process.GetCurrentProcess().Id||!Regex.IsMatch(updateTicket??"",@"^[a-f0-9]{32}$")||updater==null||updater.HasExited)return;
+            changing=true;
+            try{
+                // The server rechecks busy state atomically before accepting shutdown.
+                await Request("runtime/stop",true);
+                File.WriteAllText(Path.Combine(storage,"desktop-update","apply.txt"),updateTicket);
+                exiting=true;timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;Close();
+            }finally{changing=false;}
+        }catch{/* Keep the current application alive on failed or busy handoff. */}
+    }
     const string RunKey=@"Software\Microsoft\Windows\CurrentVersion\Run",Origin="https://pocket-code.internal";
     readonly string storage,settingsFile;
     readonly JavaScriptSerializer json=new JavaScriptSerializer{MaxJsonLength=32*1024*1024};
@@ -68,13 +94,14 @@ public sealed class PocketDesktop:Form {
         settingsFile=Path.Combine(storage,"desktop.json");preferences=new DesktopPreferences();
         if(!preview&&File.Exists(settingsFile))try{preferences=json.Deserialize<DesktopPreferences>(File.ReadAllText(settingsFile))??preferences;}catch{}
         int source=Array.IndexOf(args,"--source");if(source>=0&&source+1<args.Length)preferences.Source=Path.GetFullPath(args[source+1]);
+        else if(File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"host","package.json")))preferences.Source=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"host");
         if(String.IsNullOrEmpty(preferences.Source))preferences.Source=AppDomain.CurrentDomain.BaseDirectory;
         Text="Pocket Code";ClientSize=new Size(1280,850);MinimumSize=new Size(900,640);StartPosition=FormStartPosition.CenterScreen;
         BackColor=Color.FromArgb(17,21,18);AutoScaleMode=AutoScaleMode.Dpi;Icon=SystemIcons.Application;Controls.Add(web);
         var menu=new ContextMenuStrip();menu.Items.Add("Открыть",null,(_,e)=>RestoreWindow());menu.Items.Add("Подключить / отключить",null,async(_,e)=>await Toggle());menu.Items.Add(new ToolStripSeparator());menu.Items.Add("Выход",null,async(_,e)=>await ExitApp());
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
-        Resize+=(_,e)=>{if(WindowState==FormWindowState.Minimized)Hide();};timer.Tick+=async(_,e)=>await Poll();autoStartPending=preferences.Connect&&preferences.AutoReconnect;
+        Resize+=(_,e)=>{if(WindowState==FormWindowState.Minimized)Hide();};timer.Tick+=async(_,e)=>await Poll();autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
         Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0)Hide();await InitializeWeb();if(!preview){Save();timer.Start();await Poll();}}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);}};
     }
     async Task InitializeWeb(){
@@ -98,7 +125,11 @@ public sealed class PocketDesktop:Form {
         object id=null;try{
             var message=json.Deserialize<Dictionary<string,object>>(payload);if(!message.TryGetValue("id",out id)||!message.ContainsKey("action"))return;
             string action=message["action"] as string;object result;
-            if(action=="provider-login"){
+            if(action=="provider-logout"){
+                string provider=message.ContainsKey("provider")?message["provider"] as string:"";
+                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$"))throw new InvalidOperationException("Invalid provider.");
+                result=await Send(reader,"/provider-connections/"+provider+"/logout",true);
+            }else if(action=="provider-login"){
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"",method=message.ContainsKey("method")?message["method"] as string:"";
                 if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$")||!Regex.IsMatch(method??"",@"^(browser|console|sso|device|key|token|accessToken)$"))throw new InvalidOperationException("Invalid sign-in method.");
                 result=await Send(reader,"/provider-connections/"+provider+"/login/"+method,true);
@@ -109,8 +140,10 @@ public sealed class PocketDesktop:Form {
             }else{
                 if(action=="toggle")await Toggle();
                 else if(action=="jira"){if(!preview&&jiraUrl!=null)OpenUrl(jiraUrl);}
+                else if(action=="check-update"){StartUpdate();}
                 else if(action=="settings"){
                     if(preview)throw new InvalidOperationException("Preview settings are not saved.");
+                    if(message.ContainsKey("autoUpdate"))preferences.AutoUpdate=(bool)message["autoUpdate"];
                     if(message.ContainsKey("startup"))SetStartup((bool)message["startup"]);
                     if(message.ContainsKey("autoReconnect"))preferences.AutoReconnect=(bool)message["autoReconnect"];
                     if(message.ContainsKey("internet")){if(online||owner!=null)throw new InvalidOperationException("Disconnect before changing connection mode.");preferences.Internet=(bool)message["internet"];}
@@ -121,7 +154,7 @@ public sealed class PocketDesktop:Form {
     }
     void Reply(object message){if(exiting||IsDisposed)return;try{if(web.CoreWebView2!=null)web.CoreWebView2.PostWebMessageAsJson(json.Serialize(message));}catch(InvalidOperationException){}}
     void Push(){if(webReady&&!exiting)Reply(new{state=Snapshot()});}
-    object Snapshot(){return new{online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
+    object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
     public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();}
     void Save(){if(preview)return;Directory.CreateDirectory(storage);string temp=settingsFile+".tmp";File.WriteAllText(temp,json.Serialize(preferences),Encoding.UTF8);if(File.Exists(settingsFile))File.Replace(temp,settingsFile,null);else File.Move(temp,settingsFile);}
     bool StartupEnabled(){using(var key=Registry.CurrentUser.OpenSubKey(RunKey))return key!=null&&key.GetValue("PocketCode")!=null;}
@@ -140,7 +173,7 @@ public sealed class PocketDesktop:Form {
     async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
     async Task Poll(){
         if(preview||polling||changing||exiting)return;polling=true;
-        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();tray.Text="Pocket Code · connected";return;}
+        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();tray.Text="Pocket Code · connected";return;}
             addresses=new object[0];jiraUrl=null;if(owner!=null&&owner.ActiveCount==0){owner.Dispose();owner=null;nextAttempt=DateTime.UtcNow.AddSeconds(Math.Min(60,5*Math.Pow(2,Math.Min(failures++,4))));}
             if(owner!=null){status="Starting the host / restoring connection…";return;}
             status=preferences.Connect&&preferences.AutoReconnect?"Host unavailable. Reconnecting…":"Disconnected";if(failures>0)status+=" See desktop-launch.log in the Pocket Code data folder.";tray.Text="Pocket Code · disconnected";

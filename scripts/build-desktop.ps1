@@ -23,6 +23,9 @@ if(-not $SkipWebBuild){Push-Location $root;try{& npm.cmd run build;if($LASTEXITC
 $ui=Join-Path $output 'ui'
 New-Item -ItemType Directory -Force -Path $ui | Out-Null
 Copy-Item -Path (Join-Path $root 'dist/*') -Destination $ui -Recurse -Force
+$version=(Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw|ConvertFrom-Json).version
+[IO.File]::WriteAllText((Join-Path $output 'desktop-version.json'),(@{version=$version}|ConvertTo-Json -Compress))
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'desktop-update.ps1') -Destination $output -Force
 if($InstallShortcut){
     $installRoot=Join-Path $env:LOCALAPPDATA 'Pocket Code Desktop'
     $buildId=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.Substring(0,12)+'-'+(Get-FileHash -LiteralPath (Join-Path $ui 'index.html') -Algorithm SHA256).Hash.Substring(0,12)
@@ -31,6 +34,7 @@ if($InstallShortcut){
     Copy-Item -LiteralPath $exe -Destination (Join-Path $installed 'Pocket Code.exe') -Force
     foreach($library in @('Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.WinForms.dll','WebView2Loader.dll')){Copy-Item -LiteralPath (Join-Path $output $library) -Destination $installed -Force}
     Copy-Item -LiteralPath $ui -Destination $installed -Recurse -Force
+    foreach($name in @('desktop-version.json','desktop-update.ps1')){Copy-Item -LiteralPath (Join-Path $output $name) -Destination $installed -Force}
     [IO.File]::WriteAllText((Join-Path $installRoot 'current.txt'),(Join-Path $installed 'Pocket Code.exe'))
     $runKey='HKCU:/Software/Microsoft/Windows/CurrentVersion/Run'
     $registered=(Get-ItemProperty -LiteralPath $runKey -Name PocketCode -ErrorAction SilentlyContinue).PocketCode

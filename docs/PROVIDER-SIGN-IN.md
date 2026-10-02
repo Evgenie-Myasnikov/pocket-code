@@ -2,7 +2,13 @@
 
 Pocket Code detects the credentials already available on the PC. If detection fails, open **Settings → Providers & sign-in** in Windows. On Android the same controls are under **Settings → AI & workspace** for the selected provider; both client and host must be updated.
 
-## Status rows
+## Signing out
+
+Each provider card has **Sign out** on Windows and Android. Confirm the account change in that card. Claude and Codex use their official CLI logout commands; Copilot uses its account logout API. Active tasks must finish first. Sign-out affects the shared provider login on this PC; conversation files and Pocket Code preferences remain.
+
+Environment credentials, another Copilot account or GitHub CLI fallback can still provide access after local logout. Pocket Code reports this instead of claiming that access disappeared, and does not sign out the separate GitHub CLI. A model-list/network/subscription failure is shown separately from a confirmed Copilot account login.
+
+## Reading connection status
 
 - **Installation**: the provider CLI is present.
 - **Server**: Codex/Copilot answered through the local transport. Claude starts on demand with a task, without a permanent app server.

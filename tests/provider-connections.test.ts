@@ -23,5 +23,7 @@ test('Claude auth requires an explicit boolean, not process success or arbitrary
 test('active work and closed hosts reject sign-in before spawning',async()=>{
  const service=new ProviderConnections({},()=>true,async()=>{});
  await assert.rejects(service.start('codex','browser'),/Finish active/);
+ for(const id of ['claude','codex','copilot'] as const)await assert.rejects(service.logout(id),/Finish active/);
  service.close();await assert.rejects(service.start('claude','browser'),/Host is stopping/);
+ await assert.rejects(service.logout('copilot'),/Host is stopping/);
 });

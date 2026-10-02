@@ -8,6 +8,14 @@ function fixture(){let config:any,handler:(event:any)=>void=()=>{},finish:()=>vo
  const client={start:async()=>{},stop:async()=>[],getAuthStatus:async()=>({isAuthenticated:true}),listModels:async()=>[{id:'auto',name:'Auto'}],listSessions:async()=>[],createSession:async(c:any)=>{config=c;return session;},resumeSession:async(_id:string,c:any)=>{config=c;return session;}};
  const service=new CopilotService([process.cwd()],client as any);return{service,session,config:()=>config,emit:(e:any)=>handler(e),finish:()=>finish(),disconnected:()=>disconnected};}
 const input=()=>({id:randomUUID(),cwd:process.cwd(),text:'Fixture',mode:'default' as const,maxBudgetUsd:5});
+test('model access errors do not erase confirmed Copilot authentication',async()=>{
+ const service=new CopilotService([],{start:async()=>{},stop:async()=>[],getAuthStatus:async()=>({isAuthenticated:true}),listModels:async()=>{throw Error('Unavailable');}} as any);
+ const status=await service.status();assert.equal(status.available,true);assert.equal(status.authenticated,true);assert.equal(status.access,'models-unavailable');await service.close();
+});
+test('Copilot sign-out calls the account operation without touching other GitHub credentials',async()=>{
+ let called=0;const service=new CopilotService([],{start:async()=>{},stop:async()=>[],rpc:{account:{logout:async(args:unknown)=>{assert.deepEqual(args,{});called++;}}}} as any);
+ await service.logout();assert.equal(called,1);await service.close();
+});
 test('Copilot detects existing sign-in and does not start login again',async()=>{const f=fixture();assert.equal((await f.service.status()).authenticated,true);assert.equal((await f.service.login()).state,'connected');await f.service.close();});
 test('Copilot streams text, preserves history and completes without affecting other providers',async()=>{const f=fixture(),i=input();f.service.start(i);await tick();f.emit({id:'delta',type:'assistant.message_delta',data:{deltaContent:'Hello'}});assert.equal(f.service.get(i.id).partial,'Hello');f.emit({id:'answer',type:'assistant.message',data:{content:'Hello'}});f.finish();await tick();assert.equal(f.service.get(i.id).status,'done');assert.equal(f.service.get(i.id).messages[1].blocks[0].text,'Hello');assert.equal(f.disconnected(),1);assert.equal((await f.service.messages(f.session.sessionId))[0].blocks[0].text,'Saved answer');await f.service.close();});
 test('Copilot questions reach chat approvals and answers resolve the SDK handler',async()=>{const f=fixture(),i=input();f.service.start(i);await tick();const answer=f.config().onUserInputRequest({question:'Which path?',choices:['A','B']});const approval=f.service.get(i.id).approvals[0];assert.equal(approval.tool,'AskUserQuestion');f.service.approve(i.id,approval.id,true,{'Which path?':'B'});assert.equal((await answer).answer,'B');f.service.stop(i.id);await tick();assert.equal(f.service.get(i.id).status,'stopped');await f.service.close();});

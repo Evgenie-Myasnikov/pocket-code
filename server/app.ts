@@ -44,7 +44,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
   const engineFor=(provider:string)=>provider==='copilot'?copilot():provider==='codex'?codex():jobs;
   const allJobs = () => [...jobs.list(), ...(config.codex?.list() || []),...(config.copilot?.list()||[])];
-  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status()},id=>allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();});
+  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status()},id=>allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();},()=>copilot().logout());
   const jobView = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot.get(id):config.codex?.list().some(j => j.id === id) ? config.codex.view(config.codex.get(id)) : jobs.view(jobs.get(id));
   const engineForJob = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot:config.codex?.list().some(j => j.id === id) ? config.codex : jobs;
   function guardProject(cwd: string, id: string) {
@@ -81,7 +81,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.use(express.json({ limit: '15mb' }));
   let activeMutations = 0, runtimeStopping = false, jiraChanging=false;
-  const isBusy = () => activeMutations > 0 || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!copilotQueue?.hasWork() || !!workflow?.isBusy();
+  const isBusy = () => activeMutations > 0 || providerConnections.isSigningIn() || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!copilotQueue?.hasWork() || !!workflow?.isBusy();
   app.use('/api', (req, res, next) => {
     if (req.method === 'GET' || req.path === '/runtime/stop') { next(); return; }
     if(providerConnections.isSigningIn()&&['/jobs','/terminals','/jira/start','/jira/queue','/jira/queue/control','/jira/workflow/action','/jira/workflow/recover','/copilot/login'].includes(req.path)){res.status(409).json({error:'Complete provider sign-in before starting new work.'});return;}
@@ -289,6 +289,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
   app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));
+  app.post('/api/provider-connections/:provider/logout',async(req,res)=>res.json(await providerConnections.logout(providerSchema.parse(req.params.provider))));
   app.get('/api/copilot/status',async(_req,res)=>res.json(await copilot().status()));
   app.get('/api/copilot/login',(_req,res)=>res.json(copilot().loginStatus()));
   app.post('/api/copilot/login',async(_req,res)=>res.json(await copilot().login()));

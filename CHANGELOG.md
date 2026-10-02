@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-02 - Provider sign-out and Windows automatic updates (0.21.0)
+- Changed: Added confirmed sign-out for Claude, Codex and Copilot in shared Windows/Android provider settings; active work blocks authentication changes. Preserves chats/preferences and reports remaining environment/account credentials.
+- Fixed: Copilot model-list failures no longer overwrite confirmed authentication. Login failure messages distinguish incomplete login from server verification failures.
+- Changed: Windows checks public GitHub releases after connection and every six hours, downloads a verified desktop/host package, prepares dependencies, waits for an idle host, restarts and restores the previous version on failed health checks. Settings include automatic/manual update controls.
+- Files: server/provider-connections.ts, copilot.ts, app.ts; shared provider/update UI; desktop/DesktopWindow.cs; desktop packaging/update scripts and release manifest.
+- Validation: TypeScript/Vite and Windows builds, 13 focused server/security tests, eight desktop browser scenarios and native WebView/tray/process smoke passed. Isolated Windows update fixtures passed installation and failed-health rollback, without using real accounts or stopping the production host.
+- Follow-up: Real browser consent and account logout were not performed against personal accounts. Builds before 0.21.0 require one manual Windows installation to gain the updater; temporary internet tunnels may require a new QR after restart.
+
 ## 2026-10-02 - Automatic Windows runtime bootstrap and simpler launchers
 - Changed: Shared bootstrap detects compatible Node.js through the current/registry PATH and standard install locations. If missing, it downloads a private Node.js 24 LTS ZIP from nodejs.org, verifies SHA-256 and archive paths, and reuses it without administrator access, winget or shell restart.
 - Fixed: Clean setup now installs npm dependencies with development tools before the desktop build. Missing/partial dependencies are repaired; healthy retries do not reinstall. Per-user/runtime and per-project locks prevent overlapping installation.

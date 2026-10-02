@@ -20,7 +20,15 @@ export class CopilotService{
  private closed=false;private client:CopilotClient;private starting?:Promise<void>;private runs=new Map<string,Run>();private authLogin=new CopilotLogin(async()=>{await this.client.stop();this.starting=undefined;return (await this.status()).authenticated;});
  constructor(private roots:string[],client?:CopilotClient){this.client=client||new CopilotClient({workingDirectory:roots[0],useLoggedInUser:true});}
  private async connect(){if(this.closed)throw new HttpError(503,'Copilot host is stopping');if(!this.starting)this.starting=this.client.start().catch(error=>{this.starting=undefined;throw error;});await this.starting;return this.client;}
- async status(){try{const client=await this.connect(),auth=await client.getAuthStatus();const models=auth.isAuthenticated?await client.listModels():[];return{available:true,authenticated:auth.isAuthenticated,models:models.map(model=>({id:model.id,name:model.name,isDefault:model.id==='auto'})),error:auth.isAuthenticated?'':'Sign in to GitHub Copilot on the PC.'};}catch{return{available:false,authenticated:false,models:[],error:'GitHub Copilot is unavailable. Check the PC runtime and GitHub subscription.'};}}
+ async logout(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');await(await this.connect()).rpc.account.logout({});}
+ async status(){
+  try{
+   const client=await this.connect(),auth=await client.getAuthStatus();
+   if(!auth.isAuthenticated)return{available:true,authenticated:false,access:'sign-in-required',models:[],error:'Sign in to GitHub Copilot on the PC.'};
+   try{const models=await client.listModels();return{available:true,authenticated:true,access:'ready',models:models.map(model=>({id:model.id,name:model.name,isDefault:model.id==='auto'})),error:''};}
+   catch{return{available:true,authenticated:true,access:'models-unavailable',models:[],error:'Signed in, but Copilot models could not be loaded. Check network, subscription and organization access.'};}
+  }catch{return{available:false,authenticated:false,access:'verification-failed',models:[],error:'GitHub Copilot is unavailable. Check the PC runtime.'};}
+ }
  async sessions(){const sessions=await(await this.connect()).listSessions();return Promise.all(sessions.filter(item=>!item.isRemote).map(async item=>{const cwd=item.context?.workingDirectory||'';let readOnly=true;try{await allowedPath(this.roots,cwd,true);readOnly=false;}catch{}return{sessionId:item.sessionId,summary:item.summary||'Copilot chat',cwd,lastModified:new Date(item.modifiedTime).getTime(),source:'copilot',provider:'copilot' as const,readOnly};}));}
  private historyReads=coalesceReads<string,ChatMessage[]>(0,8);
  async messages(id:string){return this.historyReads(id,()=>this.loadMessages(id));}

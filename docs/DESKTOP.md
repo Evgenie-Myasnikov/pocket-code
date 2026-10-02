@@ -1,5 +1,13 @@
 # Windows desktop application
 
+## Automatic updates
+
+From version **0.21.0**, **Settings → Application updates** checks GitHub after connecting and every six hours. You can disable automatic updates or check manually. The Windows application and its PC host update together. Downloads use the public release directly; GitHub CLI login is not required.
+
+The updater verifies the release version, archive size, SHA-256 and file paths, prepares dependencies in a separate version folder, and waits for active tasks to finish. It then restarts the app and checks the host. If startup fails, it restores the previous version. Accounts, chat history, pairing key and preferences stay in the existing private data folder. A temporary internet tunnel can receive a new address after restart and require scanning the new QR.
+
+Older Windows builds need one manual installation: update the source and run **Setup Pocket Code.cmd**, then exit the old tray app when its tasks finish and start Pocket Code again. Subsequent releases install automatically. The Windows ZIP is also available in releases; extract it and run **Pocket Code.exe** (existing WebView2 Runtime required).
+
 See [Provider sign-in and status](PROVIDER-SIGN-IN.md) for manual login, device codes, local secret entry and server diagnostics.
 
 [Home](../README.md) · [Русский](#russian)
