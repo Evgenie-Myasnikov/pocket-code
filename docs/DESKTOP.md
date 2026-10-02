@@ -1,5 +1,7 @@
 # Windows desktop application
 
+See [Provider sign-in and status](PROVIDER-SIGN-IN.md) for manual login, device codes, local secret entry and server diagnostics.
+
 [Home](../README.md) · [Русский](#russian)
 
 Run **Setup Pocket Code.cmd** from the extracted source package. Existing users can run **Install Pocket Code Desktop.cmd**. This builds a small native Windows application and adds **Pocket Code** shortcuts to the Desktop and Start menu. Administrator access is not required. Keep the source folder: the application uses its host scripts, Node.js and dependencies. Moving that folder requires running the installer again.

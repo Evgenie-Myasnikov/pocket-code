@@ -74,7 +74,8 @@ if (Test-Path -LiteralPath $managedPointer) {
         $managedRoot = [IO.Path]::GetFullPath((Join-Path $storagePath 'host/versions')) + [IO.Path]::DirectorySeparatorChar
         $managedDirectory = (Resolve-Path -LiteralPath $managed.directory -ErrorAction Stop).Path
         $managedPackage = Get-Content -LiteralPath (Join-Path $managedDirectory 'package.json') -Raw | ConvertFrom-Json
-        if ($managedDirectory.StartsWith($managedRoot, [StringComparison]::OrdinalIgnoreCase) -and $managedPackage.name -eq 'pocket-code' -and $managedPackage.version -eq $managed.version -and (Test-Path -LiteralPath (Join-Path $managedDirectory 'server/index.ts'))) {
+        $sourcePackage = Get-Content -LiteralPath (Join-Path $projectRoot 'package.json') -Raw | ConvertFrom-Json
+        if ($managedDirectory.StartsWith($managedRoot, [StringComparison]::OrdinalIgnoreCase) -and $managedPackage.name -eq 'pocket-code' -and $managedPackage.version -eq $managed.version -and ([version]$managedPackage.version -gt [version]$sourcePackage.version) -and (Test-Path -LiteralPath (Join-Path $managedDirectory 'server/index.ts'))) {
             Set-Location -LiteralPath $managedDirectory
         }
     } catch { Write-Host 'The saved PC update is unavailable. Starting the original version.' }

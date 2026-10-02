@@ -16,6 +16,7 @@ export function copilotMessage(event:SessionEvent):ChatMessage|null{
 type Input={id:string;cwd:string;sessionId?:string;text:string;displayText?:string;model?:string;mode:'default'|'plan';maxBudgetUsd:number;baseMessageCount?:number;attachmentPaths?:string[];jira?:JobView['jira']};
 type Run={view:JobView;session?:CopilotSession;pending:Map<string,(allow:boolean,answers?:Record<string,string>)=>void>;followups:Followups};
 export class CopilotService{
+ async refreshAuthentication(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');await this.client.stop();this.starting=undefined;}
  private closed=false;private client:CopilotClient;private starting?:Promise<void>;private runs=new Map<string,Run>();private authLogin=new CopilotLogin(async()=>{await this.client.stop();this.starting=undefined;return (await this.status()).authenticated;});
  constructor(private roots:string[],client?:CopilotClient){this.client=client||new CopilotClient({workingDirectory:roots[0],useLoggedInUser:true});}
  private async connect(){if(this.closed)throw new HttpError(503,'Copilot host is stopping');if(!this.starting)this.starting=this.client.start().catch(error=>{this.starting=undefined;throw error;});await this.starting;return this.client;}

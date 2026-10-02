@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-02 - Manual provider sign-in and separate connection states
+- Changed: Added shared provider cards to desktop settings and mobile AI settings, with detected version, installation, local transport and authentication states. Desktop Connection now distinguishes host activity and actual tunnel availability.
+- Changed: Added explicit Windows CLI login methods for Claude subscription/Console/SSO, Codex browser/device/API-key/access-token, and Copilot browser/device/token. Secret entry stays in a local hidden-input prompt and reaches the CLI through stdin. Advanced cloud/enterprise methods link to official configuration guides.
+- Changed: Launcher uses the local build when its version matches the managed host, while preserving newer auto-updated hosts.
+- Reliability: Pending sign-in is deduplicated, blocks new work, refuses busy provider/queue changes, expires after ten minutes and is cleaned up on host shutdown. Successful login refreshes idle transports before checking access; raw auth output is not exposed.
+- Files: server/provider-connections.ts, app.ts, codex.ts, copilot.ts; src/ProviderConnections.tsx and shared settings; desktop bridge; docs/PROVIDER-SIGN-IN.md.
+- Validation: TypeScript/Vite and Windows builds passed; 32 server tests and 12 browser scenarios passed; native WebView/tray/cleanup smoke and eight launcher/process tests passed. Installed Claude authentication check succeeded without exposing account data. Official documentation and installed CLI help checked.
+- Follow-up: Browser consent and real key/token submission require the user and were not performed. Advanced cloud/enterprise configurations are guides, not setup wizards. The Windows installation is updated; an existing host must be restarted after its work completes. Android source is updated; no APK release is included in this change.
+
+
 ## 2026-10-02 - Shared desktop workspace and read-only conversations
 - Changed: Replaced the native form layout with the shared TypeScript/React interface in WebView2. Added provider/project selection, searchable conversations, refreshing history, Review, AI results, image zoom and subagent context. Reused Android renderers, panels, language, appearance controls and session types.
 - Changed: Kept QR/Jira pairing, tray lifecycle and startup settings in the desktop shell. The native reader allows only approved GET routes; the TypeScript adapter rejects mutations. Desktop chat editing and agent approvals remain on the phone.

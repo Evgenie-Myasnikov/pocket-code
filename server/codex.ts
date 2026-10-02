@@ -19,6 +19,7 @@ export type CodexSession = { sessionId: string; summary: string; cwd: string; la
 export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexRpc>; approvalTimeoutMs?: number; attachmentRoots?: string[]; allProjectHistory?:boolean };
 
 export class CodexService {
+  async refreshAuthentication(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');const old=this.rpc;this.rpc=undefined;this.ready=undefined;old?.close();}
   async usage() { return normalizeCodexUsage(await (await this.connect()).request('account/rateLimits/read', {})); }
   private rpc?: CodexRpc;
   private ready?: Promise<CodexRpc>;

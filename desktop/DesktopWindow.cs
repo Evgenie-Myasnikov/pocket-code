@@ -22,7 +22,7 @@ public static class DesktopReadPolicy {
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/(health|providers|projects|sessions|jobs|review|review/availability|project-artifact)$")||
+        return Regex.IsMatch(path,@"^/(health|providers|provider-connections|projects|sessions|jobs|review|review/availability|project-artifact)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");
@@ -41,7 +41,7 @@ public sealed class PocketDesktop:Form {
     readonly TaskCompletionSource<bool> initialized=new TaskCompletionSource<bool>();
     DesktopPreferences preferences;
     PocketCodeOwnedHost owner;
-    bool polling,online,changing,exiting,webReady,autoStartPending;
+    bool polling,online,changing,exiting,webReady,autoStartPending,hostBusy,tunnelOnline;
     int failures;
     DateTime nextAttempt=DateTime.MinValue;
     string status="Ready to connect",jiraUrl;
@@ -98,7 +98,11 @@ public sealed class PocketDesktop:Form {
         object id=null;try{
             var message=json.Deserialize<Dictionary<string,object>>(payload);if(!message.TryGetValue("id",out id)||!message.ContainsKey("action"))return;
             string action=message["action"] as string;object result;
-            if(action=="read"){
+            if(action=="provider-login"){
+                string provider=message.ContainsKey("provider")?message["provider"] as string:"",method=message.ContainsKey("method")?message["method"] as string:"";
+                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$")||!Regex.IsMatch(method??"",@"^(browser|console|sso|device|key|token|accessToken)$"))throw new InvalidOperationException("Invalid sign-in method.");
+                result=await Send(reader,"/provider-connections/"+provider+"/login/"+method,true);
+            }else if(action=="read"){
                 string endpoint=message.ContainsKey("endpoint")?message["endpoint"] as string:null;
                 if(preview||!DesktopReadPolicy.Allows(endpoint))throw new InvalidOperationException("Desktop chats are read-only. This request is not allowed.");
                 await reads.WaitAsync();try{result=await Send(reader,endpoint,false);}finally{reads.Release();}
@@ -117,7 +121,7 @@ public sealed class PocketDesktop:Form {
     }
     void Reply(object message){if(exiting||IsDisposed)return;try{if(web.CoreWebView2!=null)web.CoreWebView2.PostWebMessageAsJson(json.Serialize(message));}catch(InvalidOperationException){}}
     void Push(){if(webReady&&!exiting)Reply(new{state=Snapshot()});}
-    object Snapshot(){return new{online=online,busy=changing||owner!=null&&!online,status=status,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
+    object Snapshot(){return new{online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
     public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();}
     void Save(){if(preview)return;Directory.CreateDirectory(storage);string temp=settingsFile+".tmp";File.WriteAllText(temp,json.Serialize(preferences),Encoding.UTF8);if(File.Exists(settingsFile))File.Replace(temp,settingsFile,null);else File.Move(temp,settingsFile);}
     bool StartupEnabled(){using(var key=Registry.CurrentUser.OpenSubKey(RunKey))return key!=null&&key.GetValue("PocketCode")!=null;}
@@ -133,7 +137,7 @@ public sealed class PocketDesktop:Form {
         }
     }
     Task<object> Request(string endpoint,bool post=false){return Send(http,"/"+endpoint,post);}
-    async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
+    async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
     async Task Poll(){
         if(preview||polling||changing||exiting)return;polling=true;
         try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();tray.Text="Pocket Code · connected";return;}

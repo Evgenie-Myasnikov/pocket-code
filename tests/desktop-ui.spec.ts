@@ -1,4 +1,14 @@
 import {test,expect,type Page} from '@playwright/test';
+test('provider status distinguishes login from server and launches only explicit sign-in',async({page})=>{
+ await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();
+ const panel=page.locator('.provider-connections');await expect(panel.getByText('Signed in',{exact:true})).toHaveCount(1);
+ await expect(panel.getByText('Sign-in required',{exact:true})).toHaveCount(2);
+ await expect(panel.getByText('Starts with a task',{exact:true})).toBeVisible();
+ await page.screenshot({path:'artifacts/screenshots/provider-connections.png'});
+ expect(await page.evaluate(()=>(window as any).desktopCalls.filter((v:any)=>v.action==='provider-login').length)).toBe(0);
+ await panel.locator('article').filter({has:page.getByRole('heading',{name:'Codex',exact:true})}).getByRole('button',{name:'Device code',exact:true}).click();
+ expect(await page.evaluate(()=>(window as any).desktopCalls.find((v:any)=>v.action==='provider-login'))).toMatchObject({provider:'codex',method:'device'});
+});
 async function desktop(page:Page){
  await page.addInitScript(()=>{
   const listeners:((event:{data:unknown})=>void)[]=[];
@@ -7,10 +17,11 @@ async function desktop(page:Page){
   let state={online:true,busy:false,status:'Pocket Code · connected',startup:false,autoReconnect:true,internet:true,addresses:[],jira:true};
   const reply=(id:number,value:unknown)=>queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,value}})));
   (window as any).chrome={...((window as any).chrome||{}),webview:{addEventListener(_type:string,fn:(event:{data:unknown})=>void){listeners.push(fn);},postMessage(message:any){
-   calls.push(message);const {id,action}=message;if(action==='state'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
+   calls.push(message);const {id,action}=message;if(action==='state'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
    const url=new URL('https://example.invalid'+message.endpoint),p=url.pathname,provider=url.searchParams.get('provider')||'claude';
    const messageBlock=(id:string,text:string)=>({id,role:'assistant',blocks:[{type:'text',text}]});
    if(p==='/sessions'){reply(id,[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}]);return;}
+   if(p==='/provider-connections'){reply(id,{providers:['claude','codex','copilot'].map(id=>({id,installed:true,version:'1.0.0',server:id==='claude'?'on-demand':'ready',authenticated:id==='claude',busy:false,login:{state:'idle'},methods:id==='claude'?['browser','console','sso']:['browser','device']}))});return;}
    if(p==='/projects'){reply(id,['C:\\Demo\\Atlas','C:\\Demo\\Garden']);return;}
    if(p==='/jobs'){reply(id,[]);return;}
    if(p==='/review/availability'){reply(id,{available:true,mode:'working'});return;}

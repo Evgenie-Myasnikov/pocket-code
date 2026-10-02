@@ -1,4 +1,4 @@
-export type DesktopState={online:boolean;busy:boolean;status:string;startup:boolean;autoReconnect:boolean;internet:boolean;addresses:{url:string;image:string}[];jira:boolean};
+export type DesktopState={online:boolean;busy:boolean;hostBusy?:boolean;tunnelOnline?:boolean;status:string;startup:boolean;autoReconnect:boolean;internet:boolean;addresses:{url:string;image:string}[];jira:boolean};
 type Reply={id?:number;value?:unknown;error?:string;status?:number;state?:DesktopState};
 type WebView={postMessage(value:unknown):void;addEventListener(name:'message',listener:(event:{data:Reply})=>void):void};
 const view=()=>((window as unknown as {chrome?:{webview?:WebView}}).chrome?.webview);

@@ -91,6 +91,7 @@ let shutdownPromise: Promise<void> | undefined;
 function shutdown(preserveTunnel = false): Promise<void> {
   if (shutdownPromise) return shutdownPromise;
   closing = true; runtimeReady = false; hostUpdater.close(); clearInterval(workflowTimer); clearInterval(engineTimer);
+  app.locals.providerConnections?.close();
   const stopped = new Promise<void>(resolve => server.close(() => resolve()));
   const queues = [queue?.close(), codexQueue?.close(),copilotQueue?.close(),copilot.close()];
   jiraLogin.close(); codexJiraTools.close(); codex.close(); jobs.close(); terminals.close();

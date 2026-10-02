@@ -1,4 +1,5 @@
 import {GitProjects} from './git-projects.js';
+import {ProviderConnections} from './provider-connections.js';
 import {CopilotService} from './copilot.js';
 import express from 'express';
 import {TaskNotifications,jiraNotifications} from './task-notifications';
@@ -43,6 +44,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
   const engineFor=(provider:string)=>provider==='copilot'?copilot():provider==='codex'?codex():jobs;
   const allJobs = () => [...jobs.list(), ...(config.codex?.list() || []),...(config.copilot?.list()||[])];
+  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status()},id=>allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();});
   const jobView = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot.get(id):config.codex?.list().some(j => j.id === id) ? config.codex.view(config.codex.get(id)) : jobs.view(jobs.get(id));
   const engineForJob = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot:config.codex?.list().some(j => j.id === id) ? config.codex : jobs;
   function guardProject(cwd: string, id: string) {
@@ -53,6 +55,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   }
   const indexes = config.desktopSessionIndexes ?? await desktopIndexes();
   const app = express();
+  app.locals.providerConnections=providerConnections;
   app.disable('x-powered-by');
   const localSetup=(req:express.Request,res:express.Response,next:express.NextFunction)=>{
     if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')||!['127.0.0.1','localhost','[::1]'].includes(req.hostname)){res.sendStatus(403);return;}next();
@@ -81,6 +84,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const isBusy = () => activeMutations > 0 || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!copilotQueue?.hasWork() || !!workflow?.isBusy();
   app.use('/api', (req, res, next) => {
     if (req.method === 'GET' || req.path === '/runtime/stop') { next(); return; }
+    if(providerConnections.isSigningIn()&&['/jobs','/terminals','/jira/start','/jira/queue','/jira/queue/control','/jira/workflow/action','/jira/workflow/recover','/copilot/login'].includes(req.path)){res.status(409).json({error:'Complete provider sign-in before starting new work.'});return;}
     if(jiraChanging){res.status(409).json({error:'The Jira connection is changing. Please retry shortly.'});return;}
     if (runtimeStopping) { res.status(503).json({ error: 'The PC server is stopping.' }); return; }
     if (req.path.startsWith('/host-update/')) { next(); return; }
@@ -283,6 +287,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
     res.json([{ id: 'claude', name: 'Claude', available: true, models: [{ id: 'sonnet', name: 'Sonnet' }, { id: 'opus', name: 'Opus' }, { id: 'haiku', name: 'Haiku' }] }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
   });
+  app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
+  app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));
   app.get('/api/copilot/status',async(_req,res)=>res.json(await copilot().status()));
   app.get('/api/copilot/login',(_req,res)=>res.json(copilot().loginStatus()));
   app.post('/api/copilot/login',async(_req,res)=>res.json(await copilot().login()));
