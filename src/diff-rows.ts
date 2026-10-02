@@ -10,3 +10,18 @@ export function diffRows(patch:string):DiffRow[]{
     else if(line.startsWith(' ')){flush();rows.push({kind:'context',left:line.slice(1),right:line.slice(1),old:old++,next:next++});}
   }flush();return rows;
 }
+
+/** Keep each deletion block before its replacement block, as in a unified patch. */
+export function inlineDiffRows(rows:DiffRow[]):(DiffRow&{sign?:string})[]{
+  const result:(DiffRow&{sign?:string})[]=[];let changes:DiffRow[]=[];
+  const flush=()=>{for(const row of changes)if(row.left!==undefined)result.push({kind:'change',left:row.left,old:row.old,sign:'-'});for(const row of changes)if(row.right!==undefined)result.push({kind:'change',right:row.right,next:row.next,sign:'+'});changes=[];};
+  for(const row of rows){if(row.kind==='change')changes.push(row);else{flush();result.push(row);}}flush();return result;
+}
+
+/** A wholly new/deleted file has no opposite side; insertions in existing files do. */
+export function singleDiffSide(patch:string,rows:DiffRow[]):'added'|'removed'|null{
+  const content=rows.filter(row=>row.kind!=='hunk');if(!content.length)return null;
+  if(/^@@ -0,0 \+1(?:,\d+)? @@/m.test(patch)&&content.every(row=>row.old===undefined))return 'added';
+  if(/^@@ -1(?:,\d+)? \+0,0 @@/m.test(patch)&&content.every(row=>row.next===undefined))return 'removed';
+  return null;
+}

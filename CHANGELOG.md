@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-02 - Full-width new files and inline replacement blocks (0.21.2)
+- Changed: New and wholly deleted text files use a single full-width code column in either diff mode, without an empty opposite pane or line-number gutter. Normal insertions in existing files retain split comparison.
+- Fixed: Unified mode keeps each removed block followed by its added replacement, preserving surrounding context instead of alternating paired lines.
+- Files: src/diff-rows.ts, DiffTable.tsx, review.css; diff parser and browser tests.
+- Validation: Two parser tests and seven browser scenarios passed, including mixed new/modified files, mode switching, 10,000-line virtualization, fit-to-width and Unicode text. TypeScript passed.
+
+
 ## 2026-10-02 - PC-managed APK delivery, aligned diff modes and live desktop chats (0.21.1)
 - Changed: PC checks public releases at startup and every six hours, verifies/caches the APK and supplies it to connected phones. Mobile settings request a PC check; Android still confirms installation. Public downloads no longer depend on GitHub CLI login. Phone requests also signal the Windows updater; APK transfers block host shutdown.
 - Fixed: Diff gutter width rules affected spanning hunk rows and displaced code columns. Explicit shared column measurements now keep split panes aligned; visible Unified/Split buttons retain the selected layout.

@@ -27,7 +27,7 @@ test('review scrolls through collapsible files and filters detected extensions',
 test('split gutters remain fixed across unequal files and layout modes are visible',async({page})=>{
  await page.setViewportSize({width:1600,height:1000});
  await page.route('**/api/review/availability?*',route=>route.fulfill({json:{available:true,mode:'working'}}));
- await page.route('**/api/review?*',route=>{const file=new URL(route.request().url()).searchParams.get('file');return route.fulfill({json:{files:['short.ts','long.ts'].map(path=>({path,added:1,removed:0})),current:'main',base:'main',branches:['main'],binary:false,patch:file?'@@ -0,0 +1 @@\n+'+(file==='short.ts'?'short':'a longer synthetic example for the other file'):''}});});
+ await page.route('**/api/review?*',route=>{const file=new URL(route.request().url()).searchParams.get('file');return route.fulfill({json:{files:['short.ts','long.ts'].map(path=>({path,added:1,removed:0})),current:'main',base:'main',branches:['main'],binary:false,patch:file?'@@ -1 +1,2 @@\n context\n+'+(file==='short.ts'?'short':'a longer synthetic example for the other file'):''}});});
  await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
  const panel=page.getByRole('dialog',{name:'Review',exact:true});await panel.getByRole('button',{name:'Split',exact:true}).click();await expect(panel.locator('.diff-table.split')).toHaveCount(2);
  await expect(panel).toContainText('a longer synthetic example');
@@ -36,4 +36,18 @@ test('split gutters remain fixed across unequal files and layout modes are visib
  await panel.getByRole('button',{name:'Unified',exact:true}).click();await expect(panel.locator('.diff-table.unified')).toHaveCount(2);
  expect(await page.evaluate(()=>localStorage.getItem('pocket-code-diff-layout'))).toBe('unified');
  await page.screenshot({path:'artifacts/screenshots/diff-alignment-unified.png'});
+});
+test('new files fill the width in split mode; modified files support inline replacements',async({page})=>{
+ await page.setViewportSize({width:1400,height:900});
+ await page.route('**/api/review/availability?*',route=>route.fulfill({json:{available:true,mode:'working'}}));
+ await page.route('**/api/review?*',route=>{const file=new URL(route.request().url()).searchParams.get('file');return route.fulfill({json:{files:['new.ts','changed.ts'].map(path=>({path,added:2,removed:path==='new.ts'?0:2})),current:'main',branches:['main'],binary:false,patch:file==='new.ts'?'@@ -0,0 +1,2 @@\n+new file one\n+new file two':file?'@@ -1,3 +1,3 @@\n context\n-old one\n-old two\n+new one\n+new two':''}});});
+ await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
+ const panel=page.getByRole('dialog',{name:'Review',exact:true});await panel.getByRole('button',{name:'Split',exact:true}).click();
+ const added=panel.locator('.review-file').filter({hasText:'new.ts'}),changed=panel.locator('.review-file').filter({hasText:'changed.ts'});
+ await expect(added.locator('.diff-table.single-file')).toBeVisible();await expect(changed.locator('.diff-table.split')).toBeVisible();
+ const offset=await added.locator('pre').first().evaluate(el=>el.getBoundingClientRect().left-el.closest('table')!.getBoundingClientRect().left);expect(offset).toBeLessThan(100);
+ await panel.getByRole('button',{name:'Unified',exact:true}).click();await expect(changed.locator('.diff-table.unified')).toBeVisible();
+ expect(await changed.locator('pre').allTextContents()).toEqual([' context','-old one','-old two','+new one','+new two']);
+ await panel.getByRole('button',{name:'Split',exact:true}).click();await expect(added.locator('.diff-table.single-file')).toBeVisible();
+ await page.screenshot({path:'artifacts/screenshots/diff-new-file-width.png'});
 });

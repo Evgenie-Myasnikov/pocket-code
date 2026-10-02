@@ -11,7 +11,7 @@ for(const layout of ['unified','split'])test(`large ${layout} diff keeps a bound
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Интеграционный тест/}).click();
   await page.getByRole('button',{name:'Review',exact:true}).click();
   const panel=page.getByRole('dialog',{name:'Review',exact:true}),content=panel.locator('.diff-content');
-  await expect(content).toContainText('new 0');
+  await expect(content).toContainText('old 0');
   expect(await panel.locator('tr').count()).toBeLessThan(120);
   const width=await panel.locator('.diff-table').evaluate(element=>element.getBoundingClientRect().width);
   const divider=layout==='split'?await panel.locator('tr.diff-line:not(.hunk)').first().locator('td').nth(2).evaluate(element=>element.getBoundingClientRect().left):0;
@@ -32,7 +32,7 @@ for(const layout of ['unified','split'])test(`large ${layout} diff keeps a bound
   await expect(content).toContainText('new 9999');
   await expect(panel.locator('.diff-table')).toHaveCSS('font-size','24px');
   expect(await panel.locator('tr').count()).toBeLessThan(120);
-  await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('new 0');
+  await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('old 0');
   await panel.getByRole('button',{name:'Review options',exact:true}).click();
   await panel.getByLabel('Fit diff to width',{exact:true}).check();await page.keyboard.press('Escape');
   await expect.poll(()=>content.evaluate(element=>element.scrollWidth-element.clientWidth)).toBeLessThanOrEqual(2);
@@ -44,7 +44,7 @@ for(const layout of ['unified','split'])test(`large ${layout} diff keeps a bound
   await expect.poll(()=>content.evaluate(element=>element.scrollWidth-element.clientWidth)).toBeLessThanOrEqual(2);
   await content.evaluate(element=>{element.scrollTop=element.scrollHeight;});await expect(content).toContainText('new 9999');
   expect(await page.evaluate(()=>localStorage.getItem('pocket-code-diff-fit-width'))).toBe('true');
-  await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('new 0');
+  await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('old 0');
   await page.screenshot({path:`artifacts/screenshots/diff-fit-${layout}.png`});
 });
 
@@ -69,7 +69,7 @@ for(const layout of ['unified','split'])test(`${layout} fallback emoji and CJK g
     await panel.getByRole('button',{name:'Review options',exact:true}).click();await panel.getByLabel('Code size',{exact:true}).selectOption(size);await page.keyboard.press('Escape');
     for(const file of files){
       for(const name of files){const row=panel.locator('.review-file').filter({has:page.locator('.review-file-heading strong',{hasText:name})});const button=row.getByRole('button');if((await button.getAttribute('aria-expanded')==='true')!==(name===file))await button.click();}
-      await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('new 0');
+      await content.evaluate(element=>{element.scrollTop=0;});await expect(content).toContainText('old 0');
       await expect.poll(overflow).toBeLessThanOrEqual(1);
       const width=await panel.locator('.diff-table').evaluate(element=>element.getBoundingClientRect().width);
       const divider=layout==='split'?await panel.locator('tr.diff-line:not(.hunk)').first().locator('td').nth(2).evaluate(element=>element.getBoundingClientRect().left):0;
