@@ -1,5 +1,7 @@
 # Workspaces and project boards
 
+Create and edit workspace settings only in the Windows application on the host PC. A phone paired as Host can use the workspace, but cannot create it or change its name, password or project folders. The server enforces this restriction, including role changes and access revocation. On a phone, only joining/selecting a workspace is available. The header shows a participants icon and count; tapping it opens a read-only roster. The host PC can manage roles and access from this header dialog.
+
 The host PC stores workspaces, boards, invitations and member roles. A workspace groups selected local project folders; its boards and conversation list use those folders. Claude, Codex and Copilot remain separate AI providers inside the workspace.
 
 <img src="images/workspace-board-mobile.png" width="340" alt="Synthetic project notes linked by a dependency on a mobile board">
@@ -30,15 +32,21 @@ Member execution is intentionally not enabled until isolated provider execution 
 
 Passwords are stored as salted scrypt hashes. Member credentials are random tokens stored only as hashes on the host. Authentication, project-file reads, chat lists and board writes are checked on the server. Revocation takes effect on subsequent requests. Workspace data stays in the private host data directory, not in the project repository. Changing a password affects future password logins; revoke existing sessions separately when needed.
 
+Each workspace selects exactly one repository. Its boards use that repository and its chats are filtered to that folder. The host selects one repository when creating or editing the workspace; the server rejects multiple roots. Existing multi-folder workspace data is retained for compatibility rather than silently deleting boards; a folder containing a board cannot be removed.
+
 ## Visual roadmap
 
-**Add branch** reads local and remote-tracking branch names from the exact Git repository root; it does not fetch, checkout, push or create branches. Add the branches that represent your versions to the roadmap. Branch names are preserved as written, including release naming conventions.
+**The plus after the last column** opens a branch-name confirmation. The host creates a local Git branch from HEAD without checkout or push. Hold a branch heading (or right-click it on desktop) to rename the local branch; linked note/version names update across boards in that repository. Invalid or existing names, stale board revisions and repositories without a commit report an error. Remote-tracking branches cannot be renamed by this action.
 
-Create a note with a title, description/acceptance criteria, version branch, status, owner/role and dependencies. Drag its handle or use the arrow keys on that handle. Zoom from 25% to 175%; scroll the canvas to explore a larger roadmap. Dependency lines connect notes. The server rejects missing dependencies and cycles. Simultaneous edits use revisions: an outdated save reports a conflict instead of overwriting another device's changes. Reload the board and reapply that edit.
+Create a note with a title, description/acceptance criteria, status, priority and assignee. Its column determines its version branch: move the note to another column to change it. Dependency editing is deferred; existing stored links are preserved. Drag its handle or use the arrow keys on that handle. Pinch with two fingers or use Ctrl + mouse wheel / a trackpad pinch to zoom from 15% to 300%. Scroll or drag the canvas with one finger to move around; drag a note by its handle. There are no zoom buttons. Simultaneous edits use revisions: an outdated save reports a conflict instead of overwriting another device's changes. Reload the board and reapply that edit.
 
 **Discuss with AI** opens the shared chat with the note and its dependencies prepared as a draft. Sending is explicit. Once the host starts the conversation, its session is linked back to the note. Subsequent opens return to that chat. The initial prompt asks for clarification and acceptance criteria before implementation. The board does not yet parse AI answers into new cards or move statuses automatically. It does not claim that a task is guaranteed correct, create pull requests, merge, or deploy.
 
 The former Jira task list is parked while **Work** presents project boards. Existing Jira integration code and settings remain separate; opening Work does not request a Jira task list or poll its notification feed.
+
+## People view
+
+Switch **Board / People** to view the same tasks by assignee. Columns use workspace participants, with a separate Unassigned column; existing named assignees are retained. Each column sorts critical, high, normal, then low priority, with titles breaking ties. A task shows its title, priority, status and assignee in both views. Open it in either view to edit the shared data. Assignee IDs keep participants with matching display names separate. The chosen view is remembered per board on this device. The roster is the workspace membership list, not a synced corporate directory.
 
 ## Desktop chat
 

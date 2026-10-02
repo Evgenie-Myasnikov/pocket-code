@@ -1,3 +1,4 @@
+import {ChatHeader} from './ChatHeader';
 import {WorkBoards,type BoardChat} from './WorkBoards';
 import {useProjectWorkspaces,ProjectWorkspacePicker,inWorkspace} from './project-workspaces';
 import {version as packageVersion} from '../package.json';
@@ -13,7 +14,6 @@ import {AttachmentTray,type DraftAttachment} from './AttachmentTray';
 import { Review } from './Review';
 import {ActivityDrawer} from './ActivityDrawer';
 import {ActivityHandle} from './ActivityHandle';
-import {useJiraRole,jiraRoleLabel} from './jira-preferences';
 import {useActivity} from './useActivity';
 import {useChatNotifications,useRunNotifications,type WatchedChat} from './chat-notifications';
 import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
@@ -56,7 +56,6 @@ export function App({embedded}:{embedded?:EmbeddedChat}={}) {
 }
 function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:EmbeddedChat}) {
   useLanguage();
-  const jiraRole=useJiraRole();
   const appearanceSettings = useAppearance();
   const [provider, setProvider] = useState<WorkspaceProvider>(()=>embedded?.provider||selectedWorkspace());
   const [providers, setProviders] = useState<ProviderInfo[]>([{id:'claude',name:'Claude',available:true}]);
@@ -548,7 +547,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     <aside className="sidebar">
       <ProjectWorkspacePicker value={projectSpaces}/><div className="chat-list-actions">{workspacePicker('sidebar')}
       <button className="primary new-chat" disabled={busy || uploading} onClick={() => newChat()}><Plus size={18} />{t("Новый чат")}</button></div>
-      <nav className="desktop-tabs"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={17} />{(locale().startsWith('ru')?'В работе':'Work')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={17} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><Folder size={17} />{t("Проект")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
+      <nav className="desktop-tabs"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={17} />{(locale().startsWith('ru')?'Доска':'Board')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={17} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><Folder size={17} />{t("Проект")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
       <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти в чатах")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
       <div className="session-list"><div className="list-label">{t("ВАШИ ЧАТЫ ")}<span>{visible.length}</span></div>
         {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><span className="pulse-dot" /><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}</small></div></button>)}
@@ -559,13 +558,19 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {reviewOpen && connection && reviewCwd && <Review key={reviewContext} connection={connection} cwd={reviewCwd} initialMode={availableReview?.mode} onClose={()=>setReviewOpen(false)}/>}
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
-      <header className="chat-header" data-section={tab}>
-        {(tab==='chats'||tab==='terminal')&&<button className="icon-button mobile-back" aria-label={t("К списку чатов")} onClick={() => embedded?embedded.onBack():setMobileChat(false)}><ArrowLeft size={21} /></button>}
-        <div className="header-title">{(!embedded&&(tab==='terminal'||tab==='chats'&&!selected&&!job)) && <label className="project-picker"><Folder size={14}/><select aria-label={t("Папка проекта")} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>}<strong>{tab==='jobs'?(locale().startsWith('ru')?'В работе':'Work'):tab==='settings'?t("Настройки"):tab==='files'?t("Проект"):tab==='terminal'?t("Терминал"):selected?.customTitle||selected?.summary||t("Новый разговор")}</strong></div>
+      {tab==='chats'?<>
+        <ChatHeader title={selected?.customTitle||selected?.summary||t('Новый разговор')} project={basename(selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
+          onBack={()=>embedded?embedded.onBack():setMobileChat(false)}
+          review={availableReview?{disabled:!connection||demo||!!selected?.readOnly,open:()=>setReviewOpen(true)}:undefined}
+          outputs={hasOutputs||Boolean(selected)?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
+          reading={outputMessages.length>0||Boolean(job?.partial)?{disabled:loading||!history.length&&!job,open:()=>toggleReadingMode(true)}:undefined}/>
+        {!embedded&&!selected&&!job&&<div className="chat-start-context"><label className="project-picker"><Folder size={14}/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>{workspacePicker('header')}</div>}
+      </>:<header className="chat-header" data-section={tab}>
+        {tab==='terminal'&&<button className="icon-button mobile-back" aria-label={t("К списку чатов")} onClick={() => embedded?embedded.onBack():setMobileChat(false)}><ArrowLeft size={21} /></button>}
+        <div className="header-title">{(!embedded&&(tab==='terminal')) && <label className="project-picker"><Folder size={14}/><select aria-label={t("Папка проекта")} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>}<strong>{tab==='jobs'?(locale().startsWith('ru')?'Доска':'Board'):tab==='settings'?t("Настройки"):tab==='files'?t("Проект"):tab==='terminal'?t("Терминал"):selected?.customTitle||selected?.summary||t("Новый разговор")}</strong></div>
 
-        {(!embedded&&(tab==='terminal'||tab==='chats'&&!selected&&!job))&&workspacePicker('header')}
-        {tab==='chats' && <><span className="branch"><GitBranch size={13} />{selected?.gitBranch||'local'}</span>{availableReview&&<button className="secondary review-button" aria-label="Review" disabled={!connection||demo||selected?.readOnly} onClick={()=>setReviewOpen(true)}>Review</button>}{(hasOutputs||Boolean(selected))&&<button className="icon-button outputs-entry" disabled={!connection||demo||loading} aria-label={t("Результаты")} title={t("Результаты")} onClick={()=>setOutputsOpen(true)}><PanelsTopLeft size={20}/></button>}{(outputMessages.length>0||Boolean(job?.partial))&&<button className="icon-button reading-entry" disabled={loading||!history.length&&!job} aria-label={t("Режим чтения")} title={t("Режим чтения")} aria-pressed={readingMode} onClick={()=>toggleReadingMode(true)}><Eye size={20}/></button>}</>}
-      </header>
+        {(!embedded&&(tab==='terminal'))&&workspacePicker('header')}
+      </header>}
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
       {historyError && tab==='chats' && <div className="network-banner" role="status">{t("История не обновилась: ")}{t(historyError)}</div>}
       {networkError && !hostRestarting && <div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
@@ -602,7 +607,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         </div>
       </>}
     </main>
-    <nav className="mobile-nav"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={20} />{(locale().startsWith('ru')?'В работе':'Work')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={20} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => {setTab('files');setMobileChat(true);}}><Folder size={20} />{t("Проект")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={20} />{t("Настройки")}</button></nav>
+    <nav className="mobile-nav"><button className={tab === 'jobs' ? 'active' : ''} onClick={() => {setTab('jobs');setMobileChat(true);}}><ClipboardList size={20} />{(locale().startsWith('ru')?'Доска':'Board')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={20} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => {setTab('files');setMobileChat(true);}}><Folder size={20} />{t("Проект")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={20} />{t("Настройки")}</button></nav>
     {pendingTakeover && <div className="modal-backdrop"><section ref={confirmation} className="confirm-modal" role="dialog" aria-modal="true" aria-label={t("Продолжить чат с телефона?")}><Terminal size={28} /><h2>{t("Продолжить чат с телефона?")}</h2><p>{t("Сначала дождитесь завершения ответа в {0} на ПК. Одновременная работа с одной историей может вызвать конфликт.",engineName)}</p><button className="primary" onClick={() => {setPendingTakeover(false);setTakeover(true);void send(true);}}>{t("На ПК завершено — продолжить")}</button><button className="text-button" onClick={() => setPendingTakeover(false)}>{t("Отмена")}</button></section></div>}
   </div>;
 }

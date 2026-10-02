@@ -13,6 +13,7 @@ import {execFileSync} from 'node:child_process';
 
 test('workspace login isolates projects and chats, roles and credentials stay host-controlled',async()=>{
  const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-boards-')),a=path.join(dir,'atlas'),b=path.join(dir,'garden');await mkdir(a);await mkdir(b);await writeFile(path.join(b,'private.txt'),'synthetic private content');
+ execFileSync('git',['init',a],{windowsHide:true,stdio:'ignore'});await writeFile(path.join(a,'README.md'),'Synthetic repository');execFileSync('git',['-C',a,'add','README.md'],{windowsHide:true});execFileSync('git',['-C',a,'-c','user.name=Test','-c','user.email=test@example.invalid','commit','-m','Synthetic'],{windowsHide:true,stdio:'ignore'});
  const aId=randomUUID(),bId=randomUUID(),token='host-synthetic-token'.repeat(3),password='synthetic workspace password';
  const sdk:any={listSessions:async()=>[{sessionId:aId,cwd:a,summary:'Atlas',lastModified:1},{sessionId:bId,cwd:b,summary:'Garden',lastModified:1}],getSessionMessages:async()=>[]};
  const devices=await new DeviceRegistry(path.join(dir,'devices.json')).load();
@@ -20,13 +21,23 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));const base='http://127.0.0.1:'+(server.address() as AddressInfo).port+'/api';
  const call=(p:string,body?:unknown,key=token)=>fetch(base+p,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
  try{
+  assert.equal((await call('/workspaces',{name:'Multiple repositories',password,roots:[a,b]})).status,400);
   const ws=await (await call('/workspaces',{name:'Atlas team',password,roots:[a]})).json();assert.ok(ws.id);
   await call('/workspaces',{name:'Garden team',password,roots:[b]});
   const board=await (await call('/boards',{workspaceId:ws.id,name:'Roadmap',root:a})).json();assert.ok(board.id);
+  assert.equal((await call('/boards/'+board.id+'/branch',{name:'bad name',revision:0})).status,400);
+  const added=await (await call('/boards/'+board.id+'/branch',{name:'release/alpha',revision:0})).json();assert.equal(added.revision,1);
+  assert.equal((await call('/boards/'+board.id+'/branch',{name:'release/alpha',revision:1})).status,409);
+  const renamed=await (await call('/boards/'+board.id+'/branch',{name:'release/beta',previous:'release/alpha',revision:1})).json();assert.equal(renamed.revision,2);assert.deepEqual(renamed.versions,['release/beta']);
+  assert.ok((await boardBranches(a)).branches.includes('release/beta'));assert.ok(!(await boardBranches(a)).branches.includes('release/alpha'));
   assert.equal((await (await call('/pairing-role')).json()).role,'host');
   const originalQr=devices.pairingToken;
   const owner=await (await call('/devices/pair',{name:'Host phone',platform:'android',version:'test'},originalQr)).json();
-  assert.equal((await (await call('/workspaces',undefined,owner.token)).json()).host,true);
+  const phoneCatalog=await (await call('/workspaces',undefined,owner.token)).json();assert.equal(phoneCatalog.host,true);assert.equal(phoneCatalog.canManageWorkspaces,false);
+  assert.equal((await (await call('/workspaces')).json()).canManageWorkspaces,true);
+  assert.equal((await call('/workspaces',{name:'Phone area',password,roots:[a]},owner.token)).status,403);
+  assert.equal((await call('/workspaces',{id:ws.id,name:'Changed',roots:[a]},owner.token)).status,403);
+  assert.equal((await fetch(base+'/workspaces',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json','X-Forwarded-For':'192.0.2.1'},body:JSON.stringify({name:'Proxy area',password,roots:[a]})})).status,401);
   assert.equal((await call('/pairing-role',{role:'viewer',workspaceId:ws.id})).status,200);
   assert.notEqual(devices.pairingToken,originalQr);
   assert.equal((await call('/devices/pair',{name:'Old invitation',platform:'android',version:'test'},originalQr)).status,401);
@@ -36,7 +47,9 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   assert.equal((await call('/pairing-role',{role:'host'},invited.token)).status,403);
   assert.equal((await call('/workspace-login',{name:'Atlas team',password:'wrong',displayName:'Reader'},'')).status,401);
   const guest=await (await call('/workspace-login',{name:'Atlas team',password,displayName:'Reader'},'')).json();assert.ok(guest.token);
-  const catalog=await (await call('/workspaces',undefined,guest.token)).json();assert.equal(catalog.host,false);assert.equal(catalog.workspaces.length,1);assert.equal(catalog.workspaces[0].role,'viewer');assert.equal(JSON.stringify(catalog).includes(password),false);assert.equal(JSON.stringify(catalog).includes('tokenHash'),false);
+  assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,role:'developer'},owner.token)).status,403);
+  assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,remove:true},owner.token)).status,403);
+  const catalog=await (await call('/workspaces',undefined,guest.token)).json();assert.equal(catalog.host,false);assert.ok(catalog.workspaces[0].people.some((p:any)=>p.name==='Reader'));assert.equal(JSON.stringify(catalog.workspaces[0].people).includes('tokenHash'),false);assert.equal(catalog.workspaces.length,1);assert.equal(catalog.workspaces[0].role,'viewer');assert.equal(JSON.stringify(catalog).includes(password),false);assert.equal(JSON.stringify(catalog).includes('tokenHash'),false);
   const list=await (await call('/sessions',undefined,guest.token)).json();assert.deepEqual(list.map((s:any)=>s.sessionId),[aId]);assert.equal(list[0].readOnly,true);
   assert.equal((await call('/sessions/'+bId+'/messages',undefined,guest.token)).status,404);
   assert.equal((await call('/file?path='+encodeURIComponent(path.join(b,'private.txt')),undefined,guest.token)).status,403);
@@ -45,10 +58,13 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   assert.equal((await call('/workspaces',{name:'Escape',password,roots:[b]},guest.token)).status,403);
   assert.equal((await call('/jobs',{cwd:a,text:'run'},guest.token)).status,403);
   await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,role:'developer'});
-  assert.equal((await call('/boards/'+board.id,{revision:0,versions:['release/1.0'],notes:[]},guest.token)).status,200);
+  assert.equal((await call('/boards/'+board.id,{revision:2,versions:['release/1.0'],notes:[]},guest.token)).status,200);
   assert.equal((await call('/boards/'+board.id,{revision:0,versions:[],notes:[]},guest.token)).status,409);
   const disk=await readFile(path.join(dir,'uploads','.boards','workspaces.json'),'utf8');assert.equal(disk.includes(password),false);assert.equal(disk.includes(guest.token),false);
-  const loaded=await new BoardStore(path.join(dir,'uploads','.boards','workspaces.json')).load();assert.equal(loaded.snapshot().boards[0].versions[0],'release/1.0');
+  const savedNote:BoardNote={id:randomUUID(),title:'Assigned task',description:'',branch:'release/1.0',status:'working',owner:'Reader',assigneeId:guest.memberId,priority:'high',x:20,y:70,dependencies:[]};
+  assert.equal((await call('/boards/'+board.id,{revision:3,versions:['release/1.0'],notes:[savedNote]},guest.token)).status,200);
+  assert.equal((await call('/boards/'+board.id,{revision:4,versions:[],notes:[{...savedNote,priority:'invalid'}]},guest.token)).status,400);
+  const loaded=await new BoardStore(path.join(dir,'uploads','.boards','workspaces.json')).load();assert.equal(loaded.snapshot().boards[0].versions[0],'release/1.0');assert.equal(loaded.snapshot().boards[0].notes[0].priority,'high');assert.equal(loaded.snapshot().boards[0].notes[0].assigneeId,guest.memberId);
   await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,remove:true});assert.equal((await call('/workspaces',undefined,guest.token)).status,401);
  }finally{jobs.close();terminals.close();await new Promise<void>(r=>server.close(()=>r()));await rm(dir,{recursive:true,force:true});}
 });

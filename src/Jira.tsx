@@ -11,7 +11,7 @@ import type {CodexAccess} from './preferences';
 import './jira.css';
 import {useModal} from './navigation';
 import {JiraWorkflow,type JiraLink} from './JiraWorkflow';
-import {useJiraRole,setJiraRole,jiraRoleLabel,jiraStartLabel,type JiraRole} from './jira-preferences';
+import {useJiraRole,jiraRoleLabel,jiraStartLabel} from './jira-preferences';
 
 const Login = registerPlugin<{
   prepare(): Promise<{redirectUrl: string;}>;
@@ -21,7 +21,7 @@ const Login = registerPlugin<{
 type Status = {error?: string;source?: 'claude'|'codex'|'copilot';connected: boolean;sites: JiraSite[];};
 export function JiraSettings({ connection,provider='claude' }: {connection: Connection | null;provider?:'claude'|'codex'|'copilot'}) {
   const request=providerRequest(provider);
-  const role=useJiraRole();
+
   const [status, setStatus] = useState<Status | null>(null),[busy, setBusy] = useState(false),[error, setError] = useState('');
   const attempt = useRef(0);
   useEffect(() => {
@@ -61,7 +61,6 @@ export function JiraSettings({ connection,provider='claude' }: {connection: Conn
     {!status?.connected && !busy && <button className="primary" disabled={!connection||!status} onClick={() => void connect()}><Link2 size={16} />{status?.source === 'codex' ? (getLanguage()==='ru'?'Использовать подключение Codex':'Use Codex connection') : status?.source === "claude" ? t("Использовать подключение Claude") : "Connect"}</button>}
     {(status?.connected || busy || error) && <button className="secondary" onClick={() => void disconnect()}>{busy ? t("Отменить вход") : status?.connected ? t("Отключить Jira") : t("Сбросить вход")}</button>}
     <p className="muted">{status?.source === 'codex' ? (getLanguage()==='ru'?'Отключение здесь не удаляет коннектор из Codex. При отсутствии доступа автоматического переключения на Claude нет.':'Disconnecting here does not remove the Codex connector. Unavailable access never silently falls back to Claude.') : status?.source === "claude" ? t("Чтение задач использует Claude на ПК и его лимиты. Отключение здесь не отключает коннектор в Claude.") : t("Доступ хранится на ПК в защищённом хранилище Windows. Отключение удаляет его из Pocket Code; разрешение Atlassian можно отозвать в настройках аккаунта.")}</p>
-    <label className="jira-role-setting">{t('Роль в Jira')}<select value={role} onChange={event=>setJiraRole(event.target.value as JiraRole)}>{(['developer','reviewer','qa'] as const).map(item=><option key={item} value={item}>{t(jiraRoleLabel(item))}</option>)}</select></label><p className="muted">{t('Роль определяет доступные действия в задачах. Права вашего аккаунта Jira остаются прежними.')}</p>
   </section>;
 }
 export function JiraJobs({connection,roots,jobs,budget,onOpen,onSettings,provider='claude',codexAccess='full',onOpenLinked,notificationTarget,onNotificationOpened}:{notificationTarget?:{id:string;site:string;issue:JiraIssue}|null;onNotificationOpened?:()=>void;provider?:'claude'|'codex'|'copilot';codexAccess?:CodexAccess;connection:Connection|null;roots:string[];jobs:JobView[];budget:number;onOpen(job:JobView):void;onSettings():void;onOpenLinked?(link:JiraLink):void}){

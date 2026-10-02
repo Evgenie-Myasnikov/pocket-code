@@ -12,7 +12,7 @@ test('desktop keeps a draft across navigation and submits through the shared cha
  await desktop(page);await page.getByRole('button',{name:'New chat',exact:true}).click();
  await page.locator('textarea').fill('Synthetic planning request');
  await page.getByRole('button',{name:'Settings',exact:true}).first().click();
- await page.getByRole('button',{name:'Chats',exact:true}).first().click();
+ await page.getByRole('button',{name:'Open draft',exact:true}).click();
  await expect(page.locator('textarea')).toHaveValue('Synthetic planning request');
  await page.getByRole('button',{name:'Send message',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='write'&&/^\/jobs(?:\?|$)/.test(c.endpoint)&&c.data.text==='Synthetic planning request'))).toBe(true);
@@ -42,7 +42,7 @@ async function desktop(page:Page){
    if(p==='/pairing-role'){reply(id,{role:'host'});return;}
    if(p==='/health'){reply(id,{name:'Synthetic PC',roots:['C:\\Demo\\Atlas','C:\\Demo\\Garden'],version:'0.22.7',protocol:1});return;}
    if(p==='/providers'){reply(id,[{id:'claude',available:true,models:[]},{id:'codex',available:true,authenticated:true,models:[]}]);return;}
-   if(p==='/workspaces'){reply(id,{host:true,workspaces:(window as any).testWorkspaces||[],boards:[]});return;}
+   if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,workspaces:(window as any).testWorkspaces||[],boards:[]});return;}
    if(p==='/activity'){reply(id,[]);return;}
    if(p==='/task-notifications'){reply(id,{items:[],unread:0});return;}
    if(p==='/jobs'&&action==='write'){const run={...message.data,provider:message.data.provider||'claude',sessionId:'alpha',status:'running',messages:[],partial:'Working on your request',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0};(window as any).testRuns=[run];reply(id,run);return;}
@@ -79,7 +79,7 @@ test('desktop shares editable chat, review and results with provider/project sel
 test('desktop keeps the current chat while switching sections and persists appearance',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:/claude · Interface review/}).click();await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Ocean',exact:true}).click();
- await page.getByLabel('Start with Windows').check();await page.getByRole('button',{name:'Chats',exact:true}).click();await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
+ await page.getByLabel('Start with Windows').check();await page.getByRole('button',{name:/claude · Interface review/}).click();await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
  await page.getByRole('button',{name:'Connection',exact:true}).click();await expect(page.getByRole('heading',{name:'Connect your phone'})).toBeVisible();
  const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.some((call:any)=>call.action==='settings'&&call.startup===true)).toBeTruthy();
 });
@@ -151,4 +151,26 @@ test('desktop Project page shows rules, changelog and files of the selected proj
  const reads=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='read').map((c:any)=>c.endpoint.split('?')[0]));
  expect(reads).toEqual(expect.arrayContaining(['/project-docs','/project-doc']));
  expect(await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>!['read','state','settings','window-theme'].includes(c.action)).map((c:any)=>c.action))).toEqual([]);
+});
+
+for(const width of [900,1440])test('workspace repository choices keep their layout at '+width,async({page})=>{
+ await desktop(page);await page.setViewportSize({width,height:800});
+ await expect(page.getByRole('navigation').getByRole('button',{name:'Chats',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Board',exact:true}).click();
+ await page.locator('.board-toolbar').getByRole('button',{name:'Workspace',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'Workspace settings'});
+ await expect(dialog).toBeVisible();
+ const checks=dialog.locator('.board-check');await expect(checks).toHaveCount(2);
+ for(const check of await checks.all()){
+  const input=await check.locator('input').boundingBox(),text=await check.locator('span').boundingBox(),row=await check.boundingBox();
+  expect(input!.width).toBe(20);expect(input!.height).toBe(20);
+  expect(text!.x).toBeGreaterThan(input!.x+input!.width);expect(text!.x+text!.width).toBeLessThanOrEqual(row!.x+row!.width+1);
+ }
+ expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+ await dialog.locator('input[type=radio]').first().check();
+ await expect(dialog.locator('input[type=radio]').first()).toBeChecked();
+ await dialog.locator('input[type=radio]').last().check();
+ await expect(dialog.locator('input[type=radio]').first()).not.toBeChecked();
+ await expect(dialog.locator('input[type=radio]').last()).toBeChecked();
+ await page.screenshot({path:'.local/workspace-layout-'+width+'.png'});
 });

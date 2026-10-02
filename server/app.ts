@@ -86,7 +86,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       if(deviceId){res.locals.deviceId=deviceId;const release=config.devices.track(deviceId,()=>res.destroy());res.once('finish',release);res.once('close',release);next();return;}
     }
     // A noisy public tunnel peer must not lock out a client with the valid key.
-    if (!config.devices&&validToken((req.headers.authorization || '').replace(/^Bearer /, ''), config.token)) { next(); return; }
+    if (!config.devices&&validToken(key, config.token)) { res.locals.deviceAdmin=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')&&['127.0.0.1','localhost','[::1]'].includes(req.hostname)&&!req.headers['x-forwarded-for']&&!req.headers.forwarded&&!req.headers['cf-connecting-ip']; next(); return; }
     if (failures.size > 1000) for (const [key, v] of failures) if (v.reset < now) failures.delete(key);
     const entry = failures.get(ip);
     if (entry && entry.reset > now && entry.count >= 20) { res.status(429).json({ error: 'Слишком много попыток. Подождите минуту.' }); return; }

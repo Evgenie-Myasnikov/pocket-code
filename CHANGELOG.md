@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-02 - Board interaction and shared chat header (0.24.0)
+- Changed: Board and People views share priority, status and assignee metadata. Columns determine note branches; branch and dependency selectors are removed from note details. Existing dependency data is retained.
+- Added: Pinch/wheel zoom, hold-to-create notes, branch creation/rename from column headings, and optimistic note dragging without a release jump.
+- Changed: Workspace administration is desktop-only and selects one repository. Participants appear in the header; mobile users can view the roster and join workspaces.
+- Improved: Compact shared chat header with contextual actions; removed redundant desktop Chats navigation and Jira role setting.
+- Validation: 243 server tests passed; 36 chat/results/desktop browser scenarios and the board browser scenario passed, including cross-column persistence. TypeScript/Vite, Android Gradle and desktop packaging passed; native desktop lifecycle/bridge smoke passed.
+- Follow-up: Physical Android testing remains outstanding. Release publication is pending artifact privacy validation.
+
 ## 2026-10-02 - Host workspaces, visual boards and shared desktop chat (0.23.0)
 - Added: Host-owned workspaces group project folders, boards and chat lists. Participants sign in with host address, workspace name and password; the host assigns Viewer, Developer, Reviewer or QA roles and can revoke sessions. Passwords and participant tokens are hashed in private host storage.
 - Added: The desktop pairing screen selects the invitation role beside the QR, initially Host for testing. Non-host invitations select one workspace. Changing the invitation rotates the QR; the server ignores client-supplied roles.

@@ -3,7 +3,7 @@ import {startVisiblePoll} from './visible-poll';
 import {request,type Connection} from './api';
 import {useLanguage} from './i18n';
 import type {ProjectWorkspace,ProjectBoard} from '../server/boards';
-export type WorkspaceCatalog={host:boolean;workspaces:ProjectWorkspace[];boards:(Pick<ProjectBoard,'id'|'workspaceId'|'name'|'root'>&{noteCount:number})[]};
+export type WorkspaceCatalog={host:boolean;canManageWorkspaces?:boolean;workspaces:ProjectWorkspace[];boards:(Pick<ProjectBoard,'id'|'workspaceId'|'name'|'root'>&{noteCount:number})[]};
 const empty:WorkspaceCatalog={host:false,workspaces:[],boards:[]};
 const event='pocket-project-workspace';
 export function useProjectWorkspaces(connection:Connection|null){

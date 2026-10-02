@@ -1,0 +1,29 @@
+/* Shared header: context gets its own line; action sizing follows the available chat width. */
+.workspace{container-type:inline-size;container-name:chat-workspace}
+header.chat-header.chat-header-conversation{display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:16px;height:auto;min-height:72px;padding:8px 20px;flex-shrink:0}
+.chat-header-conversation .chat-header-main{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.chat-header-conversation .mobile-back{display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;min-height:48px;margin:0;padding:0;border:0;background:transparent}
+header.chat-header.chat-header-conversation .header-title{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;margin:0;padding:0;grid-area:auto}
+header.chat-header.chat-header-conversation .header-title>strong{display:block;margin:0;font-size:clamp(14px,calc(16px * var(--ui-scale,1)),20px);font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-header-conversation .chat-context{display:flex;align-items:center;gap:6px;min-width:0;font-size:clamp(10px,calc(11px * var(--ui-scale,1)),14px);line-height:1.3;color:var(--muted)}
+.chat-context-provider{flex-shrink:0}.chat-context-project{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-context-branch{display:flex;align-items:center;gap:4px;min-width:0;max-width:38%}.chat-context-branch svg{flex-shrink:0}.chat-context-branch>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-header-conversation .chat-header-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.chat-header-conversation .chat-header-actions>button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:48px;min-height:48px;height:48px;width:auto;border:0;border-radius:8px;background:transparent;color:var(--muted);box-shadow:none;padding:0 10px;margin:0;font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px);font-weight:500;white-space:nowrap}
+.chat-header-conversation .chat-header-actions>button svg{flex-shrink:0}
+.chat-header-conversation .chat-header-actions>button:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 9%,transparent);color:var(--text)}
+.chat-start-context{display:flex;align-items:center;gap:12px;padding:8px 20px;border-bottom:1px solid var(--line)}.chat-start-context .project-picker{flex:1;min-width:0;margin:0;display:flex;align-items:center;gap:6px}.chat-start-context .project-picker select{min-width:0;width:100%;margin:0;min-height:48px}.chat-start-context .workspace-picker-header{display:flex;margin:0}.chat-start-context .workspace-picker-header select{min-height:48px}
+@container chat-workspace (max-width:620px){
+  header.chat-header.chat-header-conversation{flex-direction:column;align-items:stretch;gap:0;padding:4px 12px;min-height:56px}
+  .chat-header-conversation .chat-header-main{flex:none;min-height:48px}
+  .chat-header-conversation .chat-header-actions{justify-content:flex-end;gap:4px;padding-left:0}
+  .chat-header-conversation .chat-header-actions>button{flex:0 1 auto;min-width:48px;padding:0 6px}
+  .chat-context-branch{display:none}
+  .chat-start-context{padding:8px 12px;gap:8px}
+}
+@media(max-height:500px){
+  header.chat-header.chat-header-conversation{flex-direction:row;gap:4px;padding:4px 8px;min-height:56px}
+  .chat-header-conversation .chat-header-main{flex:1}.chat-header-conversation .chat-header-actions{padding-left:0;gap:0}
+  .chat-header-conversation .chat-header-actions>button{padding:0;width:48px;flex:none}.chat-header-actions>button>span{display:none}.chat-header-conversation .chat-context{display:none}
+}
+
+.chat-header-conversation .chat-header-actions>button>span{min-width:0;overflow:hidden;text-overflow:ellipsis}

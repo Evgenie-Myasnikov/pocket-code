@@ -22,6 +22,7 @@ async function openChat(page:Page,language:string,textSize:number){
     ],previous:null,next:null}});
     if(path==='/sessions/chat/subagents')return route.fulfill({json:{agents:[agent]}});
     if(path==='/sessions/chat/subagents/child/messages')return route.fulfill({json:{messages:[{id:'child-content',role:'assistant',blocks:[{type:'text',text:'The compact controls are reachable.'}]}]}});
+    if(path==='/review/availability')return route.fulfill({json:{available:true,mode:'working'}});
     if(path==='/jobs')return route.fulfill({json:[]});
     if(path==='/updates/latest')return route.fulfill({json:{enabled:false}});
     return route.fulfill({status:404,json:{error:'Synthetic endpoint not configured'}});
@@ -35,6 +36,10 @@ for(const profile of [{width:320,language:'en',textSize:8},{width:360,language:'
   test(`quiet user and subagent surfaces fit ${profile.width}px ${profile.language} ${profile.textSize}px`,async({page})=>{
     await page.setViewportSize({width:profile.width,height:820});await openChat(page,profile.language,profile.textSize);
     await expect(page.locator('.chat-header select')).toHaveCount(0);
+    const header=page.locator('.chat-header');const titleBox=await header.locator('.header-title strong').boundingBox(),contextBox=await header.locator('.chat-context').boundingBox();expect(contextBox!.y).toBeGreaterThanOrEqual(titleBox!.y+titleBox!.height-1);
+    expect((await header.boundingBox())!.height).toBeLessThanOrEqual(110);
+    for(const control of await header.locator('button').all()){const rect=await control.boundingBox();expect(rect!.x).toBeGreaterThanOrEqual(0);expect(rect!.x+rect!.width).toBeLessThanOrEqual(profile.width);expect(rect!.height).toBeGreaterThanOrEqual(48);}
+    await expect(header.getByRole('button',{name:'Review',exact:true})).toBeVisible();
     const user=page.locator('[data-message-id="user-short"]'),agents=page.locator('[data-message-id="agents-only"]');
     await expect(user.locator('.message-label')).toHaveCount(0);await expect(agents.locator('.message-label')).toHaveCount(0);
     await user.locator('.copy-button').click();await expect.poll(()=>page.evaluate(()=>(window as any).__copied)).toBe('Thanks!');

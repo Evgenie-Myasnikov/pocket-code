@@ -9,7 +9,7 @@ import type {Express} from 'express';
 import {allowedPath,HttpError} from './security.js';
 
 const id=z.string().uuid(),name=z.string().trim().min(1).max(160);
-const note=z.object({id,title:name,description:z.string().max(20000),branch:z.string().max(300),status:z.enum(['idea','questions','ready','working','review','done']),owner:z.string().max(120),x:z.number().min(0).max(20000),y:z.number().min(0).max(20000),dependencies:z.array(id).max(100),chat:z.object({provider:z.enum(['claude','codex','copilot']),sessionId:z.string().max(200)}).optional()});
+const note=z.object({id,title:name,description:z.string().max(20000),branch:z.string().max(300),status:z.enum(['idea','questions','ready','working','review','done']),owner:z.string().max(160),assigneeId:z.string().max(200).optional(),priority:z.enum(['critical','high','normal','low']).optional(),x:z.number().min(0).max(20000),y:z.number().min(0).max(20000),dependencies:z.array(id).max(100),chat:z.object({provider:z.enum(['claude','codex','copilot']),sessionId:z.string().max(200)}).optional()});
 const board=z.object({id,workspaceId:id,name,root:z.string(),revision:z.number().int().nonnegative(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40).default([])});
 const role=z.enum(['viewer','developer','reviewer','qa']);
 const member=z.object({id,name,role,tokenHash:z.string()});
@@ -18,7 +18,7 @@ const invitation=z.object({role:z.enum(['host','viewer','developer','reviewer','
 const database=z.object({workspaces:z.array(workspace),boards:z.array(board),invitation:invitation.default({role:'host',workspaceId:undefined})});
 export type BoardNote=z.infer<typeof note>;
 export type ProjectBoard=z.infer<typeof board>;
-export type ProjectWorkspace=Omit<z.infer<typeof workspace>,'password'|'members'>&{role:'host'|z.infer<typeof role>;members?:{id:string;name:string;role:z.infer<typeof role>}[]};
+export type ProjectWorkspace=Omit<z.infer<typeof workspace>,'password'|'members'>&{role:'host'|z.infer<typeof role>;people?:{id:string;name:string;role:string}[];members?:{id:string;name:string;role:z.infer<typeof role>}[]};
 type Data=z.infer<typeof database>;
 
 // Private host state; serialized, atomic writes and optimistic board revisions protect two devices.
@@ -31,7 +31,7 @@ export class BoardStore{
   invitation(){return {...this.data.invitation};}
   getBoard(id:string){const found=this.data.boards.find(b=>b.id===id);return found?structuredClone(found):undefined;}
   boardList(){return this.data.boards.map(({id,workspaceId,name,root,notes})=>({id,workspaceId,name,root,noteCount:notes.length}));}
-  mutate<T>(change:(data:Data)=>T):Promise<T>{const run=this.queue.then(async()=>{const next=this.snapshot(),result=change(next);database.parse(next);await mkdir(path.dirname(this.file),{recursive:true});const temp=this.file+'.tmp';await writeFile(temp,JSON.stringify(next),{mode:0o600});await rename(temp,this.file);this.data=next;return structuredClone(result);});this.queue=run.then(()=>{},()=>{});return run;}
+  mutate<T>(change:(data:Data)=>T|Promise<T>):Promise<T>{const run=this.queue.then(async()=>{const next=this.snapshot(),result=await change(next);database.parse(next);await mkdir(path.dirname(this.file),{recursive:true});const temp=this.file+'.tmp';await writeFile(temp,JSON.stringify(next),{mode:0o600});await rename(temp,this.file);this.data=next;return structuredClone(result);});this.queue=run.then(()=>{},()=>{});return run;}
   save(id:string,revision:number,notes:BoardNote[],versions:string[]=[]){return this.mutate(data=>{const found=data.boards.find(b=>b.id===id);if(!found)throw new HttpError(404,'Board not found');if(found.revision!==revision)throw new HttpError(409,'This board changed on another device. Reload before saving.');validateDependencies(notes);found.notes=notes;found.versions=[...new Set(versions)];found.revision++;return found;});}
 }
 export function validateDependencies(notes:BoardNote[]){
@@ -51,7 +51,7 @@ export async function createWorkspaceAccess(file:string){
   const store=await new BoardStore(file).load();
   function identity(token:string){const hash=tokenHash(token);for(const ws of store.workspaces()){const person=ws.members.find(m=>m.tokenHash===hash);if(person)return {workspaceId:ws.id,memberId:person.id};}return undefined;}
   function current(){const ctx=workspaceRequest.getStore();if(!ctx)return undefined;const ws=store.workspaces().find(w=>w.id===ctx.workspaceId);const person=ws?.members.find(m=>m.id===ctx.memberId);if(!ws||!person)throw new HttpError(401,'Workspace access revoked');return {ws,person};}
-  function catalog(){const ctx=current();return {host:!ctx,workspaces:store.workspaces().filter(w=>!ctx||w.id===ctx.ws.id).map(w=>({id:w.id,name:w.name,roots:w.roots,role:ctx?ctx.person.role:'host',...(!ctx?{members:w.members.map(({tokenHash,...m})=>m)}:{})})),boards:store.boardList().filter(b=>!ctx||b.workspaceId===ctx.ws.id)};}
+  function catalog(){const ctx=current();return {host:!ctx,workspaces:store.workspaces().filter(w=>!ctx||w.id===ctx.ws.id).map(w=>({id:w.id,name:w.name,roots:w.roots,role:ctx?ctx.person.role:'host',people:[{id:'host',name:'Host',role:'host'},...w.members.map(({id,name,role})=>({id,name,role}))],...(!ctx?{members:w.members.map(({tokenHash,...m})=>m)}:{})})),boards:store.boardList().filter(b=>!ctx||b.workspaceId===ctx.ws.id)};}
   const attempts=new Map<string,{at:number;count:number}>();
   function publicLogin(app:Express){app.post('/api/workspace-login',async(req,res)=>{const input=z.object({name,password:z.string().min(1).max(256),displayName:name}).parse(req.body);const key=req.ip||'unknown',now=Date.now();let attempt=attempts.get(key);if(!attempt||now-attempt.at>60000){attempt={at:now,count:0};if(attempts.size>1000)attempts.clear();attempts.set(key,attempt);}if(++attempt.count>5)throw new HttpError(429,'Too many attempts. Try again in a minute.');const ws=store.workspaces().find(w=>w.name.toLowerCase()===input.name.toLowerCase());const encoded=ws?.password||hashPassword('unused');const actual=hashPassword(input.password,encoded.split(':')[0]);if(!ws?.password||!timingSafeEqual(Buffer.from(actual),Buffer.from(encoded)))throw new HttpError(401,'Incorrect workspace name or password');const token=randomBytes(32).toString('base64url');const person={id:randomUUID(),name:input.displayName,role:'viewer' as const,tokenHash:tokenHash(token)};await store.mutate(data=>{data.workspaces.find(w=>w.id===ws!.id)!.members.push(person);});res.json({token,workspaceId:ws.id,memberId:person.id,role:'viewer'});});}
   async function pairMember(displayName:string){const invite=store.invitation();if(invite.role==='host')throw new HttpError(400,'Use host pairing');const token=randomBytes(32).toString('base64url'),person={id:randomUUID(),name:displayName,role:invite.role,tokenHash:tokenHash(token)};await store.mutate(data=>{const ws=data.workspaces.find(w=>w.id===invite.workspaceId);if(!ws)throw new HttpError(409,'Select a workspace before sharing this QR');ws.members.push(person);});return {token,workspaceId:invite.workspaceId,memberId:person.id,role:person.role};}
@@ -62,15 +62,39 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   const {store,current,catalog}=access;
   function check(board:ProjectBoard,write=false){const ctx=current();if(ctx&&(board.workspaceId!==ctx.ws.id||write&&ctx.person.role==='viewer'))throw new HttpError(403,'Your role does not allow this board action');}
   app.post('/api/workspace-logout',async(_req,res)=>{const ctx=current();if(!ctx)throw new HttpError(400,'No workspace session');await store.mutate(data=>{const ws=data.workspaces.find(w=>w.id===ctx.ws.id)!;ws.members=ws.members.filter(m=>m.id!==ctx.person.id);});res.json({ok:true});});
-  app.get('/api/workspaces',(_req,res)=>res.json(catalog()));
+  app.get('/api/workspaces',(_req,res)=>res.json({...catalog(),canManageWorkspaces:!!res.locals.deviceAdmin&&!current()}));
   app.post('/api/workspaces',async(req,res)=>{
-    if(current())throw new HttpError(403,'Only the host can create and manage workspaces');
-    const input=z.object({id:id.optional(),name,password:z.string().min(10).max(256).optional(),roots:z.array(z.string()).min(1).max(100)}).parse(req.body);
+    if(current()||!res.locals.deviceAdmin)throw new HttpError(403,'Create and manage workspaces on the host PC.');
+    const input=z.object({id:id.optional(),name,password:z.string().min(10).max(256).optional(),roots:z.array(z.string()).length(1,'A workspace uses exactly one repository')}).parse(req.body);
     const folders=[...new Set(await Promise.all(input.roots.map(root=>allowedPath(roots,root,true))))];
     const result=await store.mutate(data=>{const existing=input.id?data.workspaces.find(w=>w.id===input.id):undefined;if(input.id&&!existing)throw new HttpError(404,'Workspace not found');if(!existing&&!input.password)throw new HttpError(400,'Set a workspace password (at least 10 characters)');if(data.workspaces.some(w=>w.id!==input.id&&w.name.toLowerCase()===input.name.toLowerCase()))throw new HttpError(409,'Workspace name already exists');if(existing&&data.boards.some(b=>b.workspaceId===existing.id&&!folders.includes(b.root)))throw new HttpError(409,'A project with a board cannot be removed from this workspace.');const value={id:existing?.id||randomUUID(),name:input.name,roots:folders,password:input.password?hashPassword(input.password):existing!.password,members:existing?.members||[]};if(existing)Object.assign(existing,value);else data.workspaces.push(value);return {id:value.id};});res.json(result);
   });
-  app.post('/api/workspaces/:id/member',async(req,res)=>{if(current())throw new HttpError(403,'Only the host assigns roles');const input=z.object({memberId:id,role:role.optional(),remove:z.boolean().optional()}).parse(req.body);await store.mutate(data=>{const ws=data.workspaces.find(w=>w.id===req.params.id),person=ws?.members.find(m=>m.id===input.memberId);if(!ws||!person)throw new HttpError(404,'Member not found');if(input.remove)ws.members=ws.members.filter(m=>m.id!==person.id);else if(input.role)person.role=input.role;});res.json({ok:true});});
+  app.post('/api/workspaces/:id/member',async(req,res)=>{if(current()||!res.locals.deviceAdmin)throw new HttpError(403,'Manage workspace members on the host PC.');const input=z.object({memberId:id,role:role.optional(),remove:z.boolean().optional()}).parse(req.body);await store.mutate(data=>{const ws=data.workspaces.find(w=>w.id===req.params.id),person=ws?.members.find(m=>m.id===input.memberId);if(!ws||!person)throw new HttpError(404,'Member not found');if(input.remove)ws.members=ws.members.filter(m=>m.id!==person.id);else if(input.role)person.role=input.role;});res.json({ok:true});});
   app.post('/api/boards',async(req,res)=>{const input=z.object({workspaceId:id,name,root:z.string()}).parse(req.body);if(current())throw new HttpError(403,'Only the host creates boards');const root=await allowedPath(roots,input.root,true);res.json(await store.mutate(data=>{const ws=data.workspaces.find(w=>w.id===input.workspaceId);if(!ws?.roots.includes(root))throw new HttpError(400,'Select a project from this workspace');const value:ProjectBoard={id:randomUUID(),workspaceId:ws.id,name:input.name,root,revision:0,notes:[],versions:[]};data.boards.push(value);return value;}));});
+  app.post('/api/boards/:id/branch',async(req,res)=>{
+    if(current())throw new HttpError(403,'Only the host manages Git branches');
+    const input=z.object({name:z.string().min(1).max(200),previous:z.string().min(1).max(200).optional(),revision:z.number().int().nonnegative()}).parse(req.body);
+    const boardId=id.parse(req.params.id);
+    const result=await store.mutate(async data=>{
+      const found=data.boards.find(b=>b.id===boardId);if(!found)throw new HttpError(404,'Board not found');
+      if(found.revision!==input.revision)throw new HttpError(409,'This board changed. Reload before changing a branch.');
+      await allowedPath(roots,found.root,true);
+      const options={cwd:found.root,windowsHide:true,timeout:10000,maxBuffer:1024*1024};
+      const git=async(args:string[])=>exec('git',args,options);
+      const {stdout:top}=await git(['rev-parse','--show-toplevel']);
+      if(path.resolve(top.trim()).toLowerCase()!==path.resolve(found.root).toLowerCase())throw new HttpError(400,'Select the repository root.');
+      for(const value of [input.name,input.previous].filter((v):v is string=>!!v)){
+        if(value.startsWith('-'))throw new HttpError(400,'Invalid branch name');
+        try{await git(['check-ref-format','refs/heads/'+value]);}catch{throw new HttpError(400,'Invalid branch name');}
+      }
+      if(input.previous===input.name)return found;
+      if(!input.previous&&found.versions.length>=40)throw new HttpError(400,'The board version limit was reached');
+      try{await git(input.previous?['branch','-m',input.previous,input.name]:['branch',input.name]);}catch{throw new HttpError(409,'Git could not change the branch. Check that the name is unused, the source is a local branch, and the repository has a commit.');}
+      if(input.previous){for(const b of data.boards.filter(b=>b.root===found.root)){b.versions=[...new Set(b.versions.map(v=>v===input.previous?input.name:v))];b.notes=b.notes.map(n=>n.branch===input.previous?{...n,branch:input.name}:n);b.revision++;}}
+      else{found.versions=[...new Set([...found.versions,input.name])];found.revision++;}
+      return found;
+    });res.json({...result,...await boardBranches(result.root)});
+  });
   app.get('/api/boards/:id',async(req,res)=>{const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');await allowedPath(roots,found.root,true);res.json({...found,...await boardBranches(found.root)});});
   app.post('/api/boards/:id',async(req,res)=>{const input=z.object({revision:z.number().int().nonnegative(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40)}).parse(req.body);const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');await allowedPath(roots,found.root,true);res.json(await store.save(found.id,input.revision,input.notes,input.versions));});
 }

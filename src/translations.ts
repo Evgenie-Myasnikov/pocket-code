@@ -1,5 +1,7 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+"\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044f \u0447\u0430\u0442\u0430":"Chat actions",
+"\u0427\u0442\u0435\u043d\u0438\u0435":"Read",
 "Диф по ширине экрана":"Fit diff to width",
 "Открыть чат задач":"Open task chat",
 "Подготавливаем задачи: {0} / {1}":"Preparing tasks: {0} / {1}",
