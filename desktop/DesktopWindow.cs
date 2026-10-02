@@ -22,7 +22,7 @@ public static class DesktopReadPolicy {
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/(health|providers|provider-connections|projects|sessions|jobs|review|review/availability|project-artifact)$")||
+        return Regex.IsMatch(path,@"^/(health|devices|providers|provider-connections|projects|sessions|jobs|review|review/availability|project-artifact)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");
@@ -143,7 +143,13 @@ public sealed class PocketDesktop:Form {
                 if(preview||!DesktopReadPolicy.Allows(endpoint))throw new InvalidOperationException("Desktop chats are read-only. This request is not allowed.");
                 await reads.WaitAsync();try{result=await Send(reader,endpoint,false);}finally{reads.Release();}
             }else{
-                if(action=="toggle")await Toggle();
+                if(action=="device-disconnect"||action=="device-rename"){
+                    string deviceId=message.ContainsKey("deviceId")?message["deviceId"] as string:null;Guid parsed;
+                    if(preview||!Guid.TryParse(deviceId,out parsed))throw new InvalidOperationException("Invalid device.");
+                    if(action=="device-disconnect"){result=await Send(reader,"/devices/"+parsed+"/disconnect",true);LoadPairing();}
+                    else{string deviceName=message.ContainsKey("name")?message["name"] as string:null;if(String.IsNullOrWhiteSpace(deviceName)||deviceName.Length>80)throw new InvalidOperationException("Invalid device name.");result=await Send(reader,"/devices/"+parsed+"/rename",true,json.Serialize(new{name=deviceName}));}
+                }
+                else if(action=="toggle")await Toggle();
                 else if(action=="jira"){if(!preview&&jiraUrl!=null)OpenUrl(jiraUrl);}
                 else if(action=="check-update"){await Send(reader,"/updates/check",true);StartUpdate();}
                 else if(action=="settings"){
@@ -166,10 +172,10 @@ public sealed class PocketDesktop:Form {
         for(int attempt=1;;attempt++){try{if(File.Exists(settingsFile))File.Replace(temp,settingsFile,null);else File.Move(temp,settingsFile);return;}catch(IOException){if(attempt==5)throw;Thread.Sleep(100);}}}
     bool StartupEnabled(){using(var key=Registry.CurrentUser.OpenSubKey(RunKey))return key!=null&&key.GetValue("PocketCode")!=null;}
     void SetStartup(bool enabled){using(var key=Registry.CurrentUser.CreateSubKey(RunKey)){if(enabled)key.SetValue("PocketCode","\""+Application.ExecutablePath+"\" --background --source \""+preferences.Source+"\"");else key.DeleteValue("PocketCode",false);}}
-    async Task<object> Send(HttpClient client,string endpoint,bool post){
+    async Task<object> Send(HttpClient client,string endpoint,bool post,string requestBody="{}"){
         string token=File.ReadAllText(Path.Combine(storage,"connection-key.txt")).Trim();
         using(var request=new HttpRequestMessage(post?HttpMethod.Post:HttpMethod.Get,"http://127.0.0.1:4318/api"+endpoint)){
-            request.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",token);if(post)request.Content=new StringContent("{}",Encoding.UTF8,"application/json");
+            request.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",token);if(post)request.Content=new StringContent(requestBody,Encoding.UTF8,"application/json");
             using(var response=await client.SendAsync(request)){
                 string body=await response.Content.ReadAsStringAsync();object parsed=null;try{parsed=json.DeserializeObject(body);}catch{}
                 if(!response.IsSuccessStatusCode){var fields=parsed as Dictionary<string,object>;throw new InvalidOperationException(fields!=null&&fields.ContainsKey("error")?Convert.ToString(fields["error"]):"Host request failed: "+(int)response.StatusCode);}return parsed;

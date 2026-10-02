@@ -1,7 +1,15 @@
 import { t } from "./i18n";import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { networkFailure } from './connection-errors';
 import {desktopCall} from './desktop-bridge';
-export type Connection = {url: string;token: string;desktop?:boolean;};
+export type Connection = {url: string;token: string;desktop?:boolean;pairing?:boolean;deviceId?:string;};
+let pairing:{key:string;promise:Promise<Connection>}|undefined;
+export function pairDevice(connection:Connection,version:string):Promise<Connection>{
+  if(!connection.pairing)return Promise.resolve(connection);
+  const key=connection.url+'|'+connection.token;if(pairing?.key===key)return pairing.promise;
+  const platform=/Android/i.test(navigator.userAgent)?'android':'browser';
+  const promise=request<{deviceId:string;token:string}>(connection,'/devices/pair',{name:platform==='android'?'Android device':'Browser',platform,version}).then(paired=>({url:connection.url,...paired})).catch(error=>{if(pairing?.key===key)pairing=undefined;throw error;});
+  pairing={key,promise};return promise;
+}
 export function providerRequest(provider:'claude'|'codex'|'copilot'){
   return <T,>(connection:Connection,endpoint:string,data?:unknown):Promise<T>=>{
     const [pathname,search]=endpoint.split('?');const params=new URLSearchParams(search);
@@ -27,6 +35,7 @@ export async function loadConnection(): Promise<Connection | null> {
   return raw ? JSON.parse(raw) : null;
 }
 export async function saveConnection(connection: Connection | null) {
+  if(!connection)pairing=undefined;
   if (Capacitor.isNativePlatform()) {
     if (connection) await Vault.save({ value: JSON.stringify(connection) });else await Vault.clear();
   } else if (connection) sessionStorage.setItem('connection', JSON.stringify(connection));else sessionStorage.removeItem('connection');
@@ -51,6 +60,7 @@ export async function request<T>(connection: Connection, endpoint: string, data?
   if (status === 204) return null as T;
   if (typeof body === 'string') {try {body = JSON.parse(body);} catch {body = null;}}
   if (status >= 500) throw Object.assign(new Error(t("Сервер или интернет-туннель пока недоступен (HTTP {0}). Убедитесь, что окно сервера открыто; повторите подключение или отсканируйте новый QR после перезапуска.", status)),{status});
+  if(status===401&&connection.deviceId)window.dispatchEvent(new CustomEvent('pocket-device-revoked',{detail:connection.deviceId}));
   if (status < 200 || status >= 300) throw Object.assign(new Error(body?.error || t("Ошибка подключения ({0})", status)),{status});
   if (body === null || typeof body !== 'object') throw new Error(t("По этому адресу ответил другой сервис. Отсканируйте свежий QR Pocket Code."));
   return body as T;

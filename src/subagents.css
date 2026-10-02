@@ -27,5 +27,5 @@
 :root[data-theme] .subagent-inline{border:0;background:transparent;border-radius:16px;box-shadow:none;color:var(--muted);font-size:.92em;}
 .subagent-inline>summary{min-height:48px;padding:8px;cursor:pointer;line-height:1.5;overflow-wrap:anywhere;}
 .subagent-inline>div{padding:0 8px 8px;}
-@media(hover:hover){:root[data-theme] .message .subagent-card:hover,:root[data-theme] .subagent-activity>button:hover{background:color-mix(in srgb,var(--muted) 8%,transparent);}}
+@media(hover:hover){:root[data-theme] .message .subagent-card:hover,:root[data-theme] .subagent-activity>button:hover{background:transparent;}}
 .subagent-card:focus-visible,.subagent-inline>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:16px;}

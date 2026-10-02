@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-02 - Individual device access and plain chat activity (0.22.0)
+- Changed: Windows Connection lists paired devices with online/offline/disconnected state, version, last contact, renaming and confirmed individual disconnection. Device credentials are hashed on the PC; revocation persists, closes active responses and rotates the QR without interrupting other devices or AI work.
+- Security: QR v2 exchanges a pairing secret for an individual credential. The administrative key is restricted to direct loopback requests and is no longer placed in QR codes; device management is PC-only. Online presence expires after 45 seconds without authenticated requests.
+- Migration: Update PC and Android and scan the new QR once. Old shared-key connections are rejected; if Windows updated first, install the current APK manually over the existing app before scanning. History/preferences remain intact.
+- Changed: Tool actions and subagent links have no background or border in light/dark themes, including live rows and user-role tool results; ordinary user messages retain their existing presentation.
+- Files: server/devices.ts, app.ts, index.ts, pairing.ts; desktop bridge and DesktopDevices; mobile pairing/api lifecycle; shared message styles and desktop guide.
+- Validation: Six device/runtime server tests, 19 desktop/pairing/subagent browser scenarios, plain activity light/dark check, TypeScript and native WebView/tray/process smoke passed. Android and Windows builds passed; physical multi-device testing was not available.
+
+
 ## 2026-10-02 - Desktop host polling survives locked settings (0.21.3)
 - Fixed: Right after an automatic update, the Windows application could fail to replace desktop.json while another process briefly held it. The error stopped window startup before host polling began, so the application never detected its own running host, showed no pairing QR and remained on "Starting the host" after a manual connect. A misleading WebView2 installation message was shown instead.
 - Changed: Settings writes retry briefly; a failed startup write no longer blocks polling or shows the WebView2 message.
@@ -7,6 +16,7 @@
 - Files: desktop/DesktopWindow.cs; tests/DesktopSmoke.cs, runtime-api.test.ts.
 - Validation: A new desktop smoke scenario holds desktop.json without delete sharing. Before the fix it stopped on the WebView2 message without polling; after the fix polling starts and the full desktop smoke test passes. TypeScript/Vite build passed. Full server suite: 228/229; the remaining Copilot streaming test is timing-sensitive in the full run and passed three isolated reruns with the update-worker tests.
 - Follow-up: A window already stuck this way does not poll, so it cannot detect this update; exit it from the tray once and start Pocket Code again. The update to this version runs the corrected startup code.
+
 
 ## 2026-10-02 - Full-width new files and inline replacement blocks (0.21.2)
 - Changed: New and wholly deleted text files use a single full-width code column in either diff mode, without an empty opposite pane or line-number gutter. Normal insertions in existing files retain split comparison.
@@ -362,7 +372,7 @@
 - Tasks replaces Jobs, with native Jira status-category, project, status and type filters. Filter changes clear selection; batch selection follows the active query.
 - Project opens an overview of Files, Rules and Changelog. Saved text/interface scaling is consistent on task and document cards.
 - Simplified headers and compact expandable command/file activity; removed the Normal/Plan selector from chats.
-- Added persisted Codex/Claude runtime change detection and one-time compatibility tasks in a shared Pocket Code source project. Configure automatic checks under Settings → Updates. First observation establishes a baseline; publication and host restart remain separate.
+- Added persisted Codex/Claude runtime change detection and one-time compatibility tasks in a shared Pocket Code source project. Configure automatic checks under Settings â†’ Updates. First observation establishes a baseline; publication and host restart remain separate.
 - Validation: 148 server tests, 64 responsive scenarios and focused interaction/typography tests passed; Android build and current Codex protocol initialization passed. Physical-phone installation and real automatic AI maintenance execution remain unverified.
 
 ## 2026-10-01 - 0.13.1

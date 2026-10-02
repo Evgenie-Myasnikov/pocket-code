@@ -18,3 +18,14 @@
 .message.user .user-message-content :is(.document-card,.image-preview) {max-width:100%;}
 .message.user .user-message-content .markdown pre {max-width:100%;}
 .reading-mode .message.user>.copy-button {display:none;}
+
+/* Activity is part of the transcript, including live rows outside a message. */
+:root :is(.tool-card,.subagent-card,.subagent-inline,.subagent-activity>button),
+:root[data-theme] :is(.tool-card,.subagent-card,.subagent-inline,.subagent-activity>button),
+:root[data-theme] .message :is(.tool-card,.subagent-card),
+:root[data-theme] .message .subagent-card:hover,
+:root[data-theme] .subagent-activity>button:hover {
+ background:transparent;border:0;border-radius:0;box-shadow:none;color:var(--muted);font-size:inherit;font-weight:400;
+}
+:root[data-theme] :is(.subagent-card,.subagent-activity>button,.subagent-inline>summary){padding-inline:0}
+:root[data-theme] .tool-card summary,:root[data-theme] .tool-card summary :is(span,strong){font-size:inherit;font-weight:400}

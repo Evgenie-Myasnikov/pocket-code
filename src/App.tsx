@@ -1,3 +1,4 @@
+import {version as packageVersion} from '../package.json';
 import {positionKey,readPosition,savePosition,flushPositions,clearPositions,type ChatPosition} from './chat-position';
 import {UsageIndicator} from './UsageIndicator';
 import './composer-controls.css';
@@ -32,7 +33,7 @@ import { Message, MessageList, ApprovalCard } from './Messages';
 import { JiraJobs, JiraSettings } from './Jira';
 import { ProjectDocs } from './ProjectDocs';
 import { LiveTerminal } from './LiveTerminal';
-import { fileBase64, loadConnection, request, saveConnection, type Connection } from './api';
+import { fileBase64, loadConnection, pairDevice, request, saveConnection, type Connection } from './api';
 import { demoMessages, demoSessions } from './demo';
 import type { ChatMessage, JobView, SubagentView,ActivityItem } from '../server/types';
 
@@ -252,9 +253,11 @@ function WorkspaceApp({onDisconnect}: {onDisconnect():void}) {
     setDraft([draft,rejectedDraft.text].filter(Boolean).join('\n\n'));setAttachments(combined);
     setRejectedDrafts(old=>({...old,[currentDraftKey()]:{...rejectedDraft,restored:true}}));
   }
+  useEffect(()=>{if(!connection?.deviceId)return;const beat=()=>void request(connection,'/devices/heartbeat',{}).catch(()=>{});beat();const timer=setInterval(beat,15000);const revoked=(event:Event)=>{if((event as CustomEvent).detail===connection.deviceId)void disconnect();};window.addEventListener('pocket-device-revoked',revoked);return()=>{clearInterval(timer);window.removeEventListener('pocket-device-revoked',revoked);};},[connection]);
   async function connect(c: Connection) {
     setBusy(true);setError('');
     try {
+      c=await pairDevice(c,packageVersion);
       const h = await request<Health>(c, '/health');
       if (h.protocol !== 1) throw new Error(t("Обновите приложение и сервер до одной версии"));
       const scope=await chatCacheScope(c);

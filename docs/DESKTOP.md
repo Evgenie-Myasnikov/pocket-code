@@ -1,5 +1,13 @@
 # Windows desktop application
 
+## Connected devices
+
+From **0.22.0**, open **Connection → Connected devices** to see paired phones/browsers, their app version and last contact. **Online** means contact within 45 seconds; **Offline** means no recent contact, not necessarily a powered-off device. Rename devices to distinguish them. **Disconnect** asks for confirmation and revokes only that device's credential, closes its active responses and refreshes the pairing QR. Other devices and running AI tasks are unaffected. A disconnected device must scan the current QR to regain access.
+
+**One-time migration:** update both PC and Android to 0.22.0 or later and scan the new QR. Old shared-key connections cannot access the upgraded host. If the PC updated first, install the release APK manually over the existing Android app, then scan. Chat history and preferences are retained. Devices receive individual credentials, stored in the existing encrypted Android connection vault; the PC persists credential hashes and device metadata in its private data directory. The administrative PC key is no longer put in pairing QR codes.
+
+**По-русски:** в разделе **Подключение → Подключённые устройства** доступны статус, последняя связь, переименование и отключение каждого устройства. «Не в сети» означает отсутствие запросов более 45 секунд. Отключение отзывает ключ выбранного устройства, не останавливая задачи AI и другие подключения. Для перехода с версии до 0.22.0 обновите ПК и телефон и один раз отсканируйте новый QR. Если ПК обновился первым, установите новый APK поверх приложения вручную, затем отсканируйте QR.
+
 ## Automatic updates
 
 From version **0.21.0**, **Settings → Application updates** checks GitHub after connecting and every six hours. You can disable automatic updates or check manually. The Windows application and its PC host update together. Downloads use the public release directly; GitHub CLI login is not required.

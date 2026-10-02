@@ -1,3 +1,4 @@
+import {DeviceRegistry} from './devices.js';
 import {CopilotService} from './copilot.js';
 import { randomBytes } from 'node:crypto';
 import { hostname, homedir, networkInterfaces } from 'node:os';
@@ -28,6 +29,7 @@ if (!token) {
   catch (error: any) { if (error.code !== 'ENOENT') throw error; token = randomBytes(32).toString('base64url'); await writeFile(keyFile, token, { mode: 0o600, flag: 'wx' }); }
 }
 if (token.length < 32) throw new Error('Ключ подключения должен содержать не менее 32 символов');
+const devices=await new DeviceRegistry(path.join(local,'devices.json')).load();
 const roots: string[] = process.env.POCKET_ROOTS ? JSON.parse(process.env.POCKET_ROOTS) : [process.cwd()];
 const host = process.env.POCKET_HOST || '127.0.0.1', port = Number(process.env.POCKET_PORT || 4318);
 const jira = process.env.POCKET_JIRA_MODE === 'oauth' ? new AtlassianJira(new WindowsJiraStore(path.join(local, 'jira-auth.dat'))) : new ExistingClaudeJira(path.join(local, 'jira-existing.json'));
@@ -46,7 +48,7 @@ const copilot=new CopilotService(roots);
 let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
-const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines } = await createApp({ copilot,pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
+const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines } = await createApp({ devices,refreshPairing:()=>writePairingPage(local,devices.pairingToken,host,port,internetAddress,jiraSetupKey,true).then(()=>{}),copilot,pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
 runtimeReady = true;updater.start();
 const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
 void maintainEngines().catch(()=>{});
@@ -75,7 +77,7 @@ async function showPairing() {
   }
   internetAddress = internetUrl;
   if (closing) return;
-  const file = await writePairingPage(local, token!, host, port, internetUrl,jiraSetupKey);
+  const file = await writePairingPage(local, devices.pairingToken, host, port, internetUrl,jiraSetupKey,true);
   console.log(`QR-код подключения: ${file}`);
   if (process.env.POCKET_OPEN_PAIRING === '1' && process.platform === 'win32') {
     const child = spawn('explorer.exe', [file], { windowsHide: true, detached: true, stdio: 'ignore' });

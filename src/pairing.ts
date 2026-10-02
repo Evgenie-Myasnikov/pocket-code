@@ -4,10 +4,10 @@ export function parsePairingCode(raw: string): Connection {
   if (raw.length > 4096) throw new Error(t("Это не QR-код подключения Pocket Code"));
   let data: any;
   try {data = JSON.parse(raw);} catch {throw new Error(t("Это не QR-код подключения Pocket Code"));}
-  if (!data || data.type !== 'pocket-code' || data.version !== 1 || typeof data.url !== 'string' ||
+  if (!data || data.type !== 'pocket-code' || ![1,2].includes(data.version) || typeof data.url !== 'string' ||
   typeof data.token !== 'string' || !/^[A-Za-z0-9_-]{32,512}$/.test(data.token))
   throw new Error(t("Неверный QR-код. Откройте свежий код на ПК через Start Pocket Code.cmd"));
-  return { url: normalizeUrl(data.url), token: data.token };
+  return { url: normalizeUrl(data.url), token: data.token,...(data.version===2?{pairing:true}:{}) };
 }
 
 export async function readQrImage(file: File): Promise<string> {

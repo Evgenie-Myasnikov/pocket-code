@@ -15,8 +15,8 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   useLanguage();
   const plain = message.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
   if(message.blocks.length&&message.blocks.every(b=>b.type==='tool_result'&&b.tool_use_id&&toolResults?.has(b.tool_use_id)))return null;
-  const isUser = message.role === 'user';
-  const toolOnly = !isUser && message.blocks.length > 0 && message.blocks.every((b) => ['tool_result','tool_use','thinking','codexItem','subagent'].includes(b.type));
+  const toolOnly = message.blocks.length > 0 && message.blocks.every((b) => ['tool_result','tool_use','thinking','codexItem','subagent'].includes(b.type));
+  const isUser = message.role === 'user' && !toolOnly;
   const content = message.blocks.map((block,i) => {
       if(block.type==='tool_result'&&block.tool_use_id&&toolResults?.has(block.tool_use_id))return null;
       const previous=message.blocks[i-1],next=message.blocks[i+1];
@@ -26,7 +26,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
       const result=block.type==='tool_use' && block.id ? toolResults?.get(block.id)||(next?.type==='tool_result'&&next.tool_use_id===block.id?next:undefined):undefined;
       return <RichBlock key={i} running={running} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
-  return <article data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${message.role} ${toolOnly ? 'tool-result' : ''}`}>
+  return <article data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{content}</div></> : <>
       {!toolOnly && <div className="message-label">{message.role === 'assistant' ? <><span className="claude-mark">{provider === 'codex' ? '⌘' : '✳'}</span> {provider.toUpperCase()}</> : t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
       {content}
