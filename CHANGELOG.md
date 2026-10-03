@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-10-03 - Repository boards and desktop chat recovery (0.25.5)
+- Release: Published v0.25.5 from b71799af91e3564529d72a605044b05f9e9ca976 on codex/navigation-0.25.5 with APK versionCode 68 and matching desktop/host assets. GitHub CI passed; the updater downloaded and verified the APK.
 - Fixed: Changing the AI provider preserves the Chats section; clipboard images use the attachment uploader and preview without replacing the draft.
 - Fixed: A saved board remains readable when its repository folder is unavailable; editing and chat launch are disabled. Repeated open clicks no longer discard the pending response.
 - Changed: Repository boards replace the local-board index and read project-boards files directly, including Pocket Code's curated roadmap. Existing private local records are preserved. Repository snapshots are read-only in this view; edit the source or use a workspace board.
@@ -8,7 +9,7 @@
 - Improved: Notification cards separate their type, title, preview, timestamp and read state with theme-aware icons and spacing.
 - Added: Workspace invitations require a password on first entry; saved user credentials and profiles restore access without duplicate participants or another password prompt. Host approval and revocation remain effective.
 - Packaging: Include the curated product board in PC bundles. Workspace authorization still applies before returning saved board data.
-- Validation: 31 browser scenarios and seven server/snapshot tests passed, including native clipboard image paste, repository reads and unavailable-folder recovery. TypeScript/Vite, Android build and native Windows smoke passed; final artifact audit pending. Physical Android testing unavailable.
+- Validation: 31 browser scenarios and seven server/snapshot tests passed, including native clipboard image paste, repository reads and unavailable-folder recovery. TypeScript/Vite, Android build and native Windows smoke passed; source and artifact privacy audits passed. Physical Android testing unavailable.
 
 
 ## 2026-10-03 - PC-scoped chats and neutral provider palettes (0.25.4)

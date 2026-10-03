@@ -211,9 +211,9 @@
     {
       "id": "59ce281b-014e-468d-a16d-407b0f6eb9a2",
       "title": "Browse repository boards and recover desktop chat interactions",
-      "description": "Problem: provider navigation, clipboard attachments and unavailable project folders interrupt normal work. Outcome: preserve Chats when changing providers, paste images with previews, read saved boards even when a folder is missing, and browse portable repository boards directly. Acceptance: clipboard image keeps the draft; repository list reads source files; missing folders preserve read-only data; unauthorized members cannot read other boards. Notification cards distinguish assignment and question details. Evidence: CHANGELOG.md 0.25.5; implementation and initial tests complete, final regression and packaging pending. Repository views currently read snapshots; shared editing remains in workspace boards. First workspace entry checks a password; later entries restore the same credential and profile. QR route, incorrect password, profile reuse and reload tested. See CHANGELOG.md for final release evidence.",
+      "description": "Problem: provider navigation, clipboard attachments and unavailable project folders interrupt normal work. Outcome: preserve Chats when changing providers, paste images with previews, read saved boards even when a folder is missing, and browse portable repository boards directly. Acceptance: clipboard image keeps the draft; repository list reads source files; missing folders preserve read-only data; unauthorized members cannot read other boards. Notification cards distinguish assignment and question details. Evidence: CHANGELOG.md 0.25.5; 31 browser scenarios, seven server/snapshot tests, builds, native Windows smoke, source/artifact privacy audits and GitHub CI passed; published v0.25.5 and verified its APK through the updater. Repository views currently read snapshots; shared editing remains in workspace boards. First workspace entry checks a password; later entries restore the same credential and profile. QR route, incorrect password, profile reuse and reload tested. See CHANGELOG.md for final release evidence.",
       "branch": "0.25.5",
-      "status": "review",
+      "status": "done",
       "priority": "high",
       "x": 2060,
       "y": 92,
