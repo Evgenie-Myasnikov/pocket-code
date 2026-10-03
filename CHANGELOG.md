@@ -1,27 +1,29 @@
 # Changelog
 
-## 0.25.6 (Unreleased)
+## [0.25.6](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.5...v0.25.6) (2026-10-03)
 
 ### Features
-- boards: open and edit one portable board per project; create a missing board directly in its repository.
-- rules: built-in board maintenance is enabled by default for Codex, Claude and Copilot, with a persistent per-project switch.
-- boards: show the linked Git branch or an explicit unlinked label on each version column.
-- chat: keep a permanent New row at the top; create a conversation only after its first message.
+- boards: open and edit one portable board per project; create a missing board directly in its repository. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
+- rules: built-in board maintenance is enabled by default for Codex, Claude and Copilot, with a persistent per-project switch. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
+- boards: show the linked Git branch or an explicit unlinked label on each version column. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
+- chat: keep a permanent New row at the top; create a conversation only after its first message. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
 
 ### Bug Fixes
-- boards: open the original board and highlight the note from an assignment or clarification notification.
-- boards: serialize repository writes and reject stale revisions without overwriting newer edits.
-- navigation: remove duplicate refresh controls from project documents.
-- boards: route dependency arrows outside cards and retain only concrete dependencies.
+- boards: open the original board and highlight the note from an assignment or clarification notification. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
+- boards: serialize repository writes and reject stale revisions without overwriting newer edits. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
+- navigation: remove duplicate refresh controls from project documents. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
+- boards: route dependency arrows outside cards and retain only concrete dependencies. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
 
 ### Documentation
-- docs: translate the curated Pocket Code board into Russian and document repository-backed editing.
-- rules: require concise categorized version entries in CHANGELOG.md, with real commit references only.
+- docs: translate the curated Pocket Code board into Russian and document repository-backed editing. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
+- rules: require concise categorized version entries in CHANGELOG.md, with real commit references only. ([a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e))
 
 ### Validation
 - Fourteen focused server/board/rules tests, 33 provider tests and 32 desktop/mobile browser scenarios passed. Android and Windows builds, native Windows smoke and source/archive privacy audits passed. Physical Android testing unavailable.
 - Private legacy board records remain available through their notifications; repository snapshots contain product data only.
 
+
+- Release: Published v0.25.6 with APK versionCode 69 and matching Windows/host assets from [a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e) on [codex/project-0.25.6](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/project-0.25.6). GitHub CI passed.
 
 ## [0.25.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.4...v0.25.5) (2026-10-03)
 
