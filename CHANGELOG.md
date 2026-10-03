@@ -1,12 +1,13 @@
 # Changelog
 
-## 0.25.8 (Unreleased)
+## [0.25.8](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.7...v0.25.8) (2026-10-03)
 
 ### Bug Fixes
 - boards: present board and project names in a responsive card grid without icons or secondary type labels; preserve repository board titles on opening.
 - boards: hide dependency and version connector lines; preserve dependency metadata for AI planning and existing chat prompts.
 
 ### Validation
+- Release source: [c530566](https://github.com/Evgenie-Myasnikov/pocket-code/commit/c530566eb892aefeae4102c3eda5139440d738a3), branch [codex/boards-0.25.8](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/boards-0.25.8).
 - Passed TypeScript/Vite, three focused desktop board scenarios and four board data tests. Android APK and Windows package built; source and APK/desktop/host privacy audits passed. Physical Android not tested.
 
 
