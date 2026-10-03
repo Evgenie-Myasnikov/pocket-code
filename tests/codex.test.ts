@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { CodexService } from '../server/codex.js';
+import {boardInstructions} from '../server/board-instructions.js';
 import { codexMessage } from '../server/codex-content.js';
 import { CODEX_THREAD_BUSY, CodexRequestError, type CodexRpc } from '../server/codex-rpc.js';
 
@@ -182,7 +183,7 @@ test('Codex defaults to full access with image attachments and normalized stream
   const image = path.join(root, 'image.png'); await writeFile(image, 'image');
   service.start({ ...input, attachmentPaths: [image] });
   await until(() => Boolean(service.get(input.id).turnId));
-  const start = rpc.requests.find(r => r.method === 'thread/start')!.params; assert.match(start.developerInstructions, /Pocket Code project boards/);
+  const start = rpc.requests.find(r => r.method === 'thread/start')!.params; assert.equal(start.developerInstructions,boardInstructions);
   assert.equal(start.sandbox, 'danger-full-access'); assert.equal(start.approvalPolicy, 'never'); assert.equal(start.approvalsReviewer, 'user');
   const turn = rpc.requests.find(r => r.method === 'turn/start')!.params;
   assert.deepEqual(turn.sandboxPolicy, { type: 'dangerFullAccess' }); assert.equal(turn.approvalPolicy, 'never');
@@ -208,7 +209,7 @@ for (const access of ['ask', 'auto'] as const) test(`Codex ${access} applies to 
   const { rpc, service, input, root } = await setup(t);
   service.start({ ...input, sessionId: 'session-1', codexAccess: access });
   await until(() => Boolean(service.get(input.id).turnId));
-  const resume = rpc.requests.find(r => r.method === 'thread/resume')!.params; assert.match(resume.developerInstructions, /Pocket Code project boards/);
+  const resume = rpc.requests.find(r => r.method === 'thread/resume')!.params; assert.equal(resume.developerInstructions,boardInstructions);
   const turn = rpc.requests.find(r => r.method === 'turn/start')!.params;
   assert.equal(resume.sandbox, 'workspace-write');
   for (const params of [resume, turn]) {

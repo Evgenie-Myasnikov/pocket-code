@@ -1,8 +1,9 @@
 import {createHash} from 'node:crypto';
-import {listBoardSnapshots,readBoardSnapshot,saveBoardSnapshot} from './board-snapshots.js';
+import {listBoardSnapshots,readBoardSnapshot,saveBoardSnapshot,deleteBoardSnapshot} from './board-snapshots.js';
 import {HttpError} from './security.js';
 import {boardExample} from './board-example.js';
 import type {ProjectBoard} from './boards.js';
+import {linkBoardVersions} from './board-version-links.js';
 
 const canonical='board-00000000-0000-4000-8000-000000000001.json';
 const locks=new Map<string,Promise<unknown>>();
@@ -17,7 +18,7 @@ export async function projectBoard(root:string){
  const file=(canonicalExists?canonical:undefined)||entries.map(e=>e.file).sort()[0];
  if(!file)return null;
  const data=await readBoardSnapshot(root,file,false);
- return {...data,id:file.slice(6,-5),root,revision:0,versionSource:'planned' as const,repositoryFile:file,repositoryRevision:createHash('sha256').update(JSON.stringify(data)).digest('hex'),branches:[],notes:data.notes.map(n=>({...n,owner:'',assigneeIds:[]}))};
+ return {...data,versionBranches:await linkBoardVersions(root,data.versions,data.versionBranches),id:file.slice(6,-5),root,revision:0,versionSource:'planned' as const,repositoryFile:file,repositoryRevision:createHash('sha256').update(JSON.stringify(data)).digest('hex'),branches:[],notes:data.notes.map(n=>({...n,owner:'',assigneeIds:[]}))};
 }
 export async function createProjectBoard(root:string,names:string[],language:'en'|'ru'){
  return serializeProjectBoard(root,async()=>{
@@ -31,6 +32,13 @@ export async function updateProjectBoard(root:string,revision:string,notes:Proje
  return serializeProjectBoard(root,async()=>{
   const current=await projectBoard(root);if(!current)throw new HttpError(404,'Project board not found');
   if(current.repositoryRevision!==revision)throw new HttpError(409,'The project board changed. Refresh before saving.');
-  await saveBoardSnapshot(root,{...current,notes,versions},names,false);return (await projectBoard(root))!;
+  await saveBoardSnapshot(root,{...current,notes,versions,versionBranches:await linkBoardVersions(root,versions,current.versionBranches)},names,false);return (await projectBoard(root))!;
+ });
+}
+export async function deleteProjectBoard(root:string,revision:string){
+ return serializeProjectBoard(root,async()=>{
+  const current=await projectBoard(root);if(!current)throw new HttpError(404,'Project board not found');
+  if(current.repositoryRevision!==revision)throw new HttpError(409,'The project board changed. Refresh before deleting.');
+  await deleteBoardSnapshot(root,current.repositoryFile);
  });
 }

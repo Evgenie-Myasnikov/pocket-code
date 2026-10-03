@@ -19,3 +19,17 @@ Only projects with an existing board appear in the board list. Add project board
 Built-in board maintenance is enabled by default for all three providers. Rules exposes a per-project switch, persisted as the product-only `.pocket-code-rules.json`. It applies to the next run and does not disable provider-native AGENTS.md/CLAUDE.md files. Authorized implementation includes maintaining an existing board and a categorized version changelog; a missing board is created only on explicit request; read-only questions do not create files. Version columns explicitly identify linked Git branches; planned version labels are not Git links.
 
 Dependencies are retained as AI planning metadata in note IDs. The board does not draw dependency or version connector lines.
+
+Notes may include `images: [{path, caption}]` (up to 12). Upload PNG, JPEG or WebP
+files up to 10 MB in Note details; select a thumbnail to zoom. Images are stored
+under `project-boards/assets/<sha256>.<extension>` alongside the JSON and must
+travel with it. Removing a note attachment removes its reference, preserving
+shared files. Existing notes without images remain valid. Review captions and
+image contents before sharing a repository; pixel privacy cannot be inferred
+from a filename. Old hosts need updating to read this extended format.
+
+`versionBranches` maps version labels to real Git branch names. Branches recorded
+in the changelog are resolved against local and remote Git refs automatically and
+retained on the next board save. Missing branches remain explicitly unlinked.
+Every release must record its branch and exact commit; planned columns alone
+never create branches or authorize publication.

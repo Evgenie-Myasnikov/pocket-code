@@ -29,11 +29,11 @@ const words={
   image:['Image','Изображение'],document:['Document','Документ'],toolResult:['Tool result','Результат инструмента'],toolError:['Tool error','Ошибка инструмента'],
 } as const;
 const icons={images:Image,documents:FileText,code:Code2,links:Link,tools:Wrench};
-const categories=['all','images','documents','code','links','tools'] as const;
+const categories=['all','images','documents','links'] as const;
 export function ChatOutputs(props:Props){return <OutputPanel key={`${props.connection.url}|${props.connection.token}|${props.cwd}`} {...props}/>;}
 function OutputPanel({connection,cwd,messages,onClose,onLoadMore,hasMore,loadingMore,provider='claude',sessionId}:Props){
   const language=useLanguage(),label=(key:keyof typeof words)=>words[key][language==='ru'?1:0];
-  const index=useChatOutputIndex(connection,provider,sessionId,messages),outputs=index.outputs;
+  const index=useChatOutputIndex(connection,provider,sessionId,messages),outputs=useMemo(()=>index.outputs.filter(item=>item.category!=='tools'&&item.category!=='code'),[index.outputs]);
   const [visibleCount,setVisibleCount]=useState(100);
   const [source,setSource]=useState<OutputSource|'all'>('all'),[filter,setFilter]=useState<'all'|OutputCategory>('all'),[selected,setSelected]=useState<ChatOutput|null>(null);
   const [selectedImage,setSelectedImage]=useState<ChatOutput|null>(null),thumbnails=useMemo(()=>thumbnailQueue(),[connection,cwd]);

@@ -2,6 +2,7 @@ import path from 'node:path';
 import {lstat,readFile,writeFile,rename,unlink} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {boardInstructions} from './board-instructions.js';
+import {sharedWorkflowInstructions} from './shared-workflow.js';
 import {HttpError} from './security.js';
 
 const filename='.pocket-code-rules.json';
@@ -24,5 +25,5 @@ export async function saveProjectRuleSettings(root:string,enabled:boolean){
   return {boardMaintenance:enabled};
 }
 export async function projectBoardInstructions(root:string){
-  return (await projectRuleSettings(root)).boardMaintenance?boardInstructions:'Pocket Code automatic board maintenance is disabled for this project. Do not apply earlier Pocket Code board-maintenance guidance automatically. Explicit user requests and independently loaded repository rules still apply.';
+  return (await projectRuleSettings(root)).boardMaintenance?boardInstructions:sharedWorkflowInstructions+'\nPocket Code automatic board maintenance is disabled for this project. Do not apply earlier Pocket Code board-maintenance guidance automatically. Explicit user requests and independently loaded repository rules still apply.';
 }

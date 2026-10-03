@@ -2,12 +2,17 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {CopilotService,copilotMessage} from '../server/copilot';
 import {randomUUID} from 'node:crypto';
+import {boardInstructions} from '../server/board-instructions';
 const tick=()=>new Promise(resolve=>setTimeout(resolve,10));
 function fixture(){let config:any,handler:(event:any)=>void=()=>{},finish:()=>void=()=>{};let disconnected=0;
  const session={sessionId:randomUUID(),on(fn:any){handler=fn;return()=>{handler=()=>{};};},sendAndWait:()=>new Promise<void>(resolve=>{finish=resolve;}),send:async()=>'',abort:async()=>finish(),disconnect:async()=>{disconnected++;},getEvents:async()=>[{id:'answer',type:'assistant.message',data:{content:'Saved answer'}}]};
  const client={start:async()=>{},stop:async()=>[],getAuthStatus:async()=>({isAuthenticated:true}),listModels:async()=>[{id:'auto',name:'Auto'}],listSessions:async()=>[],createSession:async(c:any)=>{config=c;return session;},resumeSession:async(_id:string,c:any)=>{config=c;return session;}};
  const service=new CopilotService([process.cwd()],client as any);return{service,session,config:()=>config,emit:(e:any)=>handler(e),finish:()=>finish(),disconnected:()=>disconnected};}
 const input=()=>({id:randomUUID(),cwd:process.cwd(),text:'Fixture',mode:'default' as const,maxBudgetUsd:5});
+
+test('Copilot fresh and resumed sessions use the shared rules, skills, board and changelog contract',async()=>{
+ for(const resume of [false,true]){const f=fixture(),i={...input(),...(resume?{sessionId:f.session.sessionId}:{})};try{f.service.start(i);await tick();assert.equal(f.config().systemMessage.content,boardInstructions);f.service.stop(i.id);await tick();}finally{await f.service.close();}}
+});
 test('model access errors do not erase confirmed Copilot authentication',async()=>{
  const service=new CopilotService([],{start:async()=>{},stop:async()=>[],getAuthStatus:async()=>({isAuthenticated:true}),listModels:async()=>{throw Error('Unavailable');}} as any);
  const status=await service.status();assert.equal(status.available,true);assert.equal(status.authenticated,true);assert.equal(status.access,'models-unavailable');await service.close();

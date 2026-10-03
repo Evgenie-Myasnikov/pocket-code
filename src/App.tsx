@@ -1,3 +1,4 @@
+import {useChatReturn} from './use-chat-return';
 import {WorkspacePassword} from './WorkspacePassword';
 import {BoardNotifications,type BoardNoticeTarget} from './BoardNotifications';
 import {MobileWorkspaceHeader} from './MobileWorkspaceHeader';
@@ -8,7 +9,7 @@ import {ChatHeader} from './ChatHeader';
 import {WorkBoards,type BoardChat} from './WorkBoards';
 import {useProjectWorkspaces} from './project-workspaces';
 import {version as packageVersion} from '../package.json';
-import {positionKey,readPosition,savePosition,flushPositions,clearPositions,type ChatPosition} from './chat-position';
+import {positionKey,positionOnOpen,savePosition,flushPositions,clearPositions,type ChatPosition} from './chat-position';
 import {UsageIndicator} from './UsageIndicator';
 import './composer-controls.css';
 import {shareMessages,shareSnapshot} from './chat-snapshot';
@@ -54,7 +55,7 @@ type RejectedDraft = Draft & {restored: boolean;};
 const codexBusyMessage = 'This chat is open in Codex on the PC. Its history is available here, but Codex must release the chat before you can send a message. Finish the task and close Codex on the PC, then try again.';
 const uniqueMessages = (messages:ChatMessage[]) => [...new Map(messages.map(message=>[message.id,message])).values()];
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() || p;
-export type EmbeddedChat={connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardChat?:BoardChat;onCreated?(session:Session,job:JobView):void;onBack():void};
+export type EmbeddedChat={visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardChat?:BoardChat;onCreated?(session:Session,job:JobView):void;onBack():void};
 export function App({embedded}:{embedded?:EmbeddedChat}={}) {
   useBackNavigation();
   const [generation, setGeneration] = useState(0);
@@ -421,6 +422,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   },[connection,provider,job?.id,job?.status,demo,busy,loading,loadingOlder,fromStart,tab]);
   useLayoutEffect(()=>{if(tab==='chats'&&scroll.current&&!loading){scroll.current.scrollTop=lastScrollTop.current;setShowScrollActions(fromStart||scroll.current.scrollHeight-scroll.current.scrollTop-scroll.current.clientHeight>=80);}},[provider,tab,mobileChat]);
   useLayoutEffect(()=>{const position=pendingPosition.current,el=scroll.current;if(!position||!el||loading||tab!=='chats')return;pendingPosition.current=null;const message=position.messageId?[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.dataset.messageId===position.messageId):null;el.scrollTop=position.bottom?el.scrollHeight:message&&position.offset!==undefined?el.scrollTop+message.getBoundingClientRect().top-el.getBoundingClientRect().top-position.offset:position.top;lastScrollTop.current=el.scrollTop;nearBottom.current=position.bottom;setShowScrollActions(!position.bottom||fromStart);},[loading,history,provider,tab]);
+  useChatReturn(selected?positionKey(cacheScope,provider,selected.sessionId):'',tab==='chats'&&(embedded?embedded.visible!==false:mobileChat),running,!loading&&!busy&&!paging.current,()=>{void jumpHistory(false);});
   function rememberPosition(){const el=scroll.current;if(!el||loading||!selected||!el.getClientRects().length)return;const top=el.getBoundingClientRect().top,message=[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.getBoundingClientRect().bottom>top);savePosition(positionKey(cacheScope,provider,selected.sessionId),{top:el.scrollTop,window:historyWindow.current,fromStart,bottom:nearBottom.current,messageId:message?.dataset.messageId,offset:message?message.getBoundingClientRect().top-top:undefined});}
   const persistPosition=useRef(()=>{});persistPosition.current=rememberPosition;
   useEffect(()=>{const save=()=>{persistPosition.current();flushPositions();};window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',save);return()=>{save();window.removeEventListener('pagehide',save);document.removeEventListener('visibilitychange',save);};},[]);
@@ -494,7 +496,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if (busy || uploading) return;
     rememberPosition();rememberDraft();setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
-    const savedPosition=readPosition(positionKey(cacheScope,provider,s.sessionId));pendingPosition.current=savedPosition;
+    const savedPosition=positionOnOpen(positionKey(cacheScope,provider,s.sessionId));pendingPosition.current=savedPosition;
     historyWindow.current = savedPosition?.window||100;setHistoryError('');setFromStart(savedPosition?.fromStart||false);setShowScrollActions(savedPosition?!savedPosition.bottom:false);lastScrollTop.current = savedPosition?.top||0;
     const cached=cacheScope&&!demo?readChatCache<ChatMessage[]>(cacheScope,provider,'chat:'+s.sessionId):null;
     setHistory(Array.isArray(cached)?cached:[]);setJob(null);restoreDraft(activeJob?.sessionId||s.sessionId);setError('');setTakeover(false);setHasMore(null);nearBottom.current = savedPosition?.bottom??true;

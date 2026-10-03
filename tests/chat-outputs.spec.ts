@@ -49,9 +49,10 @@ test('results categories isolate outputs from sources and Back preserves the par
   await page.setViewportSize({width:390,height:844});await setup(page);await page.getByLabel('Message Codex').fill('Parent draft remains here');await page.getByRole('button',{name:'Results',exact:true}).click();
   await expect(panel(page)).toBeVisible();await expect(panel(page).getByText('Your brief',{exact:true})).toHaveCount(1);
   await panel(page).getByRole('button',{name:'Assistant results',exact:true}).click();await expect(panel(page).getByText('Your brief',{exact:true})).toHaveCount(0);
-  await panel(page).getByRole('button',{name:/^Code \d/}).click();await expect(panel(page).locator('.chat-output-row')).toHaveCount(1);
-  await panel(page).locator('.chat-output-row').click();await expect(panel(page).getByText('const result = 42;',{exact:true})).toBeVisible();
-  await page.keyboard.press('Escape');await panel(page).getByRole('button',{name:'Your sources',exact:true}).click();await expect(panel(page).locator('.chat-output-row')).toHaveCount(1);
+  await expect(panel(page).getByRole('button',{name:/^(Code|Tools) \d/})).toHaveCount(0);
+  await expect(panel(page).getByText('typescript code',{exact:true})).toHaveCount(0);
+  await expect(panel(page).getByText('const result = 42;',{exact:true})).toHaveCount(0);
+  await panel(page).getByRole('button',{name:'Your sources',exact:true}).click();await expect(panel(page).locator('.chat-output-row')).toHaveCount(1);
   await panel(page).getByRole('button',{name:/Your brief/}).click();await expect(panel(page).getByText('Keep this input separate.')).toBeVisible();
   await page.keyboard.press('Escape');await page.keyboard.press('Escape');await expect(panel(page)).toHaveCount(0);await expect(page.getByLabel('Message Codex')).toHaveValue('Parent draft remains here');await expect(page.getByRole('button',{name:'Results',exact:true})).toBeFocused();
 });

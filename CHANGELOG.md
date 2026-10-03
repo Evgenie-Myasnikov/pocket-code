@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.25.9 (Unreleased)
+
+### Features
+- boards: delete a repository board from its card context action with confirmation and revision/role checks; retain project files and image assets, and disconnect Miro without deleting its remote board.
+- boards: attach up to twelve PNG/JPEG/WebP images per idea, retain portable content-addressed assets, and open thumbnails in the shared fullscreen zoom viewer.
+- boards: resolve version links against existing Git refs and preserve the mapping in repository snapshots.
+- providers: apply the same rules/skills -> board -> changelog workflow to Claude, Codex and Copilot, including resumed sessions and evidence-based bug investigation.
+
+### Bug Fixes
+- chat: return to latest messages when the agent was running on departure, including desktop section changes; retain saved positions for idle chats.
+- results: remove Tools and Code categories and entries from chat results, including All and category counts; retain images, documents and links.
+- boards: render image viewing outside the transformed canvas so zoomed boards cannot clip the fullscreen viewer.
+
+### Documentation
+- rules: require real release branches and exact source commits; preserve shared rule discovery when automatic board writes are disabled.
+- boards: document image provenance, portable storage, limits and host compatibility; extend the local helper with read-only project-board lookup.
+
+### Code Refactoring
+- release: include the source branch/commit in generated manifests, reject detached or dirty release sources, verify the repository branch and any existing tag, and publish against the exact reviewed commit.
+
+### Validation
+- Results/deletion/return changes: TypeScript/Vite, five board server checks, one position-storage check, four focused shared desktop browser scenarios and Windows native smoke passed. Legacy mobile results setup could not start because its provider selector is obsolete; shared desktop results passed. No release published; physical Android not tested.
+- TypeScript/Vite, 46 focused board/provider/API tests and four desktop/narrow-screen browser scenarios pass; image API authorization and identical fresh/resumed provider instructions are covered. Images were visually reviewed with synthetic fixtures.
+- Windows desktop build and local shortcut installation pass. No release was published. Physical Android and live provider inference were not tested.
+
+
 ## [0.25.8](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.7...v0.25.8) (2026-10-03)
 
 ### Bug Fixes

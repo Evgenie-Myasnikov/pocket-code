@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {projectRuleSettings,saveProjectRuleSettings,projectBoardInstructions} from '../server/project-rules.js';
 import {boardInstructions} from '../server/board-instructions.js';
+import {sharedWorkflowInstructions} from '../server/shared-workflow.js';
 import {projectDocuments,readProjectDocument} from '../server/project-docs.js';
 
 test('built-in board rule defaults on, persists per repository, and remains readable when disabled',async()=>{
@@ -16,6 +17,7 @@ test('built-in board rule defaults on, persists per repository, and remains read
     await saveProjectRuleSettings(root,false);
     assert.equal((await projectRuleSettings(root)).boardMaintenance,false);
     assert.match(await projectBoardInstructions(root),/disabled/);
+    assert.ok((await projectBoardInstructions(root)).startsWith(sharedWorkflowInstructions));
     assert.equal(await projectBoardInstructions(other),boardInstructions);
     const rule=(await projectDocuments(root)).documents.find(d=>d.source==='Pocket Code')!;
     assert.equal((await readProjectDocument(root,rule.path)).content,boardInstructions);

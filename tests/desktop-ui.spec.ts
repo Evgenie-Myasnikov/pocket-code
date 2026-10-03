@@ -1,6 +1,23 @@
 import {readFileSync} from 'node:fs';
 const roadmap=JSON.parse(readFileSync(new URL('../project-boards/board-7b004a10-920c-4ba7-a070-254318083e90.json',import.meta.url),'utf8'));
 import {test,expect,type Page} from '@playwright/test';
+
+for(const width of [390,1440])test('board images attach, reopen, zoom and detach at '+width,async({page})=>{
+ await page.setViewportSize({width,height:850});
+ await page.addInitScript(()=>{(window as any).projectBoardOverride={id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:'C:\\Demo\\Atlas',revision:0,repositoryRevision:'a'.repeat(64),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',versionSource:'planned',branches:[],versions:['1.0.0'],versionBranches:{'1.0.0':'release/1.0.0'},notes:[{id:'33333333-3333-4333-8333-333333333333',title:'Visual idea',description:'Synthetic acceptance',branch:'',status:'idea',owner:'',dependencies:[],x:20,y:92}]};});
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();
+ await expect(page.locator('.board-version small')).toHaveText('Branch: release/1.0.0');
+ await page.locator('.note-content').click();const dialog=page.getByRole('dialog',{name:'Note details'});
+ const buffer=Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=600;canvas.height=360;const ctx=canvas.getContext('2d')!;ctx.fillStyle='#17282c';ctx.fillRect(0,0,600,360);ctx.fillStyle='#e2ae61';ctx.beginPath();ctx.moveTo(50,310);ctx.lineTo(235,80);ctx.lineTo(420,310);ctx.fill();ctx.fillStyle='#70bbb0';ctx.beginPath();ctx.moveTo(250,310);ctx.lineTo(430,120);ctx.lineTo(570,310);ctx.fill();ctx.fillStyle='#ffffff';ctx.font='24px sans-serif';ctx.fillText('Synthetic concept',30,45);return canvas.toDataURL('image/png').split(',')[1];}),'base64');
+ await dialog.locator('input[type=file]').setInputFiles({name:'Synthetic concept.png',mimeType:'image/png',buffer});
+ await expect(dialog.getByRole('button',{name:'Open image: Synthetic concept.png'})).toBeEnabled();
+ await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toHaveCount(0);
+ await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();
+ await page.locator('.board-note').getByRole('button',{name:'Open image: Synthetic concept.png'}).click();
+ const viewer=page.getByRole('dialog',{name:'Image',exact:true});await expect(viewer).toBeVisible();const bounds=await viewer.boundingBox();expect(bounds?.x).toBe(0);expect(bounds?.y).toBe(0);expect(bounds?.width).toBe(width);await expect(viewer.getByRole('button',{name:'Close',exact:true})).toBeInViewport();await viewer.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(viewer.locator('output')).toHaveText('1.5×');
+ await page.screenshot({path:'.local/board-image-viewer-'+width+'.png'});await viewer.getByRole('button',{name:'Close',exact:true}).click();
+ await page.locator('.note-content').click();await dialog.getByRole('button',{name:'Remove image: Synthetic concept.png'}).click();await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('.board-note .board-image-thumb')).toHaveCount(0);
+});
 test('repository boards open directly and refresh from their source',async({page})=>{
  await desktop(page);await expect(page.locator('.desktop-brand')).toHaveCount(0);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
  await expect(page.getByRole('button',{name:'Workspace boards',exact:true})).toHaveCount(0);await expect(page.locator('.project-board-grid .board-index-item svg')).toHaveCount(0);const cards=page.locator('.project-board-grid .board-index-item');await expect(cards).toHaveCount(2);const a=await cards.nth(0).boundingBox(),b=await cards.nth(1).boundingBox();expect(Math.abs(a!.y-b!.y)).toBeLessThan(2);expect(b!.x).toBeGreaterThan(a!.x);await page.screenshot({path:'.local/board-grid-0258.png'});await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect(page.getByRole('heading',{name:'Atlas',exact:true})).toBeVisible();
@@ -74,8 +91,10 @@ async function desktop(page:Page){
    if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:(window as any).testBoards||[]});return;}
    if(p==='/board-notifications'){reply(id,{items:(window as any).testBoardNotices||[]});return;}if(p==='/board-notifications/read'){(window as any).testBoardNotices=((window as any).testBoardNotices||[]).map((n:any)=>({...n,readAt:Date.now()}));reply(id,{ok:true});return;}
    if(p==='/project-board/miro'){(window as any).miroBoard=message.data.url?{root:message.data.root,url:message.data.url}:null;reply(id,{miro:(window as any).miroBoard});return;}
+   if(p==='/project-board/image'){if(message.data){(window as any).boardImageData=message.data.data;reply(id,{path:'project-boards/assets/'+'a'.repeat(64)+'.png',caption:message.data.caption});}else reply(id,{mimeType:'image/png',data:(window as any).boardImageData||sampleImage});return;}
+   if(p==='/project-board/delete'){(window as any).deletedRoot=message.data.root;reply(id,{ok:true});return;}
    if(p==='/project-board/create'){(window as any).createdProjectBoard={id:'22222222-2222-4222-8222-222222222222',name:'Project board',root:message.data.root,repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'b'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]};reply(id,(window as any).createdProjectBoard);return;}
-   if(p==='/project-board'){if((window as any).projectBoardOverride){reply(id,{board:(window as any).projectBoardOverride});return;}if((window as any).missingProjectBoard){reply(id,{board:(window as any).createdProjectBoard||null,miro:(window as any).miroBoard?.root===url.searchParams.get('root')?(window as any).miroBoard:null});return;}reply(id,{board:{id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:url.searchParams.get('root'),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'a'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]}});return;}
+   if(p==='/project-board'){if((window as any).deletedRoot===url.searchParams.get('root')){reply(id,{board:null});return;}if((window as any).projectBoardOverride){if(message.data){Object.assign((window as any).projectBoardOverride,message.data);reply(id,(window as any).projectBoardOverride);}else reply(id,{board:(window as any).projectBoardOverride});return;}if((window as any).missingProjectBoard){reply(id,{board:(window as any).createdProjectBoard||null,miro:(window as any).miroBoard?.root===url.searchParams.get('root')?(window as any).miroBoard:null});return;}reply(id,{board:{id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:url.searchParams.get('root'),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'a'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]}});return;}
    if(p==='/repository-board'){reply(id,{id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:url.searchParams.get('root'),repositoryFile:url.searchParams.get('file'),revision:0,source:'project-changelog',versionSource:'planned',notes:[],versions:[],branches:[]});return;}
    if(p==='/board-snapshots'||p==='/repository-boards'){reply(id,[{file:'board-11111111-1111-4111-8111-111111111111.json',name:'Shared roadmap',noteCount:0}]);return;}
    if(p==='/board-snapshots/import'){const board={id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:message.data.root,revision:0,versionSource:'planned',notes:[],versions:[]};(window as any).testBoards=[board];reply(id,board);return;}
@@ -114,7 +133,7 @@ test('desktop shares editable chat, review and results with provider/project sel
  await page.getByRole('button',{name:/codex · Interface review/}).click();
  await expect(page.getByText('The responsive layout is ready.')).toBeVisible();await expect(page.locator('textarea')).toBeVisible();
  await page.getByRole('button',{name:'Review',exact:true}).click();const review=page.getByRole('dialog',{name:'Review',exact:true});await expect(review).toContainText('src/layout.ts');await expect(review).toContainText('adaptive');await page.keyboard.press('Escape');
- await page.getByRole('button',{name:'Results',exact:true}).click();const results=page.getByRole('dialog',{name:'Results',exact:true});await expect(results).toBeVisible();await results.getByRole('button',{name:/^Images/}).click();await expect(results.locator('.chat-output-image-item')).toHaveCount(1);await results.locator('.chat-output-image-card').click();const viewer=page.getByRole('dialog',{name:'Image',exact:true});await viewer.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(viewer.getByLabel('Zoom',{exact:true})).toContainText('1.5');await page.keyboard.press('Escape');await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'Results',exact:true}).click();const results=page.getByRole('dialog',{name:'Results',exact:true});await expect(results).toBeVisible();await expect(results.getByRole('button',{name:/^(Code|Tools) \d/})).toHaveCount(0);await expect(results.getByText('ts code',{exact:true})).toHaveCount(0);await results.getByRole('button',{name:/^Images/}).click();await expect(results.locator('.chat-output-image-item')).toHaveCount(1);await results.locator('.chat-output-image-card').click();const viewer=page.getByRole('dialog',{name:'Image',exact:true});await viewer.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(viewer.getByLabel('Zoom',{exact:true})).toContainText('1.5');await page.keyboard.press('Escape');await page.keyboard.press('Escape');
  await page.screenshot({path:'artifacts/screenshots/desktop-chat.png'});
  const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.every((call:any)=>['state','read','window-theme','write'].includes(call.action))).toBeTruthy();expect(calls.find((call:any)=>call.endpoint?.startsWith('/review?'))?.endpoint).toContain('Atlas');
 });
@@ -226,7 +245,7 @@ test('creates the board for the clicked project without a board selector',async(
 
 test('Russian Pocket Code roadmap keeps dependencies as data without visual connectors',async({page})=>{
  await page.addInitScript(board=>{(window as any).projectBoardOverride={...board,id:'7b004a10-920c-4ba7-a070-254318083e90',root:'C:\\Demo\\Atlas',revision:0,repositoryRevision:'a'.repeat(64),repositoryFile:'board-7b004a10-920c-4ba7-a070-254318083e90.json',versionSource:'planned',branches:[],notes:board.notes.map((n:any)=>({...n,owner:'',assigneeIds:[]}))};},roadmap);
- await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect(page.locator('.board-note')).toHaveCount(19);
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect(page.locator('.board-note')).toHaveCount(roadmap.notes.length);
  await page.locator('.board-viewport').dispatchEvent('wheel',{deltaY:440,ctrlKey:true,clientX:320,clientY:150});await page.screenshot({path:'.local/russian-board-0256.png'});
  expect(roadmap.notes.some((note:{dependencies:string[]})=>note.dependencies.length>0)).toBe(true);
  await expect(page.locator('.board-edges, .board-roadmap-links')).toHaveCount(0);
@@ -257,3 +276,26 @@ test('composer pointer focus uses a soft background without a textarea outline',
  expect(await page.locator('.composer').evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('none');
  await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(field).toBeFocused();expect(await page.locator('.composer').evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('solid');
 });
+
+ test('project board deletion confirms, supports keyboard and removes only the selected card',async({page})=>{
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+ const card=page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button');
+ await card.click({button:'right'});const dialog=page.getByRole('dialog',{name:'Delete board',exact:true});await expect(dialog).toContainText('Other project files and image assets are kept.');await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await expect(card).toBeVisible();
+ await card.focus();await page.keyboard.press('Delete');await dialog.getByRole('button',{name:'Delete board',exact:true}).click();await expect(card).toHaveCount(0);await expect(page.locator('.project-board-row').filter({hasText:'Garden'})).toHaveCount(1);
+ expect(await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint==='/project-board/delete').map((c:any)=>c.data))).toEqual([{root:'C:\\Demo\\Atlas',repositoryRevision:'a'.repeat(64)}]);
+ });
+
+ test('holding a project board card opens deletion without opening the board',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+ const card=page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button');
+ await card.dispatchEvent('pointerdown',{pointerType:'touch',pointerId:1,button:0,clientX:40,clientY:180});await expect(page.getByRole('dialog',{name:'Delete board',exact:true})).toBeVisible();await card.dispatchEvent('pointerup',{pointerType:'touch',pointerId:1,button:0});await card.dispatchEvent('click');await expect(page.locator('.board-header-navigation')).toHaveCount(0);await page.getByRole('dialog').getByRole('button',{name:'Cancel',exact:true}).click();await expect(card).toBeVisible();
+ });
+
+ test('returning after an active chat finishes while hidden follows latest messages; idle return preserves position',async({page})=>{
+ await desktop(page);await page.evaluate(()=>{(window as any).testRuns=[{id:'latest-run',cwd:'C:\\Demo\\Atlas',sessionId:'alpha',provider:'claude',messages:[],approvals:[],baseMessageCount:0,revision:1,startedAt:2,status:'running',partial:Array.from({length:70},(_,i)=>'Progress paragraph '+i).join('\n\n')+'\n\nLatest response'}];});
+ const row=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});await expect(row).toContainText('Working');await row.click();await expect(page.getByText('Latest response',{exact:true})).toBeVisible();
+ const scroll=page.locator('.desktop-chat-host .conversation');await scroll.evaluate(el=>{el.scrollTop=120;el.dispatchEvent(new Event('scroll'));});
+ await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await page.evaluate(()=>{(window as any).testRuns[0].status='done';(window as any).testRuns[0].revision++;});await expect(row).toContainText('Completed');await row.click();
+ await expect.poll(()=>scroll.evaluate(el=>Math.round(el.scrollHeight-el.clientHeight-el.scrollTop))).toBeLessThan(8);
+ await scroll.evaluate(el=>{el.scrollTop=120;el.dispatchEvent(new Event('scroll'));});await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await row.click();await expect.poll(()=>scroll.evaluate(el=>Math.round(el.scrollTop))).toBe(120);
+ });

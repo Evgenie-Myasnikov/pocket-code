@@ -19,6 +19,13 @@ Maintain the root CHANGELOG.md with concise, sanitized entries and actual valida
 
 # Product board continuity
 
+All providers follow **rules/skills -> board -> changelog**. Read applicable
+AGENTS.md and relevant shared `.agents/skills/*/SKILL.md` first, then existing
+cards, then recent and feature-specific history. Diagnose against current code
+and reproducible checks. Record authorized work on the same card before editing;
+after validation update its evidence and CHANGELOG. A provider change must not
+duplicate cards, erase history or turn historical test results into current ones.
+
 Read `project-boards/README.md` and the curated `board-*.json` when planning
 or implementing product changes. Help people clarify ideas, acceptance criteria,
 priorities and open questions. Maintain relevant cards for authorized work,
@@ -28,3 +35,12 @@ Repository boards contain product information only, never people, assignments,
 private chat content or credentials. Follow the board README for validation and
 refresh/import behavior. A file edit alone does not update every live board.
 Interactive providers receive the same guidance from `server/board-instructions.ts`.
+
+# Release branch continuity
+
+Every actual release must identify its existing Git branch and exact source commit
+in the release manifest, changelog and board version mapping (`versionBranches`).
+Resolve them from Git; never infer a branch merely from a planned version label.
+Publish tags against that exact commit, after verifying the source branch exists
+on the release repository and contains it. Detached HEAD is not a release branch.
+Keep unreleased work explicit. Linking releases does not authorize a push or release.
