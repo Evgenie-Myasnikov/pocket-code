@@ -1,3 +1,4 @@
+import {miroLink} from '../src/miro-link.js';
 import {projectBoard,createProjectBoard,updateProjectBoard} from './project-board.js';
 import {boardNotice,assignmentNotices,allowedRecipients,addNotice,assignees} from './board-attention.js';
 import {saveBoardSnapshot,listBoardSnapshots,readBoardSnapshot} from './board-snapshots.js';
@@ -21,7 +22,7 @@ const role=z.enum(['host','viewer','developer','reviewer','qa']);
 const member=z.object({id,name,firstName:z.string().optional(),lastName:z.string().optional(),role,tokenHash:z.string(),needsName:z.boolean().optional(),approval:z.enum(['pending','approved','rejected']).optional()});
 const workspace=z.object({id,name,roots:z.array(z.string()).max(100),password:z.string().default(''),invite:z.object({hash:z.string(),role}).optional(),members:z.array(member).default([]),hostPeople:z.array(z.object({id:z.string(),name,firstName:z.string().optional(),lastName:z.string().optional()})).default([])});
 const invitation=z.object({role:z.enum(['host','viewer','developer','reviewer','qa']).default('host'),workspaceId:id.nullish().transform(value=>value||undefined)});
-const database=z.object({notices:z.array(boardNotice).default([]),workspaces:z.array(workspace),boards:z.array(board),hiddenSourceRoots:z.array(z.string()).default([]),invitation:invitation.default({role:'host',workspaceId:undefined})});
+const database=z.object({miroBoards:z.array(z.object({root:z.string(),url:z.string()})).max(100).default([]),notices:z.array(boardNotice).default([]),workspaces:z.array(workspace),boards:z.array(board),hiddenSourceRoots:z.array(z.string()).default([]),invitation:invitation.default({role:'host',workspaceId:undefined})});
 export type BoardNote=z.infer<typeof note>;
 export type ProjectBoard=z.infer<typeof board>;
 export type ProjectWorkspace=Omit<z.infer<typeof workspace>,'password'|'invite'|'members'|'hostPeople'>&{role:'host'|z.infer<typeof role>;me?:{id:string;name:string;firstName?:string;lastName?:string;needsName:boolean;approval?:'pending'|'approved'|'rejected'};people?:{id:string;name:string;role:string}[];members?:{id:string;name:string;role:z.infer<typeof role>;needsName?:boolean;approval?:'pending'|'approved'|'rejected'}[]};
@@ -29,7 +30,7 @@ type Data=z.infer<typeof database>;
 
 // Private host state; serialized, atomic writes and optimistic board revisions protect two devices.
 export class BoardStore{
-  private data:Data={notices:[],workspaces:[],boards:[],hiddenSourceRoots:[],invitation:{role:'host',workspaceId:undefined}};private queue=Promise.resolve();
+  private data:Data={miroBoards:[],notices:[],workspaces:[],boards:[],hiddenSourceRoots:[],invitation:{role:'host',workspaceId:undefined}};private queue=Promise.resolve();
   constructor(private file:string){}
   async load(){try{this.data=database.parse(JSON.parse(await readFile(this.file,'utf8')));}catch(e:any){if(e.code!=='ENOENT')throw e;}return this;}
   snapshot(){return structuredClone(this.data);}
@@ -149,7 +150,13 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   app.post('/api/workspaces/:id/member',async(req,res)=>{if(current()||!res.locals.deviceAdmin)throw new HttpError(403,'Manage workspace members on the host PC.');const input=z.object({memberId:id,role:z.enum(['viewer','developer','reviewer','qa']).optional(),remove:z.boolean().optional(),approval:z.enum(['approved','rejected']).optional()}).parse(req.body);await store.mutate(data=>{const ws=data.workspaces.find(w=>w.id===req.params.id),person=ws?.members.find(m=>m.id===input.memberId);if(!ws||!person)throw new HttpError(404,'Member not found');if(input.remove)ws.members=ws.members.filter(m=>m.id!==person.id);else{if(input.role)person.role=input.role;if(input.approval){if(input.approval==='approved'&&(person.needsName||!completeName(profileName(person))))throw new HttpError(400,'The applicant must enter their name first');person.approval=input.approval;}};});res.json({ok:true});});
   async function projectRoot(value:unknown,write=false){const root=await allowedPath(roots,z.string().parse(value),true),ctx=current();if(ctx&&(!ctx.ws.roots.includes(root)||write&&ctx.person.role==='viewer'))throw new HttpError(403,'Project access denied');return root;}
   const privateNames=()=>store.workspaces().flatMap(w=>[...w.hostPeople,...w.members].map(p=>p.name));
-  app.get('/api/project-board',async(req,res)=>{const root=await projectRoot(req.query.root),result=await projectBoard(root);if(result)validateDependencies(result.notes);res.json({board:result});});
+  app.get('/api/project-board',async(req,res)=>{const root=await projectRoot(req.query.root),result=await projectBoard(root);if(result)validateDependencies(result.notes);res.json({board:result,miro:store.snapshot().miroBoards.find(b=>b.root===root)||null,canEdit:current()?.person.role!=='viewer'});});
+  app.post('/api/project-board/miro',async(req,res)=>{
+    const input=z.object({root:z.string(),url:z.string().max(2048).nullable()}).parse(req.body),root=await projectRoot(input.root,true);
+    let url:string|null=null;if(input.url!==null){try{url=miroLink(input.url).url;}catch{throw new HttpError(400,'Use a Miro board link: https://miro.com/app/board/…');}}
+    const linked=await store.mutate(data=>{data.miroBoards=data.miroBoards.filter(b=>b.root!==root);if(url)data.miroBoards.push({root,url});return url?{root,url}:null;});
+    res.json({miro:linked});
+  });
   app.post('/api/project-board/create',async(req,res)=>{const input=z.object({root:z.string(),language:z.enum(['en','ru']).default('en')}).parse(req.body),root=await projectRoot(input.root,true);res.json(await createProjectBoard(root,privateNames(),input.language));});
   app.post('/api/project-board',async(req,res)=>{const input=z.object({root:z.string(),repositoryRevision:z.string().length(64),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40)}).parse(req.body),root=await projectRoot(input.root,true);validateDependencies(input.notes);res.json(await updateProjectBoard(root,input.repositoryRevision,input.notes,input.versions,privateNames()));});
   app.get('/api/repository-boards',async(req,res)=>{if(current())throw new HttpError(403,'Connect to the PC to browse repository boards');const root=await allowedPath(roots,z.string().parse(req.query.root),true);res.json(await listBoardSnapshots(root,false));});

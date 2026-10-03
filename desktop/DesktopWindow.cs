@@ -20,10 +20,15 @@ public sealed class DesktopPreferences {
     public string Source="";
 }
 public static class DesktopReadPolicy {
+    public static bool AllowsMiroResource(string value,bool document){
+        Uri uri;if(!Uri.TryCreate(value,UriKind.Absolute,out uri)||uri.Scheme!="https"||!String.IsNullOrEmpty(uri.UserInfo)||!uri.IsDefaultPort)return false;
+        if(document)return uri.Host=="miro.com"&&uri.AbsolutePath.StartsWith("/app/live-embed/",StringComparison.Ordinal);
+        string host=uri.Host;return host=="miro.com"||host.EndsWith(".miro.com",StringComparison.Ordinal)||host=="mirostatic.com"||host.EndsWith(".mirostatic.com",StringComparison.Ordinal)||host=="realtimeboard.com"||host.EndsWith(".realtimeboard.com",StringComparison.Ordinal);
+    }
     public static bool AllowsWrite(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/(jobs|uploads|project-rules|project-board|project-board/create|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
+        return Regex.IsMatch(path,@"^/(jobs|uploads|project-rules|project-board|project-board/create|project-board/miro|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
     }
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
@@ -139,7 +144,7 @@ public sealed class PocketDesktop:Form {
         core.PermissionRequested+=(_,e)=>e.State=CoreWebView2PermissionState.Deny;
         core.DownloadStarting+=(_,e)=>{e.Cancel=true;if(e.DownloadOperation.MimeType!="application/pdf"||!e.DownloadOperation.Uri.StartsWith("data:application/pdf",StringComparison.OrdinalIgnoreCase))return;using(var dialog=new SaveFileDialog{Filter="PDF document|*.pdf",FileName="document.pdf",AddExtension=true,DefaultExt="pdf"}){if(dialog.ShowDialog(this)==DialogResult.OK){e.ResultFilePath=dialog.FileName;e.Handled=true;e.Cancel=false;}}};
         core.AddWebResourceRequestedFilter("*",CoreWebView2WebResourceContext.All);
-        core.WebResourceRequested+=(_,e)=>{Uri uri;if(Uri.TryCreate(e.Request.Uri,UriKind.Absolute,out uri)&&(uri.GetLeftPart(UriPartial.Authority)==Origin||uri.Scheme=="data"||uri.Scheme=="blob"||e.ResourceContext==CoreWebView2WebResourceContext.Image&&uri.Scheme=="https"))return;e.Response=core.Environment.CreateWebResourceResponse(new MemoryStream(),403,"External request blocked","");};
+        core.WebResourceRequested+=(_,e)=>{Uri uri;if(Uri.TryCreate(e.Request.Uri,UriKind.Absolute,out uri)&&(uri.GetLeftPart(UriPartial.Authority)==Origin||uri.Scheme=="data"||uri.Scheme=="blob"||DesktopReadPolicy.AllowsMiroResource(e.Request.Uri,e.ResourceContext==CoreWebView2WebResourceContext.Document)||e.ResourceContext==CoreWebView2WebResourceContext.Image&&uri.Scheme=="https"))return;e.Response=core.Environment.CreateWebResourceResponse(new MemoryStream(),403,"External request blocked","");};
         core.WebMessageReceived+=async(_,e)=>await Bridge(e.Source,e.WebMessageAsJson);
         core.NavigationCompleted+=(_,e)=>{if(e.IsSuccess){webReady=true;if(Visible)web.Focus();Push();initialized.TrySetResult(true);}else initialized.TrySetException(new InvalidOperationException("Desktop interface could not load."));};
         core.Navigate(Origin+"/index.html?desktop=1");

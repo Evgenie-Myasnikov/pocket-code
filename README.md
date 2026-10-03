@@ -124,3 +124,13 @@ Under active development. APKs are distributed through GitHub, not Google Play. 
 ### Product roadmap
 
 The [Pocket Code board](project-boards/README.md) tracks delivered features and explicit follow-up work from CHANGELOG.md. Import its JSON into Pocket Code or open the generated board from this repository. Only product content is tracked; member identities and private conversations are excluded.
+
+## Miro boards
+
+Open **Settings → Miro**, choose a project, paste its `https://miro.com/app/board/...` link and connect. Open the project in **Board** to use Miro Live Embed with Miro's own interface. A repository does not need a local board file to use Miro. WorkSpace management is no longer exposed in navigation; existing host records are preserved.
+
+Links are stored in the host's private board database, not in Git. Invitation/query parameters are discarded. Miro retains the content, accounts and access permissions. Disconnecting removes only the Pocket Code link and never deletes the board in Miro. An existing repository board file is preserved and becomes visible again after disconnecting Miro.
+
+Miro requires an internet connection and its own sign-in. If authentication, third-party cookies or the embedded browser prevent access, use **Open in browser**. Android devices without a modern isolated WebView bridge use that browser fallback. Pocket Code cannot grant Miro permissions. This integration does not import notes into Git, synchronize task dependencies, or give the AI API access to board content.
+
+Implementation follows [Miro Live Embed](https://developers.miro.com/docs/miro-live-embed-with-a-direct-link) and [Miro authentication](https://developers.miro.com/docs/miro-live-embed-authentication). Browser scenarios use synthetic boards; authenticated private-board editing and physical Android gestures still require device validation.

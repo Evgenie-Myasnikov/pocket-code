@@ -1,7 +1,8 @@
 import {useEffect,useRef,type RefObject} from 'react';
 import {Capacitor,registerPlugin} from '@capacitor/core';
 
-const NativeNavigation=registerPlugin<{minimize():Promise<void>}>('Navigation');
+const NativeNavigation=registerPlugin<{minimize():Promise<void>;embeddedBoards():Promise<{supported:boolean}>}>('Navigation');
+export async function supportsEmbeddedBoards(){if(Capacitor.getPlatform()!=='android')return true;try{return (await NativeNavigation.embeddedBoards()).supported;}catch{return false;}}
 const handlers=new Map<symbol,{priority:number;handle:()=>boolean}>();
 export function useBackAction(handle:()=>boolean,priority=0,enabled=true){
   const latest=useRef(handle);latest.current=handle;
@@ -10,10 +11,11 @@ export function useBackAction(handle:()=>boolean,priority=0,enabled=true){
 export function useBackNavigation(){
   useEffect(()=>{
     const back=()=>[...handlers.values()].reverse().sort((a,b)=>b.priority-a.priority).some(item=>item.handle());
-    const keyboard=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!event.defaultPrevented&&back()){event.preventDefault();event.stopPropagation();}};
+    const pointer=()=>{document.documentElement.dataset.keyboardNavigation='false';};
+    const keyboard=(event:KeyboardEvent)=>{if(event.key==='Tab')document.documentElement.dataset.keyboardNavigation='true';if(event.key==='Escape'&&!event.defaultPrevented&&back()){event.preventDefault();event.stopPropagation();}};
     const android=()=>{if(!back()&&Capacitor.getPlatform()==='android')void NativeNavigation.minimize().catch(()=>{});};
-    document.addEventListener('keydown',keyboard);window.addEventListener('pocket-code-back',android);
-    return()=>{document.removeEventListener('keydown',keyboard);window.removeEventListener('pocket-code-back',android);};
+    document.addEventListener('pointerdown',pointer);document.addEventListener('keydown',keyboard);window.addEventListener('pocket-code-back',android);
+    return()=>{document.removeEventListener('pointerdown',pointer);document.removeEventListener('keydown',keyboard);window.removeEventListener('pocket-code-back',android);};
   },[]);
 }
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.25.7 (Unreleased)
+
+### Features
+- miro: connect a project board by URL in Settings and open its original Miro Live Embed interface on desktop and mobile.
+- miro: persist canonical board links privately on the PC; provide reload, browser fallback and explicit disconnection without deleting the remote board.
+
+### Bug Fixes
+- chat: replace the bright input outline with a subtle focused background; retain keyboard focus indication.
+- boards: display only projects with existing boards; create optional repository boards explicitly and remove trailing card arrows.
+- rules: maintain existing boards without automatically creating boards in every repository.
+
+### Code Refactoring
+- navigation: remove shared WorkSpace navigation and joining screens; retain legacy host records without destructive migration.
+- security: restrict embedded URLs to Miro, discard invitation parameters, keep native commands isolated from external frames and use browser fallback on legacy Android WebViews.
+
+### Documentation
+- docs: explain Miro sign-in, PC-local links, remote access rights and limitations. AI API access and offline Miro editing are not included.
+
+### Validation
+- Passed 10 focused server tests, 9 interface scenarios, TypeScript/Vite, Android build and Windows desktop smoke checks. Source and final APK/desktop/host privacy audits passed. Physical Android and authenticated private Miro-board editing have not been tested.
+
+
 ## [0.25.6](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.5...v0.25.6) (2026-10-03)
 
 ### Features

@@ -5,3 +5,5 @@
 :root[data-theme=light] .settings-disconnect{color:#a51d26;border-color:#a51d2666;}
 
 .engine-updates{border-top:1px solid var(--line);margin-top:1.5em;padding-top:1em;font-size:1rem;line-height:1.5;overflow-wrap:anywhere}.engine-updates h3{font-size:1.2em}.engine-updates details{margin-top:1em}.engine-updates summary{min-height:44px}.engine-updates li{margin-bottom:1em}
+
+.miro-settings{display:grid;gap:16px;max-width:720px}.miro-settings label{display:grid;gap:8px}.miro-settings input,.miro-settings select{width:100%;min-width:0}.miro-settings-actions{display:flex;gap:12px;flex-wrap:wrap}

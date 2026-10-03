@@ -8,6 +8,12 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "Navigation")
 public class NavigationPlugin extends Plugin {
+    @PluginMethod public void embeddedBoards(PluginCall call) {
+        com.getcapacitor.JSObject result = new com.getcapacitor.JSObject();
+        result.put("supported", androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.WEB_MESSAGE_LISTENER)
+            && !getBridge().getConfig().isUsingLegacyBridge());
+        call.resolve(result);
+    }
     @Override public void load() {
         getActivity().getOnBackPressedDispatcher().addCallback(getActivity(), new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {

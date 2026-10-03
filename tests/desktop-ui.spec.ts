@@ -5,8 +5,8 @@ test('repository boards open directly and refresh from their source',async({page
  await desktop(page);await expect(page.locator('.desktop-brand')).toHaveCount(0);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
  await expect(page.getByRole('button',{name:'Workspace boards',exact:true})).toHaveCount(0);await page.locator('.project-board-row').filter({hasText:'Atlas'}).getByRole('button').click();await expect(page.getByRole('heading',{name:'Atlas',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Delete board',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Refresh board',exact:true}).click();
- await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length)).toBe(2);
+ const reads=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length);await page.getByRole('button',{name:'Refresh board',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length)).toBe(reads+1);
 });
 test('workspace deletion requires confirmation and removes the card',async({page})=>{
  await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Disposable example',roots:['C:\\Demo\\Atlas'],role:'host',people:[],members:[]}];});
@@ -73,8 +73,9 @@ async function desktop(page:Page){
    if(/^\/workspaces\/[^/]+\/delete$/.test(p)){(window as any).testWorkspaces=(window as any).testWorkspaces.filter((w:any)=>w.id!==p.split('/')[2]);reply(id,{ok:true});return;}
    if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:(window as any).testBoards||[]});return;}
    if(p==='/board-notifications'){reply(id,{items:(window as any).testBoardNotices||[]});return;}if(p==='/board-notifications/read'){(window as any).testBoardNotices=((window as any).testBoardNotices||[]).map((n:any)=>({...n,readAt:Date.now()}));reply(id,{ok:true});return;}
+   if(p==='/project-board/miro'){(window as any).miroBoard=message.data.url?{root:message.data.root,url:message.data.url}:null;reply(id,{miro:(window as any).miroBoard});return;}
    if(p==='/project-board/create'){(window as any).createdProjectBoard={id:'22222222-2222-4222-8222-222222222222',name:'Project board',root:message.data.root,repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'b'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]};reply(id,(window as any).createdProjectBoard);return;}
-   if(p==='/project-board'){if((window as any).projectBoardOverride){reply(id,{board:(window as any).projectBoardOverride});return;}if((window as any).missingProjectBoard){reply(id,{board:(window as any).createdProjectBoard||null});return;}reply(id,{board:{id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:url.searchParams.get('root'),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'a'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]}});return;}
+   if(p==='/project-board'){if((window as any).projectBoardOverride){reply(id,{board:(window as any).projectBoardOverride});return;}if((window as any).missingProjectBoard){reply(id,{board:(window as any).createdProjectBoard||null,miro:(window as any).miroBoard?.root===url.searchParams.get('root')?(window as any).miroBoard:null});return;}reply(id,{board:{id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:url.searchParams.get('root'),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'a'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]}});return;}
    if(p==='/repository-board'){reply(id,{id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:url.searchParams.get('root'),repositoryFile:url.searchParams.get('file'),revision:0,source:'project-changelog',versionSource:'planned',notes:[],versions:[],branches:[]});return;}
    if(p==='/board-snapshots'||p==='/repository-boards'){reply(id,[{file:'board-11111111-1111-4111-8111-111111111111.json',name:'Shared roadmap',noteCount:0}]);return;}
    if(p==='/board-snapshots/import'){const board={id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:message.data.root,revision:0,versionSource:'planned',notes:[],versions:[]};(window as any).testBoards=[board];reply(id,board);return;}
@@ -217,7 +218,7 @@ test('desktop pastes an image attachment using the native clipboard event',async
 
 test('creates the board for the clicked project without a board selector',async({page})=>{
  await page.addInitScript(()=>{(window as any).missingProjectBoard=true;});await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
- await page.locator('.project-board-row').filter({hasText:'Garden'}).getByRole('button').click();await page.getByRole('button',{name:'Create project board',exact:true}).click();
+ await expect(page.locator('.project-board-row').filter({hasText:'Garden'})).toHaveCount(0);await expect(page.locator('.project-board-row svg.lucide-chevron-right')).toHaveCount(0);await page.getByRole('button',{name:'Add project board',exact:true}).click();await page.getByLabel('Project for new board').selectOption('C:\\Demo\\Garden');await page.getByRole('button',{name:'Create project board',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Garden',exact:true})).toBeVisible();await expect(page.locator('.work-boards select')).toHaveCount(0);
  expect(await page.evaluate(()=>(window as any).createdProjectBoard.root)).toBe('C:\\Demo\\Garden');
  await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Garden'}).getByRole('button').click();await expect(page.getByRole('button',{name:'Create project board',exact:true})).toHaveCount(0);
@@ -225,7 +226,7 @@ test('creates the board for the clicked project without a board selector',async(
 
 test('Russian Pocket Code roadmap renders dependency arrows outside cards',async({page})=>{
  await page.addInitScript(board=>{(window as any).projectBoardOverride={...board,id:'7b004a10-920c-4ba7-a070-254318083e90',root:'C:\\Demo\\Atlas',revision:0,repositoryRevision:'a'.repeat(64),repositoryFile:'board-7b004a10-920c-4ba7-a070-254318083e90.json',versionSource:'planned',branches:[],notes:board.notes.map((n:any)=>({...n,owner:'',assigneeIds:[]}))};},roadmap);
- await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Atlas'}).getByRole('button').click();await expect(page.locator('.board-note')).toHaveCount(18);
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Atlas'}).getByRole('button').click();await expect(page.locator('.board-note')).toHaveCount(19);
  await page.locator('.board-viewport').dispatchEvent('wheel',{deltaY:440,ctrlKey:true,clientX:320,clientY:150});await page.screenshot({path:'.local/russian-board-0256.png'});
  await expect(page.locator('.board-edges>path')).toHaveCount(7);
 });
@@ -233,4 +234,25 @@ test('built-in board rule can be disabled and re-enabled from project Rules',asy
  await desktop(page);await page.getByRole('navigation').getByRole('button',{name:'Rules',exact:true}).click();
  const toggle=page.getByRole('checkbox',{name:'Maintain the project board'});await expect(toggle).toBeChecked();await toggle.uncheck();await expect(toggle).not.toBeChecked();await toggle.check();await expect(toggle).toBeChecked();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='write'&&c.endpoint==='/project-rules').length)).toBe(2);
+});
+for(const width of [390,1440])test('Miro board embeds, survives reopening and disconnects without deletion at '+width,async({page})=>{
+ await page.setViewportSize({width,height:850});await page.route('https://miro.com/**',r=>r.fulfill({contentType:'text/html',body:'<html><body>Miro synthetic board</body></html>'}));
+ await page.addInitScript(()=>{(window as any).missingProjectBoard=true;});await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+ await page.getByRole('button',{name:'Add project board',exact:true}).click();await page.getByLabel('Project for new board').selectOption('C:\\Demo\\Garden');await page.getByLabel('Board type').selectOption('miro');await page.getByLabel('Miro board link').fill('https://miro.com/app/board/synthetic_123=/?share_link_id=discard');await page.getByRole('button',{name:'Connect Miro board',exact:true}).click();
+ const frame=page.locator('iframe[title="Miro live board"]');await expect(frame).toHaveAttribute('src','https://miro.com/app/live-embed/synthetic_123=/?autoplay=true&usePostAuth=true');await expect(page.getByRole('link',{name:'Open in browser'})).toHaveAttribute('href','https://miro.com/app/board/synthetic_123=/');
+ await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Garden'}).getByRole('button').click();await expect(frame).toBeVisible();
+ await page.getByRole('button',{name:'Disconnect Miro board',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('The Miro board is kept.');await page.getByRole('button',{name:'Disconnect',exact:true}).click();await expect(frame).toHaveCount(0);await expect(page.locator('.project-board-row')).toHaveCount(0);
+});
+test('Miro connection is in settings and WorkSpace is absent from navigation',async({page})=>{
+ await page.addInitScript(()=>{(window as any).missingProjectBoard=true;});await desktop(page);
+ await expect(page.getByRole('navigation').getByRole('button',{name:'WorkSpace',exact:true})).toHaveCount(0);
+ await page.getByRole('navigation').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Miro',exact:true}).click();
+ await page.getByLabel('Miro project').selectOption('C:\\Demo\\Garden');await page.getByLabel('Miro board link').fill('https://miro.com/app/board/synthetic_123=/');await page.getByRole('button',{name:'Connect Miro board'}).click();await expect(page.getByRole('status')).toContainText('Miro board connected');
+ await page.getByRole('button',{name:'Disconnect link'}).click();await expect(page.getByRole('button',{name:'Disconnect link'})).toHaveCount(0);
+});
+test('composer pointer focus uses a soft background without a textarea outline',async({page})=>{
+ await desktop(page);await page.getByRole('button',{name:'New',exact:true}).click();const field=page.locator('textarea');await field.click();
+ await expect(field).toBeFocused();expect(await field.evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('none');
+ expect(await page.locator('.composer').evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('none');
+ await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(field).toBeFocused();expect(await page.locator('.composer').evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('solid');
 });

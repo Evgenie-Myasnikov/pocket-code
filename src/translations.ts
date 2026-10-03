@@ -1,5 +1,9 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Доска':'Board',
+  'Подключение досок проектов':'Connect project boards',
+  'Аккаунты AI':'AI accounts',
+  'Подключитесь к ПК в настройках':'Connect to the PC in Settings',
   'Правила': 'Rules',
   'История изменений': 'Changelog',
   'Присоединиться к рабочей области': 'Join a workspace',

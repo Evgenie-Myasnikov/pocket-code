@@ -1,3 +1,4 @@
+import {MiroSettings} from './MiroSettings';
 import {ProviderConnections} from './ProviderConnections';
 import {CopilotConnection} from './CopilotConnection';
 import {ArrowLeft,ChevronRight,Palette,SlidersHorizontal,ChartNoAxesCombined,Link2,Download,Laptop,Info,LogOut,Terminal} from 'lucide-react';
@@ -17,10 +18,11 @@ import pkg from '../package.json';
 import {useEffect,useRef,type ReactNode} from 'react';
 import './settings.css';
 
-export type SettingsPage='index'|'appearance'|'workspace'|'usage'|'jira'|'updates'|'connection'|'notifications'|'about';
+export type SettingsPage='index'|'appearance'|'workspace'|'usage'|'jira'|'miro'|'updates'|'connection'|'notifications'|'about';
 const categories=[
+  {id:'miro',title:'Miro',hint:'Подключение досок проектов',Icon:Link2},
   {id:'appearance',title:'Оформление и язык',hint:'Тема, цвета и размер текста',Icon:Palette},
-  {id:'workspace',title:'AI и рабочее пространство',hint:'Аккаунт, доступ и параметры чата',Icon:SlidersHorizontal},
+  {id:'workspace',title:'Аккаунты AI',hint:'Аккаунт, доступ и параметры чата',Icon:SlidersHorizontal},
   {id:'usage',title:'Лимиты использования',hint:'Оставшийся лимит и время сброса',Icon:ChartNoAxesCombined},
   {id:'jira',title:'Jira',hint:'Подключение к сервису задач',Icon:Link2},
   {id:'updates',title:'Обновления',hint:'Версия приложения и установка обновлений',Icon:Download},
@@ -45,6 +47,7 @@ export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,pro
       {page==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance}/></>}
       {page==='workspace'&&<>{workspaceSelector}{subpage==='index'?<nav className="settings-index">{(['account','access','project'] as const).map(id=><button className="settings-category" key={id} onClick={()=>setSubpage(id)}><span><strong>{t(id==='account'?'Аккаунт AI':id==='access'?'Доступ агента':'Папка для новых чатов')}</strong></span><ChevronRight size={18}/></button>)}</nav>:<button className="settings-back" onClick={()=>setSubpage('index')}><ArrowLeft size={18}/>{t('Назад')}</button>}{subpage==='account'&&<ProviderConnections connection={connection} only={provider}/>}<p className="muted">{t('Настройки рабочего пространства {0}',provider==='copilot'?'Copilot':provider==='codex'?'Codex':'Claude')}</p>{subpage==='project'&&<label>{t('Папка для новых чатов')}<select value={roots.includes(cwd)?cwd:''} onChange={event=>onProject(event.target.value)}>{!roots.includes(cwd)&&<option value="">{cwd}</option>}{roots.map(root=><option key={root}>{root}</option>)}</select></label>}{subpage==='access'&&(provider==='copilot'?<></>:provider==='codex'?<CodexAccessSettings value={codexAccess} onChange={onCodexAccess}/>:<><label>{t('Лимит стоимости одного запроса, $')}<input type="number" min="0.1" max="100" step="0.1" value={budget} onChange={event=>onBudget(Number(event.target.value))}/></label><p className="muted">{t('Оценка Agent SDK. Фактическая оплата зависит от способа входа в Claude. Лимит применяется к следующему сообщению.')}</p></>)}</>}
       {page==='usage'&&<>{workspaceSelector}<CodexUsage connection={connection} provider={provider}/></>}
+      {page==='miro'&&<MiroSettings connection={connection} roots={roots}/>}
       {page==='jira'&&<JiraSettings key={provider} connection={connection} provider={provider}/>}
       {page==='updates'&&<><div id="settings-updates"/>{provider!=='copilot'&&<EngineUpdates connection={connection} provider={provider}/>}</>}
       {page==='notifications'&&<RunAlertsToggle/>}{page==='connection'&&connectionPanel}
