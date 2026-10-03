@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.7 (Unreleased)
+## [0.25.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.6...v0.25.7) (2026-10-03)
 
 ### Features
 - miro: connect a project board by URL in Settings and open its original Miro Live Embed interface on desktop and mobile.
@@ -19,6 +19,7 @@
 - docs: explain Miro sign-in, PC-local links, remote access rights and limitations. AI API access and offline Miro editing are not included.
 
 ### Validation
+- Release source: [b7bd30d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/b7bd30d57f839db4e283b021f639a55e332915ec), branch [codex/miro-0.25.7](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/miro-0.25.7).
 - Passed 10 focused server tests, 9 interface scenarios, TypeScript/Vite, Android build and Windows desktop smoke checks. Source and final APK/desktop/host privacy audits passed. Physical Android and authenticated private Miro-board editing have not been tested.
 
 
