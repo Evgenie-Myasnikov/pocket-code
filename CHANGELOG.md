@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-03 - Independent workspace invitations and local roadmap boards (0.25.0)
+- Changed: Connection is inside Settings on Windows and Android. WorkSpace has its own QR invitations, explicit Local/Tailscale/Internet transport, desktop-only administration and named participant foldouts.
+- Changed: Trusted paired devices reuse the PC profile; independently invited members enter their name. Personal chats and local boards remain separate from shared workspace membership.
+- Added: Local boards and a Pocket Code example, populated roadmap templates, six distinct state styles and connected planned versions without creating Git branches.
+- Improved: Desktop canvas panning, destination-column highlighting and bounded note placement. Cached workspace catalogs and boards remain readable offline; offline changes are disabled.
+- Changed: Settings use categories and AI account/access/project subcategories. Desktop project selection is inside new chats.
+- Validation: 244 server tests passed; 22 browser scenarios and the roadmap example scenario passed. Android build and native desktop lifecycle/bridge smoke passed; TypeScript and Windows packaging passed. Source and release privacy checks are required before publication.
+- Follow-up: Physical Android testing remains unavailable. Independent workspace members do not receive the host's personal provider execution access.
+
+
 ## 2026-10-02 - Named participants and QR-bound shared boards (0.24.1)
 - Changed: Notes support multiple participants through initial avatars, an add button and an upper-right remove control. Stable ID-based colors and legacy single-assignee migration preserve assignments; People view uses the same notes.
 - Changed: Workspace entry asks for a personal name, stored separately from role. Host profiles are per connection; QR members choose their name after pairing.

@@ -23,7 +23,7 @@ public static class DesktopReadPolicy {
     public static bool AllowsWrite(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/(jobs|uploads|task-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
+        return Regex.IsMatch(path,@"^/(jobs|uploads|task-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
     }
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;

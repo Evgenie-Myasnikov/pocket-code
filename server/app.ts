@@ -76,6 +76,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const ip = req.socket.remoteAddress || 'unknown', now = Date.now();
     if(config.pcJira&&['/jira/pc-login','/jira/pc-source'].includes(req.path)&&validToken((req.headers.authorization||'').replace(/^Bearer /,''),config.pcJira.key)){next();return;}
     const key=(req.headers.authorization||'').replace(/^Bearer /,'');
+    if(req.method==='POST'&&req.path==='/workspace-join'&&workspaceAccess.invitationIdentity(key)){next();return;}
     const guest=workspaceAccess.identity(key);
     if(guest){workspaceRequest.run(guest,()=>{const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|workspaces|boards(?:\/[^/]+)?|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
     if(config.devices){
@@ -101,7 +102,16 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   let pairingChange:Promise<unknown>=Promise.resolve();
   app.get('/api/pairing-role',(_req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');res.json(workspaceAccess.store.invitation());});
   app.post('/api/pairing-role',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');const invite=workspaceAccess.parseInvitation(req.body);const next=pairingChange.then(async()=>{await devices().rotatePairing();await workspaceAccess.store.mutate(data=>{data.invitation=invite;});await config.refreshPairing?.();return invite;});pairingChange=next.catch(()=>{});res.json(await next);});
-  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);await pairingChange;const key=(req.headers.authorization||'').replace(/^Bearer /,'');if(!devices().isPairing(key))throw new HttpError(401,'Pairing code expired');res.json(workspaceAccess.store.invitation().role==='host'?await devices().pair(key,{...input,workspaceId:workspaceAccess.store.invitation().workspaceId}):await workspaceAccess.pairMember(input.name));});
+  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);await pairingChange;const key=(req.headers.authorization||'').replace(/^Bearer /,'');if(!devices().isPairing(key))throw new HttpError(401,'Pairing code expired');res.json(await devices().pair(key,input));});
+  const workspaceJoinAttempts=new Map<string,{at:number;count:number}>();
+  app.post('/api/workspace-join',async(req,res)=>{
+    const ip=req.socket.remoteAddress||'unknown',now=Date.now(),attempt=workspaceJoinAttempts.get(ip);if(attempt&&now-attempt.at<60000){if(++attempt.count>20)throw new HttpError(429,'Too many workspace joins. Try again in a minute.');}else{if(workspaceJoinAttempts.size>1000)workspaceJoinAttempts.clear();workspaceJoinAttempts.set(ip,{at:now,count:1});}
+    const key=(req.headers.authorization||'').replace(/^Bearer /,''),ws=workspaceAccess.invitationIdentity(key);if(!ws)throw new HttpError(401,'Workspace QR expired');
+    const input=z.object({connectionToken:z.string().max(512).optional()}).parse(req.body);
+    const linked=input.connectionToken&&config.devices?.authenticate(input.connectionToken);
+    if(linked){res.json({token:input.connectionToken,deviceId:linked,workspaceId:ws.id});return;}
+    res.json(await workspaceAccess.joinInvitation(key));
+  });
   app.post('/api/devices/self/forget',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().forget(res.locals.deviceId);res.json({ok:true});});
   app.post('/api/devices/heartbeat',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().heartbeat();res.json({ok:true});});
   app.post('/api/devices/:id/rename',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');const {name}=z.object({name:z.string().trim().min(1).max(80)}).parse(req.body);await devices().rename(uuid.parse(req.params.id),name);res.json({ok:true});});

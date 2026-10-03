@@ -1,45 +1,44 @@
-# Workspaces and project boards
+# WorkSpace, Connection and local boards
 
-A workspace shares a board for one repository. Chats are personal: choosing or joining a board does not filter, reset or share the host's provider conversations. Workspace members cannot read the host's chat history or run its AI in this version. Host access is a trusted full-access role, not a restricted member account.
+| Section | QR on the PC | What it opens |
+| --- | --- | --- |
+| Connection | Settings → Connection | Your trusted personal PC, AI chats and local boards |
+| WorkSpace | An expanded WorkSpace card | That workspace's shared boards |
+
+These are independent connections. Chats stay personal. A workspace invitation does not expose personal chats or local boards.
 
 ## Create and join
 
-1. On the host PC, open **Board ? Workspace** and create an area for one repository. Creation and member administration are only available on the PC.
-2. Use the single **Create board** button. The header shows the workspace name and participant count; inside a board, **Board / People** switches views in the header.
-3. Open **Connection** on the PC and share its QR. The workspace is attached to the invitation; there is no workspace switcher in the app. Creating a new workspace rotates the QR. Existing paired devices keep their workspace.
-4. Scan the QR on the phone and enter your name. The name is separate from your role, including Host. It is saved on the PC for that workspace and connection.
-5. The header participant count opens the roster. The desktop host can manage member roles and revoke access there.
+On Windows, use **WorkSpace → Create workspace**, with a name, password and one repository. Expand its card to see participants and their names; the PC host manages roles and revokes access here. **Open board** shows its project boards.
 
-An older phone connection without a workspace binding needs a fresh QR scan. There are no manual workspace login fields on the connection screen. The legacy password endpoint remains for compatibility.
+Choose a connection method and invitation role, then **Generate joining QR**. The QR explicitly shows **Local**, **Tailscale** or **Internet**. Each workspace has its own invitation. Replacing it expires that QR but does not revoke existing members. On Android, use **WorkSpace → Scan QR code**. Phones cannot create/manage workspaces, roles, invitations or participants, including with the Host role.
 
-## Participants on notes
+Connection has a separate QR and device list. Use it only for your own trusted devices. Workspace Host is the default for testing; membership alone does not grant PC administration or use of the host's AI account.
 
-Use the round **+** at the bottom of a note to find and attach participants. Each avatar uses the first letter of the person's name and a stable, randomly distributed color derived from its ID. Remove a person with the small **?** at the avatar's upper-right corner. Multiple people can share a note; People view shows that same note under each assignee. Unassigned notes have their own column. Old single-person assignments remain readable.
+## Identity
 
-## Roles and privacy
+Enter your first and last name on the PC when entering an area. A phone already paired through Connection at the same PC address uses that person's profile and does not ask again. An independent workspace phone enters its own name. These are display profiles, not verified organizational identities.
 
-The PC chooses the invitation role beside the QR. Host remains the default for testing and grants full access to the host's provider account; only give it to trusted users. Developer, Reviewer and QA members can edit their board. Viewer members can read it. Membership alone does not grant the host's personal conversations. Links to the host's chats are omitted from member board responses.
+Cards show the initial avatar followed by the name. On notes, the round **+** adds people; the small **×** removes them. People view shows the same note for each assigned person and orders tasks by priority.
 
-Provider execution for ordinary members is not yet enabled: it needs separate provider accounts and process isolation. Automatic AI task routing and approval gates are not implemented yet. Display names identify sessions, not verified organizational identities. Member credentials are random tokens stored as hashes; private workspace data is stored outside the public repository.
+## Local boards and examples
 
-## Visual roadmap
+Windows **Board → Local boards** shows boards outside workspace membership. Your trusted phone can open them under **WorkSpace → Local boards** after Connection pairing. Workspace members cannot read them.
 
-**The plus after the last column** opens a branch-name confirmation. The host creates a local Git branch from HEAD without checkout or push. Hold a branch heading (or right-click it on desktop) to rename the local branch; linked note/version names update across boards in that repository. Invalid or existing names, stale board revisions and repositories without a commit report an error. Remote-tracking branches cannot be renamed by this action.
+When the host loads Pocket Code's own repository, it creates a local **Pocket Code** example. This illustrates a roadmap; its statuses are not an automatically verified real backlog.
 
-Create a note with a title, description/acceptance criteria, status, priority and assignee. Its column determines its version branch: move the note to another column to change it. Dependency editing is deferred; existing stored links are preserved. Drag its handle or use the arrow keys on that handle. Pinch with two fingers or use Ctrl + mouse wheel / a trackpad pinch to zoom from 15% to 300%. Scroll or drag the canvas with one finger to move around; drag a note by its handle. There are no zoom buttons. Simultaneous edits use revisions: an outdated save reports a conflict instead of overwriting another device's changes. Reload the board and reapply that edit.
+New boards include six editable examples covering Idea, Questions, Ready, Working, Review and Done. Written labels accompany different colors and border treatments. New versions are **planned**: adding or renaming them does not create, rename, check out or push Git branches. Arrows show their sequence. Existing boards explicitly using Git retain their earlier branch behavior.
 
-**Discuss with AI** opens the shared chat with the note and its dependencies prepared as a draft. Sending is explicit. Once the host starts the conversation, its session is linked back to the note. Subsequent opens return to that chat. The initial prompt asks for clarification and acceptance criteria before implementation. The board does not yet parse AI answers into new cards or move statuses automatically. It does not claim that a task is guaranteed correct, create pull requests, merge, or deploy.
+## Navigation and editing
 
-The former Jira task list is parked while **Work** presents project boards. Existing Jira integration code and settings remain separate; opening Work does not request a Jira task list or poll its notification feed.
+Drag a note by its handle. Its destination column highlights and the note stays within that column after release. Columns determine versions. Keyboard left/right changes columns; up/down changes vertical position. On desktop, drag empty canvas or use the middle mouse button to pan. On phones, scroll with one finger. Pinch or Ctrl + wheel changes zoom; there are no zoom buttons. Revision conflicts require reloading and reapplying the change.
 
-## People view
+## Offline and settings
 
-Switch **Board / People** to view the same tasks by assignee. Columns use workspace participants, with a separate Unassigned column; existing named assignees are retained. Each column sorts critical, high, normal, then low priority, with titles breaking ties. A task shows its title, priority, status and assignee in both views. Open it in either view to edit the shared data. Assignee IDs keep participants with matching display names separate. The chosen view is remembered per board on this device. The roster is the workspace membership list, not a synced corporate directory.
+The phone opens without a PC. Previously loaded catalogs and boards are cached locally and can be read after an outage or restart, marked by an offline banner. Offline editing/queued synchronization are not supported. AI and live updates require the host. Caches are credential-scoped. Known revocation clears the connection cache; **Disconnect and forget** clears cached board data.
 
-## Desktop chat
+Settings have category screens. Windows AI accounts and limits have provider submenus; startup/tray, appearance, updates and About are separate. Android AI settings separate account, access and new-chat folder.
 
-Windows now embeds the same chat component used on the phone: drafts, messages, attachments, follow-ups while a run is active, stop, approval questions, model controls, Review, results and subagents. Switching desktop sections preserves the open chat and its draft. The native bridge accepts only the explicitly allowed chat and board routes; provider sign-in and host lifecycle retain their separate native actions.
-
-No physical Android device or multi-user deployment is implied by automated browser checks. This is the initial workspace/board foundation for a later autonomous workflow.
+Choose a project inside a new desktop chat. Existing chats keep their project, and shared boards do not filter the personal conversation list. **Discuss with AI** prepares a host chat draft; sending is explicit. Automated assignment, approval gates, PRs and deployment remain future work. Ordinary workspace members cannot run the host's provider account. Jira remains a separate integration.
 
 [Desktop guide](DESKTOP.md) · [User guide](USER_GUIDE.md)

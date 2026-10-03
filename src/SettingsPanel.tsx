@@ -17,18 +17,21 @@ import pkg from '../package.json';
 import {useEffect,useRef,type ReactNode} from 'react';
 import './settings.css';
 
-export type SettingsPage='index'|'appearance'|'workspace'|'usage'|'jira'|'updates'|'connection'|'about';
+export type SettingsPage='index'|'appearance'|'workspace'|'usage'|'jira'|'updates'|'connection'|'notifications'|'about';
 const categories=[
   {id:'appearance',title:'Оформление и язык',hint:'Тема, цвета и размер текста',Icon:Palette},
-  {id:'workspace',title:'AI и рабочее пространство',hint:'Папка проекта и доступ агента',Icon:SlidersHorizontal},
+  {id:'workspace',title:'AI и рабочее пространство',hint:'Аккаунт, доступ и параметры чата',Icon:SlidersHorizontal},
   {id:'usage',title:'Лимиты использования',hint:'Оставшийся лимит и время сброса',Icon:ChartNoAxesCombined},
-  {id:'jira',title:'Jira',hint:'Подключение и ваша роль',Icon:Link2},
+  {id:'jira',title:'Jira',hint:'Подключение к сервису задач',Icon:Link2},
   {id:'updates',title:'Обновления',hint:'Версия приложения и установка обновлений',Icon:Download},
-  {id:'connection',title:'Подключение к ПК',hint:'Компьютер и параметры связи',Icon:Laptop},
+  {id:'connection',title:'Подключение к ПК',hint:'QR и подключённый компьютер',Icon:Laptop},
+  {id:'notifications',title:'Уведомления',hint:'Завершение, ошибки и вопросы агента',Icon:Laptop},
   {id:'about',title:'О приложении',hint:'Pocket Code',Icon:Info},
 ] as const;
-type Props={workspaceSelector?:ReactNode;page:SettingsPage;onPage(page:SettingsPage):void;provider:WorkspaceProvider;connection:Connection|null;computerName:string;networkError:string;roots:string[];cwd:string;onProject(root:string):void;appearance:ReturnType<typeof useAppearance>;codexAccess:CodexAccess;onCodexAccess(value:CodexAccess):void;budget:number;onBudget(value:number):void;onDisconnect():void};
-export function SettingsPanel({workspaceSelector,page,onPage,provider,connection,computerName,networkError,roots,cwd,onProject,appearance,codexAccess,onCodexAccess,budget,onBudget,onDisconnect}:Props){
+type Props={connectionPanel?:ReactNode;workspaceSelector?:ReactNode;page:SettingsPage;onPage(page:SettingsPage):void;provider:WorkspaceProvider;connection:Connection|null;computerName:string;networkError:string;roots:string[];cwd:string;onProject(root:string):void;appearance:ReturnType<typeof useAppearance>;codexAccess:CodexAccess;onCodexAccess(value:CodexAccess):void;budget:number;onBudget(value:number):void;onDisconnect():void};
+export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,provider,connection,computerName,networkError,roots,cwd,onProject,appearance,codexAccess,onCodexAccess,budget,onBudget,onDisconnect}:Props){
+  const [subpage,setSubpage]=useState<'index'|'account'|'access'|'project'>('index');
+  useEffect(()=>setSubpage('index'),[page]);
   const category=categories.find(item=>item.id===page);
   const content=useRef<HTMLDivElement|null>(null),previous=useRef(page),indexScroll=useRef(0);
   useEffect(()=>{
@@ -40,11 +43,11 @@ export function SettingsPanel({workspaceSelector,page,onPage,provider,connection
       <button className="settings-back" onClick={()=>onPage('index')}><ArrowLeft size={18}/>{t('Все настройки')}</button>
       <h2 className="settings-page-title">{t(category?.title||'Настройки')}</h2>
       {page==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance}/></>}
-      {page==='workspace'&&<>{workspaceSelector}<ProviderConnections connection={connection} only={provider}/><p className="muted">{t('Настройки рабочего пространства {0}',provider==='copilot'?'Copilot':provider==='codex'?'Codex':'Claude')}</p><label>{t('Папка для новых чатов')}<select value={roots.includes(cwd)?cwd:''} onChange={event=>onProject(event.target.value)}>{!roots.includes(cwd)&&<option value="">{cwd}</option>}{roots.map(root=><option key={root}>{root}</option>)}</select></label>{provider==='copilot'?<></>:provider==='codex'?<CodexAccessSettings value={codexAccess} onChange={onCodexAccess}/>:<><label>{t('Лимит стоимости одного запроса, $')}<input type="number" min="0.1" max="100" step="0.1" value={budget} onChange={event=>onBudget(Number(event.target.value))}/></label><p className="muted">{t('Оценка Agent SDK. Фактическая оплата зависит от способа входа в Claude. Лимит применяется к следующему сообщению.')}</p></>}</>}
+      {page==='workspace'&&<>{workspaceSelector}{subpage==='index'?<nav className="settings-index">{(['account','access','project'] as const).map(id=><button className="settings-category" key={id} onClick={()=>setSubpage(id)}><span><strong>{t(id==='account'?'Аккаунт AI':id==='access'?'Доступ агента':'Папка для новых чатов')}</strong></span><ChevronRight size={18}/></button>)}</nav>:<button className="settings-back" onClick={()=>setSubpage('index')}><ArrowLeft size={18}/>{t('Назад')}</button>}{subpage==='account'&&<ProviderConnections connection={connection} only={provider}/>}<p className="muted">{t('Настройки рабочего пространства {0}',provider==='copilot'?'Copilot':provider==='codex'?'Codex':'Claude')}</p>{subpage==='project'&&<label>{t('Папка для новых чатов')}<select value={roots.includes(cwd)?cwd:''} onChange={event=>onProject(event.target.value)}>{!roots.includes(cwd)&&<option value="">{cwd}</option>}{roots.map(root=><option key={root}>{root}</option>)}</select></label>}{subpage==='access'&&(provider==='copilot'?<></>:provider==='codex'?<CodexAccessSettings value={codexAccess} onChange={onCodexAccess}/>:<><label>{t('Лимит стоимости одного запроса, $')}<input type="number" min="0.1" max="100" step="0.1" value={budget} onChange={event=>onBudget(Number(event.target.value))}/></label><p className="muted">{t('Оценка Agent SDK. Фактическая оплата зависит от способа входа в Claude. Лимит применяется к следующему сообщению.')}</p></>)}</>}
       {page==='usage'&&<>{workspaceSelector}<CodexUsage connection={connection} provider={provider}/></>}
       {page==='jira'&&<JiraSettings key={provider} connection={connection} provider={provider}/>}
       {page==='updates'&&<><div id="settings-updates"/>{provider!=='copilot'&&<EngineUpdates connection={connection} provider={provider}/>}</>}
-      {page==='connection'&&<>{Capacitor.getPlatform()==='android'&&<RunAlertsToggle/>}<div className="settings-computer"><Laptop size={24}/><div><strong>{computerName}</strong><span>{connection?networkError?t('Нет связи'):t('Компьютер подключён'):t('Демонстрационный режим')}</span></div></div><p className="settings-host-address">{connection?.url||t('Демонстрационный режим')}</p><p className="muted">{t('Для интернета используйте Tailscale на ПК и телефоне или HTTPS. В домашнем Wi-Fi HTTP не шифрует трафик; Tailscale шифрует соединение в обеих сетях.')}</p><p className="muted">{t('Действующие задачи продолжаются на ПК после отключения телефона.')}</p></>}
+      {page==='notifications'&&<RunAlertsToggle/>}{page==='connection'&&connectionPanel}
       {page==='about'&&<div className="settings-about"><span className="logo"><Terminal size={24}/></span><h3>Pocket Code</h3><span className="version">BETA</span><p>{t('Версия {0}',pkg.version)}</p><p className="muted">{t('Claude Code и Codex с вашего ПК — на телефоне.')}</p></div>}
     </>}{page==='index'&&<footer className="settings-exit"><button className="settings-category settings-disconnect" onClick={onDisconnect}><LogOut size={21}/><span><strong>{t('Отключить и забыть')}</strong></span></button></footer>}</div>
   </section>;
