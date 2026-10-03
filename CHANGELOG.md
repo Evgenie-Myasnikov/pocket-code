@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.11 (Unreleased)
+## [0.25.11](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.10...v0.25.11) (2026-10-03)
 
 ### Features
 - boards: choose a grid step of 8, 12, 16, 24, 32 or 64 in Appearance settings on Windows and mobile; persist it locally and apply it to the visual grid, creation, dragging and keyboard placement.
@@ -8,7 +8,8 @@
 
 ### Validation
 - Seven focused data/placement checks and three browser scenarios passed, covering all grid steps, persisted settings, creation and mouse/keyboard movement at step 64. TypeScript/Vite, Android and Windows builds passed.
-- Local source/APK/desktop/host privacy audits passed; host contents matched source and checksums. Final release metadata and packages are being verified. Physical devices were not tested.
+- Final source/APK/desktop/host privacy audits passed; host contents matched source and checksums. GitHub CI passed. Published Windows and Android assets; the updater downloaded and checksum-verified the APK. Physical devices were not tested.
+- Release source: [d77fba0](https://github.com/Evgenie-Myasnikov/pocket-code/commit/d77fba04593d9b80bf12fd4278786505cd784898), branch [codex/grid-0.25.11](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/grid-0.25.11).
 
 ## [0.25.10](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.9...v0.25.10) (2026-10-03)
 
