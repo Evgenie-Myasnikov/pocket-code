@@ -8,7 +8,7 @@ test('Workspace QR scanned from Connection joins the workspace using the real ho
  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'PC connection',exact:true}).click();
  const buffer=await QRCode.toBuffer(JSON.stringify({type:'pocket-workspace',version:1,url,token,workspaceId:ws.id}),{width:640,margin:4});await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer});
  await expect.poll(()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}').workspaceId)).toBe(ws.id);await expect(page.getByLabel('What is your name?')).toBeVisible();
- await page.getByLabel('What is your name?').fill('Taylor Example');await page.getByRole('button',{name:'Continue',exact:true}).click();
+ await page.getByLabel('What is your name?').fill('Taylor');await page.getByLabel('Last name',{exact:true}).fill('Example');await page.getByRole('button',{name:'Continue',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'Your workspace name'})).not.toBeVisible();
  await expect(page.getByRole('heading',{name:'Waiting for host approval'})).toBeVisible();
  const catalog=await (await request.get(url+'/api/workspaces',{headers})).json();const member=catalog.workspaces.find((w:any)=>w.id===ws.id).members.find((m:any)=>m.name==='Taylor Example');expect(member.approval).toBe('pending');

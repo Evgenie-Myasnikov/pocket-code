@@ -23,12 +23,12 @@ public static class DesktopReadPolicy {
     public static bool AllowsWrite(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/(jobs|uploads|task-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
+        return Regex.IsMatch(path,@"^/(jobs|uploads|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
     }
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|workspaces|boards|codex/usage|claude/usage|copilot/usage|updates/status|updates/latest|review|review/availability|project-artifact|document-projects|project-docs|project-doc|files|file)$")||
+        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|copilot/usage|updates/status|updates/latest|review|review/availability|project-artifact|document-projects|project-docs|project-doc|files|file)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");
@@ -141,7 +141,7 @@ public sealed class PocketDesktop:Form {
         core.AddWebResourceRequestedFilter("*",CoreWebView2WebResourceContext.All);
         core.WebResourceRequested+=(_,e)=>{Uri uri;if(Uri.TryCreate(e.Request.Uri,UriKind.Absolute,out uri)&&(uri.GetLeftPart(UriPartial.Authority)==Origin||uri.Scheme=="data"||uri.Scheme=="blob"||e.ResourceContext==CoreWebView2WebResourceContext.Image&&uri.Scheme=="https"))return;e.Response=core.Environment.CreateWebResourceResponse(new MemoryStream(),403,"External request blocked","");};
         core.WebMessageReceived+=async(_,e)=>await Bridge(e.Source,e.WebMessageAsJson);
-        core.NavigationCompleted+=(_,e)=>{if(e.IsSuccess){webReady=true;Push();initialized.TrySetResult(true);}else initialized.TrySetException(new InvalidOperationException("Desktop interface could not load."));};
+        core.NavigationCompleted+=(_,e)=>{if(e.IsSuccess){webReady=true;if(Visible)web.Focus();Push();initialized.TrySetResult(true);}else initialized.TrySetException(new InvalidOperationException("Desktop interface could not load."));};
         core.Navigate(Origin+"/index.html?desktop=1");
     }
     async Task Bridge(string source,string payload){
@@ -195,7 +195,7 @@ public sealed class PocketDesktop:Form {
     void Reply(object message){if(exiting||IsDisposed)return;try{if(web.CoreWebView2!=null)web.CoreWebView2.PostWebMessageAsJson(json.Serialize(message));}catch(InvalidOperationException){}}
     void Push(){if(webReady&&!exiting)Reply(new{state=Snapshot()});}
     object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
-    public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();}
+    public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();web.Focus();}
     void Save(){if(preview)return;Directory.CreateDirectory(storage);string temp=settingsFile+".tmp";File.WriteAllText(temp,json.Serialize(preferences),Encoding.UTF8);
         // Right after an update handoff another process can briefly hold desktop.json without delete sharing.
         for(int attempt=1;;attempt++){try{if(File.Exists(settingsFile))File.Replace(temp,settingsFile,null);else File.Move(temp,settingsFile);return;}catch(IOException){if(attempt==5)throw;Thread.Sleep(100);}}}

@@ -22,7 +22,7 @@ public static class DesktopSmoke {
                 var ui=(Microsoft.Web.WebView2.WinForms.WebView2)Field(form,"web");bool rendered=false;var renderDeadline=DateTime.UtcNow.AddSeconds(15);
                 while(!rendered&&DateTime.UtcNow<renderDeadline){var ready=ui.CoreWebView2.ExecuteScriptAsync("!!document.querySelector('.desktop-app')");while(!ready.IsCompleted){Application.DoEvents();Thread.Sleep(10);}rendered=ready.Result=="true";Application.DoEvents();Thread.Sleep(50);}Check(rendered,"Shared desktop interface renders");
                 form.Close();Application.DoEvents();Check(!form.Visible&&!form.IsDisposed,"Close hides without exiting");
-                form.RestoreWindow();Application.DoEvents();Check(form.Visible,"Tray open restores window");
+                form.RestoreWindow();Application.DoEvents();Check(form.Visible,"Tray open restores window");Check(ui.Focused||ui.ContainsFocus,"Restored WebView receives keyboard focus");
                 form.WindowState=FormWindowState.Minimized;Application.DoEvents();Check(!form.Visible,"Minimize hides window");
                 form.RestoreWindow();Application.DoEvents();Check(form.WindowState==FormWindowState.Normal,"Restored window is normal");
                 var themeMethod=typeof(PocketDesktop).GetMethod("ApplyWindowTheme",BindingFlags.NonPublic|BindingFlags.Instance);
@@ -104,7 +104,7 @@ public static class DesktopSmoke {
             }
             foreach(string path in new[]{"/sessions","/sessions/synthetic/messages?provider=codex","/review?cwd=example","/project-artifact?path=example.md","/project-docs?cwd=example","/project-doc?cwd=example&path=AGENTS.md","/files?path=example","/file?path=example/README.md","/sessions/synthetic/subagents/child/messages"})Check(DesktopReadPolicy.Allows(path),"Read route allowed");
             foreach(string path in new[]{"/runtime/stop","/jobs/example/stop","/files/upload","/file/write","https://example.invalid","//example.invalid","/../runtime/stop","/sessions/x/messages#hidden","/jira/login"})Check(!DesktopReadPolicy.Allows(path),"Unsafe route denied");
-            foreach(string path in new[]{"/jobs","/uploads","/jobs/11111111-1111-4111-8111-111111111111/messages","/workspaces","/boards/11111111-1111-4111-8111-111111111111","/boards/11111111-1111-4111-8111-111111111111/branch"})Check(DesktopReadPolicy.AllowsWrite(path),"Chat/board write allowed");
+            foreach(string path in new[]{"/jobs","/uploads","/jobs/11111111-1111-4111-8111-111111111111/messages","/workspaces","/workspaces/11111111-1111-4111-8111-111111111111/delete","/boards/11111111-1111-4111-8111-111111111111/delete","/boards/11111111-1111-4111-8111-111111111111","/boards/11111111-1111-4111-8111-111111111111/branch"})Check(DesktopReadPolicy.AllowsWrite(path),"Chat/board write allowed");
             foreach(string path in new[]{"/runtime/stop","/file/write","/provider-connections/claude/logout","https://example.invalid","/../jobs","/jobs#hidden"})Check(!DesktopReadPolicy.AllowsWrite(path),"Unapproved write denied");
             Console.WriteLine("PASS: shared WebView UI, tray lifecycle, scoped read/write bridge policy, nested child cleanup and saved reconnect.");return 0;
         }catch(Exception error){Console.Error.WriteLine(error);return 1;}finally{if(owned!=null)owned.Dispose();}

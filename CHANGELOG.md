@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-03 - Single host, reusable profiles and desktop editing (0.25.3)
+- Fixed: Legacy per-device host profiles consolidate to one PC owner and remap note assignments. Old member/invitation Host labels migrate to Developer without merging independent member identities; new invitations cannot assign Host.
+- Added: Required first and last name, automatic reuse of a saved complete profile, and self-renaming from participants on Windows and Android. Trusted phones request missing host profile details instead of silently skipping them.
+- Added: PC-only confirmed deletion of boards and workspaces. Workspace removal revokes credentials and deletes its board metadata; repository files remain intact. Generated-board deletion persists across restarts.
+- Improved: Restored Windows windows focus the WebView. Chat Ctrl+A scopes selection to draft or conversation, Ctrl+C uses native selection, and Ctrl+V outside a field focuses the composer.
+- Added: Explicit Git snapshot save/import with a strict public field schema, sensitive-text checks, path validation and no automatic commit/push. A curated 15-note Pocket Code product board lives in the repository and drives the generated view.
+- Added: Shared application instructions teach Claude, Codex and Copilot to read repository boards, clarify ideas and maintain evidence-based cards without identities or private data. Guidance applies to new and resumed interactive sessions.
+- Added: Private per-recipient board inbox on mobile and Windows for assignments and clarification requests. A local AI helper uses authenticated, revision-checked host endpoints and idempotent request IDs; unapproved participants and cross-member inbox access are rejected.
+- Validation: 248/249 full-suite tests passed; the timing-sensitive Copilot stream test passed with all eight provider tests in isolation. 42 final provider/board/attention tests and all 29 browser scenarios passed. TypeScript/Vite, Android/Windows packaging and native Windows smoke passed. Source, APK, Windows and host privacy audits passed; physical Android testing unavailable.
+
+
 ## 2026-10-03 - Workspace approval, identities and chat recovery (0.25.2)
 - Fixed: Repeated QR joins reuse a proven member identity; concurrent retries create one request. Authenticated legacy paired-device profiles merge into the host profile while preserving assignments.
 - Added: New independent workspace members wait for PC host approval. Pending and declined requests cannot read boards, files, people or chats. Hosts approve, decline, change roles and remove members; removal invalidates credentials.

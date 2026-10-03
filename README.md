@@ -120,3 +120,7 @@ npm run test:ui
 ```
 
 Under active development. APKs are distributed through GitHub, not Google Play. Some native behaviors still require physical-device testing; see the reference for compatibility and build requirements.
+
+### Product roadmap
+
+The [Pocket Code board](project-boards/README.md) tracks delivered features and explicit follow-up work from CHANGELOG.md. Import its JSON into Pocket Code or open the generated board from this repository. Only product content is tracked; member identities and private conversations are excluded.

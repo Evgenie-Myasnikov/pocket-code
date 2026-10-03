@@ -1,3 +1,4 @@
+import {readBoardSnapshot} from './board-snapshots.js';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
@@ -21,6 +22,7 @@ export function roadmapFromChangelog(text:string){
  return {versions,notes};
 }
 export async function readProjectRoadmap(root:string){
+ try{const shared=await readBoardSnapshot(root,'board-7b004a10-920c-4ba7-a070-254318083e90.json',false);return {versions:shared.versions,notes:shared.notes.map(note=>({...note,owner:'',assigneeIds:[]}))};}catch(error:any){if(error.code!=='ENOENT')throw error;}
  for(const name of ['CHANGELOG.md','changelog.md'])try{return roadmapFromChangelog(await readFile(path.join(root,name),'utf8'));}catch(error:any){if(error.code!=='ENOENT')throw error;}
  return {versions:[],notes:[] as BoardNote[]};
 }

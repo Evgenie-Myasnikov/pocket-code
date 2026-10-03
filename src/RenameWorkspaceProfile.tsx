@@ -1,0 +1,10 @@
+import {profileName} from './profile-name';
+import {saveProfile} from './workspace-profile';
+import {useState} from 'react';
+import {Pencil} from 'lucide-react';
+import {request,type Connection} from './api';
+import {useLanguage} from './i18n';
+export function RenameWorkspaceProfile({connection,workspaceId,name,onChange}:{connection:Connection;workspaceId:string;name:string;onChange():Promise<void>}){
+ const ru=useLanguage()==='ru',[open,setOpen]=useState(false),[value,setValue]=useState(profileName({name}).firstName),[lastName,setLastName]=useState(profileName({name}).lastName),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ return <><button className="icon-button" aria-label={ru?'Переименовать себя':'Rename yourself'} onClick={()=>{setValue(profileName({name}).firstName);setLastName(profileName({name}).lastName);setError('');setOpen(true);}}><Pencil size={16}/></button>{open&&<div className="modal-backdrop"><form className="board-dialog" role="dialog" aria-modal="true" aria-label={ru?'Ваше имя':'Your name'} onSubmit={async e=>{e.preventDefault();if(busy)return;setBusy(true);try{await request(connection,'/workspaces/'+workspaceId+'/profile',{name:value.trim()+' '+lastName.trim(),firstName:value.trim(),lastName:lastName.trim()});saveProfile({firstName:value.trim(),lastName:lastName.trim()});await onChange();setOpen(false);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}><h2>{ru?'Ваше имя':'Your name'}</h2><input aria-label={ru?'Имя':'First name'} autoFocus required maxLength={160} value={value} onChange={e=>setValue(e.target.value)}/><input aria-label={ru?'Фамилия':'Last name'} required maxLength={79} value={lastName} onChange={e=>setLastName(e.target.value)}/>{error&&<p role="alert">{error}</p>}<footer><button type="button" disabled={busy} onClick={()=>setOpen(false)}>{ru?'Отмена':'Cancel'}</button><button className="primary" disabled={busy||!value.trim()||!lastName.trim()}>{ru?'Сохранить':'Save'}</button></footer></form></div>}</>;
+}

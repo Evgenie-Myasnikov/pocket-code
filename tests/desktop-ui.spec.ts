@@ -1,4 +1,17 @@
 import {test,expect,type Page} from '@playwright/test';
+test('PC imports, exports and deletes a board without committing files',async({page})=>{
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:'Import board',exact:true}).click();await page.getByRole('button',{name:'Import',exact:true}).click();await page.getByRole('button',{name:/Shared roadmap/}).click();await page.getByRole('button',{name:'Save to repository',exact:true}).click();await page.getByRole('button',{name:'Save',exact:true}).click();await expect(page.getByRole('status')).toContainText('project-boards/');await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByRole('button',{name:'Delete board',exact:true}).click();await page.getByRole('button',{name:'Delete',exact:true}).click();await expect(page.getByRole('button',{name:/Shared roadmap/})).toHaveCount(0);
+});
+test('workspace deletion requires confirmation and removes the card',async({page})=>{
+ await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Disposable example',roots:['C:\\Demo\\Atlas'],role:'host',people:[],members:[]}];});
+ await desktop(page);await page.getByRole('button',{name:'WorkSpace',exact:true}).click();await page.locator('summary').filter({hasText:'Disposable example'}).click();await page.getByRole('button',{name:'Delete workspace',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('Project files stay on the PC.');await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('summary').filter({hasText:'Disposable example'})).toBeVisible();await page.getByRole('button',{name:'Delete workspace',exact:true}).click();await page.getByRole('button',{name:'Delete',exact:true}).click();await expect(page.locator('summary').filter({hasText:'Disposable example'})).toHaveCount(0);
+});
+test('desktop chat supports scoped select all, copy and paste',async({page,context})=>{
+ await context.grantPermissions(['clipboard-read','clipboard-write']);await desktop(page);await page.getByRole('button',{name:/claude · Interface review/}).click();
+ const input=page.locator('.composer textarea');await input.fill('Synthetic draft');await input.press('Control+a');await input.press('Control+c');await input.press('End');await input.press('Control+v');await expect(input).toHaveValue('Synthetic draftSynthetic draft');
+ await page.locator('.conversation-inner').click({position:{x:10,y:10}});await page.keyboard.press('Control+a');const selected=await page.evaluate(()=>getSelection()?.toString());expect(selected).toContain('The responsive layout is ready.');expect(selected).not.toContain('WorkSpace');
+ await page.keyboard.press('Control+c');await input.fill('');await page.locator('.conversation-inner').click({position:{x:10,y:10}});await page.keyboard.press('Control+v');await expect(input).toBeFocused();expect(await input.inputValue()).toContain('The responsive layout is ready.');
+});
 test('Connection QR and WorkSpace administration are separate',async({page})=>{
  await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Synthetic team',roots:['C:\\Demo\\Atlas'],role:'host',people:[{id:'host',name:'Alex Morgan',role:'host'}],members:[]}];});
  await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Connection',exact:true}).click();
@@ -6,7 +19,7 @@ test('Connection QR and WorkSpace administration are separate',async({page})=>{
  await page.getByRole('button',{name:'WorkSpace',exact:true}).click();
  await page.locator('summary').filter({hasText:'Synthetic team'}).click();
  await expect(page.locator('.workspace-roster')).toContainText('Alex Morgan');
- await expect(page.getByLabel('Participant role')).toHaveValue('host');
+ await expect(page.getByLabel('Participant role')).toHaveValue('developer');
  await expect(page.locator('.desktop-rail').getByLabel('Project',{exact:true})).toHaveCount(0);
  await page.screenshot({path:'artifacts/screenshots/workspace-management.png'});
 });
@@ -51,7 +64,14 @@ async function desktop(page:Page){
    if(p==='/pairing-role'){reply(id,{role:'host'});return;}
    if(p==='/health'){reply(id,{name:'Synthetic PC',roots:['C:\\Demo\\Atlas','C:\\Demo\\Garden'],version:'0.22.7',protocol:1});return;}
    if(p==='/providers'){reply(id,[{id:'claude',available:true,models:[]},{id:'codex',available:true,authenticated:true,models:[]}]);return;}
-   if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:[]});return;}
+   if(/^\/workspaces\/[^/]+\/delete$/.test(p)){(window as any).testWorkspaces=(window as any).testWorkspaces.filter((w:any)=>w.id!==p.split('/')[2]);reply(id,{ok:true});return;}
+   if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:(window as any).testBoards||[]});return;}
+   if(p==='/board-notifications'){reply(id,{items:(window as any).testBoardNotices||[]});return;}if(p==='/board-notifications/read'){(window as any).testBoardNotices=((window as any).testBoardNotices||[]).map((n:any)=>({...n,readAt:Date.now()}));reply(id,{ok:true});return;}
+   if(p==='/board-snapshots'){reply(id,[{file:'board-11111111-1111-4111-8111-111111111111.json',name:'Shared roadmap',noteCount:0}]);return;}
+   if(p==='/board-snapshots/import'){const board={id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:message.data.root,revision:0,versionSource:'planned',notes:[],versions:[]};(window as any).testBoards=[board];reply(id,board);return;}
+   if(/^\/boards\/[^/]+\/snapshot$/.test(p)){reply(id,{path:'project-boards/board-22222222-2222-4222-8222-222222222222.json'});return;}
+   if(/^\/boards\/[^/]+\/delete$/.test(p)){(window as any).testBoards=[];reply(id,{ok:true});return;}
+   if(/^\/boards\/[^/]+$/.test(p)){reply(id,(window as any).testBoards?.find((b:any)=>b.id===p.split('/')[2]));return;}
    if(p==='/activity'){reply(id,[]);return;}
    if(p==='/task-notifications'){reply(id,{items:[],unread:0});return;}
    if(p==='/jobs'&&action==='write'){const run={...message.data,provider:message.data.provider||'claude',sessionId:'alpha',status:'running',messages:[],partial:'Working on your request',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0};(window as any).testRuns=[run];reply(id,run);return;}
@@ -167,4 +187,9 @@ test('personal chats stay visible independently of the shared board workspace',a
  await desktop(page);await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toHaveCount(0);await page.getByRole('button',{name:/claude \u00b7 Interface review/}).click();await expect(page.locator('.embedded-chat')).toBeVisible();
  await page.getByRole('navigation').getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:'Workspace boards',exact:true}).click();await expect(page.locator('.board-header h1')).toHaveText('Shared board');await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:/claude \u00b7 Interface review/}).click();await expect(page.locator('.embedded-chat')).toBeVisible();
+});
+
+test('desktop board inbox shows a targeted question and marks it read after opening',async({page})=>{
+ await page.addInitScript(()=>{const boardId='22222222-2222-4222-8222-222222222222',noteId='33333333-3333-4333-8333-333333333333';(window as any).testBoards=[{id:boardId,name:'Example',notes:[{id:noteId,title:'Example feature',description:'Acceptance criteria'}]}];(window as any).testBoardNotices=[{id:'notice',boardId,noteId,recipientId:'host',kind:'question',title:'Example feature',message:'Which format should be supported?',at:1}];});
+ await desktop(page);await page.getByRole('button',{name:'Board notifications',exact:true}).click();await page.getByRole('button',{name:/Clarification requested.*Example feature/}).click();await expect(page.getByRole('heading',{name:'Example feature'})).toBeVisible();await expect(page.locator('.board-notification-detail')).toContainText('Which format should be supported?');await expect.poll(()=>page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeTruthy();
 });

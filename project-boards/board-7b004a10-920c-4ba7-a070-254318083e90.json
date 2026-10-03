@@ -1,0 +1,199 @@
+{
+  "format": "pocket-code-board",
+  "version": 1,
+  "name": "Pocket Code — product roadmap",
+  "versions": [
+    "0.25.0",
+    "0.25.1",
+    "0.25.2",
+    "0.25.3",
+    "Follow-up"
+  ],
+  "notes": [
+    {
+      "id": "a9789b72-fe9d-40ca-a5c3-37d3f343a43e",
+      "title": "Separate shared boards from personal chats",
+      "description": "Shared workspaces contain boards. Personal provider chats and local boards stay private. Evidence: CHANGELOG.md, 0.25.0 and 0.24.1.",
+      "branch": "0.25.0",
+      "status": "done",
+      "priority": "normal",
+      "x": 360,
+      "y": 92,
+      "dependencies": []
+    },
+    {
+      "id": "a329797d-297b-4210-afa1-a2b96db88765",
+      "title": "Edit ideas on a version roadmap",
+      "description": "Notes have status and priority; planned version columns do not create Git branches. Dragging highlights the destination. Evidence: CHANGELOG.md, 0.25.0.",
+      "branch": "0.25.0",
+      "status": "done",
+      "priority": "normal",
+      "x": 360,
+      "y": 412,
+      "dependencies": []
+    },
+    {
+      "id": "19521cc8-5a14-48ce-a279-5065aa5cad63",
+      "title": "Read saved boards offline",
+      "description": "Previously fetched workspace catalogs and boards remain readable during a network outage. Offline editing is disabled. Evidence: CHANGELOG.md, 0.25.0.",
+      "branch": "0.25.0",
+      "status": "done",
+      "priority": "normal",
+      "x": 360,
+      "y": 732,
+      "dependencies": []
+    },
+    {
+      "id": "d7050892-1429-4a0b-aaf3-97982ed5a384",
+      "title": "Open Rules and Changelog directly",
+      "description": "Separate document sections choose Git projects containing the relevant Markdown files. Evidence: CHANGELOG.md, 0.25.1.",
+      "branch": "0.25.1",
+      "status": "done",
+      "priority": "normal",
+      "x": 700,
+      "y": 92,
+      "dependencies": []
+    },
+    {
+      "id": "9927e12c-485c-433b-acb5-c3c090d4bbdb",
+      "title": "Route scanned QR codes to the correct connection",
+      "description": "PC pairing and workspace invitations follow separate flows; revoked pairing can be retried. Evidence: CHANGELOG.md, 0.25.1.",
+      "branch": "0.25.1",
+      "status": "done",
+      "priority": "normal",
+      "x": 700,
+      "y": 412,
+      "dependencies": []
+    },
+    {
+      "id": "c2fd3971-3991-43b5-a5f7-9b8297551544",
+      "title": "Approve new workspace participants",
+      "description": "Independent invitations wait for host approval. Pending requests cannot read boards or files. Hosts can decline and revoke membership. Evidence: CHANGELOG.md, 0.25.2.",
+      "branch": "0.25.2",
+      "status": "done",
+      "priority": "normal",
+      "x": 1040,
+      "y": 92,
+      "dependencies": [
+        "a9789b72-fe9d-40ca-a5c3-37d3f343a43e",
+        "9927e12c-485c-433b-acb5-c3c090d4bbdb"
+      ]
+    },
+    {
+      "id": "cb322c57-fc22-4b17-a4a2-fc5717165d5a",
+      "title": "Restore personal chats from cache",
+      "description": "Cached sessions restore before health/provider discovery. Failed job queries no longer block chat lists. Evidence: CHANGELOG.md, 0.25.2.",
+      "branch": "0.25.2",
+      "status": "done",
+      "priority": "normal",
+      "x": 1040,
+      "y": 412,
+      "dependencies": [
+        "19521cc8-5a14-48ce-a279-5065aa5cad63"
+      ]
+    },
+    {
+      "id": "4d70d899-c397-4321-a159-696c6471174f",
+      "title": "Switch workspaces in the mobile header",
+      "description": "Keep the selected workspace across restarts and expose the participant count beside the selector. Evidence: CHANGELOG.md, 0.25.2.",
+      "branch": "0.25.2",
+      "status": "done",
+      "priority": "normal",
+      "x": 1040,
+      "y": 732,
+      "dependencies": []
+    },
+    {
+      "id": "6443ac05-c3eb-48cd-a8df-6527b6ab0607",
+      "title": "Use one host and a reusable display profile",
+      "description": "Consolidate legacy host-device profiles, preserve assignments, require first and last name, and allow self-renaming. Server migration and profile browser tests pass; final release validation is pending. Evidence: CHANGELOG.md, 0.25.3.",
+      "branch": "0.25.3",
+      "status": "review",
+      "priority": "high",
+      "x": 1380,
+      "y": 92,
+      "dependencies": [
+        "c2fd3971-3991-43b5-a5f7-9b8297551544"
+      ]
+    },
+    {
+      "id": "26cb95f3-7636-49f7-abba-889bf8b0ab44",
+      "title": "Support familiar desktop text shortcuts",
+      "description": "Ctrl+A selects a draft or the conversation; Ctrl+C copies selected text and Ctrl+V can focus the composer. Browser clipboard and native focus checks pass. Evidence: CHANGELOG.md, 0.25.3.",
+      "branch": "0.25.3",
+      "status": "review",
+      "priority": "normal",
+      "x": 1380,
+      "y": 412,
+      "dependencies": []
+    },
+    {
+      "id": "439cd039-08b2-4062-ab12-08df51089874",
+      "title": "Delete boards and workspaces deliberately",
+      "description": "PC host confirms deletion. Workspace access and board metadata are removed; repository files remain. Generated board deletion persists. Server authorization and confirmation UI are covered. Evidence: CHANGELOG.md, 0.25.3.",
+      "branch": "0.25.3",
+      "status": "review",
+      "priority": "normal",
+      "x": 1380,
+      "y": 732,
+      "dependencies": [
+        "c2fd3971-3991-43b5-a5f7-9b8297551544"
+      ]
+    },
+    {
+      "id": "c428e50e-349f-44bd-a1f5-bbfce070ec0f",
+      "title": "Share portable board snapshots in Git",
+      "description": "Save and import ideas, feature descriptions, statuses, priorities, positions and dependency links. Exclude participant identities, assignments, chat links, credentials and machine paths. Snapshots do not commit or push automatically. Evidence: CHANGELOG.md, 0.25.3.",
+      "branch": "0.25.3",
+      "status": "review",
+      "priority": "normal",
+      "x": 1380,
+      "y": 1052,
+      "dependencies": [
+        "a329797d-297b-4210-afa1-a2b96db88765",
+        "439cd039-08b2-4062-ab12-08df51089874"
+      ]
+    },
+    {
+      "id": "24090e28-c703-4759-af73-6a39adac6726",
+      "title": "Validate the full workflow on physical Android",
+      "description": "Outstanding validation recorded in CHANGELOG.md. Check QR scanning, name reuse, approval, revocation, keyboard behavior, background reconnect and offline cache on a real device. Completion requires recorded device results; browser emulation is insufficient.",
+      "branch": "Follow-up",
+      "status": "ready",
+      "priority": "high",
+      "x": 1720,
+      "y": 92,
+      "dependencies": [
+        "6443ac05-c3eb-48cd-a8df-6527b6ab0607",
+        "cb322c57-fc22-4b17-a4a2-fc5717165d5a",
+        "4d70d899-c397-4321-a159-696c6471174f",
+        "439cd039-08b2-4062-ab12-08df51089874"
+      ]
+    },
+    {
+      "id": "98f1564b-88c8-484f-a489-76dcf17f32ac",
+      "title": "Define isolated AI execution for shared members",
+      "description": "Shared members can collaborate on boards but cannot use the host personal AI account. Define account ownership, execution isolation, resource limits and review policy before implementing member-triggered runs. Recorded limitation: CHANGELOG.md, 0.24.1.",
+      "branch": "Follow-up",
+      "status": "questions",
+      "priority": "normal",
+      "x": 1720,
+      "y": 412,
+      "dependencies": [
+        "c2fd3971-3991-43b5-a5f7-9b8297551544",
+        "6443ac05-c3eb-48cd-a8df-6527b6ab0607"
+      ]
+    },
+    {
+      "id": "fb631c46-f461-41ec-a2a3-5763c25c80b9",
+      "title": "AI board assistance and targeted notifications",
+      "description": "CHANGELOG.md · 0.25.3\nBuilt-in provider instructions help clarify ideas and maintain repository cards. The private host inbox notifies approved participants about assignments and concrete clarification requests. Acceptance: recipient isolation, replay deduplication and visible Windows/mobile inbox. Server checks and Windows browser inbox scenario passed. OS background push and physical Android verification remain follow-up; notifications currently refresh while the application is running.",
+      "branch": "0.25.3",
+      "status": "review",
+      "priority": "high",
+      "x": 1380,
+      "y": 1372,
+      "dependencies": []
+    }
+  ]
+}

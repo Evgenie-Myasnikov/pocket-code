@@ -6,10 +6,20 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import type {AddressInfo} from 'node:net';
 import {createApp} from '../server/app.js';
-import {BoardStore,validateDependencies,boardBranches,type BoardNote} from '../server/boards.js';
+import {BoardStore,createWorkspaceAccess,validateDependencies,boardBranches,type BoardNote} from '../server/boards.js';
 import {Jobs} from '../server/jobs.js';
 import {DeviceRegistry} from '../server/devices.js';
 import {execFileSync} from 'node:child_process';
+
+test('legacy host profiles consolidate without dropping assignments or member identities',async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-host-'));try{
+ const file=path.join(dir,'boards.json'),store=await new BoardStore(file).load(),workspaceId=randomUUID(),memberId=randomUUID();
+ await store.mutate(data=>{data.workspaces.push({id:workspaceId,name:'Synthetic team',roots:[],password:'',hostPeople:[{id:'device:old',name:'Old name'},{id:'host',name:'Alex Example'}],members:[{id:memberId,name:'Morgan Example',role:'host',tokenHash:'synthetic-hash'}],invite:{role:'host',hash:'synthetic-invitation'}});data.boards.push({id:randomUUID(),workspaceId,name:'Example',root:'',revision:0,versionSource:'planned',versions:[],notes:[{id:randomUUID(),title:'Example note',description:'',branch:'',status:'idea',owner:'',assigneeId:'device:old',assigneeIds:['device:old','host'],x:0,y:0,dependencies:[]}]});});
+ const migrated=await createWorkspaceAccess(file),state=migrated.store.snapshot();
+ assert.deepEqual(state.workspaces[0].hostPeople,[{id:'host',name:'Alex Example'}]);assert.equal(state.workspaces[0].members[0].id,memberId);assert.equal(state.workspaces[0].members[0].role,'developer');assert.equal(state.workspaces[0].invite?.role,'developer');assert.deepEqual(state.boards[0].notes[0].assigneeIds,['host']);assert.equal(state.boards[0].revision,1);
+ assert.deepEqual((await createWorkspaceAccess(file)).store.snapshot(),state);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
 
 test('workspace login isolates projects and chats, roles and credentials stay host-controlled',async()=>{
  const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-boards-')),a=path.join(dir,'atlas'),b=path.join(dir,'garden');await mkdir(a);await mkdir(b);await writeFile(path.join(b,'private.txt'),'synthetic private content');
@@ -34,12 +44,12 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   await call('/pairing-role',{role:'host',workspaceId:ws.id});const originalQr=devices.pairingToken;
   const owner=await (await call('/devices/pair',{name:'Host phone',platform:'android',version:'test'},originalQr)).json();
   const phoneCatalog=await (await call('/workspaces',undefined,owner.token)).json();assert.equal(owner.workspaceId,undefined);assert.equal(phoneCatalog.workspaces.length,2);assert.equal(phoneCatalog.host,true);assert.equal(phoneCatalog.canManageWorkspaces,false);
-  assert.equal(phoneCatalog.workspaces.find((w:any)=>w.id===ws.id).me.needsName,false);
-  assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'Alex'})).status,200);
+  assert.equal(phoneCatalog.workspaces.find((w:any)=>w.id===ws.id).me.needsName,true);
+  assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'Alex Example'})).status,200);
   assert.equal((await call('/workspaces/'+ws.id+'/invitation',{role:'qa'},owner.token)).status,403);
   assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'   '},owner.token)).status,400);
-  const named=await (await call('/workspaces',undefined,owner.token)).json();const namedWorkspace=named.workspaces.find((w:any)=>w.id===ws.id);assert.equal(namedWorkspace.me.name,'Alex');assert.equal(namedWorkspace.me.needsName,false);assert.deepEqual(namedWorkspace.people.map((p:any)=>p.name),['Alex']);assert.equal(namedWorkspace.people.some((p:any)=>p.name==='Host'),false);
-  assert.equal((await (await call('/workspaces')).json()).workspaces.find((w:any)=>w.id===ws.id).me.name,'Alex');
+  const named=await (await call('/workspaces',undefined,owner.token)).json();const namedWorkspace=named.workspaces.find((w:any)=>w.id===ws.id);assert.equal(namedWorkspace.me.name,'Alex Example');assert.equal(namedWorkspace.me.needsName,false);assert.deepEqual(namedWorkspace.people.map((p:any)=>p.name),['Alex Example']);assert.equal(namedWorkspace.people.some((p:any)=>p.name==='Host'),false);
+  assert.equal((await (await call('/workspaces')).json()).workspaces.find((w:any)=>w.id===ws.id).me.name,'Alex Example');
   assert.equal((await (await call('/workspaces')).json()).canManageWorkspaces,true);
   assert.equal((await call('/workspaces',{name:'Phone area',password,roots:[a]},owner.token)).status,403);
   assert.equal((await call('/workspaces',{id:ws.id,name:'Changed',roots:[a]},owner.token)).status,403);
@@ -62,22 +72,38 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:rejoined.memberId,approval:'approved'},rejoined.token)).status,403);
   assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:rejoined.memberId,approval:'approved'})).status,200);
   assert.equal((await (await call('/workspaces',undefined,rejoined.token)).json()).workspaces[0].people.filter((p:any)=>p.name==='Taylor Example').length,1);
+  const attentionBoard=await (await call('/boards',{workspaceId:ws.id,name:'Assignments',root:a,example:false})).json(),attentionNote={id:randomUUID(),title:'Synthetic task',description:'Acceptance criteria',branch:'',status:'idea',owner:'',x:0,y:0,dependencies:[]};
+  assert.equal((await call('/boards/'+attentionBoard.id,{revision:0,notes:[attentionNote],versions:[]})).status,200);
+  const attention={requestId:randomUUID(),revision:1,noteId:attentionNote.id,kind:'assign',recipients:[rejoined.memberId]};
+  assert.equal((await call('/boards/'+attentionBoard.id+'/attention',attention,rejoined.token)).status,403);
+  assert.equal((await call('/boards/'+attentionBoard.id+'/attention',attention)).status,200);
+  assert.equal((await call('/boards/'+attentionBoard.id+'/attention',attention)).status,200);
+  const personalInbox=await (await call('/board-notifications',undefined,rejoined.token)).json();assert.equal(personalInbox.items.length,1);assert.equal(personalInbox.items[0].kind,'assigned');
+  assert.equal((await (await call('/board-notifications')).json()).items.length,0);
+  await call('/board-notifications/read',{ids:[personalInbox.items[0].id]});assert.equal((await (await call('/board-notifications',undefined,rejoined.token)).json()).items[0].readAt,undefined);
+  await call('/board-notifications/read',{ids:[personalInbox.items[0].id]},rejoined.token);assert.ok((await (await call('/board-notifications',undefined,rejoined.token)).json()).items[0].readAt);
+  assert.equal((await call('/boards/'+attentionBoard.id+'/attention',{...attention,requestId:randomUUID(),revision:2,kind:'question',message:'Which format?'})).status,200);
+  assert.equal((await (await call('/board-notifications',undefined,rejoined.token)).json()).items[0].message,'Which format?');
+  assert.equal((await call('/boards/'+attentionBoard.id+'/attention',{...attention,requestId:randomUUID(),revision:2})).status,409);
+  await call('/boards/'+attentionBoard.id+'/delete',{});
+  assert.equal((await (await call('/board-notifications',undefined,rejoined.token)).json()).items.length,0);
+
   assert.equal((await (await call('/workspaces',undefined,invited.token)).json()).workspaces[0].me.needsName,true);
-  assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'Morgan'},invited.token)).status,200);
-  assert.equal((await (await call('/workspaces',undefined,invited.token)).json()).workspaces[0].me.name,'Morgan');
+  assert.equal((await call('/workspaces/'+ws.id+'/profile',{name:'Morgan Example'},invited.token)).status,200);
+  assert.equal((await (await call('/workspaces',undefined,invited.token)).json()).workspaces[0].me.name,'Morgan Example');
   const otherWorkspace=(await (await call('/workspaces')).json()).workspaces.find((w:any)=>w.id!==ws.id);assert.equal((await call('/workspaces/'+otherWorkspace.id+'/profile',{name:'Escape'},invited.token)).status,403);
   assert.equal(invited.workspaceId,ws.id);
   assert.equal((await (await call('/workspaces',undefined,invited.token)).json()).host,false);
   assert.equal((await call('/pairing-role',{role:'host'},invited.token)).status,403);
-  assert.equal((await call('/workspace-login',{name:'Atlas team',password:'wrong',displayName:'Reader'},'')).status,401);
-  const guest=await (await call('/workspace-login',{name:'Atlas team',password,displayName:'Reader'},'')).json();assert.ok(guest.token);
+  assert.equal((await call('/workspace-login',{name:'Atlas team',password:'wrong',displayName:'Reader Example'},'')).status,401);
+  const guest=await (await call('/workspace-login',{name:'Atlas team',password,displayName:'Reader Example'},'')).json();assert.ok(guest.token);
   assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,role:'developer'},owner.token)).status,403);
   assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,remove:true},owner.token)).status,403);
   assert.equal((await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,approval:'rejected'})).status,200);
   assert.equal((await call('/boards/'+board.id,undefined,guest.token)).status,403);
   assert.equal((await (await call('/workspaces',undefined,guest.token)).json()).workspaces[0].me.approval,'rejected');
   await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,approval:'approved'});
-  const catalog=await (await call('/workspaces',undefined,guest.token)).json();assert.equal(catalog.host,false);assert.ok(catalog.workspaces[0].people.some((p:any)=>p.name==='Reader'));assert.equal(JSON.stringify(catalog.workspaces[0].people).includes('tokenHash'),false);assert.equal(catalog.workspaces.length,1);assert.equal(catalog.workspaces[0].role,'viewer');assert.equal(JSON.stringify(catalog).includes(password),false);assert.equal(JSON.stringify(catalog).includes('tokenHash'),false);
+  const catalog=await (await call('/workspaces',undefined,guest.token)).json();assert.equal(catalog.host,false);assert.ok(catalog.workspaces[0].people.some((p:any)=>p.name==='Reader Example'));assert.equal(JSON.stringify(catalog.workspaces[0].people).includes('tokenHash'),false);assert.equal(catalog.workspaces.length,1);assert.equal(catalog.workspaces[0].role,'viewer');assert.equal(JSON.stringify(catalog).includes(password),false);assert.equal(JSON.stringify(catalog).includes('tokenHash'),false);
   const list=await (await call('/sessions',undefined,guest.token)).json();assert.deepEqual(list,[]);assert.equal((await call('/sessions/'+aId+'/messages',undefined,guest.token)).status,404);assert.deepEqual(await (await call('/jobs',undefined,guest.token)).json(),[]);
   assert.equal((await call('/sessions/'+bId+'/messages',undefined,guest.token)).status,404);
   assert.equal((await call('/file?path='+encodeURIComponent(path.join(b,'private.txt')),undefined,guest.token)).status,403);
@@ -94,14 +120,26 @@ test('workspace login isolates projects and chats, roles and credentials stay ho
   const localRename=await (await call('/boards/'+local.id+'/branch',{previous:'0.1',name:'Discovery',revision:0})).json();assert.equal(localRename.versions[0],'Discovery');assert.ok(localRename.notes.some((n:any)=>n.branch==='Discovery'));assert.deepEqual((await boardBranches(a)).branches,beforePlanned);
   assert.equal((await call('/boards/'+local.id,undefined,guest.token)).status,403);assert.equal((await call('/boards/'+local.id,{revision:1,versions:[],notes:[]},guest.token)).status,403);assert.ok(!(await (await call('/workspaces',undefined,guest.token)).json()).boards.some((b:any)=>b.id===local.id));
   const disk=await readFile(path.join(dir,'uploads','.boards','workspaces.json'),'utf8');assert.equal(disk.includes(password),false);assert.equal(disk.includes(guest.token),false);assert.equal(disk.includes(rotated.token),false);
-  const savedNote:BoardNote={id:randomUUID(),title:'Assigned task',description:'',branch:'release/1.0',status:'working',owner:'Reader',assigneeId:guest.memberId,assigneeIds:[guest.memberId,'host'],priority:'high',x:20,y:70,dependencies:[]};
+  const savedNote:BoardNote={id:randomUUID(),title:'Assigned task',description:'',branch:'release/1.0',status:'working',owner:'Reader Example',assigneeId:guest.memberId,assigneeIds:[guest.memberId,'host'],priority:'high',x:20,y:70,dependencies:[]};
   assert.equal((await call('/boards/'+board.id,{revision:3,versions:['release/1.0'],notes:[savedNote]},guest.token)).status,200);
   assert.equal((await call('/boards/'+board.id,{revision:4,versions:[],notes:[{...savedNote,priority:'invalid'}]},guest.token)).status,400);
-  const loaded=await new BoardStore(path.join(dir,'uploads','.boards','workspaces.json')).load();assert.equal(loaded.snapshot().boards[0].versions[0],'release/1.0');assert.equal(loaded.snapshot().boards[0].notes[0].priority,'high');assert.equal(loaded.snapshot().boards[0].notes[0].assigneeId,guest.memberId);assert.deepEqual(loaded.snapshot().boards[0].notes[0].assigneeIds,[guest.memberId,'host']);assert.equal(loaded.snapshot().workspaces[0].hostPeople[0].name,'Alex');
+  const loaded=await new BoardStore(path.join(dir,'uploads','.boards','workspaces.json')).load();assert.equal(loaded.snapshot().boards[0].versions[0],'release/1.0');assert.equal(loaded.snapshot().boards[0].notes[0].priority,'high');assert.equal(loaded.snapshot().boards[0].notes[0].assigneeId,guest.memberId);assert.deepEqual(loaded.snapshot().boards[0].notes[0].assigneeIds,[guest.memberId,'host']);assert.equal(loaded.snapshot().workspaces[0].hostPeople[0].name,'Alex Example');
   const privateChat={provider:'claude',sessionId:randomUUID()};assert.equal((await call('/boards/'+board.id,{revision:4,versions:['release/1.0'],notes:[{...savedNote,chat:privateChat}]})).status,200);
   const memberBoard=await (await call('/boards/'+board.id,undefined,guest.token)).json();assert.equal(memberBoard.notes[0].chat,undefined);
   const memberSave=await (await call('/boards/'+board.id,{revision:5,versions:['release/1.0'],notes:[{...memberBoard.notes[0],title:'Updated board note'}]},guest.token)).json();assert.equal(memberSave.notes[0].chat,undefined);assert.deepEqual((await (await call('/boards/'+board.id)).json()).notes[0].chat,privateChat);
+  assert.equal((await call('/boards/'+board.id+'/snapshot',{},guest.token)).status,403);
+  const shared=await (await call('/boards/'+board.id+'/snapshot',{})).json();assert.ok(shared.path);
+  const snapshotText=await readFile(path.join(a,shared.path),'utf8');assert.equal(snapshotText.includes(privateChat.sessionId),false);assert.equal(snapshotText.includes(guest.memberId),false);assert.equal(snapshotText.includes('Reader Example'),false);
+  const imported=await (await call('/board-snapshots/import',{root:a,file:path.basename(shared.path),workspaceId:ws.id})).json();assert.ok(imported.id);assert.notEqual(imported.id,board.id);assert.equal(imported.notes[0].owner,'');assert.deepEqual(imported.notes[0].assigneeIds,[]);assert.equal(imported.notes[0].chat,undefined);
   await call('/workspaces/'+ws.id+'/member',{memberId:guest.memberId,remove:true});assert.equal((await call('/workspaces',undefined,guest.token)).status,401);
+  assert.equal((await call('/boards/'+local.id+'/delete',{},owner.token)).status,403);
+  assert.equal((await call('/workspaces/'+ws.id+'/delete',{},rejoined.token)).status,403);
+  assert.equal((await call('/boards/'+local.id+'/delete',{})).status,200);
+  assert.equal((await call('/boards/'+local.id)).status,404);
+  assert.equal((await call('/workspaces/'+ws.id+'/delete',{})).status,200);
+  assert.equal((await call('/workspaces',undefined,rejoined.token)).status,401);
+  assert.equal((await call('/boards/'+board.id)).status,404);
+  assert.equal(await readFile(path.join(a,'README.md'),'utf8'),'Synthetic repository');
  }finally{jobs.close();terminals.close();await new Promise<void>(r=>server.close(()=>r()));await rm(dir,{recursive:true,force:true});}
 });
 test('dependencies reject dangling links and cycles; branches come from the exact repository',async()=>{

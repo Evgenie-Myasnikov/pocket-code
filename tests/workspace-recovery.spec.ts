@@ -14,6 +14,13 @@ test('mobile switches saved workspaces from the header and restores selection',a
  await page.screenshot({path:'.local/workspace-header.png'});
 });
 
+test('a member can rename their own profile from the participant list',async({page})=>{
+ let name='Alex Example';const connection={url:'http://127.0.0.1:4319',token:'synthetic-profile-token',workspaceId:first,workspaceOnly:true};
+ await page.addInitScript(c=>sessionStorage.setItem('connection',JSON.stringify(c)),connection);
+ await page.route('**/api/**',async route=>{const url=new URL(route.request().url());if(url.pathname.endsWith('/profile')){name=route.request().postDataJSON().name;return route.fulfill({json:{ok:true}});}return route.fulfill({json:url.pathname==='/api/workspaces'?{host:false,workspaces:[{id:first,name:'Atlas team',roots:[],role:'viewer',me:{id:'person',name,needsName:false},people:[{id:'person',name,role:'viewer'}]}],boards:[]}:url.pathname==='/api/health'?{protocol:1,roots:[],name:'Synthetic PC'}:[]});});
+ await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:'Participants: 1'}).click();await page.getByRole('button',{name:'Rename yourself'}).click();await page.getByLabel('First name',{exact:true}).fill('Alex');await page.getByRole('dialog',{name:'Your name',exact:true}).getByLabel('Last name',{exact:true}).fill('Updated');await page.getByRole('button',{name:'Save',exact:true}).click();await expect(page.getByRole('dialog',{name:'Your name',exact:true})).toHaveCount(0);await expect(page.getByRole('dialog',{name:'Participants',exact:true})).toContainText('Alex Updated');expect(name).toBe('Alex Updated');
+});
+
 test('cached personal chats survive failed health and provider discovery on startup',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
  await page.evaluate(async()=>{
@@ -25,4 +32,13 @@ test('cached personal chats survive failed health and provider discovery on star
  await page.route('**/api/**',route=>route.abort('internetdisconnected'));await page.reload();
  await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();
  await expect(page.getByText('Cached planning conversation',{exact:true})).toBeVisible();
+});
+
+for(const reuse of [false,true])test('workspace name requires both fields; saved profile reuse='+reuse,async({page})=>{
+ let profile:any={id:'person',name:'',needsName:true};const connection={url:'http://127.0.0.1:4319',token:'synthetic-identity-token',workspaceId:first,workspaceOnly:true};
+ await page.addInitScript(({connection,reuse})=>{sessionStorage.setItem('connection',JSON.stringify(connection));if(reuse)localStorage.setItem('pocket-own-profile',JSON.stringify({firstName:'Alex',lastName:'Example'}));},{connection,reuse});
+ await page.route('**/api/**',route=>{const url=new URL(route.request().url());if(url.pathname.endsWith('/profile')){profile={...profile,...route.request().postDataJSON(),needsName:false};return route.fulfill({json:{ok:true}});}return route.fulfill({json:url.pathname==='/api/workspaces'?{host:false,workspaces:[{id:first,name:'Atlas team',roots:[],role:'viewer',me:profile,people:profile.needsName?[]:[{id:'person',name:profile.name,role:'viewer'}]}],boards:[]}:url.pathname==='/api/health'?{protocol:1,roots:[],name:'Synthetic PC'}:[]});});
+ await page.goto('http://127.0.0.1:5173');
+ if(!reuse){await page.getByLabel('What is your name?').fill('Alex');await expect(page.getByRole('button',{name:'Continue',exact:true})).toBeDisabled();await page.getByLabel('Last name',{exact:true}).fill('Example');await page.getByRole('button',{name:'Continue',exact:true}).click();}
+ await expect.poll(()=>profile.firstName).toBe('Alex');expect(profile.lastName).toBe('Example');await expect(page.getByRole('dialog',{name:'Your workspace name'})).not.toBeVisible();
 });
