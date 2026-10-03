@@ -1,6 +1,7 @@
 import { t } from "./i18n";import { useEffect, useState } from 'react';
 import './appearance.css';
 import './neutral-themes.css';
+import {BoardGridSettings} from './BoardGridSettings';
 
 const palettes = [
 { id: 'neutral', name: 'Нейтральная', color: '#a6a6a6', hue: 0 },
@@ -55,6 +56,7 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
     <label>{t("Масштаб интерфейса ")}<output>{appearance.scale}%</output><input aria-label={t("Масштаб интерфейса")} type="range" min="60" max="130" step="5" value={appearance.scale} onChange={(e) => setAppearance((p) => ({ ...p, scale: Number(e.target.value) }))} /></label>
     <label>{t("Межстрочный интервал ")}<output>{appearance.spacing.toFixed(2)}</output><input aria-label={t("Межстрочный интервал")} type="range" min="1.1" max="2.2" step="0.05" value={appearance.spacing} onChange={(e) => setAppearance((p) => ({ ...p, spacing: Number(e.target.value) }))} /></label>
     <label className="compact-toggle"><input type="checkbox" checked={appearance.compact} onChange={(e) => setAppearance((p) => ({ ...p, compact: e.target.checked }))} />{t("Компактные отступы")}</label>
+    <BoardGridSettings/>
     <div className="appearance-preview"><span className="eyebrow">{t("ПРИМЕР СООБЩЕНИЯ")}</span><p>{t("Так будет выглядеть ваш чат.")}</p><button type="button" className="primary" onClick={() => setAppearance({ ...defaults })}>{t("Сбросить оформление")}</button></div>
     {saveError && <p role="alert" className="error">{t(saveError)}</p>}
   </section>;

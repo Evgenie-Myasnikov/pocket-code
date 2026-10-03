@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.25.11 (Unreleased)
+
+### Features
+- boards: choose a grid step of 8, 12, 16, 24, 32 or 64 in Appearance settings on Windows and mobile; persist it locally and apply it to the visual grid, creation, dragging and keyboard placement.
+- boards: widen version columns at step 64 so cards fit on the grid without crossing column boundaries; retain existing card positions until explicitly moved.
+
+### Validation
+- Three placement checks cover all selectable steps and branch boundaries; three focused desktop browser scenarios and TypeScript/Vite passed. Windows and Android package checks pending; physical devices not tested.
+
 ## [0.25.10](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.9...v0.25.10) (2026-10-03)
 
 ### Features
