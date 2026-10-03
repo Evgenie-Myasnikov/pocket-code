@@ -1,3 +1,4 @@
+import {readChatCache,writeChatCache} from './chat-cache';
 import {DesktopSettings} from './DesktopSettings';
 import {DesktopWorkspaces} from './DesktopWorkspaces';
 import {connectionKind} from './connection-kind';
@@ -64,9 +65,9 @@ export function DesktopApp(){
   const [creating,setCreating]=useState(false);
   const [selected,setSelected]=useState<Session|null>(null),[loading,setLoading]=useState(false),[revision,setRevision]=useState(0),[address,setAddress]=useState(0);
   useEffect(()=>{const unwatch=watchDesktop(setState);let active=true;void desktopCall<DesktopState>('state').then(value=>{if(active)setState(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;unwatch();};},[]);
-  useEffect(()=>{persist('provider',provider);setSessions([]);setJobs([]);if(!boardChat?.note.chat){setSelected(null);setCreating(false);}setProject(saved('project-'+provider,''));},[provider]);
+  useEffect(()=>{persist('provider',provider);setSessions(readChatCache<Session[]>('desktop-local',provider,'sessions')||[]);setJobs([]);if(!boardChat?.note.chat){setSelected(null);setCreating(false);}setProject(saved('project-'+provider,''));},[provider]);
   useEffect(()=>{if(!state.online)return;let active=true;setLoading(true);
-    const stop=startVisiblePoll(async()=>{try{const list=await request<Session[]>(connection,`/sessions?provider=${provider}`);if(!active)return;setSessions(old=>shareSnapshot(old,list));setError('');}catch(e){if(active)setError((e as Error).message);}finally{if(active)setLoading(false);}},10000);return()=>{active=false;stop();};
+    const stop=startVisiblePoll(async()=>{try{const list=await request<Session[]>(connection,`/sessions?provider=${provider}`);if(!active)return;setSessions(old=>shareSnapshot(old,list));writeChatCache('desktop-local',provider,'sessions',list);setError('');}catch(e){if(active)setError((e as Error).message);}finally{if(active)setLoading(false);}},10000);return()=>{active=false;stop();};
   },[state.online,provider,revision]);
   useEffect(()=>{if(!state.online)return;let active=true;const stop=startVisiblePoll(async()=>{try{const folders=await request<string[]>(connection,'/projects');if(active)setProjects(old=>shareSnapshot(old,folders));}catch{/* Session project folders remain available. */}},60000);return()=>{active=false;stop();};},[state.online,revision]);
   useEffect(()=>{if(!state.online)return;let active=true;const stop=startVisiblePoll(async()=>{try{const runs=await request<JobView[]>(connection,`/jobs?provider=${provider}`);if(active)setJobs(old=>shareSnapshot(old,runs));}catch{/* Keep the last known run state during a transient disconnect. */}},1000);return()=>{active=false;stop();};},[state.online,provider,revision]);

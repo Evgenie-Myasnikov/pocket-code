@@ -1,3 +1,5 @@
+import {MobileWorkspaceHeader} from './MobileWorkspaceHeader';
+import {savedWorkspaces,rememberWorkspace,workspaceJoinId,type WorkspaceAccess} from './workspace-access';
 import {clearOffline} from './offline-data';
 import {WorkspaceIdentity} from './WorkspaceIdentity';
 import {ChatHeader} from './ChatHeader';
@@ -84,6 +86,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const canRun = !offline && !!connection && providerInfo?.available === true && providerInfo.authenticated !== false && !connection?.workspaceId;
   const [boardChat,setBoardChat]=useState<BoardChat|null>(embedded?.boardChat||null);
   const [boardLaunch,setBoardLaunch]=useState<BoardChat|null>(null);
+  const [workspaceAccesses,setWorkspaceAccesses]=useState<WorkspaceAccess[]>([]);
   const [cacheScope,setCacheScope]=useState('');
   const [health, setHealth] = useState<Health | null>(embedded?null:{name:'Offline',roots:[],version:packageVersion,protocol:1}),[sessions, setSessions] = useStateForWorkspace<Session[]>([]),[jobs, setJobs] = useStateForWorkspace<JobView[]>([]);
   const [selected, setSelected] = useStateForWorkspace<Session | null>(null),[history, setHistory] = useStateForWorkspace<ChatMessage[]>([]),[job, setJob] = useStateForWorkspace<JobView | null>(null);
@@ -270,20 +273,25 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   async function connect(c: Connection) {
     setBusy(true);setError('');
     try {
-      c=await pairDevice(c,packageVersion);
-      const h = await request<Health>(c, '/health');
-      if (h.protocol !== 1) throw new Error(t("Обновите приложение и сервер до одной версии"));
-      const scope=await chatCacheScope(c);
-      if(!embedded)await saveConnection({...c,...(workspaceConnection?{workspaceAccess:workspaceConnection}:{})});setCacheScope(scope);setSaved(c);setConnection(c);setHealth(h);setDemo(false);
-    } catch (e) {setError((e as Error).message);} finally {setBusy(false);}
+      const original=c;c=await pairDevice(c,packageVersion);
+      const scope=await chatCacheScope(c),access=workspaceConnection||original.workspaceAccess,accesses=workspaceAccesses.length?workspaceAccesses:savedWorkspaces(original);
+      if(!embedded)await saveConnection({...c,...(access?{workspaceAccess:access}:{}),workspaceAccesses:accesses});
+      setCacheScope(scope);setSaved(c);setConnection(c);setDemo(false);
+      const h=await request<Health>(c,'/health');if(h.protocol!==1)throw Error(t('Обновите приложение и сервер до одной версии'));setHealth(h);
+    }catch(e){setError((e as Error).message);setOffline(true);}finally{setBusy(false);}
   }
-  useEffect(() => {if(embedded){void connect(embedded.connection);return;}loadConnection().then((c) => {if (c) {setSaved(c);if(c.workspaceAccess)setWorkspaceConnection(c.workspaceAccess);if(c.workspaceOnly){setWorkspaceConnection(c);setTab('workspace');void request<Health>(c,'/health').then(setHealth).catch(()=>{});}else void connect(c);}}).catch(() => setError(t("Не удалось прочитать сохранённое подключение. Введите ключ снова.")));}, []);
+  useEffect(()=>{if(embedded){void connect(embedded.connection);return;}loadConnection().then(c=>{if(!c)return;setSaved(c);setWorkspaceAccesses(savedWorkspaces(c));if(c.workspaceAccess)setWorkspaceConnection(c.workspaceAccess);if(c.workspaceOnly){setWorkspaceConnection(c);setTab('workspace');void request<Health>(c,'/health').then(setHealth).catch(()=>{});}else void connect(c);}).catch(()=>setError(t('Не удалось прочитать сохранённое подключение. Введите ключ снова.')));},[]);
+  async function switchWorkspace(access:WorkspaceAccess){
+    setWorkspaceConnection(access);setLocalBoards(false);setWorkspaceScanner(false);setError('');
+    await saveConnection(connection?{...connection,workspaceAccess:access,workspaceAccesses}:{...access,workspaceOnly:true,workspaceAccesses});
+  }
   async function joinWorkspace(c:Connection){
     setBusy(true);setError('');try{
-      const linked=connection?.url===c.url?connection:undefined;
-      const joined=await request<{token:string;workspaceId:string;deviceId?:string}>(c,'/workspace-join',linked?{connectionToken:linked.token}:{});
-      const access={url:c.url,...joined};setWorkspaceConnection(access);setWorkspaceScanner(false);setTab('workspace');
-      await saveConnection(connection?{...connection,workspaceAccess:access}:{...access,workspaceOnly:true});
+      const linked=connection?.url===c.url?connection:undefined,previous=workspaceAccesses.find(item=>item.url===c.url&&item.workspaceId===c.workspaceId);
+      const joined=await request<{token:string;workspaceId:string;deviceId?:string}>(c,'/workspace-join',{...(linked?{connectionToken:linked.token}:{}),...(previous?{previousToken:previous.token}:{}),joinId:await workspaceJoinId(c)});
+      const catalog=await request<{workspaces:{id:string;name:string}[]}>({url:c.url,...joined},'/workspaces?workspaceId='+encodeURIComponent(joined.workspaceId));
+      const access={url:c.url,...joined,name:catalog.workspaces.find(item=>item.id===joined.workspaceId)?.name},accesses=rememberWorkspace(workspaceAccesses,access);setWorkspaceAccesses(accesses);setWorkspaceConnection(access);setWorkspaceScanner(false);setLocalBoards(false);setTab('workspace');
+      await saveConnection(connection?{...connection,workspaceAccess:access,workspaceAccesses:accesses}:{...access,workspaceOnly:true,workspaceAccesses:accesses});
     }catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   const embeddedOpened=useRef(false);
@@ -331,18 +339,19 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     return()=>clearTimeout(timer);
   },[cacheScope,provider,demo,selected?.sessionId,outputMessages,loading,fromStart]);
   useEffect(() => {
-    if (!connection || demo || !providerInfo) return;
+    if (!connection || demo) return;
     let cancelled = false;
     let cachedSessions:Session[]|null=null;
     async function refresh() {
       try {
-        const [s, j] = await Promise.all([request<Session[]>(connection!, `/sessions?provider=${provider}`), request<JobView[]>(connection!, `/jobs?provider=${provider}`)]);
+        const [sessionResult,jobResult]=await Promise.allSettled([request<Session[]>(connection!, `/sessions?provider=${provider}`),request<JobView[]>(connection!, `/jobs?provider=${provider}`)]);
+        if(sessionResult.status==='rejected')throw sessionResult.reason;const s=sessionResult.value,j=jobResult.status==='fulfilled'?jobResult.value:null;
         if (!cancelled) {
-          const scopedSessions=s.filter(item=>!item.provider || item.provider===provider),scopedJobs=j.filter(item=>!item.provider || item.provider===provider);
+          const scopedSessions=s.filter(item=>!item.provider || item.provider===provider),scopedJobs=j?.filter(item=>!item.provider || item.provider===provider);
           const cacheSnapshot=shareSnapshot(cachedSessions,scopedSessions.slice(0,300));
           if(cacheScope&&cacheSnapshot!==cachedSessions)writeChatCache(cacheScope,provider,'sessions',cacheSnapshot);
           cachedSessions=cacheSnapshot;
-          setSessions(old=>shareSnapshot(old,scopedSessions));setJobs(old=>shareSnapshot(old,scopedJobs));setSelected(old=>old?shareSnapshot(old,scopedSessions.find(item=>item.sessionId===old.sessionId)||old):null);setNetworkError('');
+          setSessions(old=>shareSnapshot(old,scopedSessions));if(scopedJobs)setJobs(old=>shareSnapshot(old,scopedJobs));setSelected(old=>old?shareSnapshot(old,scopedSessions.find(item=>item.sessionId===old.sessionId)||old):null);setNetworkError('');
         }
       } catch (e) {if (!cancelled) setNetworkError((e as Error).message);}
     }
@@ -579,9 +588,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           outputs={hasOutputs||Boolean(selected)?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
           reading={outputMessages.length>0||Boolean(job?.partial)?{disabled:loading||!history.length&&!job,open:()=>toggleReadingMode(true)}:undefined}/>
         {!selected&&!job&&<div className="chat-start-context"><label className="project-picker"><Folder size={14}/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>{workspacePicker('header')}</div>}
-      </>:tab==='jobs'?null:<header className="chat-header" data-section={tab}>
+      </>:tab==='workspace'?<MobileWorkspaceHeader accesses={workspaceAccesses} current={workspaceConnection} value={projectSpaces} local={localBoards} canLocal={!!connection} onLocal={()=>{setLocalBoards(true);setWorkspaceScanner(false);}} onSelect={access=>void switchWorkspace(access)} onJoin={()=>{setLocalBoards(false);setWorkspaceScanner(true);}}/>:tab==='jobs'?null:<header className="chat-header" data-section={tab}>
         {tab==='terminal'&&<button className="icon-button mobile-back" aria-label={t("К списку чатов")} onClick={() => embedded?embedded.onBack():setMobileChat(false)}><ArrowLeft size={21} /></button>}
-        <div className="header-title">{(!embedded&&(tab==='terminal')) && <label className="project-picker"><Folder size={14}/><select aria-label={t("Папка проекта")} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>}<strong>{tab==='workspace'?'WorkSpace':tab==='connection'?'Connection':tab==='settings'?t("Настройки"):tab==='files'?t("Правила"):tab==='changelog'?t("История изменений"):tab==='terminal'?t("Терминал"):selected?.customTitle||selected?.summary||t("Новый разговор")}</strong></div>
+        <div className="header-title">{(!embedded&&(tab==='terminal')) && <label className="project-picker"><Folder size={14}/><select aria-label={t("Папка проекта")} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>}<strong>{tab==='connection'?'Connection':tab==='settings'?t("Настройки"):tab==='files'?t("Правила"):tab==='changelog'?t("История изменений"):tab==='terminal'?t("Терминал"):selected?.customTitle||selected?.summary||t("Новый разговор")}</strong></div>
 
         
         {(!embedded&&(tab==='terminal'))&&workspacePicker('header')}
@@ -592,7 +601,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {networkError && !hostRestarting && <div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
       {!canRun && !demo && tab==='chats' && connection && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить рабочее пространство Codex.")}</div>}
       <Updates connection={connection} expanded={tab === 'settings'&&settingsPage === 'updates'} />
-      {tab === 'connection' ? <Connect initial={saved?.workspaceOnly?null:saved} onConnect={connect} onAlternateCode={joinWorkspace} busy={busy} error={error}/> : tab === 'workspace' ? <><div className="board-scope-switch" role="group" aria-label={locale().startsWith('ru')?'Раздел досок':'Board scope'}><button aria-pressed={!localBoards} onClick={()=>setLocalBoards(false)}>WorkSpace</button>{connection&&<button aria-pressed={localBoards} onClick={()=>setLocalBoards(true)}>{locale().startsWith('ru')?'Локальные доски':'Local boards'}</button>}</div>{localBoards&&connection?<WorkBoards local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:(!workspaceConnection||workspaceScanner)?<Connect kind="workspace" onConnect={joinWorkspace} onAlternateCode={connect} busy={busy} error={error}/>:<><button className="text-button" onClick={()=>setWorkspaceScanner(true)}>{locale().startsWith('ru')?'Сканировать QR рабочей области':'Scan workspace QR'}</button><WorkBoards connection={workspaceConnection} roots={projectSpaces.workspace?.roots||[]} workspaces={projectSpaces} onChat={setBoardLaunch}/></>}</> : tab === 'jobs' ? (embedded?connection:workspaceConnection)?<WorkBoards connection={(embedded?connection:workspaceConnection)!} roots={projects||health.roots} workspaces={projectSpaces} onChat={setBoardLaunch}/>:null : tab === 'terminal' ? provider !== 'claude' ? <div className="center-message">{t("Терминал доступен в рабочем пространстве Claude. С Codex можно работать в чате.")}</div> : connection && !demo && !selected?.readOnly ? <LiveTerminal connection={connection} cwd={cwd} sessionId={selected?.sessionId} /> : <div className="center-message">{t("Живой терминал доступен после подключения к ПК.")}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={tab==='files'?'rules':'changelog'}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={<Connect initial={saved?.workspaceOnly?null:saved} onConnect={connect} onAlternateCode={joinWorkspace} busy={busy} error={error}/>} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget} onDisconnect={()=>void disconnect()}/> : <>
+      {tab === 'connection' ? <Connect initial={saved?.workspaceOnly?null:saved} onConnect={connect} onAlternateCode={joinWorkspace} busy={busy} error={error}/> : tab === 'workspace' ? <>{localBoards&&connection?<WorkBoards compactContext local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:(!workspaceConnection||workspaceScanner)?<Connect kind="workspace" onConnect={joinWorkspace} onAlternateCode={connect} busy={busy} error={error}/>:<><WorkBoards compactContext connection={workspaceConnection} roots={projectSpaces.workspace?.roots||[]} workspaces={projectSpaces} onChat={setBoardLaunch}/></>}</> : tab === 'jobs' ? (embedded?connection:workspaceConnection)?<WorkBoards connection={(embedded?connection:workspaceConnection)!} roots={projects||health.roots} workspaces={projectSpaces} onChat={setBoardLaunch}/>:null : tab === 'terminal' ? provider !== 'claude' ? <div className="center-message">{t("Терминал доступен в рабочем пространстве Claude. С Codex можно работать в чате.")}</div> : connection && !demo && !selected?.readOnly ? <LiveTerminal connection={connection} cwd={cwd} sessionId={selected?.sessionId} /> : <div className="center-message">{t("Живой терминал доступен после подключения к ПК.")}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={tab==='files'?'rules':'changelog'}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={<Connect initial={saved?.workspaceOnly?null:saved} onConnect={connect} onAlternateCode={joinWorkspace} busy={busy} error={error}/>} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget} onDisconnect={()=>void disconnect()}/> : <>
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}<div className="conversation-date"><span />{demo ? t("ПРИМЕР РАЗГОВОРА") : t("РАБОЧЕЕ ПРОСТРАНСТВО")}<span /></div>
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}

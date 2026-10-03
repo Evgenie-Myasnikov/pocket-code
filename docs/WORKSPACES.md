@@ -42,3 +42,9 @@ Settings have category screens. Windows AI accounts and limits have provider sub
 Choose a project inside a new desktop chat. Existing chats keep their project, and shared boards do not filter the personal conversation list. **Discuss with AI** prepares a host chat draft; sending is explicit. Automated assignment, approval gates, PRs and deployment remain future work. Ordinary workspace members cannot run the host's provider account. Jira remains a separate integration.
 
 [Desktop guide](DESKTOP.md) · [User guide](USER_GUIDE.md)
+
+## Joining requests and removal
+
+New independent members scan a WorkSpace QR, enter their name, and wait for approval on the host PC. Open WorkSpace, expand the workspace card, and approve or decline each request. Only approved members can read its boards. Existing members keep their access after upgrading. A trusted phone paired to its own host uses the existing host identity.
+
+Use **Remove member** to revoke workspace access. The next server request rejects the old key and clears the local workspace cache; an offline device may still hold previously downloaded data until it reconnects. Rejoining requires a new approval. Mobile users switch previously joined workspaces in the header; the number at the right opens the participant list. Personal chats are cached separately and do not belong to a shared workspace.

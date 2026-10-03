@@ -78,7 +78,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const key=(req.headers.authorization||'').replace(/^Bearer /,'');
     if(req.method==='POST'&&req.path==='/workspace-join'&&workspaceAccess.invitationIdentity(key)){next();return;}
     const guest=workspaceAccess.identity(key);
-    if(guest){workspaceRequest.run(guest,()=>{const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|workspaces|boards(?:\/[^/]+)?|document-projects|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
+    if(guest){workspaceRequest.run(guest,()=>{if(guest.approval&&guest.approval!=='approved'&&!(req.method==='GET'&&req.path==='/workspaces'||req.method==='POST'&&(/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout'))){res.status(403).json({error:guest.approval==='rejected'?'Workspace request was declined.':'Waiting for host approval.'});return;}const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|workspaces|boards(?:\/[^/]+)?|document-projects|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
     if(config.devices){
       const admin=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')&&['127.0.0.1','localhost','[::1]'].includes(req.hostname)&&!req.headers['x-forwarded-for']&&!req.headers.forwarded&&!req.headers['cf-connecting-ip']&&validToken(key,config.token);
       if(admin){res.locals.deviceAdmin=true;next();return;}
@@ -107,10 +107,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/workspace-join',async(req,res)=>{
     const ip=req.socket.remoteAddress||'unknown',now=Date.now(),attempt=workspaceJoinAttempts.get(ip);if(attempt&&now-attempt.at<60000){if(++attempt.count>20)throw new HttpError(429,'Too many workspace joins. Try again in a minute.');}else{if(workspaceJoinAttempts.size>1000)workspaceJoinAttempts.clear();workspaceJoinAttempts.set(ip,{at:now,count:1});}
     const key=(req.headers.authorization||'').replace(/^Bearer /,''),ws=workspaceAccess.invitationIdentity(key);if(!ws)throw new HttpError(401,'Workspace QR expired');
-    const input=z.object({connectionToken:z.string().max(512).optional()}).parse(req.body);
+    const input=z.object({connectionToken:z.string().max(512).optional(),previousToken:z.string().max(512).optional(),joinId:z.string().uuid().optional()}).parse(req.body);
     const linked=input.connectionToken&&config.devices?.authenticate(input.connectionToken);
     if(linked){res.json({token:input.connectionToken,deviceId:linked,workspaceId:ws.id});return;}
-    res.json(await workspaceAccess.joinInvitation(key));
+    res.json(await workspaceAccess.joinInvitation(key,input.previousToken,input.joinId));
   });
   app.post('/api/devices/self/forget',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().forget(res.locals.deviceId);res.json({ok:true});});
   app.post('/api/devices/heartbeat',async(_req,res)=>{if(!res.locals.deviceId)throw new HttpError(403,'A paired device is required');await devices().heartbeat();res.json({ok:true});});

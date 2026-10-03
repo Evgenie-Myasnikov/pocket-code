@@ -10,6 +10,13 @@ test('Connection QR and WorkSpace administration are separate',async({page})=>{
  await expect(page.locator('.desktop-rail').getByLabel('Project',{exact:true})).toHaveCount(0);
  await page.screenshot({path:'artifacts/screenshots/workspace-management.png'});
 });
+test('workspace lists each person once and exposes host approval and removal',async({page})=>{
+ await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Synthetic team',roots:['C:\\Demo\\Atlas'],role:'host',people:[{id:'host',name:'Alex Example',role:'host'},{id:'33333333-3333-4333-8333-333333333333',name:'Morgan Example',role:'viewer'}],members:[{id:'33333333-3333-4333-8333-333333333333',name:'Morgan Example',role:'viewer',approval:'approved'},{id:'44444444-4444-4444-8444-444444444444',name:'Taylor Example',role:'viewer',approval:'pending'}]}];});
+ await desktop(page);await page.getByRole('button',{name:'WorkSpace',exact:true}).click();await page.locator('summary').filter({hasText:'Synthetic team'}).click();
+ const roster=page.locator('.workspace-roster');await expect(roster.getByText('Morgan Example',{exact:true})).toHaveCount(1);await expect(roster.getByText('Taylor Example',{exact:true})).toHaveCount(1);
+ await expect(roster.getByRole('button',{name:'Approve',exact:true})).toBeVisible();await expect(roster.getByRole('button',{name:'Decline',exact:true})).toBeVisible();await expect(roster.getByRole('button',{name:'Remove member',exact:true})).toHaveCount(2);
+ await page.screenshot({path:'.local/workspace-approval-desktop.png'});
+});
 test('desktop keeps a draft across navigation and submits through the shared chat',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:'New chat',exact:true}).click();
  await page.locator('textarea').fill('Synthetic planning request');

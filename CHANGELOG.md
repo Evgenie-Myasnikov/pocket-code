@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-03 - Workspace approval, identities and chat recovery (0.25.2)
+- Fixed: Repeated QR joins reuse a proven member identity; concurrent retries create one request. Authenticated legacy paired-device profiles merge into the host profile while preserving assignments.
+- Added: New independent workspace members wait for PC host approval. Pending and declined requests cannot read boards, files, people or chats. Hosts approve, decline, change roles and remove members; removal invalidates credentials.
+- Improved: Mobile WorkSpace selection and participant count share the header. Saved workspace selection survives restarts. Desktop workspace cards show a single roster with inline management and request counts.
+- Fixed: Personal chat cache restores before host health/provider discovery; job errors no longer block session loading. Windows caches its conversation list. Personal chats remain separate from shared membership.
+- Compatibility: Existing approved memberships remain active; trusted PC-paired devices retain the host identity. Offline copies cannot be remotely erased while a device is disconnected; authorization failures clear cached workspace data after reconnecting.
+- Validation: 247 server tests plus the workspace-vault regression passed; 25 browser scenarios passed, including real QR approval/removal. TypeScript/Vite, Android and Windows packaging passed. Physical Android testing unavailable.
+
+
 ## 2026-10-03 - Direct document sections and reliable QR retries (0.25.1)
 - Changed: Replaced Project navigation with Rules and Changelog on Windows and Android. Each section selects among Git projects containing its Markdown documents; single documents open directly.
 - Fixed: QR scanning routes PC pairing and workspace invitations to the appropriate flow. Pairing results are cached only while in flight, so re-scanning can recover from a revoked device key.

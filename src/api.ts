@@ -2,7 +2,7 @@ import { t } from "./i18n";import { Capacitor, CapacitorHttp, registerPlugin } f
 import { networkFailure } from './connection-errors';
 import {desktopCall} from './desktop-bridge';
 import {cacheable,readOffline,writeOffline,clearConnectionOffline} from './offline-data';
-export type Connection = {url: string;token: string;desktop?:boolean;pairing?:boolean;deviceId?:string;workspaceId?:string;workspaceInvite?:boolean;workspaceOnly?:boolean;workspaceAccess?:{url:string;token:string;workspaceId?:string;deviceId?:string};};
+export type Connection = {url: string;token: string;desktop?:boolean;pairing?:boolean;deviceId?:string;workspaceId?:string;workspaceInvite?:boolean;workspaceOnly?:boolean;workspaceAccesses?:{url:string;token:string;workspaceId?:string;deviceId?:string;name?:string}[];workspaceAccess?:{url:string;token:string;workspaceId?:string;deviceId?:string;name?:string};};
 let pairing:{key:string;promise:Promise<Connection>}|undefined;
 // A stable installation id lets the PC replace this device's entry when it pairs again; the name tells devices apart.
 async function deviceIdentity(platform:'android'|'browser'):Promise<{name:string;model?:string;installation?:string}>{
@@ -67,10 +67,10 @@ export async function request<T>(connection: Connection, endpoint: string, data?
   if (status === 204) return null as T;
   if (typeof body === 'string') {try {body = JSON.parse(body);} catch {body = null;}}
   if (status >= 500) throw Object.assign(new Error(t("Сервер или интернет-туннель пока недоступен (HTTP {0}). Убедитесь, что окно сервера открыто; повторите подключение или отсканируйте новый QR после перезапуска.", status)),{status});
-  if(status===401){await clearConnectionOffline(connection);if(connection.deviceId)window.dispatchEvent(new CustomEvent('pocket-device-revoked',{detail:connection.deviceId}));}
+  if(status===401||status===403){await clearConnectionOffline(connection);if(status===401&&connection.deviceId)window.dispatchEvent(new CustomEvent('pocket-device-revoked',{detail:connection.deviceId}));}
   if (status < 200 || status >= 300) throw Object.assign(new Error(body?.error || t("Ошибка подключения ({0})", status)),{status});
   if (body === null || typeof body !== 'object') throw new Error(t("По этому адресу ответил другой сервис. Отсканируйте свежий QR Pocket Code."));
-  if(data===undefined&&cacheable(endpoint)){await writeOffline(connection,endpoint,body);window.dispatchEvent(new CustomEvent('pocket-online-read'));}
+  if(data===undefined&&cacheable(endpoint)){if(endpoint.startsWith('/workspaces')&&body.workspaces?.some((ws:any)=>ws.me?.approval&&ws.me.approval!=='approved'))await clearConnectionOffline(connection);await writeOffline(connection,endpoint,body);window.dispatchEvent(new CustomEvent('pocket-online-read'));}
   return body as T;
 }
 export async function fileBase64(file: File): Promise<string> {
