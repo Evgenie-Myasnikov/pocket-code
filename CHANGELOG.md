@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.25.10 (Unreleased)
+
+### Features
+- boards: right-click a note card to delete it with confirmation; preserve other cards and image files, remove dangling dependency references, and reuse existing edit permissions and revision checks.
+
+- boards: snap created and moved notes to an eight-pixel canvas grid that scales with zoom; preserve branch bounds and remove the duplicated creation menu.
+
+### Validation
+- Passed TypeScript/Vite, two placement checks and two focused desktop browser scenarios: confirmed/cancelled deletion, dependency cleanup, creation and dragging at changed zoom, no release-position jump and persistence after reopening. Final packages pending; physical device testing was not performed.
+
 ## [0.25.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.8...v0.25.9) (2026-10-03)
 
 ### Features

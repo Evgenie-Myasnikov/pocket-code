@@ -277,6 +277,27 @@ test('composer pointer focus uses a soft background without a textarea outline',
  await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(field).toBeFocused();expect(await page.locator('.composer').evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('solid');
 });
 
+test('board creates and drags notes on the eight-pixel canvas grid at changed zoom',async({page})=>{
+ await page.addInitScript(()=>{(window as any).projectBoardOverride={id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:'C:\\Demo\\Atlas',revision:0,repositoryRevision:'a'.repeat(64),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',versionSource:'planned',branches:[],versions:[],notes:[]};});
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();
+ const viewport=page.locator('.board-viewport'),canvas=page.locator('.board-canvas');await viewport.click({button:'right',position:{x:25,y:201}});await page.getByRole('menuitem',{name:'Create note'}).click();const dialog=page.getByRole('dialog',{name:'Note details'});await dialog.getByLabel('Title',{exact:true}).fill('Grid idea');await dialog.getByRole('button',{name:'Save',exact:true}).click();const card=page.locator('.board-note');
+ const coordinates=()=>card.evaluate(el=>({x:parseFloat((el as HTMLElement).style.left),y:parseFloat((el as HTMLElement).style.top)}));const created=await coordinates();expect(created.x%8).toBe(0);expect(created.y%8).toBe(0);expect(await canvas.evaluate(el=>getComputedStyle(el).backgroundSize)).toBe('8px 8px');
+ await viewport.dispatchEvent('wheel',{deltaY:300,ctrlKey:true,clientX:200,clientY:250});const scale=await canvas.evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a);expect(scale).not.toBe(1);
+ const handle=card.locator('.note-drag'),box=await handle.boundingBox();await page.mouse.move(box!.x+15,box!.y+15);await page.mouse.down();await page.mouse.move(box!.x+15+7*scale,box!.y+15+13*scale,{steps:4});const preview=await coordinates();await page.mouse.up();await expect.poll(coordinates).toEqual(preview);expect(preview.x%8).toBe(0);expect(preview.y%8).toBe(0);expect(preview.y).toBe(created.y+16);
+ await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect.poll(coordinates).toEqual(preview);
+});
+
+test('right-click note deletion confirms, preserves other cards and removes dangling dependencies',async({page})=>{
+ await page.addInitScript(()=>{const first='33333333-3333-4333-8333-333333333333';(window as any).projectBoardOverride={id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:'C:\\Demo\\Atlas',revision:0,repositoryRevision:'a'.repeat(64),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',versionSource:'planned',branches:[],versions:[],notes:[{id:first,title:'Remove this idea',description:'Synthetic acceptance',branch:'',status:'idea',owner:'',dependencies:[],x:20,y:92},{id:'44444444-4444-4444-8444-444444444444',title:'Keep this idea',description:'Synthetic dependent idea',branch:'',status:'ready',owner:'',dependencies:[first],x:20,y:420}]};});
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();
+ const card=page.locator('.board-note').filter({hasText:'Remove this idea'}),dialog=page.getByRole('dialog',{name:'Delete note',exact:true});
+ await card.locator('.note-drag').click({button:'right'});await expect(dialog).toContainText('Remove this idea');await expect(page.getByRole('menuitem',{name:'Create note'})).toHaveCount(0);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('.board-note')).toHaveCount(2);
+ expect(await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='write'&&c.endpoint==='/project-board').length)).toBe(0);
+ await card.locator('.note-content').click({button:'right'});await dialog.getByRole('button',{name:'Delete note',exact:true}).click();await expect(dialog).toHaveCount(0);await expect(card).toHaveCount(0);await expect(page.locator('.board-note')).toHaveCount(1);
+ const writes=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='write'&&c.endpoint==='/project-board').map((c:any)=>c.data));expect(writes).toHaveLength(1);expect(writes[0].repositoryRevision).toBe('a'.repeat(64));expect(writes[0].notes).toEqual([expect.objectContaining({title:'Keep this idea',dependencies:[],x:20,y:420})]);
+ await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect(page.locator('.board-note')).toHaveCount(1);await expect(page.locator('.board-note')).toContainText('Keep this idea');
+});
+
  test('project board deletion confirms, supports keyboard and removes only the selected card',async({page})=>{
  await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
  const card=page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button');
