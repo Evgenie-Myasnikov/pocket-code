@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {boardInstructions} from './board-instructions.js';
+import {projectBoardInstructions} from './project-rules.js';
 import {CopilotLogin} from './copilot-login.js';
 import {CopilotClient,type CopilotSession,type SessionEvent} from '@github/copilot-sdk';
 import {allowedPath,HttpError} from './security.js';
@@ -67,7 +67,7 @@ export class CopilotService{
  });}
  private async execute(run:Run,input:Input){let unsubscribe:(()=>void)|undefined;try{
   const client=await this.connect();await allowedPath(this.roots,input.cwd,true);if(run.view.status!=='running')return;
-  const config={workingDirectory:input.cwd,model:input.model||'auto',streaming:true,systemMessage:{mode:'append' as const,content:boardInstructions},
+  const config={workingDirectory:input.cwd,model:input.model||'auto',streaming:true,systemMessage:{mode:'append' as const,content:await projectBoardInstructions(input.cwd)},
    onPermissionRequest:async(request:any)=>{if(run.view.status!=='running')return{kind:'denied-interactively-by-user' as const};const response=await this.ask(run,request.kind||'Copilot tool',request);return{kind:response.allow?'approved' as const:'denied-interactively-by-user' as const};},
    onUserInputRequest:async(request:any)=>{if(run.view.status!=='running')return{answer:'Cancelled',wasFreeform:true};const response=await this.ask(run,'AskUserQuestion',{questions:[{question:request.question,options:request.choices?.map((label:string)=>({label}))}]});return{answer:response.allow?response.answers?.[request.question]||'':'Cancelled',wasFreeform:true};}};
   run.session=input.sessionId?await client.resumeSession(input.sessionId,config):await client.createSession(config);run.view.sessionId=run.session.sessionId;run.view.revision++;

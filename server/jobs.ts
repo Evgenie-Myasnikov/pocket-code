@@ -5,7 +5,7 @@ import { normalize, type Approval, type JobView } from './types.js';
 import { updateClaudeAgents, updateClaudeAgentResults } from './subagents.js';
 import {Followups,type FollowupInput} from './followups.js';
 import {PromptStream} from './prompt-stream.js';
-import {boardInstructions} from './board-instructions.js';
+import {projectBoardInstructions} from './project-rules.js';
 
 type Run = typeof query;
 type Job = JobView & { controller: AbortController; pending: Map<string, (result: PermissionResult) => void>; inputs:PromptStream; queued:FollowupInput[]; followups:Followups; acceptingInput:boolean };
@@ -63,7 +63,7 @@ export class Jobs {
         permissionMode: input.mode, maxBudgetUsd: input.maxBudgetUsd,
         abortController: job.controller, includePartialMessages: true,
         settingSources: ['user', 'project', 'local'],
-        systemPrompt: { type: 'preset', preset: 'claude_code', append: boardInstructions },
+        systemPrompt: { type: 'preset', preset: 'claude_code', append: await projectBoardInstructions(input.cwd) },
         ...(process.env.CLAUDE_EXECUTABLE ? { pathToClaudeCodeExecutable: process.env.CLAUDE_EXECUTABLE } : {}),
         canUseTool: async (tool, toolInput, options) => this.ask(job, tool, toolInput, options.signal),
       } });

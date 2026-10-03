@@ -23,12 +23,12 @@ public static class DesktopReadPolicy {
     public static bool AllowsWrite(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/(jobs|uploads|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
+        return Regex.IsMatch(path,@"^/(jobs|uploads|project-rules|project-board|project-board/create|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
     }
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|repository-boards|repository-board|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|copilot/usage|updates/status|updates/latest|review|review/availability|project-artifact|document-projects|project-docs|project-doc|files|file)$")||
+        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|project-board|repository-boards|repository-board|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|copilot/usage|updates/status|updates/latest|review|review/availability|project-artifact|document-projects|project-docs|project-rules|project-doc|files|file)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");

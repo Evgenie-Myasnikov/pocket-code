@@ -1,3 +1,5 @@
+import {builtInBoardRulePath} from './project-rules.js';
+import {boardInstructions} from './board-instructions.js';
 import path from 'node:path';
 import {open, opendir, realpath, lstat} from 'node:fs/promises';
 import type {Dirent} from 'node:fs';
@@ -28,7 +30,7 @@ export async function documentProjects(folders:string[],kind:'rules'|'changelog'
 
 /** Discovery stays within the selected project and never traverses dependency trees. */
 export async function projectDocuments(project:string) {
-  const documents:ProjectDocument[]=[]; let visited=0,truncated=false;
+  const documents:ProjectDocument[]=[{path:builtInBoardRulePath,name:"Board maintenance",kind:"rules",source:"Pocket Code",appliesTo:"all",bytes:Buffer.byteLength(boardInstructions)}]; let visited=0,truncated=false;
   async function entries(relative:string) {
     if(visited>=maxEntries){truncated=true;return [];}
     const folder=path.join(project,relative);
@@ -76,6 +78,7 @@ export async function projectDocuments(project:string) {
 }
 
 export async function readProjectDocument(project:string,relative:string) {
+  if(relative===builtInBoardRulePath)return {path:relative,name:'Board maintenance',kind:'rules' as const,source:'Pocket Code',appliesTo:'all' as const,bytes:Buffer.byteLength(boardInstructions),content:boardInstructions};
   if(relative.includes('\\')||relative.split('/').some(part=>!part||part==='.'||part==='..')||path.isAbsolute(relative))throw new HttpError(400,'Invalid project document path');
   const doc=(await projectDocuments(project)).documents.find(item=>item.path===relative);
   if(!doc)throw new HttpError(404,'Project document not found');

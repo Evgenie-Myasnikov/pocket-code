@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {boardInstructions} from './board-instructions.js';
+import {projectBoardInstructions} from './project-rules.js';
 import path from 'node:path';
 import { allowedPath, HttpError } from './security.js';
 import type { Approval, ChatMessage, JobView, SubagentView } from './types.js';
@@ -287,7 +287,7 @@ export class CodexService {
       }
       const permissions = codexPermissions(input.codexAccess, input.mode, cwd);
       const { sandbox, approvalPolicy, approvalsReviewer, sandboxPolicy } = permissions;
-      const startParams = { cwd, ...(input.model ? { model: input.model } : {}), sandbox, approvalPolicy, approvalsReviewer, developerInstructions: boardInstructions };
+      const startParams = { cwd, ...(input.model ? { model: input.model } : {}), sandbox, approvalPolicy, approvalsReviewer, developerInstructions: await projectBoardInstructions(cwd) };
       if (job.cancelled) return;
       const session = await rpc.request(input.sessionId ? 'thread/resume' : 'thread/start', input.sessionId ? { ...startParams, threadId: input.sessionId, excludeTurns: true } : startParams);
       verifyCodexPermissions(session, permissions);

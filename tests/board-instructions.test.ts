@@ -8,6 +8,7 @@ test('Claude receives board guidance on both fresh and resumed runs without chan
   let options:any;
   const jobs=new Jobs((({options:value}:any)=>{options=value;return(async function*(){})();}) as any);
   const view=jobs.start({id:'fixture',cwd:process.cwd(),sessionId,text:'Explain this feature',mode:'default',maxBudgetUsd:1});
+  await new Promise(resolve=>setTimeout(resolve,30));
   assert.equal(options.resume,sessionId);
   assert.equal(options.systemPrompt.preset,'claude_code');
   assert.equal(options.systemPrompt.append,boardInstructions);

@@ -1,7 +1,32 @@
 # Changelog
 
-## 2026-10-03 - Repository boards and desktop chat recovery (0.25.5)
-- Release: Published v0.25.5 from b71799af91e3564529d72a605044b05f9e9ca976 on codex/navigation-0.25.5 with APK versionCode 68 and matching desktop/host assets. GitHub CI passed; the updater downloaded and verified the APK.
+## 0.25.6 (Unreleased)
+
+### Features
+- boards: open and edit one portable board per project; create a missing board directly in its repository.
+- rules: built-in board maintenance is enabled by default for Codex, Claude and Copilot, with a persistent per-project switch.
+- boards: show the linked Git branch or an explicit unlinked label on each version column.
+- chat: keep a permanent New row at the top; create a conversation only after its first message.
+
+### Bug Fixes
+- boards: open the original board and highlight the note from an assignment or clarification notification.
+- boards: serialize repository writes and reject stale revisions without overwriting newer edits.
+- navigation: remove duplicate refresh controls from project documents.
+- boards: route dependency arrows outside cards and retain only concrete dependencies.
+
+### Documentation
+- docs: translate the curated Pocket Code board into Russian and document repository-backed editing.
+- rules: require concise categorized version entries in CHANGELOG.md, with real commit references only.
+
+### Validation
+- Fourteen focused server/board/rules tests, 33 provider tests and 32 desktop/mobile browser scenarios passed. Android and Windows builds, native Windows smoke and source/archive privacy audits passed. Physical Android testing unavailable.
+- Private legacy board records remain available through their notifications; repository snapshots contain product data only.
+
+
+## [0.25.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.4...v0.25.5) (2026-10-03)
+
+### Features
+- Release: Published v0.25.5 from [b71799a](https://github.com/Evgenie-Myasnikov/pocket-code/commit/b71799af91e3564529d72a605044b05f9e9ca976) on [codex/navigation-0.25.5](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/navigation-0.25.5) with APK versionCode 68 and matching desktop/host assets. GitHub CI passed; the updater downloaded and verified the APK.
 - Fixed: Changing the AI provider preserves the Chats section; clipboard images use the attachment uploader and preview without replacing the draft.
 - Fixed: A saved board remains readable when its repository folder is unavailable; editing and chat launch are disabled. Repeated open clicks no longer discard the pending response.
 - Changed: Repository boards replace the local-board index and read project-boards files directly, including Pocket Code's curated roadmap. Existing private local records are preserved. Repository snapshots are read-only in this view; edit the source or use a workspace board.

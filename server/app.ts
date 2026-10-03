@@ -1,3 +1,4 @@
+import {projectRuleSettings,saveProjectRuleSettings} from './project-rules.js';
 import {mountBoards,createWorkspaceAccess,workspaceRequest} from './boards.js';
 import {DeviceRegistry} from './devices.js';
 import type {RunMonitor} from './run-monitor.js';
@@ -78,7 +79,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const key=(req.headers.authorization||'').replace(/^Bearer /,'');
     if(req.method==='POST'&&req.path==='/workspace-join'&&workspaceAccess.invitationIdentity(key)){next();return;}
     const guest=workspaceAccess.identity(key);
-    if(guest){workspaceRequest.run(guest,()=>{if(guest.approval&&guest.approval!=='approved'&&!(req.method==='GET'&&req.path==='/workspaces'||req.method==='POST'&&(/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout'))){res.status(403).json({error:guest.approval==='rejected'?'Workspace request was declined.':'Waiting for host approval.'});return;}const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|board-notifications|workspaces|boards(?:\/[^/]+)?|document-projects|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout'||req.path==='/board-notifications/read');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
+    if(guest){workspaceRequest.run(guest,()=>{if(guest.approval&&guest.approval!=='approved'&&!(req.method==='GET'&&req.path==='/workspaces'||req.method==='POST'&&(/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout'))){res.status(403).json({error:guest.approval==='rejected'?'Workspace request was declined.':'Waiting for host approval.'});return;}const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|board-notifications|workspaces|boards(?:\/[^/]+)?|project-board|document-projects|project-docs|project-rules|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/project-board(?:\/create)?$/.test(req.path)||/^\/boards\/[a-f0-9-]+$/.test(req.path)||/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout'||req.path==='/board-notifications/read');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
     if(config.devices){
       const admin=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')&&['127.0.0.1','localhost','[::1]'].includes(req.hostname)&&!req.headers['x-forwarded-for']&&!req.headers.forwarded&&!req.headers['cf-connecting-ip']&&validToken(key,config.token);
       if(admin){res.locals.deviceAdmin=true;next();return;}
@@ -498,6 +499,16 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const dir = path.join(config.uploads, randomUUID()), name = safeFilename(body.name);
     await mkdir(dir, { recursive: true }); const file = path.join(dir, name); await writeFile(file, buffer, { flag: 'wx' });
     res.json({ name, reference: JSON.stringify(file), cwd: t.cwd });
+  });
+  app.get('/api/project-rules',async(req,res)=>{
+    const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);
+    res.json({...await projectRuleSettings(cwd),canEdit:!workspaceAccess.current()});
+  });
+  app.post('/api/project-rules',async(req,res)=>{
+    if(workspaceAccess.current())throw new HttpError(403,'Only the connected PC owner can change project rules.');
+    const body=z.object({cwd:text,boardMaintenance:z.boolean()}).parse(req.body);
+    const cwd=await allowedPath(accessRoots(),body.cwd,true);
+    res.json({...await saveProjectRuleSettings(cwd,body.boardMaintenance),canEdit:true});
   });
   app.get('/api/project-docs', async (req, res) => {
     const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);

@@ -8,11 +8,12 @@ import {useBackAction} from './navigation';
 import {safeWebUrl} from './RichBlocks';
 import {Files} from './Files';
 import './project-docs.css';
+import {ProjectRuleSwitch} from './ProjectRuleSwitch';
 
 type ProjectDocument={path:string;name:string;kind:'rules'|'changelog';source:string;appliesTo:'all'|'claude'|'codex'|'copilot';bytes:number};
 type DocumentIndex={project:string;documents:ProjectDocument[];truncated:boolean};
 type DocumentContent=ProjectDocument&{content:string};
-type Props={category?:'rules'|'changelog';roots?:string[];onSelectProject?(root:string):void;connection:Connection;root:string;provider?:'claude'|'codex'|'copilot';onProject:(path:string)=>void};
+type Props={refreshRevision?:number;hideRefresh?:boolean;category?:'rules'|'changelog';roots?:string[];onSelectProject?(root:string):void;connection:Connection;root:string;provider?:'claude'|'codex'|'copilot';onProject:(path:string)=>void};
 const labels={
   projectFolder:['Project folder','Папка проекта'],
   overview:['Project overview','Обзор проекта'],location:['Project folder','Расположение проекта'],rootLabel:['Project root','Корень проекта'],browse:['Browse folders and open files','Папки и просмотр файлов'],ruleHelp:['Instructions for AI in this project','Инструкции для AI в этом проекте'],historyHelp:['Read the project change history','Посмотреть историю изменений проекта'],
@@ -42,7 +43,7 @@ export function ProjectDocs(props:Props){
   return <ProjectDocuments key={`${props.connection.url}\0${props.connection.token}\0${props.root}\0${props.category||'overview'}`} {...props} label={label}/>;
 }
 
-function ProjectDocuments({category,connection,root,roots,onSelectProject,onProject,label}:Props&{label:(key:Label)=>string}){
+function ProjectDocuments({refreshRevision=0,hideRefresh=false,category,connection,root,roots,onSelectProject,onProject,label}:Props&{label:(key:Label)=>string}){
   const [kind,setKind]=useState<'overview'|'rules'|'changelog'|'files'>(category||'overview');
   const [index,setIndex]=useState<DocumentIndex|null>(null),[loading,setLoading]=useState(true),[listError,setListError]=useState('');
   const [indexRevision,setIndexRevision]=useState(0),[selected,setSelected]=useState<ProjectDocument|null>(null);
@@ -62,7 +63,7 @@ function ProjectDocuments({category,connection,root,roots,onSelectProject,onProj
     let cancelled=false;setLoading(true);setListError('');
     request<DocumentIndex>(connection,`/project-docs?${cwd}`).then(value=>{if(!cancelled)setIndex(value);}).catch(error=>{if(!cancelled)setListError(error.message);}).finally(()=>{if(!cancelled)setLoading(false);});
     return()=>{cancelled=true;};
-  },[connection,cwd,indexRevision]);
+  },[connection,cwd,indexRevision,refreshRevision]);
   useEffect(()=>{
     if(!pendingAutoOpen.current||!index||loading||listError||kind==='overview'||kind==='files')return;
     pendingAutoOpen.current=false;
@@ -71,7 +72,7 @@ function ProjectDocuments({category,connection,root,roots,onSelectProject,onProj
   },[index,loading,listError,kind]);
   useEffect(()=>{
     if(!selected){setDocument(null);setDocumentError('');setReading(false);refreshDocument.current=()=>{};return;}
-    let cancelled=false,inFlight=false;setDocument(null);setDocumentError('');
+    let cancelled=false,inFlight=false;setDocument(old=>old?.path===selected.path?old:null);setDocumentError('');
     async function load(){
       if(cancelled||inFlight)return;inFlight=true;setReading(true);
       try{const value=await request<DocumentContent>(connection,`/project-doc?${cwd}&path=${encodeURIComponent(selected!.path)}`);if(!cancelled){setDocument(value);setDocumentError('');}}
@@ -81,7 +82,7 @@ function ProjectDocuments({category,connection,root,roots,onSelectProject,onProj
     refreshDocument.current=()=>{void load();};void load();
     const timer=window.setInterval(()=>{if(globalThis.document.visibilityState!=='hidden')void load();},15000);
     return()=>{cancelled=true;window.clearInterval(timer);refreshDocument.current=()=>{};};
-  },[connection,cwd,selected?.path]);
+  },[connection,cwd,selected?.path,refreshRevision]);
   useEffect(()=>{
     if(kind==='overview'&&overviewFocus.current){overviewFocus.current=false;categoryButtons.current[lastCategory.current]?.focus({preventScroll:true});}
     else if(selected){scroller.current?.scrollTo({top:0});documentHeading.current?.focus({preventScroll:true});}
@@ -98,8 +99,9 @@ function ProjectDocuments({category,connection,root,roots,onSelectProject,onProj
   return <section className="project-docs" ref={scroller} aria-label={selected?.name||label(kind)}>
     <div className="project-docs-toolbar">
       {(!category||selected&&!directDocument.current)&&<button className="text-button project-overview-back" onClick={selected?goBack:showOverview}><ArrowLeft size={18}/>{label(selected&&!directDocument.current?'back':'overview')}</button>}
-      {kind!=='files'&&<button className="icon-button" aria-label={label(selected?'refreshDocument':'refresh')} disabled={selected?reading:loading} onClick={()=>selected?refreshDocument.current():setIndexRevision(value=>value+1)}><RefreshCw size={18} className={(selected?reading:loading)?'project-docs-refreshing':''}/></button>}
+      {!hideRefresh&&kind!=='files'&&<button className="icon-button" aria-label={label(selected?'refreshDocument':'refresh')} disabled={selected?reading:loading} onClick={()=>selected?refreshDocument.current():setIndexRevision(value=>value+1)}><RefreshCw size={18} className={(selected?reading:loading)?'project-docs-refreshing':''}/></button>}
     </div>
+    {kind==='rules'&&<ProjectRuleSwitch connection={connection} root={root}/>}
     {selected?<article className="project-document" ref={documentHeading} tabIndex={-1} aria-label={selected.name}>
       <p className="project-document-name">{selected.name}</p>
 

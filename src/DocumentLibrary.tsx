@@ -15,6 +15,6 @@ export function DocumentLibrary({connection,kind}:{connection:Connection;kind:'r
   <div className="document-library-context"><Icon size={20}/><label><span>{l('Git project','Git-проект')}</span><select aria-label={l('Git project','Git-проект')} disabled={!projects.length} value={root} onChange={e=>setRoot(e.target.value)}>{!projects.length&&<option value="">{loading?l('Finding projects…','Ищем проекты…'):l('No matching projects','Нет подходящих проектов')}</option>}{projects.map(p=><option key={p.root} value={p.root}>{p.name}{projects.filter(v=>v.name===p.name).length>1?' · '+p.root:''}</option>)}</select></label><button className="icon-button" aria-label={l('Refresh projects','Обновить проекты')} disabled={loading} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={19}/></button></div>
   {error&&<p className="error" role="alert">{error}</p>}
   {!loading&&!error&&!projects.length&&<p className="document-library-empty">{kind==='changelog'?l('Git projects containing CHANGELOG.md, CHANGES.md or HISTORY.md appear here.','Здесь появятся Git-проекты с CHANGELOG.md, CHANGES.md или HISTORY.md.'):l('Git projects with Markdown rules appear here.','Здесь появятся Git-проекты с правилами в Markdown.')}</p>}
-  {root&&<ProjectDocs key={kind+root} connection={connection} root={root} category={kind} onProject={()=>{}}/>}
+  {root&&<ProjectDocs key={kind+root} connection={connection} root={root} category={kind} hideRefresh refreshRevision={revision} onProject={()=>{}}/>}
  </section>;
 }

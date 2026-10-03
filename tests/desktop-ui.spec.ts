@@ -1,10 +1,12 @@
+import {readFileSync} from 'node:fs';
+const roadmap=JSON.parse(readFileSync(new URL('../project-boards/board-7b004a10-920c-4ba7-a070-254318083e90.json',import.meta.url),'utf8'));
 import {test,expect,type Page} from '@playwright/test';
 test('repository boards open directly and refresh from their source',async({page})=>{
  await desktop(page);await expect(page.locator('.desktop-brand')).toHaveCount(0);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
- await page.getByRole('button',{name:/Shared roadmap/}).click();await expect(page.getByRole('heading',{name:'Shared roadmap'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Workspace boards',exact:true})).toHaveCount(0);await page.locator('.project-board-row').filter({hasText:'Atlas'}).getByRole('button').click();await expect(page.getByRole('heading',{name:'Atlas',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Delete board',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Refresh board',exact:true}).click();
- await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/repository-board?')).length)).toBe(2);
+ await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length)).toBe(2);
 });
 test('workspace deletion requires confirmation and removes the card',async({page})=>{
  await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Disposable example',roots:['C:\\Demo\\Atlas'],role:'host',people:[],members:[]}];});
@@ -35,10 +37,10 @@ test('workspace lists each person once and exposes host approval and removal',as
  await page.screenshot({path:'.local/workspace-approval-desktop.png'});
 });
 test('desktop keeps a draft across navigation and submits through the shared chat',async({page})=>{
- await desktop(page);await page.getByRole('button',{name:'New chat',exact:true}).click();
+ await desktop(page);await page.getByRole('button',{name:'New',exact:true}).click();
  await page.locator('textarea').fill('Synthetic planning request');
  await page.getByRole('button',{name:'Settings',exact:true}).first().click();
- await page.getByRole('button',{name:'Open draft',exact:true}).click();
+ await page.getByRole('button',{name:'New',exact:true}).click();
  await expect(page.locator('textarea')).toHaveValue('Synthetic planning request');
  await page.getByRole('button',{name:'Send message',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='write'&&/^\/jobs(?:\?|$)/.test(c.endpoint)&&c.data.text==='Synthetic planning request'))).toBe(true);
@@ -71,6 +73,8 @@ async function desktop(page:Page){
    if(/^\/workspaces\/[^/]+\/delete$/.test(p)){(window as any).testWorkspaces=(window as any).testWorkspaces.filter((w:any)=>w.id!==p.split('/')[2]);reply(id,{ok:true});return;}
    if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:(window as any).testBoards||[]});return;}
    if(p==='/board-notifications'){reply(id,{items:(window as any).testBoardNotices||[]});return;}if(p==='/board-notifications/read'){(window as any).testBoardNotices=((window as any).testBoardNotices||[]).map((n:any)=>({...n,readAt:Date.now()}));reply(id,{ok:true});return;}
+   if(p==='/project-board/create'){(window as any).createdProjectBoard={id:'22222222-2222-4222-8222-222222222222',name:'Project board',root:message.data.root,repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'b'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]};reply(id,(window as any).createdProjectBoard);return;}
+   if(p==='/project-board'){if((window as any).projectBoardOverride){reply(id,{board:(window as any).projectBoardOverride});return;}if((window as any).missingProjectBoard){reply(id,{board:(window as any).createdProjectBoard||null});return;}reply(id,{board:{id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:url.searchParams.get('root'),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'a'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]}});return;}
    if(p==='/repository-board'){reply(id,{id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:url.searchParams.get('root'),repositoryFile:url.searchParams.get('file'),revision:0,source:'project-changelog',versionSource:'planned',notes:[],versions:[],branches:[]});return;}
    if(p==='/board-snapshots'||p==='/repository-boards'){reply(id,[{file:'board-11111111-1111-4111-8111-111111111111.json',name:'Shared roadmap',noteCount:0}]);return;}
    if(p==='/board-snapshots/import'){const board={id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:message.data.root,revision:0,versionSource:'planned',notes:[],versions:[]};(window as any).testBoards=[board];reply(id,board);return;}
@@ -85,6 +89,7 @@ async function desktop(page:Page){
    if(p==='/provider-connections'){reply(id,{providers:['claude','codex','copilot'].map(id=>({id,installed:true,version:'1.0.0',server:id==='claude'?'on-demand':'ready',authenticated:id==='claude',busy:false,login:{state:'idle'},methods:id==='claude'?['browser','console','sso']:['browser','device']}))});return;}
    if(p==='/devices'){reply(id,(window as any).testDevices||[]);return;}
    if(p==='/document-projects'){reply(id,[{root:'C:\\Demo\\Atlas',name:'Atlas',documents:[]}]);return;}
+   if(p==='/project-rules'){if(action==='write')(window as any).boardRuleEnabled=message.data.boardMaintenance;reply(id,{boardMaintenance:(window as any).boardRuleEnabled!==false,canEdit:true});return;}
    if(p==='/project-docs'){reply(id,{project:url.searchParams.get('cwd'),truncated:false,documents:[{path:'AGENTS.md',name:'AGENTS.md',kind:'rules',source:'project',appliesTo:'all',bytes:40},{path:'CHANGELOG.md',name:'CHANGELOG.md',kind:'changelog',source:'project',appliesTo:'all',bytes:40}]});return;}
    if(p==='/project-doc'){const path=url.searchParams.get('path');reply(id,{path,name:path,kind:path==='AGENTS.md'?'rules':'changelog',source:'project',appliesTo:'all',bytes:40,content:path==='AGENTS.md'?'# Synthetic rules\n\nUse synthetic data.':'# Changelog\n\n- Synthetic entry'});return;}
    if(p==='/files'){const folder=url.searchParams.get('path')||'C:\Demo\Atlas';reply(id,{path:folder,parent:null,entries:[{name:'README.md',directory:false,path:folder+'\README.md'}]});return;}
@@ -180,7 +185,7 @@ test('sidebar divider resizes the rail with mouse and keyboard, persists and res
 test('desktop has direct Rules and Changelog with internal Git project selection',async({page})=>{
  await desktop(page);const nav=page.getByRole('navigation');await expect(nav.getByRole('button',{name:'Project',exact:true})).toHaveCount(0);await nav.getByRole('button',{name:'Rules',exact:true}).click();
  await expect(page.getByLabel('Git project')).toHaveValue('C:\\Demo\\Atlas');await expect(page.locator('.project-docs-markdown')).toContainText('Use synthetic data.');await nav.getByRole('button',{name:'Changelog',exact:true}).click();await expect(page.locator('.project-docs-markdown')).toContainText('Synthetic entry');
- await page.screenshot({path:'artifacts/screenshots/desktop-changelog.png'});
+ await expect(page.locator('.document-library').getByRole('button',{name:/^Refresh/})).toHaveCount(1);const before=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length);await page.getByRole('button',{name:'Refresh projects',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length)).toBeGreaterThan(before);await page.screenshot({path:'artifacts/screenshots/desktop-changelog.png'});
 });
 
 for(const width of [900,1440])test('workspace creation fits '+width,async({page})=>{
@@ -191,13 +196,13 @@ for(const width of [900,1440])test('workspace creation fits '+width,async({page}
 test('personal chats stay visible independently of the shared board workspace',async({page})=>{
  await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Shared board',roots:['C:\\Other\\Repository'],role:'host',members:[]}];});
  await desktop(page);await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toHaveCount(0);await page.getByRole('button',{name:/claude \u00b7 Interface review/}).click();await expect(page.locator('.embedded-chat')).toBeVisible();
- await page.getByRole('navigation').getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:'Workspace boards',exact:true}).click();await expect(page.locator('.board-header h1')).toHaveText('Shared board');await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toHaveCount(0);
+ await page.getByRole('navigation').getByRole('button',{name:'Board',exact:true}).click();await expect(page.getByRole('button',{name:'Workspace boards',exact:true})).toHaveCount(0);await expect(page.locator('.project-board-row').first()).toBeVisible();await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:/claude \u00b7 Interface review/}).click();await expect(page.locator('.embedded-chat')).toBeVisible();
 });
 
 test('desktop board inbox shows a targeted question and marks it read after opening',async({page})=>{
- await page.addInitScript(()=>{const boardId='22222222-2222-4222-8222-222222222222',noteId='33333333-3333-4333-8333-333333333333';(window as any).testBoards=[{id:boardId,name:'Example',notes:[{id:noteId,title:'Example feature',description:'Acceptance criteria'}]}];(window as any).testBoardNotices=[{id:'notice',boardId,noteId,recipientId:'host',kind:'question',title:'Example feature',message:'Which format should be supported?',at:1}];});
- await desktop(page);await page.getByRole('button',{name:'Board notifications',exact:true}).click();await page.screenshot({path:'.local/notifications-0255.png'});await page.getByRole('button',{name:/Clarification requested.*Example feature/}).click();await expect(page.getByRole('heading',{name:'Example feature'})).toBeVisible();await expect(page.locator('.board-notification-detail')).toContainText('Which format should be supported?');await expect.poll(()=>page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeTruthy();
+ await page.addInitScript(()=>{const boardId='22222222-2222-4222-8222-222222222222',noteId='33333333-3333-4333-8333-333333333333';(window as any).testBoards=[{id:boardId,name:'Example',root:'C:\\Demo\\Atlas',revision:0,versions:[],versionSource:'planned',notes:[{id:noteId,title:'Example feature',description:'Acceptance criteria',branch:'',status:'idea',owner:'',dependencies:[],x:1200,y:900}]}];(window as any).testBoardNotices=[{id:'notice',boardId,noteId,recipientId:'host',kind:'question',title:'Example feature',message:'Which format should be supported?',at:1}];});
+ await desktop(page);await page.getByRole('button',{name:'Board notifications',exact:true}).click();await page.screenshot({path:'.local/notifications-0255.png'});await page.getByRole('button',{name:/Clarification requested.*Example feature/}).click();await expect(page.getByRole('dialog',{name:'Note details'})).toBeVisible();await expect(page.getByLabel('Title',{exact:true})).toHaveValue('Example feature');await expect(page.getByRole('dialog',{name:'Note details'})).toContainText('Which format should be supported?');await expect(page.getByRole('heading',{name:'Example',exact:true})).toBeVisible();await expect.poll(()=>page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeTruthy();await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('.board-note-highlight')).toBeInViewport();await page.screenshot({path:'.local/notification-board-0256.png'});
 });
 
 test('desktop pastes an image attachment using the native clipboard event',async({page,context})=>{
@@ -208,4 +213,24 @@ test('desktop pastes an image attachment using the native clipboard event',async
  await expect(page.locator('.draft-attachment img')).toBeVisible();await expect(page.locator('.composer textarea')).toHaveValue('Keep this draft');
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/uploads')).length)).toBe(1);
  await page.locator('.attachment-remove').click();await expect(page.locator('.draft-attachment')).toHaveCount(0);
+});
+
+test('creates the board for the clicked project without a board selector',async({page})=>{
+ await page.addInitScript(()=>{(window as any).missingProjectBoard=true;});await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+ await page.locator('.project-board-row').filter({hasText:'Garden'}).getByRole('button').click();await page.getByRole('button',{name:'Create project board',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Garden',exact:true})).toBeVisible();await expect(page.locator('.work-boards select')).toHaveCount(0);
+ expect(await page.evaluate(()=>(window as any).createdProjectBoard.root)).toBe('C:\\Demo\\Garden');
+ await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Garden'}).getByRole('button').click();await expect(page.getByRole('button',{name:'Create project board',exact:true})).toHaveCount(0);
+});
+
+test('Russian Pocket Code roadmap renders dependency arrows outside cards',async({page})=>{
+ await page.addInitScript(board=>{(window as any).projectBoardOverride={...board,id:'7b004a10-920c-4ba7-a070-254318083e90',root:'C:\\Demo\\Atlas',revision:0,repositoryRevision:'a'.repeat(64),repositoryFile:'board-7b004a10-920c-4ba7-a070-254318083e90.json',versionSource:'planned',branches:[],notes:board.notes.map((n:any)=>({...n,owner:'',assigneeIds:[]}))};},roadmap);
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Atlas'}).getByRole('button').click();await expect(page.locator('.board-note')).toHaveCount(18);
+ await page.locator('.board-viewport').dispatchEvent('wheel',{deltaY:440,ctrlKey:true,clientX:320,clientY:150});await page.screenshot({path:'.local/russian-board-0256.png'});
+ await expect(page.locator('.board-edges>path')).toHaveCount(7);
+});
+test('built-in board rule can be disabled and re-enabled from project Rules',async({page})=>{
+ await desktop(page);await page.getByRole('navigation').getByRole('button',{name:'Rules',exact:true}).click();
+ const toggle=page.getByRole('checkbox',{name:'Maintain the project board'});await expect(toggle).toBeChecked();await toggle.uncheck();await expect(toggle).not.toBeChecked();await toggle.check();await expect(toggle).toBeChecked();
+ await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='write'&&c.endpoint==='/project-rules').length)).toBe(2);
 });

@@ -8,7 +8,8 @@ import type {ProjectBoard} from '../server/boards';
 import './task-notifications.css';
 import './board-notifications.css';
 
-export function BoardNotifications({connection}:{connection:Connection|null}){
+export type BoardNoticeTarget={board:ProjectBoard;connection:Connection;noteId:string;message:string;requestId:number};
+export function BoardNotifications({connection,onOpen}:{connection:Connection|null;onOpen?:(target:BoardNoticeTarget)=>void}){
  const ru=useLanguage()==='ru',l=(en:string,other:string)=>ru?other:en;
  const [items,setItems]=useState<BoardNotice[]>([]),[open,setOpen]=useState(false),[error,setError]=useState(''),[detail,setDetail]=useState<{title:string;description:string}|null>(null);
  const modal=useRef<HTMLElement|null>(null),epoch=useRef(0);useModal(modal,open,()=>{setOpen(false);setDetail(null);});
@@ -16,7 +17,7 @@ export function BoardNotifications({connection}:{connection:Connection|null}){
   const poll=async()=>{try{const result=await request<{items:BoardNotice[]}>(connection,'/board-notifications');if(!Array.isArray(result?.items))throw Error('Unsupported inbox response');if(!stopped){setItems(result.items);setError('');}}catch{if(!stopped)setError(l('Notifications unavailable. Retry when connected.','Уведомления недоступны. Проверьте подключение.'));}finally{if(!stopped&&generation===epoch.current)timer=setTimeout(poll,10000);}};
   void poll();return()=>{stopped=true;clearTimeout(timer);};
  },[connection?.url,connection?.token,ru]);
- async function read(item:BoardNotice){if(!connection)return;const generation=epoch.current;try{const board=await request<ProjectBoard>(connection,'/boards/'+item.boardId),note=board.notes.find(n=>n.id===item.noteId);if(!note)throw Error('Missing note');if(generation!==epoch.current)return;setDetail({title:note.title,description:item.kind==='question'?item.message:note.description});await request(connection,'/board-notifications/read',{ids:[item.id]});if(generation===epoch.current)setItems(old=>old.map(n=>n.id===item.id?{...n,readAt:Date.now()}:n));}catch{if(generation===epoch.current)setError(l('Could not open the task. It may have been removed.','Не удалось открыть задачу. Возможно, она удалена.'));}}
+ async function read(item:BoardNotice){if(!connection)return;const generation=epoch.current;try{const board=await request<ProjectBoard>(connection,'/boards/'+item.boardId),note=board.notes.find(n=>n.id===item.noteId);if(!note)throw Error('Missing note');if(generation!==epoch.current)return;if(onOpen){setOpen(false);setDetail(null);onOpen({board,connection,noteId:note.id,message:item.message,requestId:Date.now()});}else setDetail({title:note.title,description:item.kind==='question'?item.message:note.description});await request(connection,'/board-notifications/read',{ids:[item.id]});if(generation===epoch.current)setItems(old=>old.map(n=>n.id===item.id?{...n,readAt:Date.now()}:n));}catch{if(generation===epoch.current)setError(l('Could not open the task. It may have been removed.','Не удалось открыть задачу. Возможно, она удалена.'));}}
  const unread=items.filter(n=>!n.readAt).length;
  if(!connection)return null;
  return <div className="board-notifications"><button className="board-notifications-trigger" aria-label={l('Board notifications','Уведомления досок')} onClick={()=>setOpen(true)}><Bell size={18}/><span>{l('Notifications','Уведомления')}</span>{unread>0&&<b>{unread>99?'99+':unread}</b>}</button>
