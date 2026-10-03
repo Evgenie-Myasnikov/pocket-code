@@ -71,10 +71,12 @@ export async function createWorkspaceAccess(file:string){
   async function pairMember(displayName:string){const invite=store.invitation();if(invite.role==='host')throw new HttpError(400,'Use host pairing');const token=randomBytes(32).toString('base64url'),person={id:randomUUID(),name:displayName,role:invite.role,tokenHash:tokenHash(token),needsName:true,approval:'pending' as const};await store.mutate(data=>{const ws=data.workspaces.find(w=>w.id===invite.workspaceId);if(!ws)throw new HttpError(409,'Select a workspace before sharing this QR');ws.members.push(person);});return {token,workspaceId:invite.workspaceId,memberId:person.id,role:person.role};}
   function parseInvitation(value:unknown){const result=invitation.parse(value);if(result.role!=='host'&&!store.workspaces().some(w=>w.id===result.workspaceId))throw new HttpError(400,'Select a workspace for this invitation');return result;}
   function invitationIdentity(token:string){const hash=tokenHash(token);return store.workspaces().find(w=>w.invite?.hash===hash);}
-  async function joinInvitation(token:string,previousToken?:string,joinId?:string){
+  function verifyInvitationPassword(token:string,password?:string){const ws=invitationIdentity(token);if(!ws)throw new HttpError(401,'Workspace QR expired');if(!password)throw new HttpError(428,'Enter the workspace password');const encoded=ws.password,actual=encoded&&hashPassword(password,encoded.split(':')[0]);if(!encoded||!actual||Buffer.byteLength(actual)!==Buffer.byteLength(encoded)||!timingSafeEqual(Buffer.from(actual),Buffer.from(encoded)))throw new HttpError(401,'Incorrect workspace password');}
+  async function joinInvitation(token:string,previousToken?:string,joinId?:string,password?:string){
     const ws=invitationIdentity(token);if(!ws?.invite)throw new HttpError(401,'Workspace QR expired');
     const previous=previousToken&&identity(previousToken);
     if(previous&&previous.workspaceId===ws.id)return {token:previousToken!,workspaceId:ws.id,memberId:previous.memberId};
+    verifyInvitationPassword(token,password);
     const accessToken=joinId?createHmac('sha256',token).update('workspace-join:'+joinId).digest('base64url'):randomBytes(32).toString('base64url');
     return store.mutate(data=>{const target=data.workspaces.find(w=>w.id===ws.id);if(target?.invite?.hash!==tokenHash(token))throw new HttpError(401,'Workspace QR expired');
       const hash=tokenHash(accessToken);let person=target.members.find(m=>m.tokenHash===hash);
@@ -82,7 +84,7 @@ export async function createWorkspaceAccess(file:string){
       return {token:accessToken,workspaceId:ws.id,memberId:person.id};
     });
   }
-  return {store,identity,current,catalog,publicLogin,pairMember,parseInvitation,invitationIdentity,joinInvitation};
+  return {store,identity,current,catalog,publicLogin,pairMember,parseInvitation,invitationIdentity,joinInvitation,verifyInvitationPassword};
 }
 export async function mountBoards(app:Express,roots:string[],access:Awaited<ReturnType<typeof createWorkspaceAccess>>,onWorkspaceCreated?:()=>Promise<void>){
   const {store,current,catalog}=access;
@@ -144,6 +146,8 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
     });res.json({ok:true});
   });
   app.post('/api/workspaces/:id/member',async(req,res)=>{if(current()||!res.locals.deviceAdmin)throw new HttpError(403,'Manage workspace members on the host PC.');const input=z.object({memberId:id,role:z.enum(['viewer','developer','reviewer','qa']).optional(),remove:z.boolean().optional(),approval:z.enum(['approved','rejected']).optional()}).parse(req.body);await store.mutate(data=>{const ws=data.workspaces.find(w=>w.id===req.params.id),person=ws?.members.find(m=>m.id===input.memberId);if(!ws||!person)throw new HttpError(404,'Member not found');if(input.remove)ws.members=ws.members.filter(m=>m.id!==person.id);else{if(input.role)person.role=input.role;if(input.approval){if(input.approval==='approved'&&(person.needsName||!completeName(profileName(person))))throw new HttpError(400,'The applicant must enter their name first');person.approval=input.approval;}};});res.json({ok:true});});
+  app.get('/api/repository-boards',async(req,res)=>{if(current())throw new HttpError(403,'Connect to the PC to browse repository boards');const root=await allowedPath(roots,z.string().parse(req.query.root),true);res.json(await listBoardSnapshots(root,false));});
+  app.get('/api/repository-board',async(req,res)=>{if(current())throw new HttpError(403,'Connect to the PC to browse repository boards');const root=await allowedPath(roots,z.string().parse(req.query.root),true),file=z.string().parse(req.query.file),shared=await readBoardSnapshot(root,file,false);const notes=shared.notes.map(n=>({...n,owner:'',assigneeIds:[]}));validateDependencies(notes);res.json({...shared,id:file.slice(6,-5),root,notes,revision:0,versionSource:'planned',source:'project-changelog',repositoryFile:file,branches:[]});});
   app.get('/api/board-snapshots',async(req,res)=>{if(current()||!res.locals.deviceAdmin)throw new HttpError(403,'Use the PC host to load board snapshots');const root=await allowedPath(roots,z.string().parse(req.query.root),true);res.json(await listBoardSnapshots(root));});
   app.post('/api/board-snapshots/import',async(req,res)=>{
     if(current()||!res.locals.deviceAdmin)throw new HttpError(403,'Use the PC host to import boards');const input=z.object({root:z.string(),file:z.string(),workspaceId:id.optional()}).parse(req.body),root=await allowedPath(roots,input.root,true),shared=await readBoardSnapshot(root,input.file);const notes=shared.notes.map(n=>({...n,owner:'',assigneeId:'',assigneeIds:[]}));validateDependencies(notes);
@@ -188,6 +192,6 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
       return found;
     });res.json({...result,...(result.versionSource==='planned'?{branches:[]}:await boardBranches(result.root))});
   });
-  app.get('/api/boards/:id',async(req,res)=>{const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');await allowedPath(roots,found.root,true);res.json({...visibleBoard(found),...(found.source?await readProjectRoadmap(found.root):{}),...(found.versionSource==='planned'?{branches:[]}:await boardBranches(found.root))});});
+  app.get('/api/boards/:id',async(req,res)=>{const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found);try{await allowedPath(roots,found.root,true);}catch{res.json({...visibleBoard(found),branches:[],repositoryUnavailable:true,error:'Repository unavailable. Showing the saved board; reconnect its project folder on the PC to edit.'});return;}res.json({...visibleBoard(found),...(found.source?await readProjectRoadmap(found.root):{}),...(found.versionSource==='planned'?{branches:[]}:await boardBranches(found.root))});});
   app.post('/api/boards/:id',async(req,res)=>{const input=z.object({revision:z.number().int().nonnegative(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40)}).parse(req.body);const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');if(found.source)throw new HttpError(403,'This board is generated from CHANGELOG.md.');await allowedPath(roots,found.root,true);const notes=current()?input.notes.map(n=>({...n,chat:found.notes.find(old=>old.id===n.id)?.chat})):input.notes;res.json(visibleBoard(await store.save(found.id,input.revision,notes,input.versions)));});
 }

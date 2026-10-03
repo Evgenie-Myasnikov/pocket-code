@@ -1,3 +1,4 @@
+import {WorkspacePassword} from './WorkspacePassword';
 import {BoardNotifications} from './BoardNotifications';
 import {MobileWorkspaceHeader} from './MobileWorkspaceHeader';
 import {savedWorkspaces,rememberWorkspace,workspaceJoinId,type WorkspaceAccess} from './workspace-access';
@@ -96,11 +97,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const projectRoots = (projects || health?.roots || []);
   const [projectReady, setProjectReady] = useStateForWorkspace(false);
   const projectChosen = useRefForWorkspace(false);
-  const [cwd, setCwd] = useStateForWorkspace(''),[tab, setTab] = useStateForWorkspace<'chats' | 'files' | 'changelog' | 'settings' | 'terminal' | 'jobs' | 'connection' | 'workspace'>(embedded?'chats':'workspace'),[mobileChat, setMobileChat] = useStateForWorkspace(!embedded);
+  const [cwd, setCwd] = useStateForWorkspace('');
+  // Section navigation belongs to the connected PC, not to an AI provider.
+  const [tab,setTab]=useWorkspaceState<'chats' | 'files' | 'changelog' | 'settings' | 'terminal' | 'jobs' | 'connection' | 'workspace'>('claude',embedded?'chats':'workspace',cacheScope);
+  const [mobileChat,setMobileChat]=useWorkspaceState('claude',!embedded,cacheScope);
   const [chatViewOpen,setChatViewOpen]=useStateForWorkspace(false);
   useEffect(()=>{if(tab==='chats')setChatViewOpen(mobileChat);},[tab,mobileChat]);
   const returnToChats=()=>{setTab('chats');setMobileChat(chatViewOpen);};
-  const [settingsPage,setSettingsPage]=useStateForWorkspace<SettingsPage>('index');
+  const [settingsPage,setSettingsPage]=useWorkspaceState<SettingsPage>('claude','index',cacheScope);
   const [draft, setDraft] = useStateForWorkspace(''),[search, setSearch] = useStateForWorkspace(''),[model, setModel] = useStateForWorkspace(id=>preferences(id).model);
   const codexEffort=useCodexEffort(provider==='codex'?providerInfo?.models:undefined,model);
   const [codexAccess,setCodexAccess]=useStateForWorkspace(id=>preferences(id).codexAccess);
@@ -291,14 +295,15 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     setWorkspaceConnection(access);setLocalBoards(false);setWorkspaceScanner(false);setError('');
     await saveConnection(connection?{...connection,workspaceAccess:access,workspaceAccesses}:{...access,workspaceOnly:true,workspaceAccesses});
   }
-  async function joinWorkspace(c:Connection){
+  const [workspacePasswordRequest,setWorkspacePasswordRequest]=useState<Connection|null>(null);
+  async function joinWorkspace(c:Connection,password?:string){
     setBusy(true);setError('');try{
       const linked=connection?.url===c.url?connection:undefined,previous=workspaceAccesses.find(item=>item.url===c.url&&item.workspaceId===c.workspaceId);
-      const joined=await request<{token:string;workspaceId:string;deviceId?:string}>(c,'/workspace-join',{...(linked?{connectionToken:linked.token}:{}),...(previous?{previousToken:previous.token}:{}),joinId:await workspaceJoinId(c)});
+      const joined=await request<{token:string;workspaceId:string;deviceId?:string}>(c,'/workspace-join',{password,...(linked?{connectionToken:linked.token}:{}),...(previous?{previousToken:previous.token}:{}),joinId:await workspaceJoinId(c)});
       const catalog=await request<{workspaces:{id:string;name:string}[]}>({url:c.url,...joined},'/workspaces?workspaceId='+encodeURIComponent(joined.workspaceId));
-      const access={url:c.url,...joined,name:catalog.workspaces.find(item=>item.id===joined.workspaceId)?.name},accesses=rememberWorkspace(workspaceAccesses,access);setWorkspaceAccesses(accesses);setWorkspaceConnection(access);setWorkspaceScanner(false);setLocalBoards(false);setTab('workspace');
+      const access={url:c.url,...joined,name:catalog.workspaces.find(item=>item.id===joined.workspaceId)?.name},accesses=rememberWorkspace(workspaceAccesses,access);setWorkspaceAccesses(accesses);setWorkspaceConnection(access);setWorkspaceScanner(false);setLocalBoards(false);setTab('workspace');setWorkspacePasswordRequest(null);
       await saveConnection(connection?{...connection,workspaceAccess:access,workspaceAccesses:accesses}:{...access,workspaceOnly:true,workspaceAccesses:accesses});
-    }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+    }catch(e){if((e as {status?:number}).status===428)setWorkspacePasswordRequest(c);setError((e as Error).message);}finally{setBusy(false);}
   }
   const embeddedOpened=useRef(false);
   useEffect(()=>{if(!embedded||!health||!connection||embeddedOpened.current)return;embeddedOpened.current=true;
@@ -544,8 +549,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       setJob(next);setTakeover(true);setDraft('');setAttachments([]);retry.current = null;nearBottom.current = true;
     } catch (e) {if (epoch === navigation.current) setError((e as Error).message);} finally {sending.current = false;setBusy(false);}
   }
-  async function upload(files: FileList | null) {
-    if (!files || !connection) return;
+  async function upload(files: FileList | File[] | null) {
+    if (!files || !connection || uploading) return;
     setUploading(true);setError('');
     const epoch = navigation.current;
     try {
@@ -559,6 +564,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   function startDemo() {setDemo(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.10.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
   // Leaving on the phone also removes it from the PC's device list; an unreachable or older PC is not a blocker.
   async function disconnect() {try {if(workspaceConnection&&!workspaceConnection.deviceId)await request(workspaceConnection,'/workspace-logout',{}).catch(()=>{});if(connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);clearOffline();try{localStorage.removeItem("pocket-own-profile");}catch{}clearChatCache();persistPosition.current=()=>{};clearPositions();onDisconnect();}catch(e){setError((e as Error).message);}}
+  if(workspacePasswordRequest)return <WorkspacePassword busy={busy} error={error} onCancel={()=>{setWorkspacePasswordRequest(null);setError('');}} onSubmit={password=>void joinWorkspace(workspacePasswordRequest,password)}/>;
   // Without a reachable PC the phone still checks, downloads and offers the latest release itself.
   if(!health&&embedded)return <div className="desktop-empty" role="status">{error||t("Loading...")}{error&&<button className="secondary" onClick={()=>void connect(embedded.connection)}>{t("Retry")}</button>}</div>;
   if (!health) return <><Connect initial={saved} onConnect={connect} onDemo={startDemo} busy={busy} error={error} /><Updates connection={null} expanded={false} /></>;
@@ -631,7 +637,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <div className="composer-area">{error && <div className="error" role="alert">{t(error)}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
           <div className="composer">{attachments.length > 0 && <AttachmentTray attachments={attachments} disabled={busy} onRemove={id=>setAttachments(old=>old.filter(a=>a.id!==id))}/>}
-            <div className="composer-input"><textarea aria-label={t("Сообщение {0}",engineName)} placeholder={demo ? t("Подключите ПК, чтобы отправлять сообщения") : t("Что нужно сделать?")} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={demo || busy || selected?.readOnly} onKeyDown={(e) => {if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {e.preventDefault();void send();}}} />
+            <div className="composer-input"><textarea aria-label={t("Сообщение {0}",engineName)} placeholder={demo ? t("Подключите ПК, чтобы отправлять сообщения") : t("Что нужно сделать?")} value={draft} onChange={(e) => setDraft(e.target.value)} onPaste={e=>{const files=Array.from(e.clipboardData.files);if(files.length){e.preventDefault();if(!uploading)void upload(files);}}} disabled={demo || busy || selected?.readOnly} onKeyDown={(e) => {if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {e.preventDefault();void send();}}} />
             {connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[model|| (provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}</div>
             <div className="composer-tools"><input hidden ref={fileInput} type="file" multiple onChange={(e) => void upload(e.target.files)} /><button className="icon-button" aria-label={t("Прикрепить файлы")} disabled={demo || uploading || busy || selected?.readOnly} onClick={() => fileInput.current?.click()}><Paperclip size={19} /></button><select aria-label={t("Модель {0}",engineName)} value={model} disabled={busy||running} onChange={(e) => setModel(e.target.value)}><option value="">{provider==='claude'?'Sonnet':provider==='copilot'?'Auto':providerInfo?.models?.find(item=>item.isDefault)?.name||(providerInfo?.models?.length===1?providerInfo.models[0].name:'\u2014')}</option>{(provider === 'claude' ? [{id:'sonnet',name:'Sonnet'},{id:'opus',name:'Opus'},{id:'haiku',name:'Haiku'}] : providerInfo?.models || []).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>{provider==='codex'&&<EffortPicker {...codexEffort} disabled={busy||running||uploading||selected?.readOnly}/>}<span className="composer-spacer" />{running && <button className="icon-button stop-button" aria-label={t("Остановить {0}",engineName)} onClick={async () => {try {await api(`/jobs/${job!.id}/stop`, {});} catch (e) {setError((e as Error).message);}}}><Square size={16} /></button>}<button className="send-button" aria-label={t("Отправить сообщение")} disabled={demo || !canRun || selected?.readOnly || busy || loading || uploading || !draft.trim() && !attachments.length} onClick={() => void send()}><ArrowUp size={21} /></button></div>
           </div>

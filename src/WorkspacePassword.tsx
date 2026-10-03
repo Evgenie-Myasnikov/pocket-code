@@ -1,0 +1,6 @@
+import {useState} from 'react';
+import {useLanguage} from './i18n';
+export function WorkspacePassword({busy,error,onSubmit,onCancel}:{busy:boolean;error:string;onSubmit(password:string):void;onCancel():void}){
+ const ru=useLanguage()==='ru',[password,setPassword]=useState('');
+ return <div className="connect-page"><form className="board-dialog" onSubmit={e=>{e.preventDefault();if(password&&!busy)onSubmit(password);}}><h2>{ru?'Вход в рабочую область':'Join workspace'}</h2><label>{ru?'Пароль рабочей области':'Workspace password'}<input autoFocus type="password" autoComplete="current-password" required maxLength={256} value={password} onChange={e=>setPassword(e.target.value)}/></label><p>{ru?'Доступ сохранится на этом устройстве. При следующем входе пароль не потребуется.':'Access is remembered on this device. You will not need the password next time.'}</p>{error&&error!=='Enter the workspace password'&&<p role="alert">{error==='Incorrect workspace password'?(ru?'Неверный пароль рабочей области':'Incorrect workspace password'):error}</p>}<footer><button type="button" disabled={busy} onClick={onCancel}>{ru?'Отмена':'Cancel'}</button><button className="primary" disabled={busy||!password}>{busy?(ru?'Входим…':'Joining…'):(ru?'Войти':'Join')}</button></footer></form></div>;
+}

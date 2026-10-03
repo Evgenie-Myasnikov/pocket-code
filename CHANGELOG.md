@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-03 - Repository boards and desktop chat recovery (0.25.5)
+- Fixed: Changing the AI provider preserves the Chats section; clipboard images use the attachment uploader and preview without replacing the draft.
+- Fixed: A saved board remains readable when its repository folder is unavailable; editing and chat launch are disabled. Repeated open clicks no longer discard the pending response.
+- Changed: Repository boards replace the local-board index and read project-boards files directly, including Pocket Code's curated roadmap. Existing private local records are preserved. Repository snapshots are read-only in this view; edit the source or use a workspace board.
+- Changed: Remove the redundant Pocket Code brand row from the desktop sidebar; conversations and New chat remain available.
+- Improved: Notification cards separate their type, title, preview, timestamp and read state with theme-aware icons and spacing.
+- Added: Workspace invitations require a password on first entry; saved user credentials and profiles restore access without duplicate participants or another password prompt. Host approval and revocation remain effective.
+- Packaging: Include the curated product board in PC bundles. Workspace authorization still applies before returning saved board data.
+- Validation: 31 browser scenarios and seven server/snapshot tests passed, including native clipboard image paste, repository reads and unavailable-folder recovery. TypeScript/Vite, Android build and native Windows smoke passed; final artifact audit pending. Physical Android testing unavailable.
+
+
 ## 2026-10-03 - PC-scoped chats and neutral provider palettes (0.25.4)
 - Fixed: Chat history, drafts, attachments, selected sessions and asynchronous state are isolated by PC connection credentials plus AI provider. Switching a shared WorkSpace preserves the personal PC chat. Returning to a connected PC restores its in-memory conversation state.
 - Fixed: A board from another connection cannot open or link a chat on the wrong PC; workspace invitations are not accepted as personal chat connections.

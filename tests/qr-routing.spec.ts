@@ -7,6 +7,7 @@ test('Workspace QR scanned from Connection joins the workspace using the real ho
  const invitation=await request.post(url+'/api/workspaces/'+ws.id+'/invitation',{headers,data:{role:'viewer'}});expect(invitation.ok()).toBeTruthy();const {token}=await invitation.json();
  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'PC connection',exact:true}).click();
  const buffer=await QRCode.toBuffer(JSON.stringify({type:'pocket-workspace',version:1,url,token,workspaceId:ws.id}),{width:640,margin:4});await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer});
+ await page.getByLabel('Workspace password',{exact:true}).fill('wrong-password');await page.getByRole('button',{name:'Join',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Incorrect workspace password');await page.getByLabel('Workspace password',{exact:true}).fill('synthetic-password');await page.getByRole('button',{name:'Join',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}').workspaceId)).toBe(ws.id);await expect(page.getByLabel('What is your name?')).toBeVisible();
  await page.getByLabel('What is your name?').fill('Taylor');await page.getByLabel('Last name',{exact:true}).fill('Example');await page.getByRole('button',{name:'Continue',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'Your workspace name'})).not.toBeVisible();
@@ -14,6 +15,7 @@ test('Workspace QR scanned from Connection joins the workspace using the real ho
  const catalog=await (await request.get(url+'/api/workspaces',{headers})).json();const member=catalog.workspaces.find((w:any)=>w.id===ws.id).members.find((m:any)=>m.name==='Taylor Example');expect(member.approval).toBe('pending');
  expect((await request.post(url+'/api/workspaces/'+ws.id+'/member',{headers,data:{memberId:member.id,approval:'approved'}})).ok()).toBeTruthy();
  await page.getByRole('button',{name:'Check status'}).click();await expect(page.getByRole('heading',{name:'Waiting for host approval'})).toHaveCount(0);await expect(page.getByRole('button',{name:'Participants: 1'})).toBeVisible();
+ await page.reload();await expect(page.getByLabel('Workspace password',{exact:true})).toHaveCount(0);await expect(page.getByLabel('What is your name?')).toHaveCount(0);await expect(page.getByRole('button',{name:'Participants: 1'})).toBeVisible();
  expect((await request.post(url+'/api/workspaces/'+ws.id+'/member',{headers,data:{memberId:member.id,remove:true}})).ok()).toBeTruthy();
  const access=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}'));expect((await request.get(url+'/api/workspaces',{headers:{Authorization:'Bearer '+access.token}})).status()).toBe(401);
 });

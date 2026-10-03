@@ -1,6 +1,10 @@
 import {test,expect,type Page} from '@playwright/test';
-test('PC imports, exports and deletes a board without committing files',async({page})=>{
- await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:'Import board',exact:true}).click();await page.getByRole('button',{name:'Import',exact:true}).click();await page.getByRole('button',{name:/Shared roadmap/}).click();await page.getByRole('button',{name:'Save to repository',exact:true}).click();await page.getByRole('button',{name:'Save',exact:true}).click();await expect(page.getByRole('status')).toContainText('project-boards/');await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByRole('button',{name:'Delete board',exact:true}).click();await page.getByRole('button',{name:'Delete',exact:true}).click();await expect(page.getByRole('button',{name:/Shared roadmap/})).toHaveCount(0);
+test('repository boards open directly and refresh from their source',async({page})=>{
+ await desktop(page);await expect(page.locator('.desktop-brand')).toHaveCount(0);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+ await page.getByRole('button',{name:/Shared roadmap/}).click();await expect(page.getByRole('heading',{name:'Shared roadmap'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Delete board',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Refresh board',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/repository-board?')).length)).toBe(2);
 });
 test('workspace deletion requires confirmation and removes the card',async({page})=>{
  await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Disposable example',roots:['C:\\Demo\\Atlas'],role:'host',people:[],members:[]}];});
@@ -67,11 +71,13 @@ async function desktop(page:Page){
    if(/^\/workspaces\/[^/]+\/delete$/.test(p)){(window as any).testWorkspaces=(window as any).testWorkspaces.filter((w:any)=>w.id!==p.split('/')[2]);reply(id,{ok:true});return;}
    if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:(window as any).testBoards||[]});return;}
    if(p==='/board-notifications'){reply(id,{items:(window as any).testBoardNotices||[]});return;}if(p==='/board-notifications/read'){(window as any).testBoardNotices=((window as any).testBoardNotices||[]).map((n:any)=>({...n,readAt:Date.now()}));reply(id,{ok:true});return;}
-   if(p==='/board-snapshots'){reply(id,[{file:'board-11111111-1111-4111-8111-111111111111.json',name:'Shared roadmap',noteCount:0}]);return;}
+   if(p==='/repository-board'){reply(id,{id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:url.searchParams.get('root'),repositoryFile:url.searchParams.get('file'),revision:0,source:'project-changelog',versionSource:'planned',notes:[],versions:[],branches:[]});return;}
+   if(p==='/board-snapshots'||p==='/repository-boards'){reply(id,[{file:'board-11111111-1111-4111-8111-111111111111.json',name:'Shared roadmap',noteCount:0}]);return;}
    if(p==='/board-snapshots/import'){const board={id:'22222222-2222-4222-8222-222222222222',name:'Shared roadmap',root:message.data.root,revision:0,versionSource:'planned',notes:[],versions:[]};(window as any).testBoards=[board];reply(id,board);return;}
    if(/^\/boards\/[^/]+\/snapshot$/.test(p)){reply(id,{path:'project-boards/board-22222222-2222-4222-8222-222222222222.json'});return;}
    if(/^\/boards\/[^/]+\/delete$/.test(p)){(window as any).testBoards=[];reply(id,{ok:true});return;}
    if(/^\/boards\/[^/]+$/.test(p)){reply(id,(window as any).testBoards?.find((b:any)=>b.id===p.split('/')[2]));return;}
+   if(p==='/uploads'){reply(id,{id:'pasted-image',name:message.data.name,size:100});return;}
    if(p==='/activity'){reply(id,[]);return;}
    if(p==='/task-notifications'){reply(id,{items:[],unread:0});return;}
    if(p==='/jobs'&&action==='write'){const run={...message.data,provider:message.data.provider||'claude',sessionId:'alpha',status:'running',messages:[],partial:'Working on your request',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0};(window as any).testRuns=[run];reply(id,run);return;}
@@ -191,5 +197,15 @@ test('personal chats stay visible independently of the shared board workspace',a
 
 test('desktop board inbox shows a targeted question and marks it read after opening',async({page})=>{
  await page.addInitScript(()=>{const boardId='22222222-2222-4222-8222-222222222222',noteId='33333333-3333-4333-8333-333333333333';(window as any).testBoards=[{id:boardId,name:'Example',notes:[{id:noteId,title:'Example feature',description:'Acceptance criteria'}]}];(window as any).testBoardNotices=[{id:'notice',boardId,noteId,recipientId:'host',kind:'question',title:'Example feature',message:'Which format should be supported?',at:1}];});
- await desktop(page);await page.getByRole('button',{name:'Board notifications',exact:true}).click();await page.getByRole('button',{name:/Clarification requested.*Example feature/}).click();await expect(page.getByRole('heading',{name:'Example feature'})).toBeVisible();await expect(page.locator('.board-notification-detail')).toContainText('Which format should be supported?');await expect.poll(()=>page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeTruthy();
+ await desktop(page);await page.getByRole('button',{name:'Board notifications',exact:true}).click();await page.screenshot({path:'.local/notifications-0255.png'});await page.getByRole('button',{name:/Clarification requested.*Example feature/}).click();await expect(page.getByRole('heading',{name:'Example feature'})).toBeVisible();await expect(page.locator('.board-notification-detail')).toContainText('Which format should be supported?');await expect.poll(()=>page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeTruthy();
+});
+
+test('desktop pastes an image attachment using the native clipboard event',async({page,context})=>{
+ await context.grantPermissions(['clipboard-read','clipboard-write']);await desktop(page);
+ await page.getByRole('button',{name:/Interface review/}).first().click();
+ await page.evaluate(async()=>{const canvas=document.createElement('canvas');canvas.width=8;canvas.height=8;const blob=await new Promise<Blob>(r=>canvas.toBlob(b=>r(b!),'image/png'));await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);});
+ await page.locator('.composer textarea').fill('Keep this draft');await page.locator('.composer textarea').press('Control+v');
+ await expect(page.locator('.draft-attachment img')).toBeVisible();await expect(page.locator('.composer textarea')).toHaveValue('Keep this draft');
+ await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/uploads')).length)).toBe(1);
+ await page.locator('.attachment-remove').click();await expect(page.locator('.draft-attachment')).toHaveCount(0);
 });

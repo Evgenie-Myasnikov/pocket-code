@@ -8,6 +8,7 @@
     "0.25.2",
     "0.25.3",
     "0.25.4",
+    "0.25.5",
     "Follow-up"
   ],
   "notes": [
@@ -162,7 +163,7 @@
       "branch": "Follow-up",
       "status": "ready",
       "priority": "high",
-      "x": 2060,
+      "x": 2400,
       "y": 92,
       "dependencies": [
         "6443ac05-c3eb-48cd-a8df-6527b6ab0607",
@@ -178,7 +179,7 @@
       "branch": "Follow-up",
       "status": "questions",
       "priority": "normal",
-      "x": 2060,
+      "x": 2400,
       "y": 412,
       "dependencies": [
         "c2fd3971-3991-43b5-a5f7-9b8297551544",
@@ -206,6 +207,19 @@
       "x": 1720,
       "y": 92,
       "dependencies": []
+    },
+    {
+      "id": "59ce281b-014e-468d-a16d-407b0f6eb9a2",
+      "title": "Browse repository boards and recover desktop chat interactions",
+      "description": "Problem: provider navigation, clipboard attachments and unavailable project folders interrupt normal work. Outcome: preserve Chats when changing providers, paste images with previews, read saved boards even when a folder is missing, and browse portable repository boards directly. Acceptance: clipboard image keeps the draft; repository list reads source files; missing folders preserve read-only data; unauthorized members cannot read other boards. Notification cards distinguish assignment and question details. Evidence: CHANGELOG.md 0.25.5; implementation and initial tests complete, final regression and packaging pending. Repository views currently read snapshots; shared editing remains in workspace boards. First workspace entry checks a password; later entries restore the same credential and profile. QR route, incorrect password, profile reuse and reload tested. See CHANGELOG.md for final release evidence.",
+      "branch": "0.25.5",
+      "status": "review",
+      "priority": "high",
+      "x": 2060,
+      "y": 92,
+      "dependencies": [
+        "753152d2-7446-4400-9274-fdd0d8b03e86"
+      ]
     }
   ]
 }

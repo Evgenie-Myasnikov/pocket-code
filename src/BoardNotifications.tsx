@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {Bell,Check,X} from 'lucide-react';
+import {Bell,Check,X,MessageCircle,UserPlus,ChevronRight} from 'lucide-react';
 import {request,type Connection} from './api';
 import {useLanguage} from './i18n';
 import {useModal} from './navigation';
@@ -21,7 +21,7 @@ export function BoardNotifications({connection}:{connection:Connection|null}){
  if(!connection)return null;
  return <div className="board-notifications"><button className="board-notifications-trigger" aria-label={l('Board notifications','Уведомления досок')} onClick={()=>setOpen(true)}><Bell size={18}/><span>{l('Notifications','Уведомления')}</span>{unread>0&&<b>{unread>99?'99+':unread}</b>}</button>
  {open&&<div className="task-inbox-backdrop" onClick={event=>{if(event.target===event.currentTarget)setOpen(false);}}><section className="task-inbox" role="dialog" aria-modal="true" aria-label={l('Board notifications','Уведомления досок')} ref={modal}><header><h2>{l('Notifications','Уведомления')}</h2><button className="icon-button" aria-label={l('Close','Закрыть')} onClick={()=>{setOpen(false);setDetail(null);}}><X size={20}/></button></header><div className="task-inbox-scroll">{error&&<p role="alert">{error}</p>}
- {detail?<article className="board-notification-detail"><button onClick={()=>setDetail(null)}>{l('Back to notifications','К уведомлениям')}</button><h3>{detail.title}</h3><p>{detail.description}</p></article>:<>{!items.length&&<p>{l('No assignments or clarification requests yet.','Пока нет назначений и вопросов.')}</p>}<ul>{items.map(item=><li key={item.id}><button className={'task-inbox-item'+(!item.readAt?' unread':'')} onClick={()=>void read(item)}><span><small>{item.kind==='assigned'?l('You were assigned a task','Вам назначена задача'):l('Clarification requested','Нужно уточнение')}</small><strong>{item.title}</strong>{item.message&&<span>{item.message}</span>}<time>{new Date(item.at).toLocaleString(ru?'ru':'en')}</time></span>{item.readAt&&<Check size={16}/>}</button></li>)}</ul></>}
+ {detail?<article className="board-notification-detail"><button onClick={()=>setDetail(null)}>{l('Back to notifications','К уведомлениям')}</button><h3>{detail.title}</h3><p>{detail.description}</p></article>:<>{!items.length&&<p>{l('No assignments or clarification requests yet.','Пока нет назначений и вопросов.')}</p>}<ul>{items.map(item=><li key={item.id}><button className={'task-inbox-item'+(!item.readAt?' unread':'')} onClick={()=>void read(item)}><span className={'board-notice-icon '+item.kind} aria-hidden="true">{item.kind==='question'?<MessageCircle size={20}/>:<UserPlus size={20}/>}</span><span className="board-notice-body"><small>{item.kind==='assigned'?l('You were assigned a task','Вам назначена задача'):l('Clarification requested','Нужно уточнение')}</small><strong>{item.title}</strong>{item.message&&<span>{item.message}</span>}<time>{new Date(item.at).toLocaleString(ru?'ru':'en')}</time></span>{item.readAt?<Check size={16}/>:<ChevronRight size={16}/>}</button></li>)}</ul></>}
  </div></section></div>}
  </div>;
 }
