@@ -5,6 +5,7 @@
 - Fixed: A board from another connection cannot open or link a chat on the wrong PC; workspace invitations are not accepted as personal chat connections.
 - Added: Neutral, Codex-inspired, Claude-inspired and Copilot-inspired palettes in light/dark/system modes, using shared interface tokens and matching native Windows frame colors. Existing palettes and saved preferences remain supported.
 - Validation: 24 interface scenarios (including PC switching, inbox and eight palette/mode contrast checks), five workspace recovery scenarios and two roadmap tests passed. TypeScript/Vite, Android/Windows builds, native Windows smoke and source/artifact privacy audits passed. Physical Android testing unavailable.
+- Release: Published v0.25.4 from codex/interface-0.25.4 (343790d), APK versionCode 67, with Windows, host and manifest assets. GitHub CI passed; the production updater downloaded and verified the APK. No production host restart was performed; test listeners exited.
 
 
 ## 2026-10-03 - Single host, reusable profiles and desktop editing (0.25.3)

@@ -199,9 +199,9 @@
     {
       "id": "753152d2-7446-4400-9274-fdd0d8b03e86",
       "title": "Keep PC conversations separate and add neutral themes",
-      "description": "CHANGELOG.md · 0.25.4\nPersonal chat state follows the PC connection and provider, independently of shared workspace selection. Neutral and provider-inspired light/dark palettes apply shared tokens and native Windows frame colors. Acceptance: two PCs with the same session ID preserve separate histories/drafts; all eight palette/mode combinations have readable contrast. Browser checks passed; release validation is pending.",
+      "description": "CHANGELOG.md · 0.25.4\nPersonal chat state follows the PC connection and provider, independently of shared workspace selection. Neutral and provider-inspired light/dark palettes apply shared tokens and native Windows frame colors. Acceptance: two PCs with the same session ID preserve separate histories/drafts; all eight palette/mode combinations have readable contrast. Browser, build and artifact checks passed. Released in v0.25.4; physical Android verification remains pending.",
       "branch": "0.25.4",
-      "status": "review",
+      "status": "done",
       "priority": "high",
       "x": 1720,
       "y": 92,
