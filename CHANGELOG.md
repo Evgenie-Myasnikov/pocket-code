@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.10 (Unreleased)
+## [0.25.10](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.9...v0.25.10) (2026-10-03)
 
 ### Features
 - boards: right-click a note card to delete it with confirmation; preserve other cards and image files, remove dangling dependency references, and reuse existing edit permissions and revision checks.
@@ -8,7 +8,9 @@
 - boards: snap created and moved notes to an eight-pixel canvas grid that scales with zoom; preserve branch bounds and remove the duplicated creation menu.
 
 ### Validation
-- Passed TypeScript/Vite, two placement checks and two focused desktop browser scenarios: confirmed/cancelled deletion, dependency cleanup, creation and dragging at changed zoom, no release-position jump and persistence after reopening. Final packages pending; physical device testing was not performed.
+- Passed TypeScript/Vite, two placement checks and two focused desktop browser scenarios: confirmed/cancelled deletion, dependency cleanup, creation and dragging at changed zoom, no release-position jump and persistence after reopening. Android and Windows packages were built and published. Physical device testing was not performed.
+- Release source: [d4a6369](https://github.com/Evgenie-Myasnikov/pocket-code/commit/d4a6369fee9bc7ead6fa0c73660f2f6c25ca7d1d), branch [codex/cards-0.25.10](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/cards-0.25.10). Six focused server/placement checks, two browser scenarios in the clean source and GitHub CI passed.
+- Final source/APK/desktop/host privacy audits passed; host contents matched source and checksums. The published updater downloaded and checksum-verified the APK.
 
 ## [0.25.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.8...v0.25.9) (2026-10-03)
 
