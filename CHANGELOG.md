@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.9 (Unreleased)
+## [0.25.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.8...v0.25.9) (2026-10-03)
 
 ### Features
 - boards: delete a repository board from its card context action with confirmation and revision/role checks; retain project files and image assets, and disconnect Miro without deleting its remote board.
@@ -21,9 +21,10 @@
 - release: include the source branch/commit in generated manifests, reject detached or dirty release sources, verify the repository branch and any existing tag, and publish against the exact reviewed commit.
 
 ### Validation
-- Results/deletion/return changes: TypeScript/Vite, five board server checks, one position-storage check, four focused shared desktop browser scenarios and Windows native smoke passed. Legacy mobile results setup could not start because its provider selector is obsolete; shared desktop results passed. No release published; physical Android not tested.
-- TypeScript/Vite, 46 focused board/provider/API tests and four desktop/narrow-screen browser scenarios pass; image API authorization and identical fresh/resumed provider instructions are covered. Images were visually reviewed with synthetic fixtures.
-- Windows desktop build and local shortcut installation pass. No release was published. Physical Android and live provider inference were not tested.
+- Release source: [24d1059](https://github.com/Evgenie-Myasnikov/pocket-code/commit/24d105996df6d6d0fcc730d0df55b5c3ee3cbb13), branch [codex/chat-0.25.9](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/chat-0.25.9); published Windows and Android assets with matching update manifest.
+- Passed 51 focused server tests, 6 browser scenarios, TypeScript/Vite, Android and Windows builds, and Windows native smoke. Synthetic board images were visually reviewed.
+- Final source, APK, desktop archive and host bundle privacy checks passed; host content matched source and checksums. GitHub CI passed; the published updater downloaded and checksum-verified the APK.
+- Legacy mobile results test setup still uses an obsolete provider selector; shared desktop results passed. Physical Android, private Miro authentication and live provider inference were not tested.
 
 
 ## [0.25.8](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.7...v0.25.8) (2026-10-03)
