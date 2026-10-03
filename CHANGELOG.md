@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-03 - PC-scoped chats and neutral provider palettes (0.25.4)
+- Fixed: Chat history, drafts, attachments, selected sessions and asynchronous state are isolated by PC connection credentials plus AI provider. Switching a shared WorkSpace preserves the personal PC chat. Returning to a connected PC restores its in-memory conversation state.
+- Fixed: A board from another connection cannot open or link a chat on the wrong PC; workspace invitations are not accepted as personal chat connections.
+- Added: Neutral, Codex-inspired, Claude-inspired and Copilot-inspired palettes in light/dark/system modes, using shared interface tokens and matching native Windows frame colors. Existing palettes and saved preferences remain supported.
+- Validation: 24 interface scenarios (including PC switching, inbox and eight palette/mode contrast checks), five workspace recovery scenarios and two roadmap tests passed. TypeScript/Vite, Android/Windows builds, native Windows smoke and source/artifact privacy audits passed. Physical Android testing unavailable.
+
+
 ## 2026-10-03 - Single host, reusable profiles and desktop editing (0.25.3)
 - Fixed: Legacy per-device host profiles consolidate to one PC owner and remap note assignments. Old member/invitation Host labels migrate to Developer without merging independent member identities; new invitations cannot assign Host.
 - Added: Required first and last name, automatic reuse of a saved complete profile, and self-renaming from participants on Windows and Android. Trusted phones request missing host profile details instead of silently skipping them.

@@ -67,8 +67,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const providerInfo = providers.find(item => item.id === provider);
   const engineName = provider==='copilot'?'Copilot':provider === 'codex' ? 'Codex' : 'Claude';
 
-  const useStateForWorkspace = <T,>(initial:T | ((provider:WorkspaceProvider)=>T)) => useWorkspaceState(provider, initial);
-  const useRefForWorkspace = <T,>(initial:T) => useWorkspaceRef(provider, initial);
+  const [cacheScope,setCacheScope]=useState('');
+  const connectEpoch=useRef(0);
+  const useStateForWorkspace = <T,>(initial:T | ((provider:WorkspaceProvider)=>T)) => useWorkspaceState(provider, initial, cacheScope);
+  const useRefForWorkspace = <T,>(initial:T) => useWorkspaceRef(provider, initial, cacheScope);
   const [reviewOpen,setReviewOpen] = useStateForWorkspace(false);
   const [reviewAvailability,setReviewAvailability]=useStateForWorkspace<{key:string;mode:'working'|'branch'}|null>(null);
   const [outputsOpen,setOutputsOpen] = useStateForWorkspace(false);
@@ -88,7 +90,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [boardChat,setBoardChat]=useState<BoardChat|null>(embedded?.boardChat||null);
   const [boardLaunch,setBoardLaunch]=useState<BoardChat|null>(null);
   const [workspaceAccesses,setWorkspaceAccesses]=useState<WorkspaceAccess[]>([]);
-  const [cacheScope,setCacheScope]=useState('');
   const [health, setHealth] = useState<Health | null>(embedded?null:{name:'Offline',roots:[],version:packageVersion,protocol:1}),[sessions, setSessions] = useStateForWorkspace<Session[]>([]),[jobs, setJobs] = useStateForWorkspace<JobView[]>([]);
   const [selected, setSelected] = useStateForWorkspace<Session | null>(null),[history, setHistory] = useStateForWorkspace<ChatMessage[]>([]),[job, setJob] = useStateForWorkspace<JobView | null>(null);
   const [projects, setProjects] = useState<string[] | null>(null);
@@ -272,14 +273,18 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   }
   useEffect(()=>{if(!connection?.deviceId)return;const beat=()=>void request(connection,'/devices/heartbeat',{}).catch(()=>{});beat();const timer=setInterval(beat,15000);const revoked=(event:Event)=>{if((event as CustomEvent).detail===connection.deviceId)void disconnect();};window.addEventListener('pocket-device-revoked',revoked);return()=>{clearInterval(timer);window.removeEventListener('pocket-device-revoked',revoked);};},[connection]);
   async function connect(c: Connection) {
+    const epoch=++connectEpoch.current;
     setBusy(true);setError('');
     try {
-      const original=c;c=await pairDevice(c,packageVersion);
+      if(c.workspaceOnly||c.workspaceInvite)throw Error('Use Connection QR to access personal PC chats. WorkSpace invitations only open shared boards.');
+      const original=c;c=await pairDevice(c,packageVersion);if(epoch!==connectEpoch.current)return;
       const scope=await chatCacheScope(c),access=workspaceConnection||original.workspaceAccess,accesses=workspaceAccesses.length?workspaceAccesses:savedWorkspaces(original);
       if(!embedded)await saveConnection({...c,...(access?{workspaceAccess:access}:{}),workspaceAccesses:accesses});
+      if(epoch!==connectEpoch.current)return;
+      if(scope!==cacheScope){rememberPosition();rememberDraft();setProjects(null);setProviders([]);setBoardChat(null);setBoardLaunch(null);setActivityTarget(null);}
       setCacheScope(scope);setSaved(c);setConnection(c);setDemo(false);
-      const h=await request<Health>(c,'/health');if(h.protocol!==1)throw Error(t('Обновите приложение и сервер до одной версии'));setHealth(h);
-    }catch(e){setError((e as Error).message);setOffline(true);}finally{setBusy(false);}
+      const h=await request<Health>(c,'/health');if(epoch!==connectEpoch.current)return;if(h.protocol!==1)throw Error(t('Обновите приложение и сервер до одной версии'));setHealth(h);
+    }catch(e){if(epoch===connectEpoch.current){setError((e as Error).message);setOffline(true);}}finally{if(epoch===connectEpoch.current)setBusy(false);}
   }
   useEffect(()=>{if(embedded){void connect(embedded.connection);return;}loadConnection().then(c=>{if(!c)return;setSaved(c);setWorkspaceAccesses(savedWorkspaces(c));if(c.workspaceAccess)setWorkspaceConnection(c.workspaceAccess);if(c.workspaceOnly){setWorkspaceConnection(c);setTab('workspace');void request<Health>(c,'/health').then(setHealth).catch(()=>{});}else void connect(c);}).catch(()=>setError(t('Не удалось прочитать сохранённое подключение. Введите ключ снова.')));},[]);
   async function switchWorkspace(access:WorkspaceAccess){
@@ -476,7 +481,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     } catch (e) {setError((e as Error).message);} finally
     {if (epoch === navigation.current) setLoading(false);}
   }
-  useEffect(()=>{if(!boardLaunch||!health)return;const target=boardLaunch;if(target.note.chat&&target.note.chat.provider!==provider){setProvider(target.note.chat.provider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat)void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});else{newChat(target.root);setDraft(target.prompt);}},[boardLaunch,provider,health]);
+  useEffect(()=>{if(!boardLaunch||!health)return;const target=boardLaunch;if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}if(target.note.chat&&target.note.chat.provider!==provider){setProvider(target.note.chat.provider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat)void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});else{newChat(target.root);setDraft(target.prompt);}},[boardLaunch,provider,health]);
   useEffect(()=>{if(!boardChat||!job?.sessionId||!connection)return;const target=boardChat;setBoardChat(null);void (async()=>{try{const b=await request<any>(connection,'/boards/'+target.boardId);await request(connection,'/boards/'+b.id,{revision:b.revision,versions:b.versions,notes:b.notes.map((n:any)=>n.id===target.note.id?{...n,chat:{provider,sessionId:job.sessionId}}:n)});}catch(e){setError((e as Error).message);}})();},[job?.sessionId,boardChat,connection]);
   async function openSession(s: Session, activeJob?: Pick<JobView,'id'|'sessionId'>) {
     if (busy || uploading) return;

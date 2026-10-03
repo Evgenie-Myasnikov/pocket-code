@@ -1,7 +1,12 @@
 import { t } from "./i18n";import { useEffect, useState } from 'react';
 import './appearance.css';
+import './neutral-themes.css';
 
 const palettes = [
+{ id: 'neutral', name: 'Нейтральная', color: '#a6a6a6', hue: 0 },
+{ id: 'codex', name: 'Codex', color: '#e5e5e5', hue: 0 },
+{ id: 'claude', name: 'Claude', color: '#ce967b', hue: 25 },
+{ id: 'copilot', name: 'Copilot', color: '#8db3ff', hue: 215 },
 { id: 'sage', name: 'Шалфей', color: '#c3dda8', hue: 94 },
 { id: 'ocean', name: 'Океан', color: '#9fcfff', hue: 211 },
 { id: 'lilac', name: 'Сирень', color: '#d2b5ff', hue: 267 },
@@ -30,6 +35,7 @@ export function useAppearance() {
     const applyTheme = () => {root.dataset.theme = appearance.theme === 'system' ? system.matches ? 'light' : 'dark' : appearance.theme;};
     applyTheme();system.addEventListener('change', applyTheme);
     root.dataset.compact = String(appearance.compact);
+    root.dataset.palette = appearance.palette;
     root.style.setProperty('--palette-hue', String(palettes.find((p) => p.id === appearance.palette)!.hue));
     root.style.setProperty('--chat-font-size', `${appearance.textSize}px`);
     root.style.setProperty('--ui-scale', String(appearance.scale / 100));
@@ -49,7 +55,7 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
     <label>{t("Масштаб интерфейса ")}<output>{appearance.scale}%</output><input aria-label={t("Масштаб интерфейса")} type="range" min="60" max="130" step="5" value={appearance.scale} onChange={(e) => setAppearance((p) => ({ ...p, scale: Number(e.target.value) }))} /></label>
     <label>{t("Межстрочный интервал ")}<output>{appearance.spacing.toFixed(2)}</output><input aria-label={t("Межстрочный интервал")} type="range" min="1.1" max="2.2" step="0.05" value={appearance.spacing} onChange={(e) => setAppearance((p) => ({ ...p, spacing: Number(e.target.value) }))} /></label>
     <label className="compact-toggle"><input type="checkbox" checked={appearance.compact} onChange={(e) => setAppearance((p) => ({ ...p, compact: e.target.checked }))} />{t("Компактные отступы")}</label>
-    <div className="appearance-preview"><span className="eyebrow">{t("ПРИМЕР СООБЩЕНИЯ")}</span><p>{t("Так будет выглядеть ваш чат с Claude.")}</p><button type="button" className="primary" onClick={() => setAppearance({ ...defaults })}>{t("Сбросить оформление")}</button></div>
+    <div className="appearance-preview"><span className="eyebrow">{t("ПРИМЕР СООБЩЕНИЯ")}</span><p>{t("Так будет выглядеть ваш чат.")}</p><button type="button" className="primary" onClick={() => setAppearance({ ...defaults })}>{t("Сбросить оформление")}</button></div>
     {saveError && <p role="alert" className="error">{t(saveError)}</p>}
   </section>;
 }

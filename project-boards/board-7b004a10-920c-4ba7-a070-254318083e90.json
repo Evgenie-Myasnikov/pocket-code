@@ -7,6 +7,7 @@
     "0.25.1",
     "0.25.2",
     "0.25.3",
+    "0.25.4",
     "Follow-up"
   ],
   "notes": [
@@ -161,7 +162,7 @@
       "branch": "Follow-up",
       "status": "ready",
       "priority": "high",
-      "x": 1720,
+      "x": 2060,
       "y": 92,
       "dependencies": [
         "6443ac05-c3eb-48cd-a8df-6527b6ab0607",
@@ -177,7 +178,7 @@
       "branch": "Follow-up",
       "status": "questions",
       "priority": "normal",
-      "x": 1720,
+      "x": 2060,
       "y": 412,
       "dependencies": [
         "c2fd3971-3991-43b5-a5f7-9b8297551544",
@@ -193,6 +194,17 @@
       "priority": "high",
       "x": 1380,
       "y": 1372,
+      "dependencies": []
+    },
+    {
+      "id": "753152d2-7446-4400-9274-fdd0d8b03e86",
+      "title": "Keep PC conversations separate and add neutral themes",
+      "description": "CHANGELOG.md · 0.25.4\nPersonal chat state follows the PC connection and provider, independently of shared workspace selection. Neutral and provider-inspired light/dark palettes apply shared tokens and native Windows frame colors. Acceptance: two PCs with the same session ID preserve separate histories/drafts; all eight palette/mode combinations have readable contrast. Browser checks passed; release validation is pending.",
+      "branch": "0.25.4",
+      "status": "review",
+      "priority": "high",
+      "x": 1720,
+      "y": 92,
       "dependencies": []
     }
   ]
