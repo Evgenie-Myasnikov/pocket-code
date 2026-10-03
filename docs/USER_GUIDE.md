@@ -101,13 +101,12 @@ On Android, allow notifications to follow the last open chat while the app is mi
 From 0.22.7, Pocket Code also notifies you when **any** chat on the PC finishes or is stopped, including chats started in Codex, Claude Code or Copilot CLI on the PC and never opened on the phone. The PC detects the end of each turn from the providers' session files; while the phone is paired, Android shows a silent **PC chat tracking** notification. Each chat has one alert that a later result replaces. Turn this off in **Settings → Connection → Notify when any PC chat finishes**. If Android closes the app, tracking resumes the next time you open it.
 
 <a id="project"></a>
-## Project files, rules and changelog
+## Rules and Changelog
 
-The **Project** tab contains **Files**, **Rules**, and **Changelog**. Select the project folder first. A single document opens directly; multiple matching documents are listed. Markdown is rendered for reading. Viewing a rules document does not edit it or change the AI's instructions.
+**Rules** and **Changelog** are separate sections on PC and phone. Choose a **Git project** inside the section: only repositories containing the appropriate Markdown documents appear. Changelog recognizes CHANGELOG.md, CHANGES.md and HISTORY.md at the root or in docs/. A single document opens directly; multiple documents appear as a list. Refresh beside the project rescans projects; refresh beside the document reloads its content. Choose a new chat's project inside that chat.
 
-Choose the project on your phone under **Project → Project folder**. The standard Windows launcher exposes local fixed drives to the paired app, and the list gradually discovers Git repositories and worktrees even without AI chats. Use **Files → New chat in this folder** for other folders. Discovery skips system directories, dependency/build caches and directory links; it refreshes completed scans after five minutes. It does not clone repositories or read remote GitHub accounts. Advanced launchers can restrict access with `scripts/start.ps1 -ProjectPath D:\Projects`; discovery stays within those configured roots.
+PC pairing is under **Settings → Connection**. The scanner recognizes both PC pairing and WorkSpace invitations and opens the appropriate flow. Keep Pocket Code up to date on both devices.
 
-<a id="tasks"></a>
 ## Jira tasks and notifications
 
 Jira uses one shared PC connection, independent of the AI selected for a task. Select the existing Claude connection or the direct MCP path through Codex. Each source needs its own authorization; the Claude path can consume model usage. See [providers and accounts](PROVIDERS.md#jira-is-independent-of-the-task-ai).

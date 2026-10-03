@@ -14,7 +14,7 @@ export function pairDevice(connection:Connection,version:string):Promise<Connect
   if(!connection.pairing)return Promise.resolve(connection);
   const key=connection.url+'|'+connection.token;if(pairing?.key===key)return pairing.promise;
   const platform=/Android/i.test(navigator.userAgent)?'android':'browser';
-  const promise=deviceIdentity(platform).then(identity=>request<{deviceId?:string;token:string;workspaceId?:string}>(connection,'/devices/pair',{...identity,platform,version})).then(paired=>({url:connection.url,...paired})).catch(error=>{if(pairing?.key===key)pairing=undefined;throw error;});
+  const promise=deviceIdentity(platform).then(identity=>request<{deviceId?:string;token:string;workspaceId?:string}>(connection,'/devices/pair',{...identity,platform,version})).then(paired=>({url:connection.url,...paired})).catch(error=>{if(pairing?.key===key)pairing=undefined;throw error;}).finally(()=>{if(pairing?.promise===promise)pairing=undefined;});
   pairing={key,promise};return promise;
 }
 export function providerRequest(provider:'claude'|'codex'|'copilot'){

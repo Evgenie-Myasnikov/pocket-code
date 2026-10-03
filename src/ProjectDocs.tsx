@@ -12,7 +12,7 @@ import './project-docs.css';
 type ProjectDocument={path:string;name:string;kind:'rules'|'changelog';source:string;appliesTo:'all'|'claude'|'codex'|'copilot';bytes:number};
 type DocumentIndex={project:string;documents:ProjectDocument[];truncated:boolean};
 type DocumentContent=ProjectDocument&{content:string};
-type Props={roots?:string[];onSelectProject?(root:string):void;connection:Connection;root:string;provider?:'claude'|'codex'|'copilot';onProject:(path:string)=>void};
+type Props={category?:'rules'|'changelog';roots?:string[];onSelectProject?(root:string):void;connection:Connection;root:string;provider?:'claude'|'codex'|'copilot';onProject:(path:string)=>void};
 const labels={
   projectFolder:['Project folder','Папка проекта'],
   overview:['Project overview','Обзор проекта'],location:['Project folder','Расположение проекта'],rootLabel:['Project root','Корень проекта'],browse:['Browse folders and open files','Папки и просмотр файлов'],ruleHelp:['Instructions for AI in this project','Инструкции для AI в этом проекте'],historyHelp:['Read the project change history','Посмотреть историю изменений проекта'],
@@ -39,24 +39,24 @@ export function ProjectDocs(props:Props){
   if(!props.root)return <section className="project-docs"><p className="project-docs-empty">{label('noProject')}</p></section>;
   // Remounting on project/host changes prevents even one frame of another
   // project's document and isolates all requests and navigation state.
-  return <ProjectDocuments key={`${props.connection.url}\0${props.connection.token}\0${props.root}`} {...props} label={label}/>;
+  return <ProjectDocuments key={`${props.connection.url}\0${props.connection.token}\0${props.root}\0${props.category||'overview'}`} {...props} label={label}/>;
 }
 
-function ProjectDocuments({connection,root,roots,onSelectProject,onProject,label}:Props&{label:(key:Label)=>string}){
-  const [kind,setKind]=useState<'overview'|'rules'|'changelog'|'files'>('overview');
+function ProjectDocuments({category,connection,root,roots,onSelectProject,onProject,label}:Props&{label:(key:Label)=>string}){
+  const [kind,setKind]=useState<'overview'|'rules'|'changelog'|'files'>(category||'overview');
   const [index,setIndex]=useState<DocumentIndex|null>(null),[loading,setLoading]=useState(true),[listError,setListError]=useState('');
   const [indexRevision,setIndexRevision]=useState(0),[selected,setSelected]=useState<ProjectDocument|null>(null);
   const [document,setDocument]=useState<DocumentContent|null>(null),[reading,setReading]=useState(false),[documentError,setDocumentError]=useState('');
   const refreshDocument=useRef<()=>void>(()=>{});
   const scroller=useRef<HTMLElement|null>(null),listScroll=useRef(0),documentHeading=useRef<HTMLElement|null>(null);
   const returnFocus=useRef<HTMLButtonElement|null>(null),returnPath=useRef(''),focusBack=useRef(false);
-  const pendingAutoOpen=useRef(false),directDocument=useRef(false),lastCategory=useRef(''),overviewFocus=useRef(false);
+  const pendingAutoOpen=useRef(Boolean(category)),directDocument=useRef(false),lastCategory=useRef(''),overviewFocus=useRef(false);
   const categoryButtons=useRef<Record<string,HTMLButtonElement|null>>({});
   const cwd=`cwd=${encodeURIComponent(root)}`;
-  function showOverview(){pendingAutoOpen.current=false;directDocument.current=false;overviewFocus.current=true;setSelected(null);setKind('overview');}
+  function showOverview(){pendingAutoOpen.current=false;directDocument.current=false;overviewFocus.current=true;setSelected(null);setKind(category||'overview');}
   function goBack(){if(directDocument.current){showOverview();return;}setSelected(null);focusBack.current=true;}
   function openCategory(value:'rules'|'changelog'|'files'){lastCategory.current=value;directDocument.current=false;pendingAutoOpen.current=value!=='files';setKind(value);}
-  useBackAction(()=>{if(selected)goBack();else showOverview();return true;},20,Boolean(selected)||kind!=='overview');
+  useBackAction(()=>{if(selected)goBack();else showOverview();return true;},20,Boolean(selected&&!directDocument.current)||(!category&&kind!=='overview'));
 
   useEffect(()=>{
     let cancelled=false;setLoading(true);setListError('');
@@ -97,7 +97,7 @@ function ProjectDocuments({connection,root,roots,onSelectProject,onProject,label
   </section>;
   return <section className="project-docs" ref={scroller} aria-label={selected?.name||label(kind)}>
     <div className="project-docs-toolbar">
-      <button className="text-button project-overview-back" onClick={selected?goBack:showOverview}><ArrowLeft size={18}/>{label(selected&&!directDocument.current?'back':'overview')}</button>
+      {(!category||selected&&!directDocument.current)&&<button className="text-button project-overview-back" onClick={selected?goBack:showOverview}><ArrowLeft size={18}/>{label(selected&&!directDocument.current?'back':'overview')}</button>}
       {kind!=='files'&&<button className="icon-button" aria-label={label(selected?'refreshDocument':'refresh')} disabled={selected?reading:loading} onClick={()=>selected?refreshDocument.current():setIndexRevision(value=>value+1)}><RefreshCw size={18} className={(selected?reading:loading)?'project-docs-refreshing':''}/></button>}
     </div>
     {selected?<article className="project-document" ref={documentHeading} tabIndex={-1} aria-label={selected.name}>
@@ -108,7 +108,7 @@ function ProjectDocuments({connection,root,roots,onSelectProject,onProject,label
       {document&&(document.content.trim()?<div className="markdown project-docs-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<a className="project-docs-image-link" href={safeWebUrl(src as string)!} target="_blank" rel="noopener noreferrer">{label('attachment')}{alt?` · ${alt}`:''}</a>:<span>📎 {alt||label('attachment')}</span>}}>{document.content}</ReactMarkdown></div>:<p className="project-docs-empty">{label('emptyDocument')}</p>)}
     </article>:kind==='files'?<div className="project-docs-files" id="project-documents-list" role="region" aria-label={label('files')}><Files connection={connection} root={root} onProject={onProject}/></div>:<div id="project-documents-list" role="region" aria-label={label(kind)}>
 
-      <h2 className="project-section-title">{label(kind)}</h2>
+      {!category&&<h2 className="project-section-title">{label(kind)}</h2>}
       {listError&&failure(listError,'list',Boolean(index))}
       {loading&&!index&&<p role="status">{label('loading')}</p>}
       {index?.truncated&&<p className="project-docs-limit" role="status">{label('truncated')}</p>}

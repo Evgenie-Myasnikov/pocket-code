@@ -1,3 +1,4 @@
+import {readProjectRoadmap} from './project-roadmap.js';
 import {boardExample,pocketCodeExample} from './board-example.js';
 import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';
 import path from 'node:path';
@@ -11,7 +12,7 @@ import {allowedPath,HttpError} from './security.js';
 
 const id=z.string().uuid(),name=z.string().trim().min(1).max(160);
 const note=z.object({id,title:name,description:z.string().max(20000),branch:z.string().max(300),status:z.enum(['idea','questions','ready','working','review','done']),owner:z.string().max(160),assigneeId:z.string().max(200).optional(),assigneeIds:z.array(z.string().min(1).max(200)).max(100).optional(),priority:z.enum(['critical','high','normal','low']).optional(),x:z.number().min(0).max(20000),y:z.number().min(0).max(20000),dependencies:z.array(id).max(100),chat:z.object({provider:z.enum(['claude','codex','copilot']),sessionId:z.string().max(200)}).optional()});
-const board=z.object({id,workspaceId:id.optional(),name,root:z.string(),revision:z.number().int().nonnegative(),versionSource:z.enum(['planned','git']).default('git'),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40).default([])});
+const board=z.object({id,workspaceId:id.optional(),name,root:z.string(),revision:z.number().int().nonnegative(),versionSource:z.enum(['planned','git']).default('git'),source:z.literal('project-changelog').optional(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40).default([])});
 const role=z.enum(['host','viewer','developer','reviewer','qa']);
 const member=z.object({id,name,role,tokenHash:z.string(),needsName:z.boolean().optional()});
 const workspace=z.object({id,name,roots:z.array(z.string()).max(100),password:z.string().default(''),invite:z.object({hash:z.string(),role}).optional(),members:z.array(member).default([]),hostPeople:z.array(z.object({id:z.string(),name})).default([])});
@@ -64,7 +65,11 @@ export async function createWorkspaceAccess(file:string){
 export async function mountBoards(app:Express,roots:string[],access:Awaited<ReturnType<typeof createWorkspaceAccess>>,onWorkspaceCreated?:()=>Promise<void>){
   const {store,current,catalog}=access;
   // Only seed this app's own repository; do not inspect unrelated project content.
-  for(const root of roots){let appRoot=false;try{appRoot=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).name==='pocket-code';}catch{}if(appRoot&&!store.boardList().some(b=>!b.workspaceId&&b.root===root&&b.name==='Pocket Code'))await store.mutate(data=>{data.boards.push({id:randomUUID(),name:'Pocket Code',root,revision:0,versionSource:'planned',...pocketCodeExample()});});}
+  for(const root of roots){let appRoot=false;try{appRoot=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).name==='pocket-code';}catch{}if(!appRoot)continue;
+    const existing=store.boardList().find(b=>!b.workspaceId&&b.root===root&&b.name==='Pocket Code');
+    const legacy=existing&&store.getBoard(existing.id)?.notes.every(n=>n.description.startsWith('Illustrative Pocket Code roadmap.'));
+    if(!existing||legacy){const roadmap=await readProjectRoadmap(root);await store.mutate(data=>{if(existing){const found=data.boards.find(b=>b.id===existing.id)!;Object.assign(found,roadmap,{source:'project-changelog'});found.revision++;}else data.boards.push({id:randomUUID(),name:'Pocket Code',root,revision:0,versionSource:'planned',source:'project-changelog',...roadmap});});}
+  }
 
   const visibleBoard=(value:ProjectBoard)=>current()?{...value,notes:value.notes.map(({chat,...n})=>n)}:value;
   function check(board:ProjectBoard,write=false){const ctx=current();if(ctx&&(board.workspaceId!==ctx.ws.id||write&&ctx.person.role==='viewer'))throw new HttpError(403,'Your role does not allow this board action');}
@@ -98,6 +103,7 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
     const boardId=id.parse(req.params.id);
     const result=await store.mutate(async data=>{
       const found=data.boards.find(b=>b.id===boardId);if(!found)throw new HttpError(404,'Board not found');
+      if(found.source)throw new HttpError(403,'This board is generated from CHANGELOG.md.');
       if(found.revision!==input.revision)throw new HttpError(409,'This board changed. Reload before changing a branch.');
       if(found.versionSource==='planned'){
         const next=input.name.trim();if(!next||found.versions.includes(next)&&input.previous!==next)throw new HttpError(409,'Choose a unique version name');if(input.previous&&!found.versions.includes(input.previous))throw new HttpError(404,'Version not found');if(!input.previous&&found.versions.length>=40)throw new HttpError(400,'Version limit reached');
@@ -120,6 +126,6 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
       return found;
     });res.json({...result,...(result.versionSource==='planned'?{branches:[]}:await boardBranches(result.root))});
   });
-  app.get('/api/boards/:id',async(req,res)=>{const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');await allowedPath(roots,found.root,true);res.json({...visibleBoard(found),...(found.versionSource==='planned'?{branches:[]}:await boardBranches(found.root))});});
-  app.post('/api/boards/:id',async(req,res)=>{const input=z.object({revision:z.number().int().nonnegative(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40)}).parse(req.body);const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');await allowedPath(roots,found.root,true);const notes=current()?input.notes.map(n=>({...n,chat:found.notes.find(old=>old.id===n.id)?.chat})):input.notes;res.json(visibleBoard(await store.save(found.id,input.revision,notes,input.versions)));});
+  app.get('/api/boards/:id',async(req,res)=>{const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');await allowedPath(roots,found.root,true);res.json({...visibleBoard(found),...(found.source?await readProjectRoadmap(found.root):{}),...(found.versionSource==='planned'?{branches:[]}:await boardBranches(found.root))});});
+  app.post('/api/boards/:id',async(req,res)=>{const input=z.object({revision:z.number().int().nonnegative(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40)}).parse(req.body);const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');if(found.source)throw new HttpError(403,'This board is generated from CHANGELOG.md.');await allowedPath(roots,found.root,true);const notes=current()?input.notes.map(n=>({...n,chat:found.notes.find(old=>old.id===n.id)?.chat})):input.notes;res.json(visibleBoard(await store.save(found.id,input.revision,notes,input.versions)));});
 }

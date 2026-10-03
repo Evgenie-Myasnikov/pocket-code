@@ -1,6 +1,8 @@
 import path from 'node:path';
 import {open, opendir, realpath, lstat} from 'node:fs/promises';
 import type {Dirent} from 'node:fs';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {HttpError, within} from './security.js';
 
 export type ProjectDocument = {path:string; name:string; kind:'rules'|'changelog'; source:string; appliesTo:'all'|'claude'|'codex'; bytes:number};
@@ -8,6 +10,21 @@ const maxDocuments=150, maxEntries=2000, maxBytes=1024*1024;
 const ruleRoots = new Map<string,ProjectDocument['appliesTo']>([['.claude','claude'],['.codex','codex'],['.agents','all']]);
 const rootRules = new Map<string,ProjectDocument['appliesTo']>([['agents.md','codex'],['agents.override.md','codex'],['claude.md','claude'],['claude.local.md','claude'],['rules.md','all']]);
 const changelogNames=new Set(['changelog.md','changes.md','history.md']);
+const run=promisify(execFile);
+
+export async function documentProjects(folders:string[],kind:'rules'|'changelog') {
+  const result:{root:string;name:string;documents:ProjectDocument[]}[]=[];
+  let cursor=0;
+  await Promise.all(Array.from({length:4},async()=>{
+    while(cursor<folders.length){const root=folders[cursor++];try{
+      const git=await run('git',['-C',root,'rev-parse','--is-inside-work-tree'],{timeout:3000,windowsHide:true,maxBuffer:4096});
+      if(git.stdout.trim()!=='true')continue;
+      const documents=(await projectDocuments(root)).documents.filter(item=>item.kind===kind);
+      if(documents.length)result.push({root,name:path.basename(root),documents});
+    }catch{/* Inaccessible and non-Git folders are not document projects. */}}
+  }));
+  return result.sort((a,b)=>a.name.localeCompare(b.name)||a.root.localeCompare(b.root));
+}
 
 /** Discovery stays within the selected project and never traverses dependency trees. */
 export async function projectDocuments(project:string) {

@@ -10,7 +10,7 @@ import packageJson from '../package.json';
 import type { HostUpdater } from './host-update.js';
 import { review, reviewAvailability } from './review.js';
 import { readClaudeUsage } from './claude-usage.js';
-import { projectDocuments, readProjectDocument } from './project-docs.js';
+import { documentProjects, projectDocuments, readProjectDocument } from './project-docs.js';
 import { projectArtifact } from './project-artifact.js';
 import type { ReleaseUpdater } from './updates.js';
 import cors from 'cors';
@@ -78,7 +78,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const key=(req.headers.authorization||'').replace(/^Bearer /,'');
     if(req.method==='POST'&&req.path==='/workspace-join'&&workspaceAccess.invitationIdentity(key)){next();return;}
     const guest=workspaceAccess.identity(key);
-    if(guest){workspaceRequest.run(guest,()=>{const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|workspaces|boards(?:\/[^/]+)?|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
+    if(guest){workspaceRequest.run(guest,()=>{const read=req.method==='GET'&&/^\/(health|providers|projects|sessions(?:\/[^/]+\/(?:messages|subagents)(?:\/[^/]+\/messages)?)?|jobs(?:\/[^/]+)?|activity|workspaces|boards(?:\/[^/]+)?|document-projects|project-docs|project-doc|project-artifact|files|file|review(?:\/availability)?)$/.test(req.path);const write=req.method==='POST'&&(/^\/boards\/[a-f0-9-]+$/.test(req.path)||/^\/workspaces\/[a-f0-9-]+\/profile$/.test(req.path)||req.path==='/workspace-logout');if(!read&&!write){res.status(403).json({error:'This workspace role cannot perform this host action.'});return;}next();});return;}
     if(config.devices){
       const admin=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')&&['127.0.0.1','localhost','[::1]'].includes(req.hostname)&&!req.headers['x-forwarded-for']&&!req.headers.forwarded&&!req.headers['cf-connecting-ip']&&validToken(key,config.token);
       if(admin){res.locals.deviceAdmin=true;next();return;}
@@ -344,7 +344,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/copilot/login',async(_req,res)=>res.json(await copilot().login()));
   // Project folders are shared; conversation histories remain provider-specific.
   const gitProjects=new GitProjects(roots);
-  app.get('/api/projects', async (_req, res) => {
+  async function projectFolders() {
     const results = await Promise.allSettled([sessions('claude'), sessions('codex'),sessions('copilot')]);
     const projects = new Set([...roots,...await gitProjects.list()]);
     for (const result of results) if (result.status === 'fulfilled') {
@@ -354,8 +354,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
         catch { /* Missing and out-of-scope folders cannot grant project access. */ }
       }
     }
-    res.json([...projects].filter(visibleRoot));
-  });
+    return [...projects].filter(visibleRoot);
+  }
+  app.get('/api/projects',async(_req,res)=>res.json(await projectFolders()));
+  app.get('/api/document-projects',async(req,res)=>res.json(await documentProjects(await projectFolders(),z.enum(['rules','changelog']).parse(req.query.kind))));
   app.get('/api/sessions', async (req, res) => res.json(await sessions(providerSchema.parse(req.query.provider))));
   app.get('/api/sessions/:id/messages', async (req, res) => {
     const provider = providerSchema.parse(req.query.provider);

@@ -3,7 +3,17 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,rm,symlink} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import {projectDocuments,readProjectDocument} from '../server/project-docs.js';
+import {projectDocuments,readProjectDocument,documentProjects} from '../server/project-docs.js';
+import {execFileSync} from 'node:child_process';
+
+test('document library offers only Git projects containing the selected document kind',async()=>{
+ const base=await mkdtemp(path.join(os.tmpdir(),'pocket-library-'));
+ try{const a=path.join(base,'atlas'),b=path.join(base,'orbit'),c=path.join(base,'ordinary');for(const folder of [a,b,c])await mkdir(folder);
+ for(const folder of [a,b])execFileSync('git',['init',folder],{windowsHide:true,stdio:'ignore'});
+ await writeFile(path.join(a,'CHANGELOG.md'),'# Current changes');await writeFile(path.join(b,'AGENTS.md'),'# Rules');await writeFile(path.join(c,'CHANGELOG.md'),'# Not a Git project');
+ assert.deepEqual((await documentProjects([a,b,c],'changelog')).map(p=>p.root),[a]);assert.deepEqual((await documentProjects([a,b,c],'rules')).map(p=>p.root),[b]);
+ }finally{await rm(base,{recursive:true,force:true});}
+});
 
 test('project rules and local changelog are discovered without unrelated Markdown or dependency traversal',async()=>{
   const base=await mkdtemp(path.join(os.tmpdir(),'pocket-docs-'));

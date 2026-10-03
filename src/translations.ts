@@ -1,5 +1,12 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Правила': 'Rules',
+  'История изменений': 'Changelog',
+  'Присоединиться к рабочей области': 'Join a workspace',
+  'Откройте приглашение WorkSpace на ПК и отсканируйте его QR-код.': 'Open the WorkSpace invitation on your PC and scan its QR code.',
+  'Откройте Настройки → Connection на ПК и отсканируйте QR-код.': 'Open Settings → Connection on your PC and scan its QR code.',
+  'Это QR подключения к ПК. Откройте Настройки → Подключение к ПК.': 'This QR connects a PC. Open Settings → PC connection.',
+  'Это QR рабочей области. Откройте WorkSpace.': 'This is a workspace QR. Open WorkSpace.',
   'Аккаунт, доступ и параметры чата': 'Account, access and chat preferences',
   'Подключение к сервису задач': 'Task service connection',
   'QR и подключённый компьютер': 'QR code and connected computer',

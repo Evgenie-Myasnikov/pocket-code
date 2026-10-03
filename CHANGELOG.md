@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-03 - Direct document sections and reliable QR retries (0.25.1)
+- Changed: Replaced Project navigation with Rules and Changelog on Windows and Android. Each section selects among Git projects containing its Markdown documents; single documents open directly.
+- Fixed: QR scanning routes PC pairing and workspace invitations to the appropriate flow. Pairing results are cached only while in flight, so re-scanning can recover from a revoked device key.
+- Changed: Pocket Code's generated board reads the latest six versions from local CHANGELOG.md and refreshes on demand. Only recorded publications show Done. Untouched legacy examples migrate; edited boards are preserved.
+- Improved: Compact connection screen and workspace rows; invitation and member management controls expand on demand.
+- Validation: Full server run passed 245/246; an unrelated timing-sensitive Copilot test passed in an isolated eight-test rerun. Roadmap migration API test passed. 21 desktop/navigation/QR/board browser scenarios and six document scenarios passed; offline scenarios passed separately. TypeScript/Vite, Android and Windows packaging passed; publication privacy checks are required.
+- Follow-up: The reported phone QR error text was not provided; identified wrong-section and stale-credential failures are covered. Physical Android testing remains unavailable.
+
+
 ## 2026-10-03 - Independent workspace invitations and local roadmap boards (0.25.0)
 - Changed: Connection is inside Settings on Windows and Android. WorkSpace has its own QR invitations, explicit Local/Tailscale/Internet transport, desktop-only administration and named participant foldouts.
 - Changed: Trusted paired devices reuse the PC profile; independently invited members enter their name. Personal chats and local boards remain separate from shared workspace membership.

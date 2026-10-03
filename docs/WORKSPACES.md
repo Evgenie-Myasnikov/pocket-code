@@ -25,7 +25,7 @@ Cards show the initial avatar followed by the name. On notes, the round **+** ad
 
 Windows **Board → Local boards** shows boards outside workspace membership. Your trusted phone can open them under **WorkSpace → Local boards** after Connection pairing. Workspace members cannot read them.
 
-When the host loads Pocket Code's own repository, it creates a local **Pocket Code** example. This illustrates a roadmap; its statuses are not an automatically verified real backlog.
+The local **Pocket Code** board reads the latest six versions from the repository's CHANGELOG.md. Refresh reloads the file. Published entries are marked Done; changes without a recorded publication are Review. This generated view is read-only. Untouched older examples migrate automatically; user-edited boards are preserved.
 
 New boards include six editable examples covering Idea, Questions, Ready, Working, Review and Done. Written labels accompany different colors and border treatments. New versions are **planned**: adding or renaming them does not create, rename, check out or push Git branches. Arrows show their sequence. Existing boards explicitly using Git retain their earlier branch behavior.
 
