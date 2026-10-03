@@ -9,6 +9,7 @@
 - Added: Shared application instructions teach Claude, Codex and Copilot to read repository boards, clarify ideas and maintain evidence-based cards without identities or private data. Guidance applies to new and resumed interactive sessions.
 - Added: Private per-recipient board inbox on mobile and Windows for assignments and clarification requests. A local AI helper uses authenticated, revision-checked host endpoints and idempotent request IDs; unapproved participants and cross-member inbox access are rejected.
 - Validation: 248/249 full-suite tests passed; the timing-sensitive Copilot stream test passed with all eight provider tests in isolation. 42 final provider/board/attention tests and all 29 browser scenarios passed. TypeScript/Vite, Android/Windows packaging and native Windows smoke passed. Source, APK, Windows and host privacy audits passed; physical Android testing unavailable.
+- Release: Published v0.25.3 from codex/board-0.25.3 (4fe2149), APK versionCode 66, with Windows, host and manifest assets. GitHub CI passed; the production updater downloaded and verified the APK. Test listeners exited; the production host was not restarted.
 
 
 ## 2026-10-03 - Workspace approval, identities and chat recovery (0.25.2)
