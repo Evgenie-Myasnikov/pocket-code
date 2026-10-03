@@ -3,7 +3,7 @@ const roadmap=JSON.parse(readFileSync(new URL('../project-boards/board-7b004a10-
 import {test,expect,type Page} from '@playwright/test';
 test('repository boards open directly and refresh from their source',async({page})=>{
  await desktop(page);await expect(page.locator('.desktop-brand')).toHaveCount(0);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
- await expect(page.getByRole('button',{name:'Workspace boards',exact:true})).toHaveCount(0);await page.locator('.project-board-row').filter({hasText:'Atlas'}).getByRole('button').click();await expect(page.getByRole('heading',{name:'Atlas',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Workspace boards',exact:true})).toHaveCount(0);await expect(page.locator('.project-board-grid .board-index-item svg')).toHaveCount(0);const cards=page.locator('.project-board-grid .board-index-item');await expect(cards).toHaveCount(2);const a=await cards.nth(0).boundingBox(),b=await cards.nth(1).boundingBox();expect(Math.abs(a!.y-b!.y)).toBeLessThan(2);expect(b!.x).toBeGreaterThan(a!.x);await page.screenshot({path:'.local/board-grid-0258.png'});await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect(page.getByRole('heading',{name:'Atlas',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Delete board',exact:true})).toHaveCount(0);
  const reads=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length);await page.getByRole('button',{name:'Refresh board',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length)).toBe(reads+1);
@@ -219,16 +219,17 @@ test('desktop pastes an image attachment using the native clipboard event',async
 test('creates the board for the clicked project without a board selector',async({page})=>{
  await page.addInitScript(()=>{(window as any).missingProjectBoard=true;});await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
  await expect(page.locator('.project-board-row').filter({hasText:'Garden'})).toHaveCount(0);await expect(page.locator('.project-board-row svg.lucide-chevron-right')).toHaveCount(0);await page.getByRole('button',{name:'Add project board',exact:true}).click();await page.getByLabel('Project for new board').selectOption('C:\\Demo\\Garden');await page.getByRole('button',{name:'Create project board',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Garden',exact:true})).toBeVisible();await expect(page.locator('.work-boards select')).toHaveCount(0);
+ const createdName=await page.evaluate(()=>(window as any).createdProjectBoard.name);await expect(page.getByRole('heading',{name:createdName,exact:true})).toBeVisible();await expect(page.locator('.work-boards select')).toHaveCount(0);
  expect(await page.evaluate(()=>(window as any).createdProjectBoard.root)).toBe('C:\\Demo\\Garden');
  await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Garden'}).getByRole('button').click();await expect(page.getByRole('button',{name:'Create project board',exact:true})).toHaveCount(0);
 });
 
-test('Russian Pocket Code roadmap renders dependency arrows outside cards',async({page})=>{
+test('Russian Pocket Code roadmap keeps dependencies as data without visual connectors',async({page})=>{
  await page.addInitScript(board=>{(window as any).projectBoardOverride={...board,id:'7b004a10-920c-4ba7-a070-254318083e90',root:'C:\\Demo\\Atlas',revision:0,repositoryRevision:'a'.repeat(64),repositoryFile:'board-7b004a10-920c-4ba7-a070-254318083e90.json',versionSource:'planned',branches:[],notes:board.notes.map((n:any)=>({...n,owner:'',assigneeIds:[]}))};},roadmap);
- await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Atlas'}).getByRole('button').click();await expect(page.locator('.board-note')).toHaveCount(19);
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect(page.locator('.board-note')).toHaveCount(19);
  await page.locator('.board-viewport').dispatchEvent('wheel',{deltaY:440,ctrlKey:true,clientX:320,clientY:150});await page.screenshot({path:'.local/russian-board-0256.png'});
- await expect(page.locator('.board-edges>path')).toHaveCount(7);
+ expect(roadmap.notes.some((note:{dependencies:string[]})=>note.dependencies.length>0)).toBe(true);
+ await expect(page.locator('.board-edges, .board-roadmap-links')).toHaveCount(0);
 });
 test('built-in board rule can be disabled and re-enabled from project Rules',async({page})=>{
  await desktop(page);await page.getByRole('navigation').getByRole('button',{name:'Rules',exact:true}).click();

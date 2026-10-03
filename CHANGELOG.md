@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.25.8 (Unreleased)
+
+### Bug Fixes
+- boards: present board and project names in a responsive card grid without icons or secondary type labels; preserve repository board titles on opening.
+- boards: hide dependency and version connector lines; preserve dependency metadata for AI planning and existing chat prompts.
+
+### Validation
+- Passed TypeScript/Vite, three focused desktop board scenarios and four board data tests. Android APK and Windows package built; source and APK/desktop/host privacy audits passed. Physical Android not tested.
+
+
 ## [0.25.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.6...v0.25.7) (2026-10-03)
 
 ### Features
