@@ -7,7 +7,8 @@
 - boards: widen version columns at step 64 so cards fit on the grid without crossing column boundaries; retain existing card positions until explicitly moved.
 
 ### Validation
-- Three placement checks cover all selectable steps and branch boundaries; three focused desktop browser scenarios and TypeScript/Vite passed. Windows and Android package checks pending; physical devices not tested.
+- Seven focused data/placement checks and three browser scenarios passed, covering all grid steps, persisted settings, creation and mouse/keyboard movement at step 64. TypeScript/Vite, Android and Windows builds passed.
+- Local source/APK/desktop/host privacy audits passed; host contents matched source and checksums. Final release metadata and packages are being verified. Physical devices were not tested.
 
 ## [0.25.10](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.9...v0.25.10) (2026-10-03)
 
