@@ -20,7 +20,7 @@ for(const width of [390,1440])test('board images attach, reopen, zoom and detach
 });
 test('repository boards open directly and refresh from their source',async({page})=>{
  await desktop(page);await expect(page.locator('.desktop-brand')).toHaveCount(0);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
- await expect(page.getByRole('button',{name:'Workspace boards',exact:true})).toHaveCount(0);await expect(page.locator('.project-board-grid .board-index-item svg')).toHaveCount(0);const cards=page.locator('.project-board-grid .board-index-item');await expect(cards).toHaveCount(2);const a=await cards.nth(0).boundingBox(),b=await cards.nth(1).boundingBox();expect(Math.abs(a!.y-b!.y)).toBeLessThan(2);expect(b!.x).toBeGreaterThan(a!.x);await page.screenshot({path:'.local/board-grid-0258.png'});await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect(page.getByRole('heading',{name:'Atlas',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Workspace boards',exact:true})).toHaveCount(0);await expect(page.locator('.project-board-grid .board-index-item > svg')).toHaveCount(0);const cards=page.locator('.project-board-grid .board-index-item');await expect(cards).toHaveCount(2);const a=await cards.nth(0).boundingBox(),b=await cards.nth(1).boundingBox();expect(Math.abs(a!.y-b!.y)).toBeLessThan(2);expect(b!.x).toBeGreaterThan(a!.x);await page.screenshot({path:'.local/board-grid-0258.png'});await page.locator('.project-board-row').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).getByRole('button').click();await expect(page.getByRole('heading',{name:'Atlas',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Delete board',exact:true})).toHaveCount(0);
  const reads=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length);await page.getByRole('button',{name:'Refresh board',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length)).toBe(reads+1);
@@ -310,3 +310,8 @@ test('right-click note deletion confirms, preserves other cards and removes dang
  await expect.poll(()=>scroll.evaluate(el=>Math.round(el.scrollHeight-el.clientHeight-el.scrollTop))).toBeLessThan(8);
  await scroll.evaluate(el=>{el.scrollTop=120;el.dispatchEvent(new Event('scroll'));});await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await row.click();await expect.poll(()=>scroll.evaluate(el=>Math.round(el.scrollTop))).toBe(120);
  });
+
+test('desktop notifications sit with navigation and retain a full-size touch target',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await desktop(page);
+ const bell=page.locator('.desktop-rail nav').getByRole('button',{name:'Board notifications'});await expect(bell).toBeVisible();expect((await bell.boundingBox())!.height).toBeGreaterThanOrEqual(48);await expect(page.locator('.desktop-rail > .board-notifications')).toHaveCount(0);await bell.click();await expect(page.getByRole('dialog',{name:'Board notifications'})).toBeVisible();
+});

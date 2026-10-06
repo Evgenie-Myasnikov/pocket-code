@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.26.2 (Unreleased)
+
+### Bug Fixes
+- notifications: integrate the bell into mobile section/chat headers and Windows navigation instead of a separate strip; use a 48px target and 24px icon, preserve unread badges and render the inbox outside header layout.
+
+### Features
+- boards: replace dim overlays with a full-board, aspect-preserving miniature on a subtle grid, including all loaded notes, column labels and status colors; separate the readable board/project caption and widen responsive cards. Miro preview availability is unchanged.
+
+### Validation
+- Five focused browser checks passed on 320/390px and desktop; modal focus, navigation, card open/delete and chat width verified. Synthetic captures inspected; TypeScript/Vite build passed. Not released; physical-device check remains outstanding.
+
 ## [0.26.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.0...v0.26.1) (2026-10-06)
 
 ### Features
