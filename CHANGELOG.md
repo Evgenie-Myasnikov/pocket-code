@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.3 (Unreleased)
+## [0.26.3](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.2...v0.26.3) (2026-10-06)
 
 ### Bug Fixes
 - navigation: align mobile chat-provider, board, settings, rules and changelog headers with a shared height, title size and inset; remove the navigation divider below the open chat composer.
@@ -13,6 +13,9 @@
 ### Validation
 - Five browser checks passed, including tab geometry at 60/100/130% scale and notification controls at 320/390px. TypeScript/Vite build passed. Physical-device validation and release remain outstanding.
 - Follow-up validation: 21 browser scenarios passed across gallery search, card actions, board drag/zoom, header/bell alignment, composer and streaming completion; two Unicode/reveal unit checks and TypeScript/Vite passed. Synthetic mobile/desktop captures inspected. Physical-device and live-provider stream checks remain outstanding; unreleased.
+
+- Release validation: 21 browser scenarios and two reveal tests passed in the release checkout; Android/Windows built, APK signing continuity, source-matched host (306 files), artifact privacy, downloaded checksums and GitHub CI verified. Earlier unreleased notes above record pre-release checks.
+- Release source: [01fd4e0](https://github.com/Evgenie-Myasnikov/pocket-code/commit/01fd4e0f592ac864f7cd76a2b6ba1cf3ab51bef4), branch [codex/gallery-chat-0.26.3](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/gallery-chat-0.26.3). Physical-device and live-provider stream validation remain outstanding.
 
 ## [0.26.2](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.1...v0.26.2) (2026-10-06)
 
