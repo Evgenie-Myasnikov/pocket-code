@@ -1,0 +1,5 @@
+.running-action{margin:16px 0;color:var(--muted);font-size:.9em;min-width:0}
+.running-action>span{display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.action-shimmer{color:var(--muted);background:linear-gradient(100deg,var(--muted) 35%,var(--text) 50%,var(--muted) 65%);background-size:240% 100%;background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:action-sweep 2s linear infinite}
+@keyframes action-sweep{from{background-position:150% 0}to{background-position:-50% 0}}
+@media(prefers-reduced-motion:reduce){.action-shimmer{animation:none;background:none;-webkit-text-fill-color:currentColor}}

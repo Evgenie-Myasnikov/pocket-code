@@ -1,0 +1,23 @@
+/* Quiet gallery and canvas chrome; color belongs to note state. */
+.project-board-index.board-index{padding:20px;max-width:1440px;width:100%;margin-inline:auto;box-sizing:border-box}
+.project-board-index .board-index-actions{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px}
+.board-gallery-search{display:flex;align-items:center;gap:10px;flex:1;min-width:160px;margin:0;color:var(--muted)}
+.board-gallery-search input{width:100%;min-width:0;background:transparent!important;border:0!important;box-shadow:none;padding:12px 0;font:inherit;color:var(--text)}
+.project-board-index .board-index-actions>button{border:0;background:var(--surface);border-radius:12px;min-height:48px}
+.project-board-index .board-index-actions>.icon-button{background:transparent}
+.project-board-grid .board-index-item.board-index-item{border:0;border-radius:14px;background:transparent;box-shadow:none;overflow:hidden;transition:background-color .16s}
+.project-board-grid .board-index-item.board-index-item:hover{border:0;box-shadow:none;background:var(--panel)}
+.project-board-grid .board-index-item.board-index-item>span{border:0;padding:14px 12px 18px}
+.project-board-grid .board-preview-stage{border-radius:14px;background:color-mix(in srgb,var(--panel) 75%,var(--bg));padding:18px}
+.project-board-grid .board-index-item:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.work-boards .board-header,.work-boards .board-toolbar,.work-boards .board-tools{border:0;background:var(--bg)}
+.work-boards .board-column{border-color:color-mix(in srgb,var(--line) 25%,transparent)}
+.work-boards .board-viewport{background-image:radial-gradient(color-mix(in srgb,var(--line) 35%,transparent) .7px,transparent .8px)}
+.work-boards .board-version{border-bottom:0}
+.work-boards .board-note{border:0;box-shadow:0 3px 14px #00000014;background:color-mix(in srgb,var(--note-color,var(--muted)) 7%,var(--panel));border-radius:12px}
+.work-boards .note-chat{border-top:0!important}
+.work-boards .board-view-switch{background:var(--panel);padding:3px;border-radius:10px}
+.work-boards .board-view-switch button{border:0;background:transparent;border-radius:7px}
+.work-boards .board-view-switch button[aria-pressed=true]{background:var(--surface);color:var(--text);box-shadow:none}
+@media(max-width:600px){.project-board-index.board-index{padding:16px 20px}.project-board-index .board-index-actions{gap:8px}.board-gallery-search{flex-basis:100%}.project-board-grid.project-board-grid{gap:20px}}
+@media(prefers-reduced-motion:reduce){.project-board-grid .board-index-item.board-index-item{transition:none}}

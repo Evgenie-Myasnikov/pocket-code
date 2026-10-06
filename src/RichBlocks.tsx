@@ -35,7 +35,8 @@ const MarkdownBody=memo(function MarkdownBody({text,reveal}:{text:string;reveal?
 });
 function StreamingMarkdown({text,animateInitial}:{text:string;animateInitial:boolean}){const speed=useStreamSpeed(),visible=usePacedText(text,animateInitial,speed);return <MarkdownBody text={visible} reveal={useStreamingReveal(visible,speed!==0,animateInitial)}/>;}
 export const Markdown=memo(function Markdown({text,streaming=false,animateInitial=false}:{text:string;streaming?:boolean;animateInitial?:boolean}){
-  return streaming?<StreamingMarkdown text={text} animateInitial={animateInitial}/>:<MarkdownBody text={text}/>;
+  const wasStreaming=useRef(streaming);if(streaming)wasStreaming.current=true;
+  return wasStreaming.current?<StreamingMarkdown text={text} animateInitial={animateInitial}/>:<MarkdownBody text={text}/>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.

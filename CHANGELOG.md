@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.26.3 (Unreleased)
+
+### Bug Fixes
+- navigation: align mobile chat-provider, board, settings, rules and changelog headers with a shared height, title size and inset; remove the navigation divider below the open chat composer.
+- notifications: add the inbox to the chat list and align its trigger with section/conversation headers; opening a notice from the list reveals its board.
+- chat: pace current-run message blocks as well as partial text, retain the mounted reveal queue on completion and cap burst acceleration; replace the dotted generic running footer with the latest action and a reduced-motion-aware text sweep.
+
+### Features
+- boards: add board/project search, remove gallery card outlines and caption dividers, and soften canvas chrome while preserving state colors, previews and context actions.
+
+### Validation
+- Five browser checks passed, including tab geometry at 60/100/130% scale and notification controls at 320/390px. TypeScript/Vite build passed. Physical-device validation and release remain outstanding.
+- Follow-up validation: 21 browser scenarios passed across gallery search, card actions, board drag/zoom, header/bell alignment, composer and streaming completion; two Unicode/reveal unit checks and TypeScript/Vite passed. Synthetic mobile/desktop captures inspected. Physical-device and live-provider stream checks remain outstanding; unreleased.
+
 ## [0.26.2](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.1...v0.26.2) (2026-10-06)
 
 ### Bug Fixes

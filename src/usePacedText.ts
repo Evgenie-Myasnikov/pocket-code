@@ -25,7 +25,7 @@ export function usePacedText(text:string,animateInitial:boolean,speed=40){
       state.last=performance.now();
       const tick=(now:number)=>{
         // Catch up to large network bursts without letting the display queue grow indefinitely.
-        const rate=Math.max(state.speed,state.ends.length/(0.65*40/state.speed));
+        const rate=Math.min(state.speed*2,Math.max(state.speed,(state.ends.length-state.index)/3));
         state.credit+=Math.min(50,now-state.last)*rate/1000;state.last=now;
         const count=Math.floor(state.credit);
         if(count){state.credit-=count;state.index=Math.min(state.ends.length,state.index+count);show(state.target.slice(0,state.ends[state.index-1]));}

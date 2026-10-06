@@ -23,6 +23,7 @@ import {type useProjectWorkspaces} from './project-workspaces';
 import type {ProjectBoard,BoardNote} from '../server/boards';
 import {BoardImages} from './BoardImages';
 import './work-boards.css';
+import './board-surfaces.css';
 export type BoardChat={taskRun?:TaskRun;root:string;prompt:string;note:BoardNote;boardId:string;connectionUrl?:string};
 export type BoardView=ProjectBoard&{branches:string[];error?:string;repositoryUnavailable?:boolean;repositoryFile?:string;repositoryRevision?:string};
 export function WorkBoards({connection,roots,workspaces,onChat,local=false,compactContext=false,focusTarget}:{connection:Connection;roots:string[];workspaces:ReturnType<typeof useProjectWorkspaces>;onChat(chat:BoardChat):void;local?:boolean;compactContext?:boolean;focusTarget?:BoardNoticeTarget|null}){
