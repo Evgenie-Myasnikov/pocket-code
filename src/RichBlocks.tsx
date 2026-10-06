@@ -3,6 +3,9 @@ import { useModal } from './navigation';
 import { Capacitor } from '@capacitor/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import {useStreamingReveal} from './useStreamingReveal';
+import {rehypeStreamingReveal,type RevealOptions} from './streaming-reveal';
+import './streaming-reveal.css';
 import type { Block, SubagentView } from '../server/types';
 import { t, useLanguage } from './i18n';
 import {Terminal, Pencil, ChevronRight, Wrench} from 'lucide-react';
@@ -24,9 +27,13 @@ function Picture({src,alt}:{src:string;alt:string}) {
   if(!loaded)return <button className="secondary" onClick={()=>setLoaded(true)}>{t('Загрузить внешнее изображение')} · {alt}</button>;
   return <><button className="image-preview" aria-label={t('Открыть изображение')} onClick={()=>setExpanded(true)}><img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></button>{expanded&&<ImageViewer src={src} title={alt} onClose={()=>setExpanded(false)}/>}</>;
 }
-export const Markdown=memo(function Markdown({text}:{text:string}) {
+const MarkdownBody=memo(function MarkdownBody({text,reveal}:{text:string;reveal?:RevealOptions}) {
   useLanguage();
-  return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<Picture src={safeWebUrl(src as string)!} alt={alt||t('Изображение')}/>:<span>📎 {alt||t('Изображение')}</span>}}>{text}</ReactMarkdown></div>;
+  return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={reveal?[[rehypeStreamingReveal,reveal]]:[]} components={{a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<Picture src={safeWebUrl(src as string)!} alt={alt||t('Изображение')}/>:<span>📎 {alt||t('Изображение')}</span>}}>{text}</ReactMarkdown></div>;
+});
+function StreamingMarkdown({text}:{text:string}){return <MarkdownBody text={text} reveal={useStreamingReveal(text,true)}/>;}
+export const Markdown=memo(function Markdown({text,streaming=false}:{text:string;streaming?:boolean}){
+  return streaming?<StreamingMarkdown text={text}/>:<MarkdownBody text={text}/>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.
@@ -43,9 +50,9 @@ function Document({block}:{block:Block}) {
 function ToolResultContent({block,depth}:{block:Block;depth:number}) {
   return <>{Array.isArray(block.content)?block.content.map((item:any,i:number)=>item && typeof item==='object' && typeof item.type==='string'?<RichBlock block={item} depth={depth+1} key={i}/>:<pre key={i}>{JSON.stringify(item,null,2)}</pre>):<Markdown text={typeof block.content==='string'?block.content:JSON.stringify(block.content,null,2)||''}/>}</>;
 }
-export function RichBlock({block,depth=0,result,onSubagent,running=false}:{block:Block;depth?:number;result?:Block;running?:boolean;onSubagent?(agent:SubagentView):void}) {
+export function RichBlock({block,depth=0,result,onSubagent,running=false,streaming=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;onSubagent?(agent:SubagentView):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;
-  if(block.type==='text')return <Markdown text={block.text || ''}/>;
+  if(block.type==='text')return <Markdown text={block.text || ''} streaming={streaming}/>;
   if(block.type==='subagent' && block.agent) {
     const agent=block.agent,label=t(({running:'Работает',completed:'Завершён',error:'Ошибка',stopped:'Остановлен',unknown:'Статус неизвестен'} as const)[agent.status]);
     return onSubagent?<button className={`subagent-card subagent-${agent.status}`} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span><ChevronRight className="subagent-chevron" size={16} aria-hidden="true"/></button>:<Disclosure className="subagent-inline" summary={<>{agent.name} · {label}</>}>{()=> <>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</>}</Disclosure>;

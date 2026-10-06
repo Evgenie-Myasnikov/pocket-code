@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import { test, expect, type Page, type Route } from '@playwright/test';
 
 const connection = { url: 'http://127.0.0.1:4319', token: 'test-only-'.repeat(5) };
@@ -20,7 +21,7 @@ async function setup(page: Page, usage: (route: Route, provider: string) => Prom
     if (endpoint === '/jira/status') return route.fulfill({ json: { connected: false, sites: [] } });
     return route.fulfill({ status: 404, json: { error: 'Synthetic endpoint not configured' } });
   });
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Usage limits', exact: true }).click();
 }

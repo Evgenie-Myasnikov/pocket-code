@@ -1,6 +1,6 @@
 # Windows desktop application
 
-See [Workspaces and project boards](WORKSPACES.md) for host-owned areas, password sign-in, QR invitation roles and the visual roadmap.
+See the [user guide](USER_GUIDE.md) for navigation and [project boards and Miro](BOARDS.md) for planning. The former Workspace category is retired; AI accounts, PC pairing and repository boards have separate controls.
 
 ## Window appearance
 
@@ -8,13 +8,13 @@ The app icon is shared by Android, the Windows executable, taskbar and tray. **S
 
 ## Connected devices
 
-From **0.22.0**, open **Connection → Connected devices** to see paired phones/browsers, their app version and last contact. **Online** means contact within 45 seconds; **Offline** means no recent contact, not necessarily a powered-off device. Rename devices to distinguish them. **Disconnect** asks for confirmation, removes the device from the list and revokes only its credential, closes its active responses and refreshes the pairing QR. Other devices and running AI tasks are unaffected. A disconnected device must scan the current QR to regain access.
+From **0.22.0**, open **Settings → Connection → Connected devices** to see paired phones/browsers, their app version and last contact. **Online** means contact within 45 seconds; **Offline** means no recent contact, not necessarily a powered-off device. Rename devices to distinguish them. **Disconnect** asks for confirmation, removes the device from the list and revokes only its credential, closes its active responses and refreshes the pairing QR. Other devices and running AI tasks are unaffected. A disconnected device must scan the current QR to regain access.
 
 From **0.22.5**, a phone shows its Android device name (or maker and model when no name is set), and the model appears beside the version. Scanning the QR again on the same installation, including after reinstalling the app, updates its existing entry instead of adding another; a name you set on the PC is kept. Leaving the connection on the phone removes it from the list as well. Entries created by 0.22.0–0.22.4 have no installation identity: remove leftovers once with **Disconnect**.
 
 **One-time migration:** update both PC and Android to 0.22.0 or later and scan the new QR. Old shared-key connections cannot access the upgraded host. If the PC updated first, install the release APK manually over the existing Android app, then scan. Chat history and preferences are retained. Devices receive individual credentials, stored in the existing encrypted Android connection vault; the PC persists credential hashes and device metadata in its private data directory. The administrative PC key is no longer put in pairing QR codes.
 
-**По-русски:** в разделе **Подключение → Подключённые устройства** доступны статус, последняя связь, переименование и отключение каждого устройства. «Не в сети» означает отсутствие запросов более 45 секунд. Отключение удаляет устройство из списка и отзывает его ключ, не останавливая задачи AI и другие подключения. С 0.22.5 телефон показывает своё имя из настроек Android (или производителя и модель), повторное сканирование QR той же установкой, в том числе после переустановки, обновляет существующую запись вместо новой, а выход из подключения на телефоне тоже убирает его из списка. Записи, созданные версиями 0.22.0–0.22.4, один раз удалите кнопкой **Отключить**. Для перехода с версии до 0.22.0 обновите ПК и телефон и один раз отсканируйте новый QR. Если ПК обновился первым, установите новый APK поверх приложения вручную, затем отсканируйте QR.
+**По-русски:** в разделе **Настройки → Подключение → Подключённые устройства** доступны статус, последняя связь, переименование и отключение каждого устройства. «Не в сети» означает отсутствие запросов более 45 секунд. Отключение удаляет устройство из списка и отзывает его ключ, не останавливая задачи AI и другие подключения. С 0.22.5 телефон показывает своё имя из настроек Android (или производителя и модель), повторное сканирование QR той же установкой, в том числе после переустановки, обновляет существующую запись вместо новой, а выход из подключения на телефоне тоже убирает его из списка. Записи, созданные версиями 0.22.0–0.22.4, один раз удалите кнопкой **Отключить**. Для перехода с версии до 0.22.0 обновите ПК и телефон и один раз отсканируйте новый QR. Если ПК обновился первым, установите новый APK поверх приложения вручную, затем отсканируйте QR.
 
 ## Automatic updates
 
@@ -32,13 +32,15 @@ See [Provider sign-in and status](PROVIDER-SIGN-IN.md) for manual login, device 
 
 Run **Setup Pocket Code.cmd** from the extracted source package to install or update. Setup automatically detects Node.js, downloads a checksum-verified private Node.js 24 LTS copy if needed, and installs npm dependencies before building. It does not require winget, administrator rights or restarting PowerShell after an existing Node installation. It adds **Pocket Code** shortcuts to Desktop and Start menu. Keep the source folder: the application uses its host scripts and dependencies. Moving that folder requires running setup again. **Start Pocket Code.cmd** opens the app and installs it if missing; internet mode and Exit are inside the app instead of separate batch files.
 
-The desktop window uses the same TypeScript/React message renderer, Review, results gallery, image viewer, subagent viewer, themes and sizing controls as Android. Its wider layout has a left sidebar with provider, project and conversation selection. Chats use the shared interactive mobile component: send messages, attach files, steer active work and answer agent questions on either device. The view refreshes automatically while open. Review uses the selected conversation's project folder; results scan that conversation's available history.
+The desktop window uses the same TypeScript/React message renderer, Review, results gallery, image viewer, subagent viewer, themes and sizing controls as Android. Its wider layout has a left sidebar with provider and conversation selection. Choose a project in the New chat composer; an existing conversation keeps its original project. Chats use the shared interactive mobile component: send messages, attach files, steer active work and answer agent questions on either device. The view refreshes automatically while open. Review uses the selected conversation's project folder; results scan that conversation's available history.
 
-**Connection** contains pairing QR codes, internet/LAN selection and Jira setup. **Settings** contains Windows startup/reconnection, English/Russian language selection and the shared appearance controls. Preferences are local to each device; changing your PC theme does not change the phone theme.
+**Settings → Connection** contains pairing QR codes, internet/LAN selection and connected devices. Jira authorization is a separate settings category. **Settings** contains Windows startup/reconnection, English/Russian language selection and the shared appearance controls. Preferences are local to each device; changing your PC theme does not change the phone theme.
 
 Installation downloads a checksum-pinned Microsoft WebView2 SDK to build the Windows shell. If the WebView2 Runtime is missing, it installs Microsoft's signed bootstrapper. The window requires 64-bit Windows and uses a private local web origin. Its native bridge allows explicitly approved read and chat/board write endpoints; arbitrary HTTP endpoints remain unavailable. Provider credentials remain in host storage. The native layer owns the tray, startup, host lifecycle and QR pairing; it does not reimplement the chat widgets.
 
 ![Desktop conversation with fictional sample content](images/desktop-chat.png)
+
+This synthetic capture shows an earlier interface revision; follow the current navigation described above.
 
 | Action | Result |
 | --- | --- |
@@ -59,14 +61,14 @@ The Windows updater replaces both the desktop application and its bundled host. 
 <a id="russian"></a>
 ## Приложение для Windows
 
-На ПК используются те же компоненты TypeScript/React, что на Android: сообщения, Review, результаты, просмотр изображений с масштабированием, субагенты, темы и размеры. Слева выбираются провайдер, проект и чат. **Чаты доступны только для чтения**; сообщения и ответы на вопросы агента отправляются с телефона. Открытая переписка обновляется автоматически.
+На ПК используются те же компоненты TypeScript/React, что на Android: сообщения, Review, результаты, просмотр изображений с масштабированием, субагенты, темы и размеры. Слева выбираются провайдер и чат, проект задаётся при создании нового чата. На ПК можно отправлять сообщения, прикреплять файлы и отвечать на вопросы агента, как на телефоне. Открытая переписка обновляется автоматически.
 
-QR-код и Jira находятся в **Подключении**, язык, оформление, автозапуск и восстановление связи — в **Настройках**. Настройки оформления сохраняются отдельно на каждом устройстве. Нужна 64-битная Windows; WebView2 при необходимости устанавливается автоматически.
+QR-код и список устройств находятся в **Настройки → Подключение**, авторизация Jira — в отдельной категории; язык, оформление, автозапуск и восстановление связи — в **Настройках**. Настройки оформления сохраняются отдельно на каждом устройстве. Нужна 64-битная Windows; WebView2 при необходимости устанавливается автоматически.
 
 Для установки или обновления запустите **Setup Pocket Code.cmd**. Node.js определяется автоматически даже в старом окне PowerShell; если подходящей версии нет, загрузится проверенная локальная копия Node.js 24 LTS. Права администратора и winget не нужны. Зависимости, включая TypeScript, устанавливаются до сборки. Для запуска остаётся **Start Pocket Code.cmd** или ярлык **Pocket Code**. Интернет-режим и выход доступны в приложении. Папку исходников оставьте на месте; после её переноса повторите установку.
 
 - **Крестик и сворачивание** скрывают окно в трей, сервер продолжает работать.
-- **Двойной щелчок по значку** возвращает окно с QR-кодом и настройкой Jira.
+- **Двойной щелчок по значку** возвращает окно приложения.
 - **Отключить** завершает соединение и запоминает отключённое состояние. При активных задачах сначала нужно дождаться их завершения.
 - **Правая кнопка по значку → Выход** завершает приложение и запущенные им процессы. Активная работа при этом прерывается.
 - **Запускать с Windows** включает запуск в трее после входа в Windows.

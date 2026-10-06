@@ -4,7 +4,7 @@
 
 ## First checks
 
-Record the phone version from **Settings → About**, the host version, the selected provider and the action that failed. Check whether the PC is awake and whether its launcher is running. Try a simple read, such as opening the project files, to distinguish connection failure from an AI or Jira error.
+Record the phone version from **Settings → About**, the host version, the selected provider and the action that failed. Check whether the PC is awake and whether Pocket Code is running in the system tray. Try a simple read, such as opening a project changelog, to distinguish connection failure from an AI or Jira error.
 
 Do not reset everything first. **Disconnect and forget** removes pairing and cached conversations; it is not a repair for provider authorization or an occupied port.
 
@@ -12,12 +12,12 @@ Do not reset everything first. **Disconnect and forget** removes pairing and cac
 
 | Symptom | What to check |
 | --- | --- |
-| PC unavailable on mobile data | Use the internet launcher or a reachable private-network address. A home LAN address alone is insufficient from another network. |
+| PC unavailable on mobile data | Enable internet mode in the Windows connection settings or use a reachable private-network address. A home LAN address alone is insufficient from another network. |
 | It worked before restarting the tunnel | Scan the newly opened QR. Temporary tunnel addresses can change. |
-| Closing the browser did not stop the PC host | Expected: the browser only displays pairing. Close the launcher or use the stop launcher when idle. |
+| Closing the browser did not stop the PC host | Expected: the desktop app owns the connection. Use tray → Exit to end the application and its owned host. |
 | Port 4318 already in use | A current launcher reuses an existing recognized Pocket Code host. If another program owns the port, it will not kill that program. Identify the owner or choose another port. |
 | Launcher still asks for a project/Enter | You are using an older launcher file. Update the source/launcher; replacing only the APK does not replace that original script. |
-| No Git projects appear immediately | Discovery is incremental and skips system/cache/link directories. Check the allowed roots and browse through Project → Files. |
+| No Git projects appear immediately | Discovery is incremental and skips system/cache/link directories. Check the allowed roots and the project selector in New chat or Changelog. |
 | Folder is missing after host auto-update | An automatic restart preserves existing roots. Restart the updated normal launcher once to adopt its default disk selection, or launch with explicit ProjectPath. |
 
 For restricted access, launch from PowerShell with `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -ProjectPath D:\Projects`. Add `-Internet` for a temporary internet tunnel. An explicit root is an access boundary, not just a list filter.
@@ -35,7 +35,7 @@ For restricted access, launch from PowerShell with `powershell -NoProfile -Execu
 | A limit is shown as unavailable | The account/runtime may not expose it, or the read failed. This is not a claim that usage is zero. |
 | Windows error 1058 during tool execution | Preserve the full provider error and check the Windows service/runtime it names. The number alone does not justify enabling arbitrary services or changing security settings. |
 
-For Copilot, start sign-in from **Settings → AI & workspace**, complete the browser flow on the PC and recheck. The login can time out after five minutes; finish active Copilot jobs before starting another login.
+For Copilot, start sign-in from **Settings → AI accounts → AI account**, complete the browser flow on the PC and recheck. The login can time out after five minutes; finish active Copilot jobs before starting another login.
 
 ## Review, files and Results
 
@@ -47,7 +47,9 @@ If Results seems incomplete, wait for history indexing and check category/source
 
 Rules and Changelog are read-only viewers. A single matching document opens directly; multiple documents produce a list. A document shown here is not automatically injected as a new instruction to the AI.
 
-## Jira and PRs
+## Jira and PR compatibility
+
+The current main navigation uses repository boards and Miro. Jira connection settings and legacy server APIs remain, but the former Tasks queue, role picker and Jira workflow screen are not exposed. The following checks apply to integrations or older clients, not to a missing current navigation tab.
 
 | Symptom | What to check |
 | --- | --- |
@@ -55,7 +57,6 @@ Rules and Changelog are read-only viewers. A single matching document opens dire
 | Changing AI did not change Jira account | Expected: the host has one selected shared Jira connection. |
 | Description failed to load | Retry the issue detail and check connector access; do not treat a retrieval error as an empty description. |
 | Status cannot change without an estimate | Complete the required transition fields. Unsupported validators/fields need Jira itself. |
-| Role does not offer the expected action | Roles organize UI; live transitions and account permissions decide what is possible. |
 | PR creation is blocked | Check GitHub CLI login, repository root, task branch, clean worktree and committed changes. The app does not commit unrelated files for you. |
 | Bell has no old Jira alerts | It starts from a baseline and detects subsequent changes; it is not Jira's full inbox. |
 
@@ -67,7 +68,7 @@ An old APK that rejects **Invalid update source** needs one manual installation 
 
 Host updates wait for active work, verify the package and attempt a restart. A failed startup can trigger rollback. Check the update status instead of force-stopping a handoff. From 0.21.1 the PC owns update checks and APK delivery; it does not wait for the phone to update first. Use Check for updates on PC on the phone, or the Windows update settings. PC GitHub/npm access is required.
 
-For chat alerts, check Android notification permission and the **Chat results and questions** channel, whether the last chat was explicitly left, PC connectivity and Android background restrictions. The Jira bell is a separate feature. Browser use does not provide the Android native background service.
+For chat alerts, check Android notification permission and the **Chat results and questions** channel, whether the last chat was explicitly left, PC connectivity and Android background restrictions. Task-service notifications are separate from chat alerts. Browser use does not provide the Android native background service.
 
 ## Report a useful issue
 

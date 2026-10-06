@@ -25,33 +25,20 @@ test('repository boards open directly and refresh from their source',async({page
  const reads=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length);await page.getByRole('button',{name:'Refresh board',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-board?')).length)).toBe(reads+1);
 });
-test('workspace deletion requires confirmation and removes the card',async({page})=>{
- await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Disposable example',roots:['C:\\Demo\\Atlas'],role:'host',people:[],members:[]}];});
- await desktop(page);await page.getByRole('button',{name:'WorkSpace',exact:true}).click();await page.locator('summary').filter({hasText:'Disposable example'}).click();await page.getByRole('button',{name:'Delete workspace',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('Project files stay on the PC.');await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('summary').filter({hasText:'Disposable example'})).toBeVisible();await page.getByRole('button',{name:'Delete workspace',exact:true}).click();await page.getByRole('button',{name:'Delete',exact:true}).click();await expect(page.locator('summary').filter({hasText:'Disposable example'})).toHaveCount(0);
-});
 test('desktop chat supports scoped select all, copy and paste',async({page,context})=>{
  await context.grantPermissions(['clipboard-read','clipboard-write']);await desktop(page);await page.getByRole('button',{name:/claude · Interface review/}).click();
  const input=page.locator('.composer textarea');await input.fill('Synthetic draft');await input.press('Control+a');await input.press('Control+c');await input.press('End');await input.press('Control+v');await expect(input).toHaveValue('Synthetic draftSynthetic draft');
  await page.locator('.conversation-inner').click({position:{x:10,y:10}});await page.keyboard.press('Control+a');const selected=await page.evaluate(()=>getSelection()?.toString());expect(selected).toContain('The responsive layout is ready.');expect(selected).not.toContain('WorkSpace');
  await page.keyboard.press('Control+c');await input.fill('');await page.locator('.conversation-inner').click({position:{x:10,y:10}});await page.keyboard.press('Control+v');await expect(input).toBeFocused();expect(await input.inputValue()).toContain('The responsive layout is ready.');
 });
-test('Connection QR and WorkSpace administration are separate',async({page})=>{
- await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Synthetic team',roots:['C:\\Demo\\Atlas'],role:'host',people:[{id:'host',name:'Alex Morgan',role:'host'}],members:[]}];});
+test('Connection is in Settings without retired workspace administration',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Connection',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Connect your phone',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Ready to connect',exact:true})).toBeVisible();
  await expect(page.getByLabel('QR role')).toHaveCount(0);
- await page.getByRole('button',{name:'WorkSpace',exact:true}).click();
- await page.locator('summary').filter({hasText:'Synthetic team'}).click();
- await expect(page.locator('.workspace-roster')).toContainText('Alex Morgan');
- await expect(page.getByLabel('Participant role')).toHaveValue('developer');
+ await expect(page.getByRole('button',{name:'WorkSpace',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Create workspace',exact:true})).toHaveCount(0);
  await expect(page.locator('.desktop-rail').getByLabel('Project',{exact:true})).toHaveCount(0);
- await page.screenshot({path:'artifacts/screenshots/workspace-management.png'});
-});
-test('workspace lists each person once and exposes host approval and removal',async({page})=>{
- await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Synthetic team',roots:['C:\\Demo\\Atlas'],role:'host',people:[{id:'host',name:'Alex Example',role:'host'},{id:'33333333-3333-4333-8333-333333333333',name:'Morgan Example',role:'viewer'}],members:[{id:'33333333-3333-4333-8333-333333333333',name:'Morgan Example',role:'viewer',approval:'approved'},{id:'44444444-4444-4444-8444-444444444444',name:'Taylor Example',role:'viewer',approval:'pending'}]}];});
- await desktop(page);await page.getByRole('button',{name:'WorkSpace',exact:true}).click();await page.locator('summary').filter({hasText:'Synthetic team'}).click();
- const roster=page.locator('.workspace-roster');await expect(roster.getByText('Morgan Example',{exact:true})).toHaveCount(1);await expect(roster.getByText('Taylor Example',{exact:true})).toHaveCount(1);
- await expect(roster.getByRole('button',{name:'Approve',exact:true})).toBeVisible();await expect(roster.getByRole('button',{name:'Decline',exact:true})).toBeVisible();await expect(roster.getByRole('button',{name:'Remove member',exact:true})).toHaveCount(2);
- await page.screenshot({path:'.local/workspace-approval-desktop.png'});
 });
 test('desktop keeps a draft across navigation and submits through the shared chat',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:'New',exact:true}).click();
@@ -123,7 +110,7 @@ async function desktop(page:Page){
    reply(id,{});
   }}};
  });
- await page.goto('http://127.0.0.1:5173/?desktop=1');
+ await page.goto((test.info().project.use.baseURL||'http://127.0.0.1:5173')+'/?desktop=1');
  await expect(page.getByRole('button',{name:/claude · Interface review/})).toBeVisible();
 }
 test('desktop shares editable chat, review and results with provider/project selection',async({page})=>{
@@ -135,7 +122,7 @@ test('desktop shares editable chat, review and results with provider/project sel
  await page.getByRole('button',{name:'Review',exact:true}).click();const review=page.getByRole('dialog',{name:'Review',exact:true});await expect(review).toContainText('src/layout.ts');await expect(review).toContainText('adaptive');await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'Results',exact:true}).click();const results=page.getByRole('dialog',{name:'Results',exact:true});await expect(results).toBeVisible();await expect(results.getByRole('button',{name:/^(Code|Tools) \d/})).toHaveCount(0);await expect(results.getByText('ts code',{exact:true})).toHaveCount(0);await results.getByRole('button',{name:/^Images/}).click();await expect(results.locator('.chat-output-image-item')).toHaveCount(1);await results.locator('.chat-output-image-card').click();const viewer=page.getByRole('dialog',{name:'Image',exact:true});await viewer.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(viewer.getByLabel('Zoom',{exact:true})).toContainText('1.5');await page.keyboard.press('Escape');await page.keyboard.press('Escape');
  await page.screenshot({path:'artifacts/screenshots/desktop-chat.png'});
- const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.every((call:any)=>['state','read','window-theme','write'].includes(call.action))).toBeTruthy();expect(calls.find((call:any)=>call.endpoint?.startsWith('/review?'))?.endpoint).toContain('Atlas');
+ const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.every((call:any)=>['state','read','window-theme','write','run-alerts','notification-pending'].includes(call.action))).toBeTruthy();expect(calls.find((call:any)=>call.endpoint?.startsWith('/review?'))?.endpoint).toContain('Atlas');
 });
 test('desktop keeps the current chat while switching sections and persists appearance',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:/claude · Interface review/}).click();await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
@@ -208,10 +195,6 @@ test('desktop has direct Rules and Changelog with internal Git project selection
  await expect(page.locator('.document-library').getByRole('button',{name:/^Refresh/})).toHaveCount(1);const before=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length);await page.getByRole('button',{name:'Refresh projects',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length)).toBeGreaterThan(before);await page.screenshot({path:'artifacts/screenshots/desktop-changelog.png'});
 });
 
-for(const width of [900,1440])test('workspace creation fits '+width,async({page})=>{
- await desktop(page);await page.setViewportSize({width,height:800});await page.getByRole('button',{name:'WorkSpace',exact:true}).click();await page.getByRole('button',{name:'Create workspace',exact:true}).click();
- const dialog=page.getByRole('dialog',{name:'Create workspace',exact:true});await expect(dialog).toBeVisible();await expect(dialog.getByRole('combobox',{name:'Repository',exact:true}).locator('option')).toHaveCount(2);expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();await page.screenshot({path:'.local/workspace-create-'+width+'.png'});
-});
 
 test('personal chats stay visible independently of the shared board workspace',async({page})=>{
  await page.addInitScript(()=>{(window as any).testWorkspaces=[{id:'11111111-1111-4111-8111-111111111111',name:'Shared board',roots:['C:\\Other\\Repository'],role:'host',members:[]}];});

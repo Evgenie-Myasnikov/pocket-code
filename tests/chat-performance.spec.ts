@@ -1,9 +1,10 @@
+import {openChatList,newChat} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 
 async function connect(page:Page){
-  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
-  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
+  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await page.getByRole('button',{name:'Performance history',exact:false}).click();
 }
 
@@ -39,7 +40,7 @@ test('unchanged history avoids cache rewrites and background polls resume with f
   await page.route('**/api/sessions?*',route=>route.fulfill({json:[{sessionId:'performance-history',summary:'Performance history',cwd:'C:\\Test',lastModified:1}]}));
   await page.route('**/api/sessions/performance-history/messages?*',route=>{reads++;return route.fulfill({json:{messages:[{id:'saved-message',role:'assistant',blocks:[{type:'text',text}]}],previous:null,next:null}});});
   await connect(page);await expect(page.getByText('Saved performance reply',{exact:true})).toBeVisible();
-  await expect.poll(()=>page.evaluate(()=>(window as any).__chatWrites)).toBeGreaterThan(1);
+  await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('pocket-code-chats-v1:')).some(key=>JSON.parse(localStorage.getItem(key)||'{}')['chat:performance-history']))).toBeTruthy();
   const firstWrites=await page.evaluate(()=>(window as any).__chatWrites),firstReads=reads;
   await expect.poll(()=>reads,{timeout:8000}).toBeGreaterThan(firstReads);
   await page.waitForTimeout(600);expect(await page.evaluate(()=>(window as any).__chatWrites)).toBe(firstWrites);

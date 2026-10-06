@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 
 const root='C:\\Workspace\\effort-demo';
@@ -29,7 +30,7 @@ async function open(page:Page,{language='en',scale=100,choices}:{language?:strin
     localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({scale,textSize:14}));
     if(choices&&!localStorage.getItem('pocket-code-codex-effort-v1'))localStorage.setItem('pocket-code-codex-effort-v1',JSON.stringify(choices));
   },{language,scale,choices});
-  await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:language==='ru'?'Новый чат':'New chat',exact:false}).click();
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);await newChat(page);
   await expect(page.getByLabel(language==='ru'?'Сообщение Codex':'Message Codex')).toBeVisible();
 }
 const effort=(page:Page)=>page.getByLabel('Codex reasoning effort',{exact:true});
@@ -47,7 +48,7 @@ test('Codex effort is remembered per model across reload and remains absent from
   await host(page);await open(page);await effort(page).selectOption('ultra');
   await page.getByLabel('Codex model').selectOption(small.id);await expect(effort(page).locator('option')).toHaveText(['Low','High']);await expect(effort(page)).toHaveValue('low');
   await effort(page).selectOption('high');await page.getByLabel('Codex model').selectOption(standard.id);await expect(effort(page)).toHaveValue('ultra');
-  await page.reload();await page.getByRole('button',{name:'New chat',exact:false}).click();await expect(effort(page)).toHaveValue('ultra');
+  await page.reload();await newChat(page);await expect(effort(page)).toHaveValue('ultra');
   await page.getByLabel('Codex model').selectOption(small.id);await expect(effort(page)).toHaveValue('high');
   await page.locator('.workspace-picker-sidebar select').selectOption('claude');await expect(effort(page)).toHaveCount(0);
   await page.locator('.workspace-picker-sidebar select').selectOption('codex');await expect(effort(page)).toHaveValue('high');

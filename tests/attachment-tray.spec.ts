@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 ﻿import {test,expect} from '@playwright/test';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
 for(const scale of [60,130])test(`attachment thumbnails and file cards at ${scale}%`,async({page})=>{
@@ -13,7 +14,7 @@ for(const scale of [60,130])test(`attachment thumbnails and file cards at ${scal
   if(endpoint==='/updates/latest')return route.fulfill({json:{enabled:false}});
   return route.fulfill({status:404,json:{error:'Fixture'}});
  });
- await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:'New chat',exact:false}).click();
+ await page.goto('http://127.0.0.1:5173');await openChatList(page);await newChat(page);
  await page.locator('input[type=file]').setInputFiles([{name:'preview.png',mimeType:'image/png',buffer:png},{name:'project-notes-with-a-long-name.md',mimeType:'text/markdown',buffer:Buffer.from('# Notes')}]);
  const tray=page.locator('.attachment-tray'),photo=tray.getByRole('img',{name:'preview.png'});
  await expect(photo).toBeVisible();await expect(tray.getByRole('button',{name:'Remove preview.png',exact:true})).toBeVisible();await expect.poll(()=>photo.evaluate(el=>(el as HTMLImageElement).naturalWidth)).toBe(1);

@@ -15,6 +15,8 @@ Pairing does not sign you into the other services. A GitHub CLI login alone is n
 
 ## Claude
 
+**Unreleased source change:** the composer loads the installed Claude Code catalog. Aliases may expose a resolved full model ID; choosing that ID pins the version. **Other version…** accepts a full provider-qualified ID, including supported context suffixes. Selection survives reload. The host performs metadata-only initialization with a timeout/cache and closes the process without submitting a prompt. When discovery fails, aliases and manual IDs remain; the account still decides model access. See [Claude model configuration](https://code.claude.com/docs/en/model-config). Runtime version in account settings is separate from model version.
+
 Sign in to Claude Code on the PC, then choose **Claude** in Pocket Code. The app uses the Agent SDK for structured chats and supported local Code histories. Ordinary cloud-only Claude conversations are not imported.
 
 Send messages and attachments, expand tool actions, answer approvals/questions and stop a running turn from its chat. A follow-up can be sent while work runs. The request budget in settings belongs to the Claude path; it is not a universal account balance or a Codex/Copilot budget.
@@ -27,7 +29,7 @@ Sign in to Codex on the PC and select **Codex**. Models and reasoning-effort cho
 
 An existing Desktop conversation can be readable while another process owns its writer lock. Finish its desktop work and release the conversation before continuing it from the phone. Pocket Code does not remove lock files or close Desktop for you. A rejected message remains recoverable and is not silently resent.
 
-**Settings → AI & workspace** offers:
+**Settings → AI accounts** offers:
 
 | Access | Behavior |
 | --- | --- |
@@ -46,9 +48,11 @@ The question-mark control explains the setting. Changing access applies to subse
 
 Credentials stay with the native PC tool. Command/file permissions and supported clarification questions appear in the chat. Copilot does not reuse the Codex Full access setting. A follow-up is queued through the Copilot session; do not assume it immediately interrupts the current action. Subscription-limit display and subagent context do not have the same coverage as Claude/Codex.
 
-The current standard startup script still expects Claude or Codex to be installed; a Copilot-only installation is not a complete one-click setup path yet.
+The setup installs the bundled Copilot SDK/runtime. Successful installation is separate from GitHub sign-in and Copilot entitlement.
 
 ## Jira is independent of the task AI
+
+The old Jira Tasks page is retired from current navigation. The connection and compatible host APIs remain for existing clients.
 
 The PC has **one selected Jira connection**. In the QR page choose **Jira · Connect / Settings**, or open Jira settings in the app. Use the existing Claude connection, or the direct Atlassian MCP path through Codex with its own authorization. Selecting Claude, Codex or Copilot to execute a task does not switch the Jira account.
 

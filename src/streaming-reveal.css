@@ -1,0 +1,3 @@
+.stream-glyph{animation:stream-ink .38s cubic-bezier(.2,.65,.3,1) both}
+@keyframes stream-ink{from{opacity:.16;filter:blur(1.2px)}to{opacity:1;filter:blur(0)}}
+@media(prefers-reduced-motion:reduce){.stream-glyph{animation:none;opacity:1;filter:none}}

@@ -46,11 +46,12 @@ test('the activity feed requires a key and returns only events after the cursor'
   const root=await mkdtemp(path.join(os.tmpdir(),'pocket-runs-api-')),token='synthetic-feed-key-'.repeat(3);
   const events=[{id:'1',provider:'codex',sessionId:'synthetic-a',cwd:'C:\Demo',title:'Demo',status:'done',at:1000},{id:'2',provider:'claude',sessionId:'synthetic-b',cwd:'C:\Demo',title:'Demo',status:'stopped',at:2000}];
   const runs={events:(since:number)=>events.filter(event=>event.at>since)} as any;
+  const start=Date.now()-3000;for(const event of events)event.at+=start;
   const result=await createApp({runs,roots:[root],token,hostName:'Synthetic host',uploads:path.join(root,'uploads'),desktopSessionIndexes:[]},new Jobs(),{listSessions:async()=>[],getSessionMessages:async()=>[]} as any);
   const server=result.app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));const base=`http://127.0.0.1:${(server.address() as any).port}/api/activity/events`;
   try{
     assert.equal((await fetch(base+'?since=0')).status,401);
     const all=await(await fetch(base+'?since=0',{headers:{Authorization:'Bearer '+token}})).json();assert.deepEqual(all.events.map((e:any)=>e.id),['1','2']);assert.equal(typeof all.now,'number');
-    assert.deepEqual((await(await fetch(base+'?since=1500',{headers:{Authorization:'Bearer '+token}})).json()).events.map((e:any)=>e.id),['2']);
-  }finally{result.jobs.close();result.terminals.close();await result.queue?.close();await result.codexQueue?.close();server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(root,{recursive:true,force:true});}
+    assert.deepEqual((await(await fetch(base+'?since='+(start+1500),{headers:{Authorization:'Bearer '+token}})).json()).events.map((e:any)=>e.id),['2']);
+  }finally{result.jobs.close();result.terminals.close();await result.queue?.close();await result.codexQueue?.close();await result.closeTaskServices();server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(root,{recursive:true,force:true});}
 });

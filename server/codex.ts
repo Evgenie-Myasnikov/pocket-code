@@ -29,7 +29,10 @@ export class CodexService {
   private sessionReads = coalesceReads<string, CodexSession[]>(0, 1);
   private itemReads = coalesceReads<string, { metadata: any; items: any[] }>(0, 8);
   private messageReads = coalesceReads<string, ChatMessage[]>(0, 8);
-  constructor(private roots: string[], private options: CodexServiceOptions = {}) {}
+  private configuredRoots:string[];
+  constructor(private roots: string[], private options: CodexServiceOptions = {}) {this.configuredRoots=[...roots];}
+  /** Called only by the host after verifying its persisted task worktrees. */
+  setManagedTaskRoots(roots:string[]){this.roots=[...this.configuredRoots,...roots];}
   private connect(): Promise<CodexRpc> {
     if (this.closed) return Promise.reject(new Error('Codex service is closed.'));
     if (this.ready) return this.ready;

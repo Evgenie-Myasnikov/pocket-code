@@ -1,3 +1,4 @@
+import {validModelId} from '../server/provider-model';
 export type WorkspaceProvider = 'claude' | 'codex' | 'copilot';
 export type CodexAccess = 'full' | 'ask' | 'auto';
 function codexAccess(value:unknown):CodexAccess{return value==='ask'||value==='auto'?value:'full';}
@@ -5,7 +6,7 @@ const preferenceKey = (provider: WorkspaceProvider) => `pocket-code-chat-prefere
 export function preferences(provider: WorkspaceProvider = 'claude') {
   try {
     const value = JSON.parse(localStorage.getItem(preferenceKey(provider)) || (provider === 'claude' ? localStorage.getItem('pocket-code-chat-preferences') : null) || '{}');
-    const validModel = typeof value.model === 'string' && value.model.length <= 200 && (provider !== 'claude' || ['', 'sonnet', 'opus', 'haiku'].includes(value.model));
+    const validModel = value.model === '' || validModelId(value.model);
     return { model: validModel ? value.model : '', mode: ['default', 'plan'].includes(value.mode) ? value.mode : 'default', budget: typeof value.budget === 'number' && Number.isFinite(value.budget) && value.budget >= 0.1 && value.budget <= 100 ? value.budget : 5, codexAccess:codexAccess(value.codexAccess) };
   } catch { return { model: '', mode: 'default', budget: 5, codexAccess:'full' as CodexAccess }; }
 }

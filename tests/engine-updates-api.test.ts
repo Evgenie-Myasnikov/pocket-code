@@ -6,13 +6,14 @@ import path from 'node:path';
 import {createApp} from '../server/app.js';
 import {EngineUpdates} from '../server/engine-updates.js';
 test('compatibility trigger is authenticated, waits for active jobs and launches once in source',async t=>{
- const root=await mkdtemp(path.join(tmpdir(),'compat-api-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const root=await mkdtemp(path.join(tmpdir(),'compat-api-'));let release=async()=>{};t.after(async()=>{await release();await rm(root,{recursive:true,force:true});});
  await mkdir(path.join(root,'src'));await mkdir(path.join(root,'scripts'));await writeFile(path.join(root,'package.json'),'{"name":"pocket-code"}');await writeFile(path.join(root,'src/App.tsx'),'');await writeFile(path.join(root,'scripts/build-android.ps1'),'');
  let version='1.0.0',busy=true;const launches:any[]=[];
  const engineUpdates=new EngineUpdates(path.join(root,'versions.json'),async()=>({codex:version}));await engineUpdates.check();await engineUpdates.configure(true,'claude');version='1.1.0';await engineUpdates.check();
- const jobs:any={list:()=>busy?[{id:'active',cwd:root,status:'running'}]:[],start:(input:any)=>{launches.push(input);return input;}};
- const {app,maintainEngines}=await createApp({roots:[root],uploads:path.join(root,'uploads'),hostName:'Synthetic PC',token:'test-only-'.repeat(5),desktopSessionIndexes:[],engineUpdates},jobs);
- const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));t.after(()=>new Promise<void>(resolve=>server.close(()=>resolve())));
+ const activeJob={id:'active',cwd:root,status:'running',startedAt:Date.now(),messages:[],approvals:[],partial:'',revision:0,baseMessageCount:0};
+ const jobs:any={list:()=>busy?[activeJob]:[],get:(id:string)=>{assert.equal(id,'active');return activeJob;},view:(job:unknown)=>job,start:(input:any)=>{launches.push(input);return input;}};
+ const {app,maintainEngines,closeTaskServices,terminals}=await createApp({roots:[root],uploads:path.join(root,'uploads'),hostName:'Synthetic PC',token:'test-only-'.repeat(5),desktopSessionIndexes:[],engineUpdates},jobs);
+ const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));release=async()=>{await closeTaskServices();terminals.close();await new Promise<void>(resolve=>server.close(()=>resolve()));};
  const address=server.address() as {port:number},url=`http://127.0.0.1:${address.port}/api/engine-updates`;
  assert.equal((await fetch(url)).status,401);assert.equal((await fetch(url+'/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"enabled":false}'})).status,401);
  await maintainEngines();assert.equal(launches.length,0);busy=false;await Promise.all([maintainEngines(),maintainEngines()]);assert.equal(launches.length,1);assert.equal(launches[0].cwd,root);assert.match(launches[0].text,/1.0.0 -> 1.1.0/);

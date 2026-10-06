@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {openChatList} from './chat-navigation';
 
 test.use({hasTouch:true,isMobile:true});
 async function openChat(page:Page,scale:number) {
@@ -17,7 +18,7 @@ async function openChat(page:Page,scale:number) {
     if(endpoint==='/api/jira/status')return route.fulfill({json:{connected:false,sites:[]}});
     return route.fulfill({status:404,json:{error:'Synthetic endpoint'}});
   });
-  await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:/A chat with a long project title/}).click();
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);await page.getByRole('button',{name:/A chat with a long project title/}).click();
   await expect(page.getByLabel('Message Claude')).toBeVisible();
 }
 async function checkTargets(page:Page,selectors:string) {
@@ -34,7 +35,9 @@ for(const width of [320,390])for(const scale of [60,100])test(`touch targets sta
   const edges=await page.locator('.chat-header button,.chat-header select,.composer-tools button,.composer-tools select').evaluateAll(elements=>elements.map(element=>{const rect=element.getBoundingClientRect();return {left:rect.left,right:rect.right};}));
   for(const rect of edges){expect(rect.left).toBeGreaterThanOrEqual(0);expect(rect.right).toBeLessThanOrEqual(width);}
   expect(await page.locator('.message').first().evaluate(element=>getComputedStyle(element).fontSize)).toBe('8px');
-  await page.getByLabel('Message Claude').fill('Draft before navigation');await page.keyboard.press('Tab');
+  await page.getByLabel('Message Claude').fill('Draft before navigation');
+  // The context-usage button now precedes attachments in the composer tab order.
+  for(let i=0;i<4&&!await page.getByLabel('Attach files').evaluate(el=>el===document.activeElement);i++)await page.keyboard.press('Tab');
   await expect(page.getByLabel('Attach files')).toBeFocused();
   expect(await page.getByLabel('Attach files').evaluate(element=>getComputedStyle(element).outlineStyle)).not.toBe('none');
   if(width===390&&scale===60)await page.screenshot({path:'artifacts/screenshots/mobile-touch-60-percent.png',fullPage:true});

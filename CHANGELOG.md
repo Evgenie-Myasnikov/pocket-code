@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.26.0 (Unreleased)
+
+### Features
+- tasks: link saved board cards to private, persistent task runs with an isolated Git worktree, provider chat, pinned-base diff, automatic executable checks and explicit human snapshot approval; preserve source files and interrupted work without automatic merge or relaunch.
+- miro: add separate host OAuth/token setup and per-linked-board read/write opt-ins; providers can page through items and update existing notes, text and cards through the bundled helper, with stale-edit checks and encrypted Windows credential storage.
+- notifications: persist bounded run events and native delivery cursors, catch up after reconnection and open the exact provider/job from Windows or Android alerts; expose one shared notification preference.
+- claude: select aliases or exact model versions from a project-scoped runtime catalog, retain custom IDs, and pass the selected ID unchanged to new and resumed requests; fall back to aliases/manual entry when discovery is unavailable.
+- chat: introduce a shared auto-growing prompt composer with compact circular actions, theme-aware focus and attachment previews; softly reveal newly appended prose characters while preserving Markdown, Unicode and reduced-motion preferences.
+
+### Bug Fixes
+- task navigation: ignore preparation responses after a note closes and prevent late status reads from replacing newly saved verification settings; stale file snapshots cannot retain current approval.
+- desktop alerts: consume notification links in the outer shell, including when no chat is mounted, and retain mobile notification targets while an upload/navigation action is busy.
+- packaging: include the Miro helper in host/desktop packages and accept only the portable board's public file formats during verified host installation.
+- navigation: preserve the current section and visible QR/reconnect errors when the PC cache scope changes; restore history jumps before paint so a delayed callback cannot override subsequent scrolling.
+- results/boards: clear outputs when changing chat scope, ignore late responses, persist the board view consistently, roll back rejected drags and prevent completed saves from reopening a departed board.
+- controls: keep quota refresh clear of the activity handle and maintain usable touch targets for diff layout selection.
+- claude: always close query resources after completion/failure, including time-bounded model discovery.
+
+### Code Refactoring
+- workflow: separate task orchestration, persistence, Git worktrees, check execution, result UI, Miro access and notification delivery into focused modules shared by Windows and Android.
+- navigation: remove unreachable Jira inbox/terminal rendering and its eager terminal dependency from the shared app; preserve compatibility APIs and explicitly archive retired UI tests with current replacement coverage.
+- chat: extract the composer/model picker and consolidate their styles; limit animated glyphs to a short fresh tail and avoid serializing completed history on each streamed delta.
+- tests: share current chat/QR navigation helpers, await observable asynchronous outcomes and include privacy checks in the default test command. Retain failures from obsolete UI scenarios for migration.
+
+### Documentation
+- workflow: document isolated tasks and review gates in English/Russian, Miro developer-app setup and supported writes, private state boundaries, restart recovery and notification delivery limits.
+- guides: refresh English/Russian setup, provider models/sign-in, chat, QR, updates, diff review, boards/Miro and troubleshooting; add architecture, local link checking and a scoped [maintenance report](docs/MAINTENANCE-2026-10-06.md).
+
+### Validation
+- 2026-10-06: 281 unit/server checks and 139 distinct focused browser scenarios passed across scoped runs; TypeScript/Vite, Windows/native smoke and Android debug build passed. Verified local documentation references and working source/documentation text with the privacy guard rules.
+- Follow-up: 319/319 unit/server checks passed. The full current browser run passed 281/283; two obsolete navigation/copy assertions were updated, and both passed in a five-scenario rerun (including documentation captures). Thus all 283 current scenarios passed across these runs, not in one uninterrupted green run. Retired interface contracts are explicitly archived with replacement coverage.
+- TypeScript/Vite, Windows build, native notification smoke checks and Android debug build passed; the actual host bundle was source-matched and verified through its installer. Documentation links and synthetic screenshots were checked. Physical Android and authenticated Miro/all live provider combinations remain unverified. A Windows node-pty cleanup helper emitted an AttachConsole error although the PTY lifecycle assertion passed; this remains a follow-up. No new release, installation or publication.
+
 ## [0.25.11](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.10...v0.25.11) (2026-10-03)
 
 ### Features
@@ -60,7 +93,6 @@
 - Release source: [c530566](https://github.com/Evgenie-Myasnikov/pocket-code/commit/c530566eb892aefeae4102c3eda5139440d738a3), branch [codex/boards-0.25.8](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/boards-0.25.8).
 - Passed TypeScript/Vite, three focused desktop board scenarios and four board data tests. Android APK and Windows package built; source and APK/desktop/host privacy audits passed. Physical Android not tested.
 
-
 ## [0.25.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.6...v0.25.7) (2026-10-03)
 
 ### Features
@@ -82,7 +114,6 @@
 ### Validation
 - Release source: [b7bd30d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/b7bd30d57f839db4e283b021f639a55e332915ec), branch [codex/miro-0.25.7](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/miro-0.25.7).
 - Passed 10 focused server tests, 9 interface scenarios, TypeScript/Vite, Android build and Windows desktop smoke checks. Source and final APK/desktop/host privacy audits passed. Physical Android and authenticated private Miro-board editing have not been tested.
-
 
 ## [0.25.6](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.5...v0.25.6) (2026-10-03)
 
@@ -106,7 +137,6 @@
 - Fourteen focused server/board/rules tests, 33 provider tests and 32 desktop/mobile browser scenarios passed. Android and Windows builds, native Windows smoke and source/archive privacy audits passed. Physical Android testing unavailable.
 - Private legacy board records remain available through their notifications; repository snapshots contain product data only.
 
-
 - Release: Published v0.25.6 with APK versionCode 69 and matching Windows/host assets from [a47085e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/a47085ea70497f1431d0fde2a2b07366f706b30e) on [codex/project-0.25.6](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/project-0.25.6). GitHub CI passed.
 
 ## [0.25.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.4...v0.25.5) (2026-10-03)
@@ -121,7 +151,6 @@
 - Added: Workspace invitations require a password on first entry; saved user credentials and profiles restore access without duplicate participants or another password prompt. Host approval and revocation remain effective.
 - Packaging: Include the curated product board in PC bundles. Workspace authorization still applies before returning saved board data.
 - Validation: 31 browser scenarios and seven server/snapshot tests passed, including native clipboard image paste, repository reads and unavailable-folder recovery. TypeScript/Vite, Android build and native Windows smoke passed; source and artifact privacy audits passed. Physical Android testing unavailable.
-
 
 ## 2026-10-03 - PC-scoped chats and neutral provider palettes (0.25.4)
 - Fixed: Chat history, drafts, attachments, selected sessions and asynchronous state are isolated by PC connection credentials plus AI provider. Switching a shared WorkSpace preserves the personal PC chat. Returning to a connected PC restores its in-memory conversation state.
@@ -149,7 +178,8 @@
 - Improved: Mobile WorkSpace selection and participant count share the header. Saved workspace selection survives restarts. Desktop workspace cards show a single roster with inline management and request counts.
 - Fixed: Personal chat cache restores before host health/provider discovery; job errors no longer block session loading. Windows caches its conversation list. Personal chats remain separate from shared membership.
 - Compatibility: Existing approved memberships remain active; trusted PC-paired devices retain the host identity. Offline copies cannot be remotely erased while a device is disconnected; authorization failures clear cached workspace data after reconnecting.
-- Validation: 247 server tests plus the workspace-vault regression passed; 25 browser scenarios passed, including real QR approval/removal. TypeScript/Vite, Android and Windows packaging passed. Physical Android testing unavailable.
+- Validation: 247 server tests plus the workspace-vault regression passed; 25 browser scenarios passed, including real QR approval/removal. TypeScript/Vite, Android and Windows packaging and native desktop lifecycle smoke passed. Physical Android testing unavailable.
+- Release: Published v0.25.2 from codex/workspace-0.25.2 (2a7c38c), APK versionCode 65, with Windows, host and manifest assets. Source/artifact privacy audits and GitHub CI passed. The production updater downloaded the release and verified the APK checksum. Test listeners exited; the production host was not restarted.
 
 
 ## 2026-10-03 - Direct document sections and reliable QR retries (0.25.1)
@@ -157,7 +187,8 @@
 - Fixed: QR scanning routes PC pairing and workspace invitations to the appropriate flow. Pairing results are cached only while in flight, so re-scanning can recover from a revoked device key.
 - Changed: Pocket Code's generated board reads the latest six versions from local CHANGELOG.md and refreshes on demand. Only recorded publications show Done. Untouched legacy examples migrate; edited boards are preserved.
 - Improved: Compact connection screen and workspace rows; invitation and member management controls expand on demand.
-- Validation: Full server run passed 245/246; an unrelated timing-sensitive Copilot test passed in an isolated eight-test rerun. Roadmap migration API test passed. 21 desktop/navigation/QR/board browser scenarios and six document scenarios passed; offline scenarios passed separately. TypeScript/Vite, Android and Windows packaging passed; publication privacy checks are required.
+- Validation: Full server run passed 245/246; an unrelated timing-sensitive Copilot test passed in an isolated eight-test rerun. Roadmap migration API test passed. 21 desktop/navigation/QR/board browser scenarios and six document scenarios passed; offline scenarios passed separately. TypeScript/Vite, Android and Windows packaging passed; native desktop smoke passed after a transient log cleanup lock on the first run.
+- Release: Published v0.25.1 from codex/documents-0.25.1 (4324ff4), APK versionCode 64, with Windows/host/manifest assets. Source and artifact privacy audits and GitHub CI passed. After release metadata propagation, the production updater downloaded 0.25.1 and verified the APK checksum. Test listeners exited.
 - Follow-up: The reported phone QR error text was not provided; identified wrong-section and stale-credential failures are covered. Physical Android testing remains unavailable.
 
 
@@ -167,7 +198,8 @@
 - Added: Local boards and a Pocket Code example, populated roadmap templates, six distinct state styles and connected planned versions without creating Git branches.
 - Improved: Desktop canvas panning, destination-column highlighting and bounded note placement. Cached workspace catalogs and boards remain readable offline; offline changes are disabled.
 - Changed: Settings use categories and AI account/access/project subcategories. Desktop project selection is inside new chats.
-- Validation: 244 server tests passed; 22 browser scenarios and the roadmap example scenario passed. Android build and native desktop lifecycle/bridge smoke passed; TypeScript and Windows packaging passed. Source and release privacy checks are required before publication.
+- Validation: 244 server tests and 23 browser scenarios passed, with the three offline/Connection scenarios rechecked after the final navigation change. TypeScript/Vite, Android build, Windows packaging and native desktop lifecycle/bridge smoke passed.
+- Release: Published v0.25.0 from codex/workspace-0.25.0 (5ded52f), APK versionCode 63, with matching Windows/host/manifest assets. Source and artifact privacy audits and GitHub CI passed; the production updater downloaded the release and verified the APK checksum. Test listeners exited; no production host was started.
 - Follow-up: Physical Android testing remains unavailable. Independent workspace members do not receive the host's personal provider execution access.
 
 
@@ -178,7 +210,7 @@
 - Privacy: Personal chats remain independent of boards. Ordinary workspace members cannot read host sessions/jobs or note chat links; shared-note edits preserve private links on the host. Trusted Host retains full provider access.
 - Pairing: QR bindings persist with the device; new workspaces rotate invitations. Older unbound device connections require a fresh QR scan. Manual workspace sign-in UI is removed; legacy API remains compatible.
 - Validation: 19 browser scenarios passed across board, desktop and device pairing (18 together, board rechecked separately). Full server run: 242/243 passed; the single Jira workflow failure passed on an isolated four-test rerun. Board privacy/profile and device checks passed; TypeScript/Vite, Android and native desktop smoke/build/package passed.
-- Follow-up: Physical Android testing and isolated AI execution for ordinary workspace members remain outstanding. Publication pending artifact audit.
+- Follow-up: Physical Android testing and isolated AI execution for ordinary workspace members remain outstanding. Published v0.24.1 from codex/board-0.24.1 (23e9c06), Android versionCode 62, with desktop/host/manifest assets. Source/APK/desktop/host privacy audits and release checksum checks passed; GitHub privacy CI passed. The production updater downloaded 0.24.1 and verified the APK checksum.
 
 ## 2026-10-02 - Board interaction and shared chat header (0.24.0)
 - Changed: Board and People views share priority, status and assignee metadata. Columns determine note branches; branch and dependency selectors are removed from note details. Existing dependency data is retained.
@@ -186,7 +218,67 @@
 - Changed: Workspace administration is desktop-only and selects one repository. Participants appear in the header; mobile users can view the roster and join workspaces.
 - Improved: Compact shared chat header with contextual actions; removed redundant desktop Chats navigation and Jira role setting.
 - Validation: 243 server tests passed; 36 chat/results/desktop browser scenarios and the board browser scenario passed, including cross-column persistence. TypeScript/Vite, Android Gradle and desktop packaging passed; native desktop lifecycle/bridge smoke passed.
-- Follow-up: Physical Android testing remains outstanding. Release publication is pending artifact privacy validation.
+- Release: Published v0.24.0 from branch codex/board-0.24.0, commit da7abbb, with APK versionCode 61 and matching desktop/host/manifest assets. Source, APK, desktop and host privacy checks passed; asset sizes/hashes match the manifest and GitHub privacy CI passed. The real updater downloaded v0.24.0 and verified the APK checksum.
+- Follow-up: Physical Android testing remains outstanding.
+
+## 2026-10-02 - Board section label
+- Changed: Renamed the Work section to Board in English and its corresponding Russian label in mobile/desktop navigation and section headers. Task status labels remain unchanged.
+- Files: src/App.tsx, DesktopApp.tsx, WorkBoards.tsx; related UI test selectors.
+- Validation: TypeScript passed; targeted label replacements checked for remaining section labels.
+- Follow-up: Local change, not published.
+
+
+## 2026-10-02 - PC-only workspace administration and header roster
+- Changed: Phone users only join/select workspaces. Creation/settings controls and member administration are hidden; role changes and revocation now require the local host-admin connection even for a paired Host phone.
+- Added: Header participants icon/count opens a read-only roster on phones. The desktop host manages roles/access from the same dialog. Dialog supports Escape, outside dismissal and focus return.
+- Files: src/WorkspaceParticipants.tsx, WorkspaceMembers.tsx, WorkBoards.tsx, work-boards.css; server/boards.ts; workspace guides and tests.
+- Validation: Two server tests passed including mobile Host role/revoke rejection. Browser board scenario passed hidden management controls and header roster assertions. TypeScript/Vite, Android Gradle and desktop builds completed; local APK and host bundle regenerated. The PowerShell redirect returned a nonzero status from native stderr, but the log confirms BUILD SUCCESSFUL and completed APK/bundle/manifest stages.
+- Follow-up: Local artifacts only, not a new GitHub release. Existing running host was not restarted.
+
+
+## 2026-10-02 - People view and shared task metadata
+- Added: Board/People view switch remembered per board. People columns use workspace participants plus retained legacy assignees and Unassigned; tasks sort by critical/high/normal/low priority and title.
+- Changed: Notes store priority and assignee ID alongside the existing owner label. Both views show title, priority, status and assignee and open the same editor; switching views creates no task copies or coordinate changes. Legacy notes display normal priority until edited.
+- Access: Authorized workspace participants can read the scoped roster (IDs, display names and roles only); credential hashes stay private. Viewer board writes remain denied. The roster is workspace membership, not a corporate-directory integration.
+- Files: src/BoardPeople.tsx, WorkBoards.tsx, work-boards.css; server/boards.ts; workspace guides and board tests.
+- Validation: Two server tests passed, including metadata persistence and invalid priority rejection. Browser scenario passed priority sorting, shared status edits, reassignment to Unassigned, branch dialogs, gestures and delayed-save note dragging. Synthetic mobile screenshot inspected. TypeScript/Vite build and native desktop smoke passed.
+- Follow-up: Local build only; not published as a new release. Physical phone testing remains outstanding.
+
+
+## 2026-10-02 - Branch columns and stable note release
+- Changed: Replaced Add branch selector with a plus after the last column and an editable confirmation. Holding or right-clicking a branch heading opens rename; keyboard Enter/Space works too.
+- Git: Host-only create/rename operates on local branches in the exact repository root, validates names and board revisions, and never checks out or pushes. Rename updates references across that repository's boards. Board writes serialize with Git operations.
+- Fixed: Note release keeps its new position optimistically while the host saves, restoring the prior state only on save failure rather than jumping back on every drop.
+- Files: server/boards.ts; src/BoardBranchHeading.tsx, WorkBoards.tsx, work-boards.css; desktop/DesktopWindow.cs; workspace guide and board tests.
+- Validation: Two server tests passed with real temporary Git create/rename and name-conflict checks; board browser scenario passed with plus/hold dialogs and delayed-save drop positioning. TypeScript/Vite and native desktop builds passed.
+- Follow-up: Changes remain local, not published in a new release. Physical phone testing remains outstanding.
+
+
+## 2026-10-02 - Create board notes by holding the canvas
+- Changed: Removed the toolbar Note button. Holding empty board space for 550ms opens Create note; right-click opens the same menu on desktop. The draft starts at the canvas location adjusted for scroll/zoom and inherits its version lane.
+- Interaction: Movement, additional pointers, scrolling and navigation cancel the hold. Existing note controls are excluded; viewers cannot create notes. Outside press and Escape dismiss the menu.
+- Files: src/BoardContextMenu.tsx, WorkBoards.tsx, work-boards.css; tests/work-boards.spec.ts.
+- Validation: TypeScript and the board browser scenario passed, including real touch hold, cancellation while panning, right-click creation, removed toolbar button and existing zoom behavior.
+- Follow-up: Local patch, not published; physical Android testing remains outstanding.
+
+
+## 2026-10-02 - Board gestures and one repository per workspace
+- Changed: Removed zoom buttons. Board zoom uses two-finger pinch or Ctrl/Meta + wheel (15-300%), anchored at the gesture; single-finger canvas movement and note-handle dragging remain available.
+- Fixed: The scaled canvas clips to its scaled layout box, avoiding an unscaled overflow area when zoomed out.
+- Changed: Workspace setup chooses one repository with radio options, and the server rejects zero or multiple roots on create/edit. Existing multi-folder records remain readable to avoid silently losing boards; existing board-root removal protection remains.
+- Files: src/use-board-zoom.ts, WorkBoards.tsx, work-boards.css; server/boards.ts; workspace guide and board/desktop tests.
+- Validation: Two server tests and three browser scenarios passed, including wheel zoom, browser touch pinch and exclusive repository selection at 900/1440px. Physical phone testing remains outstanding.
+- Follow-up: Local patch; not published as a new release.
+
+
+## 2026-10-02 - PC-only workspace setup and simpler desktop navigation
+- Changed: Removed the redundant Chats navigation category on Windows; conversations open from the existing list, with a draft entry preserving access after switching sections.
+- Security: Workspace creation and settings changes require the host PC admin connection. Paired phones, including Host invitations, cannot create or modify workspaces; the mobile interface hides these controls.
+- Fixed: Project checkboxes in workspace settings no longer inherit full-width text-input sizing and margins; long folder labels stay inside the dialog.
+- Files: src/DesktopApp.tsx, WorkBoards.tsx, project-workspaces.tsx, work-boards.css; server/app.ts, boards.ts; workspace guides and regression tests.
+- Validation: TypeScript/Vite build, two board/server tests and four browser scenarios passed, including desktop draft return, mobile controls and checkbox geometry at 900/1440px. Inspected the synthetic 900px screenshot.
+- Follow-up: These changes are local; no new GitHub release has been published for this patch.
+
 
 ## 2026-10-02 - Host workspaces, visual boards and shared desktop chat (0.23.0)
 - Added: Host-owned workspaces group project folders, boards and chat lists. Participants sign in with host address, workspace name and password; the host assigns Viewer, Developer, Reviewer or QA roles and can revoke sessions. Passwords and participant tokens are hashed in private host storage.
@@ -195,8 +287,8 @@
 - Changed: Desktop embeds the shared interactive chat, including sending, attachments, steering, approvals, results and Review; switching sections preserves the draft. The native bridge permits only specific chat/board writes.
 - Files: server/boards.ts, app.ts, devices.ts; src/WorkBoards.tsx, project-workspaces.tsx, WorkspaceLogin.tsx, WorkspaceMembers.tsx, PairingRole.tsx, App.tsx, DesktopApp.tsx; desktop/DesktopWindow.cs; docs/WORKSPACES.md.
 - Validation: TypeScript, web/Android builds and native desktop smoke passed; 15 desktop/board browser scenarios passed. Server suite passed 243/243 sequentially; its first concurrent run had a transient Jira workflow failure which passed in isolation. Targeted access/device/server tests passed after the final scope check.
+- Deployment: Published GitHub v0.23.0 from sanitized commit 1be70d2 with matching APK, Windows ZIP, host bundle and manifest. GitHub privacy CI and separate source/archive checks passed; the production updater downloaded the public APK and verified its checksum. Test-owned listeners were closed; the existing production host was not restarted.
 - Follow-up: This is the visual workflow foundation, not autonomous delivery: AI-created board updates, human routing, approval gates and target delivery remain unimplemented. Member AI execution stays blocked until provider execution is isolated. Physical Android and multi-user deployment testing remain outstanding.
-
 
 ## 2026-10-02 - Notifications for every PC chat (0.22.7)
 - Added: The phone notifies when any chat on the PC finishes or is stopped, including chats started in Codex, Claude Code or Copilot CLI on the PC and never opened on the phone. The PC reads the end of each turn from provider session files (Codex task events, Claude end of turn, Copilot turn end after a quiet period) every 10 seconds and serves the transitions at /api/activity/events; existing history never notifies.

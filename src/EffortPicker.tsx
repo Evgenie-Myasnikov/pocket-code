@@ -2,7 +2,8 @@ import {useEffect,useState} from 'react';
 import {t} from './i18n';
 import './effort-picker.css';
 
-export type EffortModel={id:string;name:string;reasoningEfforts?:string[];defaultReasoningEffort?:string;isDefault?:boolean};
+export type {ProviderModel as EffortModel} from '../server/provider-model';
+import type {ProviderModel as EffortModel} from '../server/provider-model';
 type Choices=Record<string,string>;
 const storageKey='pocket-code-codex-effort-v1';
 function load():Choices{

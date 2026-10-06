@@ -1,0 +1,81 @@
+import {openChatList,newChat} from './chat-navigation';
+import {test,expect,type Page} from '@playwright/test';
+const root='C:\\Workspace\\access-demo';
+const connection={url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)};
+const issue={key:'DEMO-1',summary:'Access task',description:'Implement this task.',status:'Open',priority:'Medium',issueType:'Task',url:'https://example.atlassian.net/browse/DEMO-1',updated:''};
+const view={issue,stage:'open',role:'developer',actions:[{id:'start_development',label:'Start development',kind:'start',transitions:[{id:'start',name:'Proceed',to:{id:'working',name:'In progress'},fields:{}}]}]};
+async function setup(page:Page,options:{language?:string;scale?:number;stored?:string;availability?:()=>{available:boolean;mode:'working'|'branch'};sent?:any[];batches?:any[];actions?:any[];reviewModes?:string[]}={}){
+  await page.route('**/api/**',route=>{
+    const req=route.request(),url=new URL(req.url()),endpoint=url.pathname.replace('/api','');
+    if(endpoint==='/health')return route.fulfill({json:{name:'Synthetic PC',roots:[root],protocol:1,version:'0.12.0'}});
+    if(endpoint==='/projects')return route.fulfill({json:[root,root+'\\second']});
+    if(endpoint==='/providers')return route.fulfill({json:[{id:'claude',available:true,authenticated:true},{id:'codex',available:true,authenticated:true,models:[]}]});
+    if(endpoint==='/sessions')return route.fulfill({json:[]});
+    if(endpoint==='/jobs'&&req.method()==='POST'){const data=req.postDataJSON();options.sent?.push(data);return route.fulfill({json:{id:data.id,provider:data.provider,cwd:data.cwd,sessionId:'completed',status:'done',messages:[{id:'answer',role:'assistant',blocks:[{type:'text',text:'Task completed.'}]}],partial:'',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0}});}
+    if(endpoint==='/jobs')return route.fulfill({json:[]});
+    if(endpoint==='/sessions/completed/messages')return route.fulfill({json:{messages:[{id:'answer',role:'assistant',blocks:[{type:'text',text:'Task completed.'}]}],previous:null,next:null}});
+    if(endpoint==='/sessions/completed/subagents')return route.fulfill({json:{agents:[]}});
+    if(endpoint==='/review/availability')return route.fulfill({json:options.availability?.()||{available:false,mode:'working'}});
+    if(endpoint==='/review'){options.reviewModes?.push(url.searchParams.get('mode')!);return route.fulfill({json:{files:[],current:'feature/task',base:'main',branches:['main'],patch:'',binary:false}});}
+    if(endpoint==='/updates/latest')return route.fulfill({json:{enabled:false}});
+    if(endpoint==='/jira/status')return route.fulfill({json:{connected:true,source:'claude',sites:[{id:'site-a',name:'Example Jira',url:'https://example.atlassian.net'}]}});
+    if(endpoint==='/jira/issues')return route.fulfill({json:{issues:[issue],next:null}});
+    if(endpoint==='/jira/issue')return route.fulfill({json:issue});
+    if(endpoint==='/jira/workflow')return route.fulfill({json:view});
+    if(endpoint==='/jira/workflow/action'){options.actions?.push(req.postDataJSON());return route.fulfill({json:{view:{...view,actions:[]}}});}
+    if(endpoint==='/jira/queue'){if(req.method()==='POST')options.batches?.push(req.postDataJSON());return route.fulfill({json:{paused:true,items:[]}});}
+    return route.fulfill({status:404,json:{error:'Synthetic endpoint not configured'}});
+  });
+  await page.addInitScript(({connection,language,scale,stored})=>{
+    sessionStorage.setItem('connection',JSON.stringify(connection));
+    if(!localStorage.getItem('access-test-seeded')){localStorage.setItem('access-test-seeded','true');localStorage.setItem('pocket-code-workspace','codex');localStorage.setItem('pocket-code-language-v1',language);localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',textSize:14,scale}));if(stored)localStorage.setItem('pocket-code-chat-preferences-codex',stored);}
+  },{connection,language:options.language||'en',scale:options.scale||100,stored:options.stored});
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);await expect(page.locator('.workspace-picker-sidebar select')).toHaveValue('codex');
+}
+const settings=async(page:Page)=>{await page.locator('.mobile-nav').getByRole('button',{name:/^(Settings|Настройки)$/,exact:true}).click();if(await page.locator('[data-settings-category="workspace"]').isVisible())await page.locator('[data-settings-category="workspace"]').click();const access=page.getByRole('button',{name:/^(Agent access|Доступ агента)$/,exact:true});if(await access.isVisible())await access.click();};
+test.beforeEach(async({page})=>{await page.setViewportSize({width:390,height:844});});
+
+test('Full access defaults on new and migrated Codex preferences and is sent on the next message',async({page})=>{
+  const sent:any[]=[];await setup(page,{sent,stored:JSON.stringify({model:'',mode:'default',budget:5})});await settings(page);await expect(page.getByRole('radio',{name:'Full access',exact:true})).toBeChecked();await expect(page.getByText('Plan mode always has read-only access.')).toBeHidden();
+  await newChat(page);await page.getByLabel('Message Codex').fill('Run the task');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);expect(sent[0]).toMatchObject({provider:'codex',codexAccess:'full',mode:'default'});
+});
+
+test('Codex access explanations appear only after pressing the question mark',async({page})=>{
+  await setup(page);await settings(page);
+  const help=page.getByRole('button',{name:'About Codex access modes',exact:true});
+  await expect(help).toHaveAttribute('aria-expanded','false');
+  await expect(page.locator('.codex-access-help')).toBeHidden();
+  await help.click();await expect(help).toHaveAttribute('aria-expanded','true');
+  await expect(page.getByText('Plan mode always has read-only access.')).toBeVisible();
+  await page.getByRole('radio',{name:'Ask for approval',exact:true}).check();
+  await expect(page.locator('.codex-access-help')).toContainText('asks when an action needs approval');
+  await help.click();await expect(page.locator('.codex-access-help')).toBeHidden();
+  await expect(page.getByRole('radio',{name:'Ask for approval',exact:true})).toBeChecked();
+});
+
+test('Codex access selection survives reload and workspace switches without changing Claude payloads',async({page})=>{
+  const sent:any[]=[];await setup(page,{sent});await settings(page);await page.getByRole('radio',{name:'Ask for approval',exact:true}).check();await page.reload();await settings(page);await expect(page.getByRole('radio',{name:'Ask for approval',exact:true})).toBeChecked();
+  await newChat(page);await page.getByLabel('Message Codex').fill('Ask before action');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);expect(sent[0].codexAccess).toBe('ask');
+  await settings(page);await page.locator('.workspace-picker-settings select').selectOption('claude');await expect(page.locator('.codex-access-settings')).toHaveCount(0);await newChat(page);await page.getByLabel('Message Claude').fill('Claude task');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent.length).toBe(2);expect(sent[1].codexAccess).toBeUndefined();
+  await settings(page);await page.locator('.workspace-picker-settings select').selectOption('codex');await expect(page.getByRole('radio',{name:'Ask for approval',exact:true})).toBeChecked();
+});
+
+test('selected access reaches both Jira batch and individual workflow requests',async({page})=>{
+  const batches:any[]=[],actions:any[]=[];await setup(page,{batches,actions});await settings(page);await page.getByRole('radio',{name:'Approve for me',exact:true}).check();
+  await page.locator('.mobile-nav').getByRole('button',{name:'Tasks',exact:true}).click();await page.getByRole('button',{name:'Select tasks',exact:true}).click();await page.getByLabel('Select DEMO-1',{exact:true}).check();await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Start selected (1)',exact:true}).click();await expect.poll(()=>batches.length).toBe(1);expect(batches[0]).toMatchObject({provider:'codex',codexAccess:'auto'});
+  await page.getByRole('button',{name:'Access task',exact:true}).click();await page.getByRole('button',{name:'Start development',exact:true}).click();await page.locator('.jira-form-actions').getByRole('button',{name:'Start development',exact:true}).click();await expect.poll(()=>actions.length).toBe(1);expect(actions[0]).toMatchObject({provider:'codex',codexAccess:'auto'});
+});
+
+test('Chat hides the mode selector with Full access selected, and empty chats hide unused actions',async({page})=>{
+  const sent:any[]=[];await setup(page,{sent});await newChat(page);await expect(page.getByRole('button',{name:'Review',exact:true})).toHaveCount(0);await expect(page.locator('.outputs-entry')).toHaveCount(0);await expect(page.locator('.reading-entry')).toHaveCount(0);
+  await expect(page.getByLabel('Mode',{exact:true})).toHaveCount(0);await page.getByLabel('Message Codex').fill('Plan this task');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);expect(sent[0]).toMatchObject({codexAccess:'full',mode:'default'});await expect(page.locator('.reading-entry')).toBeVisible();await expect(page.locator('.outputs-entry')).toHaveCount(0);
+});
+
+test('Review appears for actual branch changes and opens that mode, then disappears in a clean project',async({page})=>{
+  let available=true;const reviewModes:string[]=[];await setup(page,{availability:()=>({available,mode:'branch'}),reviewModes});await newChat(page);await page.getByRole('button',{name:'Review',exact:true}).click();await expect(page.getByLabel('Comparison',{exact:true})).toHaveValue('branch');expect(reviewModes[0]).toBe('branch');await page.keyboard.press('Escape');available=false;await page.getByLabel('Project folder',{exact:true}).selectOption(root+'\\second');await expect(page.getByRole('button',{name:'Review',exact:true})).toHaveCount(0);
+});
+
+for(const language of ['en','ru'])test(`Codex access controls fit 320px at 130% in ${language}`,async({page})=>{
+  await page.setViewportSize({width:320,height:640});await setup(page,{language,scale:130});await settings(page);const section=page.locator('.codex-access-settings');await section.scrollIntoViewIfNeeded();await expect(section.getByRole('radio',{name:language==='ru'?'Полный доступ':'Full access',exact:true})).toBeChecked();
+  const metrics=await section.evaluate(element=>({spill:document.documentElement.scrollWidth-innerWidth,labels:[...element.querySelectorAll('label')].map(label=>{const box=label.getBoundingClientRect();return{height:box.height,left:box.left,right:box.right};})}));expect(metrics.spill).toBeLessThanOrEqual(1);expect(metrics.labels.every(label=>label.height>=48&&label.left>=0&&label.right<=320)).toBeTruthy();await page.screenshot({path:`artifacts/screenshots/codex-access-${language}.png`,fullPage:true});
+});

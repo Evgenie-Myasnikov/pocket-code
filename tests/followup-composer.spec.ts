@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {test,expect} from '@playwright/test';
 for(const provider of ['claude','codex'])test(`${provider} accepts clarification while running and preserves a rejected draft`,async({page})=>{
   await page.setViewportSize({width:320,height:740});
@@ -22,7 +23,7 @@ for(const provider of ['claude','codex'])test(`${provider} accepts clarification
     if(endpoint==='/jira/status')return route.fulfill({json:{connected:false,sites:[]}});
     return route.fulfill({status:404,json:{error:'Fixture endpoint unavailable'}});
   });
-  await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:'New chat',exact:false}).click();
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);await newChat(page);
   const draft=page.getByRole('textbox',{name:provider==='codex'?'Message Codex':'Message Claude'}),send=page.getByRole('button',{name:'Send message',exact:true});
   await draft.fill('Start work');await send.click();
   await expect(page.getByRole('button',{name:provider==='codex'?'Stop Codex':'Stop Claude',exact:true})).toBeVisible();
@@ -34,5 +35,5 @@ for(const provider of ['claude','codex'])test(`${provider} accepts clarification
   expect(sent[0].text).toBe('Focus on tests');await expect(page.locator('.conversation')).toContainText('Focus on tests');
   const fits=await page.locator('.composer-tools').evaluate(el=>Array.from(el.querySelectorAll('button,select')).every(child=>{const r=child.getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.width>=40;}));expect(fits).toBe(true);
   fail=true;await draft.fill('Keep this clarification');await send.click();await expect(page.getByRole('alert')).toContainText('draft is preserved');await expect(draft).toHaveValue('Keep this clarification');
-  await page.locator('.mobile-nav').getByRole('button',{name:'Tasks',exact:true}).click();await expect(page.locator('.chat-header')).toContainText('Developer');await expect(page.getByText('Assigned to me',{exact:true})).toHaveCount(0);
+  await page.locator('.mobile-nav').getByRole('button',{name:'Board',exact:true}).click();await expect(page.getByRole('heading',{name:'Board',exact:true})).toBeVisible();await expect(page.getByText('Assigned to me',{exact:true})).toHaveCount(0);
 });

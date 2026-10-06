@@ -1,3 +1,4 @@
+import {waitFor} from './wait-for';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
@@ -44,6 +45,7 @@ test('Jira jobs use fresh server issue data, preserve approvals, deduplicate and
     assert.equal((await (await req('/jira/issues?site=site&cursor=page-2')).json()).next, null);
     const body = { id: randomUUID(), site: 'site', key: 'TEST-1', cwd: root, description: 'Forged browser description' };
     const first = await (await req('/jira/start', body)).json();
+    await waitFor(()=>jobs.get(first.id).approvals.length===1);
     assert.equal(first.jira.key, 'TEST-1'); assert.match(prompt, /Fresh requirement/); assert.ok(!prompt.includes('Forged browser description'));
     const second = await (await req('/jira/start', { ...body, id: randomUUID() })).json();
     assert.equal(second.id, first.id); assert.equal(launches, 1); assert.equal(jobs.get(first.id).approvals.length, 1);

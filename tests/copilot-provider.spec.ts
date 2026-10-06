@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect} from '@playwright/test';
 test('Copilot is a separate workspace, sends auto model and offers detected GitHub sign-in',async({page})=>{
@@ -6,6 +7,7 @@ test('Copilot is a separate workspace, sends auto model and offers detected GitH
   if(endpoint==='/health')return route.fulfill({json:{name:'Test PC',roots:[root],version:'0.20.0',protocol:1}});
   if(endpoint==='/providers')return route.fulfill({json:[{id:'claude',available:true},{id:'copilot',available:true,authenticated:true,models:[]}]});
   if(endpoint==='/copilot/status')return route.fulfill({json:{available:true,authenticated:true,models:[]}});
+  if(endpoint==='/provider-connections')return route.fulfill({json:{providers:[{id:'copilot',installed:true,version:'fixture',server:'ready',authenticated:true,busy:false,login:{state:'connected'},methods:['browser','device','token']}]}});
   if(endpoint==='/copilot/login')return route.fulfill({json:{state:'connected',error:''}});
   if(endpoint==='/sessions')return route.fulfill({json:url.searchParams.get('provider')==='copilot'?[{sessionId:'11111111-1111-4111-8111-111111111111',summary:'Copilot example',cwd:root,lastModified:Date.now(),provider:'copilot'}]:[]});
   if(endpoint.includes('/messages'))return route.fulfill({json:{messages:[],previous:null,next:null,total:0}});
@@ -16,10 +18,10 @@ test('Copilot is a separate workspace, sends auto model and offers detected GitH
   if(endpoint==='/updates/latest')return route.fulfill({json:{enabled:false}});
   return route.fulfill({status:404,json:{error:'Not available in fixture'}});
  });
- await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','fixture-'.repeat(6));
- await page.getByLabel('Workspace',{exact:true}).first().selectOption('copilot');await page.getByRole('button',{name:/Copilot example/}).click();await page.getByLabel('Message Copilot').fill('Hello');await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','fixture-'.repeat(6));await openChatList(page);
+ await page.locator('.workspace-picker-sidebar select').selectOption('copilot');await page.getByRole('button',{name:/Copilot example/}).click();await page.getByLabel('Message Copilot').fill('Hello');await page.getByRole('button',{name:'Send message',exact:true}).click();
  await page.getByRole('button',{name:'Finished on PC — continue',exact:true}).click();
  await expect.poll(()=>sent?.provider).toBe('copilot');expect(sent.model).toBe('auto');expect(sent.reasoningEffort).toBeUndefined();await expect(page.getByText('Copilot response',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Settings',exact:true}).last().click();await page.locator('[data-settings-category="workspace"]').click();await expect(page.getByText('Connected through GitHub on your PC',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Settings',exact:true}).last().click();await page.locator('[data-settings-category="workspace"]').click();await page.getByRole('button',{name:'AI account',exact:true}).click();await expect(page.locator('.provider-card')).toContainText('Signed in');await expect(page.locator('.provider-card')).toContainText('GitHub Copilot');
  await page.screenshot({path:'artifacts/screenshots/copilot-connection.png',fullPage:true});
 });

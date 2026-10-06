@@ -23,8 +23,7 @@ public class ChatWatchService extends Service {
     private volatile int generation;
     private Intent selection;
     private static volatile ChatWatchService active;
-    /** The chat this screen watches; the all-chats feed skips it to avoid a second alert. */
-    static volatile String watchedSession="";
+    static volatile boolean attentionEnabled=true;
     private boolean keepNotification;
     private String lastState="";
     private long started;
@@ -44,7 +43,7 @@ public class ChatWatchService extends Service {
     @Override public int onStartCommand(Intent intent,int flags,int startId){
         if(intent==null){stopSelf();return START_NOT_STICKY;}
         boolean same=selection!=null&&key(selection).equals(key(intent));
-        selection=new Intent(intent);watchedSession=value(intent,"sessionId");
+        selection=new Intent(intent);
         if(same)return START_NOT_STICKY;
         int epoch=++generation;started=System.currentTimeMillis();lastState="";alerts.reset();keepNotification=false;
         if(scheduled!=null)scheduled.cancel(true);
@@ -58,7 +57,7 @@ public class ChatWatchService extends Service {
         scheduled=worker.scheduleWithFixedDelay(()->poll(snapshot,epoch),0,5,TimeUnit.SECONDS);
         return START_NOT_STICKY;
     }
-    private String key(Intent value){return value.getStringExtra("url")+"|"+value.getStringExtra("token")+"|"+value.getStringExtra("provider")+"|"+value.getStringExtra("sessionId")+"|"+value.getStringExtra("jobId");}
+    private String key(Intent value){return value.getStringExtra("url")+"|"+value.getStringExtra("token")+"|"+value.getStringExtra("provider")+"|"+value.getStringExtra("sessionId")+"|"+value.getStringExtra("jobId")+"|"+value.getStringExtra("alerts");}
     private String value(Intent intent,String name){String value=intent.getStringExtra(name);return value==null?"":value;}
     private void poll(Intent config,int epoch){
         if(epoch!=generation)return;
@@ -111,19 +110,21 @@ public class ChatWatchService extends Service {
     }
     private String text(String en,String ru){return selection!=null&&"ru".equals(selection.getStringExtra("language"))?ru:en;}
     private void alert(Intent config,String jobId,String sessionId,String state,String version,long jobStarted){
+        if(!attentionEnabled)return;
         if(!alerts.observe(jobId,state,jobStarted,started))return;
-        String identity=value(config,"url")+"|"+value(config,"provider")+"|"+jobId+"|"+version+"|"+state;
-        String key;
-        try{byte[] digest=java.security.MessageDigest.getInstance("SHA-256").digest(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8));key=android.util.Base64.encodeToString(digest,android.util.Base64.NO_WRAP);}catch(Exception ignored){return;}
+        String key=NotificationIdentity.event(value(config,"url"),value(config,"provider"),jobId,version,state);
         android.content.SharedPreferences seen=getSharedPreferences("chat-alerts",MODE_PRIVATE);
         if(seen.contains(key))return;
         NotificationManager manager=getSystemService(NotificationManager.class);
         if(Build.VERSION.SDK_INT>=24&&!manager.areNotificationsEnabled())return;
         if(Build.VERSION.SDK_INT>=26&&manager.getNotificationChannel(ALERT_CHANNEL).getImportance()==NotificationManager.IMPORTANCE_NONE)return;
         selection.putExtra("jobId",jobId);selection.putExtra("sessionId",sessionId);
-        try{manager.notify(ALERT_ID,notification(statusText(state),false,true));}catch(SecurityException ignored){return;}
+        try{manager.notify("run:"+NotificationIdentity.target(value(config,"url"),value(config,"provider"),sessionId,jobId),ALERT_ID,notification(statusText(state),false,true));}catch(SecurityException ignored){return;}
+        rememberAlert(seen,key);
+    }
+    static void rememberAlert(android.content.SharedPreferences seen,String key){
         android.content.SharedPreferences.Editor edit=seen.edit();
-        if(seen.getAll().size()>=128){String oldest=seen.getAll().entrySet().stream().min(java.util.Comparator.comparingLong(entry->((Number)entry.getValue()).longValue())).map(java.util.Map.Entry::getKey).orElse(null);if(oldest!=null)edit.remove(oldest);}
+        if(seen.getAll().size()>=400){String oldest=seen.getAll().entrySet().stream().min(java.util.Comparator.comparingLong(entry->((Number)entry.getValue()).longValue())).map(java.util.Map.Entry::getKey).orElse(null);if(oldest!=null)edit.remove(oldest);}
         edit.putLong(key,System.currentTimeMillis()).apply();
     }
     private String statusText(String state){
@@ -152,6 +153,8 @@ public class ChatWatchService extends Service {
     private Notification notification(String status,boolean ongoing,boolean attention){
         Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         open.putExtra("chatNotification",true);
+        open.putExtra("connectionUrl",value(selection,"url"));
+        open.setData(android.net.Uri.parse("pocket-code://chat/"+NotificationIdentity.target(value(selection,"url"),value(selection,"provider"),value(selection,"sessionId"),value(selection,"jobId"))));
         for(String key:new String[]{"provider","sessionId","jobId","cwd","title"})open.putExtra(key,value(selection,key));
         PendingIntent pending=PendingIntent.getActivity(this,attention?ALERT_ID:NOTIFICATION_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         String title=value(selection,"title");if(title.isEmpty())title="Pocket Code";
@@ -168,5 +171,5 @@ public class ChatWatchService extends Service {
         keepNotification=true;stopForeground(STOP_FOREGROUND_DETACH);stopSelf();
     }
     static void cancelActive(){if(active!=null){active.generation++;active.keepNotification=false;}}
-    @Override public void onDestroy(){watchedSession="";generation++;if(scheduled!=null)scheduled.cancel(true);if(request!=null)request.disconnect();worker.shutdownNow();main.removeCallbacksAndMessages(null);if(!keepNotification)getSystemService(NotificationManager.class).cancel(NOTIFICATION_ID);selection=null;if(active==this)active=null;super.onDestroy();}
+    @Override public void onDestroy(){generation++;if(scheduled!=null)scheduled.cancel(true);if(request!=null)request.disconnect();worker.shutdownNow();main.removeCallbacksAndMessages(null);if(!keepNotification)getSystemService(NotificationManager.class).cancel(NOTIFICATION_ID);selection=null;if(active==this)active=null;super.onDestroy();}
 }

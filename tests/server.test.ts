@@ -10,6 +10,7 @@ import { Jobs } from '../server/jobs.js';
 import { allowedPath, validToken } from '../server/security.js';
 import { normalizeUrl } from '../src/api.js';
 import packageJson from '../package.json';
+import {waitFor} from './wait-for';
 
 test('tokens and transport validation fail closed', () => {
   assert.equal(validToken('', ''), false);
@@ -67,7 +68,7 @@ test('API authenticates, scopes sessions, prevents path escapes and routes attac
     assert.equal(upload.name, 'hello.txt'); assert.ok(upload.id);
     assert.equal((await (await request('/file?path=' + encodeURIComponent(path.join(root, 'hello.txt')))).json()).text, 'Hello');
     const post = { id: randomUUID(), cwd: root, text: 'Read attachment', attachments: [upload.id] };
-    const result = await request('/jobs', post); assert.equal(result.status, 200); assert.match(prompt, /uploads/);
+    const result = await request('/jobs', post); assert.equal(result.status, 200); await waitFor(()=>jobs.get(post.id).status==='done'); assert.match(prompt, /uploads/);
     assert.equal((await request('/jobs', { ...post, id: randomUUID(), attachments: [randomUUID()] })).status, 400);
     assert.equal((await request('/jobs', { ...post, id: randomUUID(), sessionId: id })).status, 409);
     assert.equal((await request('/jobs', { ...post, id: randomUUID(), sessionId: id, takeoverConfirmed: true })).status, 200);
@@ -90,14 +91,14 @@ test('job approvals, cancellation, idempotency and project concurrency', async (
   const jobs = new Jobs(run), input = { id: randomUUID(), cwd: '/project', text: 'hello', mode: 'default' as const, maxBudgetUsd: 1 };
   try {
     jobs.start(input); jobs.start(input);
-    await new Promise(r => setTimeout(r, 20)); assert.equal(calls, 1);
+    await waitFor(()=>jobs.get(input.id).approvals.length>0); assert.equal(calls, 1);
     assert.throws(() => jobs.start({ ...input, id: randomUUID() }), /уже работает/);
     const approval = jobs.get(input.id).approvals[0]; assert.equal(approval.tool, 'Write');
     jobs.approve(input.id, approval.id, true);
-    await new Promise(r => setTimeout(r, 20)); assert.equal(decision.behavior, 'allow'); assert.equal(jobs.get(input.id).status, 'done');
+    await waitFor(()=>jobs.get(input.id).status==='done'); assert.equal(decision.behavior, 'allow'); assert.equal(jobs.get(input.id).status, 'done');
     assert.throws(() => jobs.approve(input.id, approval.id, true), /уже закрыт/);
     const next = { ...input, id: randomUUID() }; jobs.start(next);
-    await new Promise(r => setTimeout(r, 20)); jobs.stop(next.id);
-    await new Promise(r => setTimeout(r, 20)); assert.equal(decision.behavior, 'deny'); assert.equal(jobs.get(next.id).status, 'stopped'); assert.equal(jobs.get(next.id).approvals.length, 0);
+    await waitFor(()=>jobs.get(next.id).approvals.length>0); jobs.stop(next.id);
+    await waitFor(()=>jobs.get(next.id).status==='stopped'&&decision.behavior==='deny'); assert.equal(decision.behavior, 'deny'); assert.equal(jobs.get(next.id).status, 'stopped'); assert.equal(jobs.get(next.id).approvals.length, 0);
   } finally { jobs.close(); }
 });

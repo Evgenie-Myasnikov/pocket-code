@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 test('live commands, agent links and user-role tool results have no bubble background',async({page})=>{
  await page.goto('http://127.0.0.1:5173');
+ await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;const {Message}=await import('/src/Messages.tsx' as string),{RichBlock}=await import('/src/RichBlocks.tsx' as string);
   const root=document.createElement('div');root.id='plain-fixture';document.body.append(root);

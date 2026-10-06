@@ -27,7 +27,7 @@ test('Jira settings use the selected workspace and never silently select Claude'
  const reconnects:string[]=[];
  await page.route('**/api/jira/**',route=>{const url=new URL(route.request().url()),provider=url.searchParams.get('provider');if(url.pathname.endsWith('connect-existing'))reconnects.push(route.request().postDataJSON().provider);return route.fulfill({json:{connected:false,source:provider,sites:[]}});});
  await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Jira',exact:true}).click();
- await expect(page.getByText(/Tools run directly, without a model turn/)).toBeVisible();
+ await expect(page.getByText(/Jira uses direct Atlassian MCP through Codex.*without a model turn/)).toBeVisible();
  await page.getByRole('button',{name:'Use Codex connection',exact:true}).click();expect(reconnects).toEqual(['codex']);
  await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();
  await page.locator('.workspace-picker-sidebar select').selectOption('claude');

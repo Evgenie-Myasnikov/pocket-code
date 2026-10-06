@@ -1,136 +1,64 @@
 # Pocket Code
 
-[Workspaces, boards and QR roles](docs/WORKSPACES.md) · [Рабочие области, доски и роли QR](docs/WORKSPACES.ru.md)
+**AI coding on your Windows PC, with the same chats on Android.**
 
-**Your coding workspace, within reach of your Android phone.**
+Pocket Code connects **Claude Code**, **Codex** and **GitHub Copilot** to a shared TypeScript interface. Send instructions, attach files, follow work, answer questions and review changes from either device. Projects and tools run on the PC; model requests use your provider account.
 
-Read a reply, send a follow-up, review code or pick up a task while your AI works on your Windows PC. Pocket Code connects Android to **Claude Code**, **Codex** and **GitHub Copilot** through a small PC host.
+[Download Windows / Android](https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest) · [Full guide](docs/USER_GUIDE.md) · [Русский](docs/USER_GUIDE.ru.md) · [Documentation](docs/README.md)
 
-The [Windows desktop application](docs/DESKTOP.md) also shows your chats in a wider, read-only layout: select a provider and project, browse conversations, inspect Review and open AI results. It shares the Android interface components and stays in the system tray.
+## Start in three steps
 
-**GitHub Copilot:** select its workspace. Existing PC authentication (including GitHub CLI) is detected automatically. Otherwise use **Settings → Workspace → Connect GitHub Copilot** and complete GitHub sign-in in the PC browser. The host installs the official SDK and login runtime through npm; a Copilot entitlement is required. Copilot commands and file changes request approval in the chat. Copilot quota details and subagent transcripts are not yet exposed in Pocket Code.
+1. On Windows, extract the repository and run **Setup Pocket Code.cmd**. It detects Node.js or installs a checksum-verified private runtime, installs dependencies, builds the desktop app and creates shortcuts. For later launches use **Start Pocket Code.cmd**.
+2. In desktop **Settings**, check the AI account and open **Connection**. Select the offered LAN, Tailscale or internet address. Keep the PC awake.
+3. Install the Android APK from Releases. Open **Settings → PC connection**, scan the PC QR, then open **Chats → New**. Select a project and provider and send the first message.
 
-[Download APK](https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest) · [Get started](#get-started) · [Русский](docs/README.ru.md) · [Documentation](docs/README.md)
+QR codes are private connection credentials. Provider sign-in is separate. The PC application stays in the tray when its window closes; **tray → Exit** ends it. Windows autostart and reconnect are optional settings.
 
-<table>
-<tr><td align="center"><b>Continue a conversation</b></td><td align="center"><b>Explore your project</b></td><td align="center"><b>Make it comfortable</b></td></tr>
-<tr><td><img src="docs/images/chat.png" width="250" alt="Example chat with a formatted answer and code"></td><td><img src="docs/images/project.png" width="250" alt="Project overview: Files, Rules and Changelog"></td><td><img src="docs/images/settings.png" width="250" alt="Settings organized into categories"></td></tr>
-</table>
+## What it includes
 
-*Current interface screenshots with fictional sample content. No personal chats, connection keys or workplace data.*
-
-## What can I do with it?
-
-| When you want to… | Open… |
+| Area | Features |
 | --- | --- |
-| Read a reply or give another instruction | **Chats** — attachments, model selection and Codex reasoning effort |
-| Check what changed | **Review** inside a chat — repository, branch and code differences |
-| Find an image, document or code result | **Results** inside a chat |
-| Follow work or answer a question | The **right-side activity drawer** |
-| Read files and project instructions | **Project** — Files, Markdown rules and Changelog |
-| Work through assigned Jira issues | **Tasks** — search, filters, role-based actions and notifications |
-| Change language, size, theme or permissions | **Settings** |
+| Chats | Claude, Codex and Copilot; text/files/images; provider model choices; Codex effort; follow-ups during work; history, search and saved reading position |
+| Review | Scrollable file diffs, unified/split views with inline highlights, file-type filters, folding, code size and fit-to-width |
+| Results | Images, documents and links from available chat history; image zoom and local file previews |
+| Activity | Running, completed, failed and waiting-for-answer chats; child agent context where the provider exposes it |
+| Board | Optional repository boards with version columns, notes, images, status and priority; Miro Live Embed |
+| Rules / Changelog | Markdown documents selected by repository; a switch for built-in board maintenance |
+| Settings | Accounts and logout, usage, themes, scaling, grid spacing, notifications, connection and updates |
 
-Switch between Claude and Codex, follow subagents when context is available, and send follow-ups while supported jobs run. Recent chats are cached on the phone and refreshed from the PC. Reading mode hides extra controls.
+Windows supports writing chats as well as reading them. Android and Windows use the same conversation, review and result components. Chats belong to the connected PC and provider; boards belong to repositories. There is no separate WorkSpace administration section in current navigation.
 
-## How it works
+<img src="docs/images/chat.png" width="290" alt="Illustrative chat using synthetic project content"> <img src="docs/images/review.png" width="290" alt="Illustrative review of synthetic changes">
 
-```mermaid
-flowchart LR
-    Phone[Android phone] <-->|Wi-Fi or HTTPS tunnel| Host[Pocket Code on Windows]
-    Host <--> Claude[Claude Code]
-    Host <--> Codex[Codex]
-    Host <--> Files[Project files]
-```
+These synthetic screenshots illustrate earlier interface revisions; labels can differ from the current guide. They contain no real conversations or pairing codes.
 
-The PC must stay awake and connected. Your AI account and usage limits still apply. This independent companion is not an official OpenAI, Anthropic or Atlassian app. It does not embed their desktop interfaces or include an AI subscription.
+## Models and permissions
 
-## Get started
+Claude aliases follow the provider's current model; an explicit model ID pins a version. **Unreleased source change:** the picker now loads the installed Claude Code model catalog, shows resolved versions when advertised, and accepts a full model ID. A released 0.25.11 installation still has the earlier alias-only selector. See [model selection](docs/PROVIDERS.md#claude).
 
-You need **Windows 10+**, **Android 7+**, and **Claude Code and/or Codex installed and signed in on the PC**.
+Codex advertises models and reasoning effort through its runtime. Copilot advertises its own models. Accounts, quotas and capabilities are provider-specific. Full access is the Codex mobile default; choose another policy in settings if needed. This setting does not change Claude or Copilot permissions.
 
-### 1. Run setup on your PC
+## Boards and Miro
 
-Download this repository using **Code → Download ZIP**, then extract it. Double-click **Setup Pocket Code.cmd**.
+Create a board only when a repository needs one. Notes are stored in `project-boards/board-*.json`; saving does not commit or push Git. Dependencies are AI planning metadata and are not drawn as arrows. Set an 8/12/16/24/32/64 grid in Appearance; right-click a card for deletion with confirmation.
 
-Setup detects a compatible Node.js installation, including installations not yet visible in the current terminal's PATH. If needed, it downloads a private Node.js 24 LTS copy from nodejs.org and verifies its SHA-256 checksum. No winget, administrator prompt or terminal restart is required. It installs dependencies (including TypeScript) before building the Windows application and creating Desktop/Start menu shortcuts. Sign in to your provider in Settings, then pair Android by QR. Dependencies and the internet tunnel are prepared automatically.
+For Miro, open **Settings → Miro**, select a project and paste its board URL. Miro supplies its interface and permissions. If embedded login is unavailable, use **Open in browser**. Optional, separately authorized [AI API access](docs/MIRO-AI.md) is unreleased; it reads linked boards and updates existing items without importing them into Git. [Board guide](docs/BOARDS.md)
 
-No Android SDK is needed to use the released APK. AI sign-in stays in the native tool on your PC.
+**Unreleased:** [task runs](docs/TASK-PIPELINE.md) connect a saved card to an isolated Git
+working copy, chat, pinned diff, automatic verification commands and human approval.
 
-### 2. Install and scan
+## Updates and privacy
 
-1. On your phone, download the APK from [the latest release](https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest).
-2. Install it. Allow installation from your browser or file manager if Android asks.
-3. Open Pocket Code, tap **Scan QR code**, and scan the PC pairing QR.
-4. Choose **Claude** or **Codex**, then open a chat or start one in your project.
+The PC checks releases and supplies the matching APK to Android. The phone can trigger the PC check; Android still asks for installation confirmation. Windows updates preserve local configuration and wait for a safe restart. [Update workflow](docs/USER_GUIDE.md#updates)
 
-**Closing or minimizing the desktop window keeps Pocket Code in the system tray.** Right-click its icon and choose **Выход (Exit)** to stop it. Windows startup is an optional checkbox. An explicitly disconnected connection stays disconnected; otherwise the application can reconnect on launch. Treat the QR like a password. A restarted temporary internet tunnel may require scanning a new QR. [Desktop application guide](docs/DESKTOP.md).
+Recent conversations and board snapshots can be cached locally. Offline mode does not run AI or synchronize edits without the host. Never share pairing codes, credentials, private chats, local account configuration or runtime storage. **Disconnect and forget** removes the saved phone connection and its caches; provider logout is a separate action.
 
-<details>
-<summary>Manual setup and subsequent launches</summary>
+This is an independent companion, not an official OpenAI, Anthropic, GitHub or Miro app. It does not include subscriptions, reproduce cloud-only chat histories or guarantee every provider feature.
 
-There are only two launchers: **Setup Pocket Code.cmd** to install/update and **Start Pocket Code.cmd** to open the application. Choose internet/LAN inside the app; disconnect there or use **Exit** from the tray. Rerunning setup repairs missing build dependencies. A working Node.js 22.12+ or 24+ installation is reused; private runtime files are stored under `%LOCALAPPDATA%\Pocket Code\runtime\node`. Advanced troubleshooting scripts remain in `scripts/`.
+## Documentation and development
 
-</details>
+[User guide](docs/USER_GUIDE.md) · [Руководство](docs/USER_GUIDE.ru.md) · [Providers](docs/PROVIDERS.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Architecture and testing](docs/ARCHITECTURE.md) · [Technical reference](docs/REFERENCE.md) · [Changelog](CHANGELOG.md)
 
-## Before you start work
+`npm ci` installs the locked dependencies. Run `npm test`, `npm run build`, `npm run test:ui` and `npm run check:docs`. Browser tests use synthetic data; native builds and physical-device behavior require separate checks. Read [AGENTS.md](AGENTS.md) before preparing public changes.
 
-- **Permissions:** Codex defaults to Full access. Choose your access level in **Settings → AI & workspace**. Full access allows commands and file changes without approval prompts.
-- **Desktop chats:** supported local histories can be opened. A chat owned by Codex Desktop may remain read-only until Desktop releases it. Cloud-only chats and every desktop artifact are not supported.
-- **Jira is optional:** one shared PC connection is selected independently of the task AI. Direct MCP through Codex avoids a model turn; the existing Claude connector can consume Claude usage. Separate authorization may be required; there is no silent account fallback.
-- **Task notifications:** the bell shows periodically detected changes, not Jira's complete inbox or Android push notifications.
-- **Updates:** use **Settings → Updates**. Android asks for installation confirmation. Compatible hosts can apply the matching PC update when idle.
-- **Saved history:** reopening is faster, but the initial connection still needs the host. This is not fully offline mode.
-
-## Privacy and control
-
-AI sign-in stays with the native PC tools. Android stores the pairing key through its connection vault. Recent chats are cached locally on the phone; **Disconnect and forget** clears the connection and chat cache.
-
-Project operations run on your PC, but prompts and relevant content are processed by your AI provider. Internet mode passes encrypted traffic through Cloudflare; local HTTP is for trusted networks.
-
-Never publish pairing QR codes, keys, credentials, private chats or the **.pocket-code** runtime folder. Documentation examples are synthetic.
-
-## Documentation
-
-[Start here](docs/README.md) | [Everyday workflows](docs/WORKFLOWS.md) | [Providers and accounts](docs/PROVIDERS.md) | [Troubleshooting](docs/TROUBLESHOOTING.md) | [Full user guide](docs/USER_GUIDE.md) | [Russian documentation](docs/INDEX.ru.md)
-
-## Need help?
-
-**[User guide](docs/USER_GUIDE.md)** · **[Руководство на русском](docs/USER_GUIDE.ru.md)** — QR pairing, diffs, updates, chats, project files and Jira tasks with screenshots.
-
-| Problem | Try this |
-| --- | --- |
-| PC unavailable | Check power and host window; scan a fresh QR after a tunnel restart. |
-| Host already running | Reopening the launcher reuses the existing instance. |
-| AI authentication expired | Sign in again with the AI tool on the PC. |
-| Codex chat busy | Finish its desktop task, close Codex Desktop if necessary, then retry. |
-| Old APK says Invalid update source | Install the latest APK manually over the existing app once. |
-
-[Report an issue](https://github.com/Evgenie-Myasnikov/pocket-code/issues) with app/host versions and reproduction steps. Remove private content from logs and screenshots.
-
-## For contributors
-
-[Technical reference](docs/REFERENCE.md) · [Performance audit](docs/PERFORMANCE.md) · [Feature coverage](FEATURES.md) · [Usability notes](USABILITY.md) · [Changelog](CHANGELOG.md)
-
-```sh
-npm ci
-npm test
-npm run build
-npm run test:ui
-```
-
-Under active development. APKs are distributed through GitHub, not Google Play. Some native behaviors still require physical-device testing; see the reference for compatibility and build requirements.
-
-### Product roadmap
-
-The [Pocket Code board](project-boards/README.md) tracks delivered features and explicit follow-up work from CHANGELOG.md. Import its JSON into Pocket Code or open the generated board from this repository. Only product content is tracked; member identities and private conversations are excluded.
-
-## Miro boards
-
-Open **Settings → Miro**, choose a project, paste its `https://miro.com/app/board/...` link and connect. Open the project in **Board** to use Miro Live Embed with Miro's own interface. A repository does not need a local board file to use Miro. WorkSpace management is no longer exposed in navigation; existing host records are preserved.
-
-Links are stored in the host's private board database, not in Git. Invitation/query parameters are discarded. Miro retains the content, accounts and access permissions. Disconnecting removes only the Pocket Code link and never deletes the board in Miro. An existing repository board file is preserved and becomes visible again after disconnecting Miro.
-
-Miro requires an internet connection and its own sign-in. If authentication, third-party cookies or the embedded browser prevent access, use **Open in browser**. Android devices without a modern isolated WebView bridge use that browser fallback. Pocket Code cannot grant Miro permissions. This integration does not import notes into Git, synchronize task dependencies, or give the AI API access to board content.
-
-Implementation follows [Miro Live Embed](https://developers.miro.com/docs/miro-live-embed-with-a-direct-link) and [Miro authentication](https://developers.miro.com/docs/miro-live-embed-authentication). Browser scenarios use synthetic boards; authenticated private-board editing and physical Android gestures still require device validation.
+The [Pocket Code product board](project-boards/README.md) records plans and evidence. Release versions link their exact source commit and branch. Unreleased entries describe source changes, not an already available update.

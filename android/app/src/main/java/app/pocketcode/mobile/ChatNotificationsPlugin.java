@@ -18,6 +18,7 @@ public class ChatNotificationsPlugin extends Plugin {
     private Intent latest,feed;
     private boolean askedFeed;
     @PluginMethod public void watch(PluginCall call) {
+        ChatWatchService.attentionEnabled=call.getBoolean("alerts",true);
         try{latest=configuration(call);}catch(Exception error){call.reject("Invalid chat notification configuration");return;}
         if(Build.VERSION.SDK_INT>=33&&getPermissionState("notifications")!=PermissionState.GRANTED){
             if(!asked){asked=true;requestPermissionForAlias("notifications",call,"permissionResult");}
@@ -36,6 +37,7 @@ public class ChatNotificationsPlugin extends Plugin {
             if(!("https".equals(uri.getScheme())||"http".equals(uri.getScheme()))||uri.getHost()==null||uri.getUserInfo()!=null)throw new Exception();
             Intent intent=new Intent(getContext(),ChatWatchService.class);
             for(String key:new String[]{"url","token","provider","sessionId","jobId","cwd","title","language"})intent.putExtra(key,call.getString(key,""));
+            intent.putExtra("alerts",String.valueOf(call.getBoolean("alerts",true)));
             return intent;
     }
     private void start(PluginCall call){
@@ -48,6 +50,7 @@ public class ChatNotificationsPlugin extends Plugin {
         }catch(Exception error){call.reject("Chat notification could not start");}
     }
     @PluginMethod public void watchAll(PluginCall call){
+        ChatWatchService.attentionEnabled=true;
         try{feed=configuration(call);feed.setClass(getContext(),RunFeedService.class);}catch(Exception error){call.reject("Invalid chat notification configuration");return;}
         if(Build.VERSION.SDK_INT>=33&&getPermissionState("notifications")!=PermissionState.GRANTED){
             if(!askedFeed){askedFeed=true;requestPermissionForAlias("notifications",call,"feedPermissionResult");}
@@ -64,7 +67,11 @@ public class ChatNotificationsPlugin extends Plugin {
         try{if(feed!=null){if(Build.VERSION.SDK_INT>=26)getContext().startForegroundService(feed);else getContext().startService(feed);}call.resolve();}
         catch(Exception error){call.reject("Chat tracking could not start");}
     }
-    @PluginMethod public void stopAll(PluginCall call){feed=null;getContext().stopService(new Intent(getContext(),RunFeedService.class));call.resolve();}
+    @PluginMethod public void stopAll(PluginCall call){
+        ChatWatchService.attentionEnabled=false;RunFeedService.cancelActive();
+        if(feed!=null){String url=feed.getStringExtra("url"),token=feed.getStringExtra("token");getContext().getSharedPreferences("run-feed-"+NotificationIdentity.hash(url+"|"+token),android.content.Context.MODE_PRIVATE).edit().clear().apply();}
+        feed=null;getContext().stopService(new Intent(getContext(),RunFeedService.class));call.resolve();
+    }
     @PluginMethod public void clear(PluginCall call){
         latest=null;
         getActivity().runOnUiThread(()->{
@@ -78,7 +85,7 @@ public class ChatNotificationsPlugin extends Plugin {
     @PluginMethod public void pending(PluginCall call){
         Intent intent=getActivity().getIntent();JSObject result=new JSObject();
         if(intent!=null&&intent.getBooleanExtra("chatNotification",false)){
-            JSObject chat=new JSObject();for(String key:new String[]{"provider","sessionId","jobId","cwd","title"})chat.put(key,intent.getStringExtra(key));
+            JSObject chat=new JSObject();for(String key:new String[]{"provider","sessionId","jobId","cwd","title","connectionUrl"})chat.put(key,intent.getStringExtra(key));
             result.put("chat",chat);intent.removeExtra("chatNotification");
         }
         call.resolve(result);

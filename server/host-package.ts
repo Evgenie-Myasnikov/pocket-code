@@ -26,7 +26,7 @@ export async function unpackHost(bytes: Buffer, release: HostAsset, directory: s
   const entries: { name: string; bytes: Buffer }[] = [];
   for (const file of bundle.files) {
     const name = file.path;
-    if (typeof name !== 'string' || name.length > 240 || !/^(?:package(?:-lock)?\.json|tsconfig\.json|(?:server|src|dist|scripts)\/[A-Za-z0-9_./@-]+)$/.test(name) || name.split('/').some((p: string) => !p || p === '.' || p === '..' || p.endsWith('.') || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p)) || names.has(name.toLowerCase()) || typeof file.content !== 'string' || file.content.length > 30_000_000 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.content)) throw new Error('Invalid PC bundle path or content.');
+    if (typeof name !== 'string' || name.length > 240 || !/^(?:package(?:-lock)?\.json|tsconfig\.json|(?:server|src|dist|scripts)\/[A-Za-z0-9_./@-]+|project-boards\/(?:README\.md|board-[A-Za-z0-9-]+\.json|assets\/[a-f0-9]{64}\.(?:png|jpe?g|webp)))$/.test(name) || name.split('/').some((p: string) => !p || p === '.' || p === '..' || p.endsWith('.') || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p)) || names.has(name.toLowerCase()) || typeof file.content !== 'string' || file.content.length > 30_000_000 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.content)) throw new Error('Invalid PC bundle path or content.');
     const content = Buffer.from(file.content, 'base64'); total += content.length;
     if (total > 45_000_000 || createHash('sha256').update(content).digest('hex') !== file.sha256) throw new Error('Invalid PC bundle checksum.');
     names.add(name.toLowerCase()); entries.push({ name, bytes: content });

@@ -3,6 +3,7 @@ import {promisify} from 'node:util';
 import {stat,lstat,readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {allowedPath,HttpError,within} from './security.js';
+import {isolatedGitEnvironment} from './git-environment.js';
 const execute=promisify(execFile);
 export type ReviewFile={path:string;added:number;removed:number;binary:boolean;untracked:boolean};
 const flags=['--no-ext-diff','--no-textconv','--no-renames'];
@@ -11,20 +12,21 @@ async function gitContext(roots:string[],input:string) {
   let root=cwd;
   while(true){try{await stat(path.join(root,'.git'));break;}catch{const parent=path.dirname(root);if(parent===root)throw new HttpError(400,'This project is not a Git repository.');root=parent;}}
   const filterOverrides:string[]=[];
+  const env=isolatedGitEnvironment();
   // Reading a worktree diff otherwise runs configured clean/process filters.
   const safeArgs=['--no-optional-locks','--literal-pathspecs','-c',`safe.directory=${root}`,'-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-c','core.quotePath=false'];
   let filterKeys='';
-  try { filterKeys=(await execute('git',[...safeArgs,'-C',root,'config','--null','--name-only','--get-regexp','^filter\\.'],{windowsHide:true,timeout:15000,maxBuffer:100_000})).stdout; }
+  try { filterKeys=(await execute('git',[...safeArgs,'-C',root,'config','--null','--name-only','--get-regexp','^filter\\.'],{env,windowsHide:true,timeout:15000,maxBuffer:100_000})).stdout; }
   catch(error:any) { if(error.code!==1)throw new HttpError(400,'Could not inspect Git filters safely.'); }
   const filters=new Set(filterKeys.split('\0').filter(Boolean).map(key=>key.slice(0,key.lastIndexOf('.'))));
   if(filters.size>200)throw new HttpError(400,'Too many Git filters to inspect this comparison safely.');
   for(const name of filters)filterOverrides.push('-c',`${name}.clean=`,'-c',`${name}.process=`,'-c',`${name}.required=false`);
   const git=async(args:string[],maxBuffer=3_000_000)=>{
-    try{return (await execute('git',[...safeArgs,...filterOverrides,'-C',root,...args],{windowsHide:true,timeout:15000,maxBuffer})).stdout;}
+    try{return (await execute('git',[...safeArgs,...filterOverrides,'-C',root,...args],{env,windowsHide:true,timeout:15000,maxBuffer})).stdout;}
     catch{throw new HttpError(400,'Could not read this Git comparison. Check the branch or reduce the diff size.');}
   };
   const changed=async(range:string[])=>{
-    try { await execute('git',[...safeArgs,...filterOverrides,'-C',root,'diff',...flags,'--quiet',...range,'--',scope],{windowsHide:true,timeout:15000,maxBuffer:100_000});return false; }
+    try { await execute('git',[...safeArgs,...filterOverrides,'-C',root,'diff',...flags,'--quiet',...range,'--',scope],{env,windowsHide:true,timeout:15000,maxBuffer:100_000});return false; }
     catch(error:any) { if(error.code===1)return true;throw new HttpError(400,'Could not read this Git comparison. Check the branch or reduce the diff size.'); }
   };
   const scope=path.relative(root,cwd).replaceAll('\\','/')||'.';
@@ -39,19 +41,20 @@ async function comparisonMetadata(git:Awaited<ReturnType<typeof gitContext>>['gi
   const comparison=base||branches.find(b=>b==='origin/main')||branches.find(b=>b==='origin/master')||branches.find(b=>b==='main'&&b!==current)||branches.find(b=>b==='master'&&b!==current)||'HEAD';
   return {branches,current,comparison};
 }
-export async function review(roots:string[],input:string,mode:'working'|'staged'|'branch',base?:string,file?:string) {
+export async function review(roots:string[],input:string,mode:'working'|'staged'|'branch'|'task',base?:string,file?:string) {
   const {git,scope,cwd,root}=await gitContext(roots,input);
   const [{branches,current,comparison},hasHead]=await Promise.all([
     comparisonMetadata(git,base),git(['rev-parse','--verify','HEAD']).then(()=>true,()=>false),
   ]);
   if(mode==='branch' && comparison!=='HEAD' && !branches.includes(comparison))throw new HttpError(400,'Select an existing base branch.');
-  const range=mode==='staged'?['--cached']:mode==='branch'?[`${comparison}...HEAD`]:hasHead?['HEAD']:['--cached'];
+  if(mode==='task'&&(!base||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(base)||(await git(['rev-parse','--verify',base+'^{commit}'])).trim()!==base))throw new HttpError(400,'The task baseline commit is unavailable.');
+  const range=mode==='task'?[base!]:mode==='staged'?['--cached']:mode==='branch'?[`${comparison}...HEAD`]:hasHead?['HEAD']:['--cached'];
   const [stats,untracked]=await Promise.all([
     git(['diff',...flags,'--numstat','-z',...range,'--',scope]),
-    mode==='working'?git(['ls-files','--others','--exclude-standard','-z','--',scope]):Promise.resolve(''),
+    mode==='working'||mode==='task'?git(['ls-files','--others','--exclude-standard','-z','--',scope]):Promise.resolve(''),
   ]);
   const files:ReviewFile[]=stats.split('\0').filter(Boolean).map(row=>{const [add,remove,...name]=row.split('\t');return {path:name.join('\t'),added:Number(add)||0,removed:Number(remove)||0,binary:add==='-',untracked:false};}).filter(item=>within(cwd,path.resolve(root,item.path)));
-  if(mode==='working'){
+  if(mode==='working'||mode==='task'){
     const newFiles=untracked.split('\0').filter(Boolean);
     for(const name of newFiles)if(within(cwd,path.resolve(root,name)))files.push({path:name,added:0,removed:0,binary:false,untracked:true});
   }

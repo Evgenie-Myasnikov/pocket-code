@@ -1,130 +1,110 @@
 # Pocket Code user guide
 
-[Documentation index](README.md) | [Workflows](WORKFLOWS.md) | [Troubleshooting](TROUBLESHOOTING.md)
+[Documentation](README.md) · [Русский](USER_GUIDE.ru.md)
 
-[Home](../README.md) · [Русский](USER_GUIDE.ru.md) · [Technical reference](REFERENCE.md)
-
-Jump to [QR pairing](#qr), [code review](#diff), [updates](#updates), [chats](#chats), [project](#project), [tasks](#tasks), or [settings](#settings).
-
-Screenshots use the real interface with fictional data. Never publish your pairing QR, connection key, or private chat screenshots.
+Pocket Code is a Windows host and Android companion for local AI coding tools. Windows and Android can both send chat messages. The host must be running for fresh history, AI requests, files, repository edits and update downloads.
 
 <a id="qr"></a>
-## Connect by QR
+## Install and connect
 
-<img src="images/connect.png" width="320" alt="Connection screen with QR scanning and QR image options">
+1. Run **Setup Pocket Code.cmd** on Windows. Setup reuses a supported Node.js installation or downloads a private LTS runtime and verifies its checksum. It installs development dependencies, builds the shared UI and desktop shell, and creates shortcuts. You do not need the Android SDK to install a released APK.
+2. Open desktop **Settings → AI providers**. Choose Claude, Codex or Copilot and inspect installation, server and sign-in states. If automatic detection fails, choose a supported manual sign-in method. Complete login in the provider's PC window or browser, then refresh. See [sign-in methods](PROVIDER-SIGN-IN.md).
+3. Open desktop **Settings → Connection**. Select one of the available addresses: local Wi-Fi/LAN, a configured Tailscale address, or HTTPS internet tunnel. These are different routes to the same host, not different AI accounts.
+4. Install the released APK on Android. Open **Settings → PC connection → Scan QR code**, point the camera at the selected PC QR and allow pairing. No manual address/key entry is required for the normal flow.
+5. Open **Chats**, choose a provider, then **New**. Choose the project for the new conversation. Existing chats keep their original folder.
 
-1. Extract the source package on your PC and run **Setup Pocket Code.cmd**. Install Claude Code or Codex and sign in on the PC first.
-2. Choose **Internet / mobile data** for access from another network, or **Same trusted Wi-Fi** for your local network.
-3. Wait for the host and QR page to open. The launcher does not ask for a project or require Enter.
-4. Install the APK from the [latest release](https://github.com/Evgenie-Myasnikov/pocket-code/releases/latest) on Android. Tap **Scan QR code**, allow camera access, and scan the PC screen.
-5. The app fills in the connection details and connects automatically.
+Treat the QR as a password. The host gives each paired device its own credential. Windows Connection lists devices, status and disconnect controls. Revoking a phone requires pairing again. A changed temporary tunnel address may also require a fresh scan.
 
-If the camera is unavailable, choose **QR from image**. The QR supplies the address and pairing key automatically; there are no manual credential fields. If a scanned or saved connection fails, **Reconnect** retries it. Scan a new QR when the PC's address changes.
-
-Keep the PC awake and the host running. The native desktop window closes to the tray; use its tray menu **Exit** to terminate it. Only the legacy console launcher terminates the host when its window closes. Restarting a temporary internet tunnel changes its address: scan the new QR. A local Wi-Fi address normally cannot be reached over mobile data. See [desktop setup and autostart](DESKTOP.md).
-
-## View images from a conversation
-
-<table><tr><td><img src="images/results-images.png" width="280" alt="Results gallery with image thumbnails"></td><td><img src="images/image-viewer.png" width="280" alt="Full-screen image with zoom and Fit to screen controls"></td></tr></table>
-
-Open **Results → Images** to browse thumbnails while the panel gradually scans the complete available chat history. All materials appear by default. Switch between **Assistant results** and **Your sources** to see generated images or your attachments. Tap a thumbnail to open it, pinch or use **+ / −** to zoom, and drag to inspect details. **Fit to screen** resets the view. Close or press Back to return to the same gallery position.
-
-External images have a **Load external image** button. Local images use the connected computer; a missing file can no longer be previewed. Earlier files appear automatically as the history scan progresses. Closing the panel stops scanning; reopening starts a fresh scan.
-
-<a id="diff"></a>
-## Review code changes
-
-<table><tr><td><img src="images/review.png" width="300" alt="Mobile code diff with added and removed lines"></td><td><img src="images/review-options.png" width="300" alt="Comparison and code size settings in an overlay"></td></tr></table>
-
-Open a chat and tap **Review** when Git changes are available. Check the repository and branch in the header. The comparison is restricted to the chat's project folder, including when that folder is inside a larger repository.
-
-Scroll through the changed files, as in a pull request. Tap a file heading to collapse or expand its diff. Green lines were added; red lines were removed. Each heading shows that file's plus/minus counts. In options, **Show file types** lets you hide detected extensions, such as `.png`.
-
-The sliders button opens an options sheet over the diff. Close it with **X**, Back, or the backdrop. It does not shrink the code area.
-
-| Comparison | Contents |
-| --- | --- |
-| All changes | Uncommitted working-tree changes relative to HEAD, including staged edits and supported untracked files. It is not the entire project history. |
-| Staged changes | The Git index: changes prepared for a commit. |
-| Branch changes | Committed changes since the merge base with the selected base branch. It does not include uncommitted edits. |
-
-Choose **One column** for a phone or **Two columns** for side-by-side reading. **Code size** follows chat text with a 14 px minimum by default; you can save a separate size. Long lines scroll horizontally. Sizes from 4 to 24 px and **Fit diff to width** are available; fit scales each file independently while retaining normal controls. See [Review workflow](WORKFLOWS.md#inspect-code-changes).
-
-The open review refreshes every five seconds while visible and when returning to the app. The refresh button checks immediately. Background refresh retains collapsed files and the scroll position; files no longer changed disappear from the list. Diffs load near the visible area. A connection error means the retained content may be stale.
-
-Tap the **eye** for reading mode, then the restore button or Android Back to show controls again. **Back to chat** returns to your conversation.
-
-Review includes manual edits and edits by other tools in the project, not just this chat's actions. Ignored files are excluded by Git. New, untracked files appear as whole-file additions. Binary or large files may have no text preview. Viewing a diff does not create a commit, PR, or approve changes.
-
-<a id="updates"></a>
-## Update the phone and host
-
-<img src="images/updates.png" width="360" alt="Update settings with automatic download and manual checking">
-
-This screenshot shows the browser presentation. APK downloading and the Android installation prompt are available in the native app.
-
-1. The PC checks releases at startup and every six hours, then downloads and verifies the APK.
-2. While the PC is connected and answering, the phone receives that APK from the PC.
-3. If the PC is not connected, does not answer or has updates disabled, the phone checks the latest GitHub release itself when it starts, when you return to it and at most hourly while open. It downloads the APK and opens the installer, accepting only an APK whose checksum matches the release and whose signing certificate matches the installed app.
-4. **Android asks you to confirm installation.** If prompted, allow Pocket Code to install updates, return, and choose **Install update**. Install over the existing app to preserve settings.
-5. Windows updates its desktop application and host together when idle, with rollback if the new host fails to start. APK transfers block a restart.
-
-Use **Settings → Updates → Check for updates on PC** to request a check from the phone. Without a reachable PC the same section offers **Check for updates**, which asks GitHub directly. After a failed download, choose **Receive APK from PC** or **Download update** to retry. A cancelled installation can be reopened with **Install update**.
-
-The PC needs public GitHub/npm access, but updates do not require GitHub CLI or GitHub login. Older hosts may need a manual PC update. Restarting a temporary tunnel may require a fresh QR.
-
-| Problem | Next step |
-| --- | --- |
-| An old APK reports Invalid update source | Install the current release APK manually over it once. |
-| Waiting for PC tasks | Let jobs and terminals finish; do not force-close the host to update. |
-| Restarting | Wait for the host to reconnect. |
-| Updates not configured | See [update configuration](REFERENCE.md#updates). |
-| Download failed | Check PC connectivity and retry from Updates. |
-
-AI runtime compatibility checks are separate: a detected Claude/Codex version change can create a compatibility task in the Pocket Code source project. That task does not automatically publish a release.
+Closing/minimizing Windows hides it in the tray. **Tray → Exit** ends the application and its owned host. Enable Windows startup or reconnect in **Settings → Windows application**. Explicit disconnect remains disconnected. Sleep, shutdown and network loss can interrupt remote access; cached content is not proof that the PC is online.
 
 <a id="chats"></a>
-## Chats, attachments and activity
+## Chats and model selection
 
-The small ring on the right of the input shows the **remaining** allowance: the lowest reported shared or matching-model limit. Tap it for window/reset details. It refreshes every minute while visible and on return; a dash means current data is unavailable. The send button has a compact visual face with a larger touch target.
+**New** is the first item in the conversation list. A real conversation is created when the first message is sent. On Windows, choose a provider in the side rail; on mobile choose it in the chat list or new-chat context. Project/provider selectors are not a way to move an existing history to another repository.
 
-Choose Claude, Codex or Copilot and a project, then open an existing chat or create one. The composer shows the selected model and supported effort setting. You can send a clarification during execution where the provider supports it.
+Use search to find a conversation. Supported local Claude Code, Codex and Copilot histories appear from allowed PC folders. Cloud-only conversations and some provider-specific desktop artifacts are unavailable. A busy Codex Desktop writer can block sending; release the chat on the PC and retry explicitly. A rejected send keeps a recoverable draft rather than silently resubmitting it.
 
-Attach images and files with the attachment button. Images have thumbnails; use the cross to remove an attachment before sending. Expand compact tool activity rows to see details. Chat results can be filtered by content type, and subagents can be opened when the provider supplies their context.
+The model selector is below the message field. **Unreleased Claude improvement:** it reads the installed Claude catalog, includes exact versions when reported and offers **Other version…** for a full model ID. Aliases such as Sonnet can change their target after a provider update; a full ID pins it. The selected model persists. If the catalog cannot load, aliases and manual IDs remain available. The account/provider decides whether a selected ID is actually allowed.
 
-Scroll upward to load older messages automatically. An indicator distinguishes more history, loading and the beginning of the chat. Reading position is saved separately per chat, including across app restarts. The reading-mode eye hides extra controls. Switching main tabs retains the selected chat. Recent history is cached and refreshed after connecting; this is not a full offline archive. Unsaved drafts should not be treated as durable storage.
+Codex reasoning effort appears when advertised for the model and is saved per model. Model and effort changes apply to the next turn. Provider runtime version and model version are different: the installed runtime is shown in account settings. [Provider capabilities](PROVIDERS.md)
 
-Open the right-edge activity drawer for running chats, errors, and questions needing a response. Reading a finished activity dismisses it from the queue; pending questions still require an answer.
+Send with the arrow or **Ctrl+Enter / Cmd+Enter**. A running chat accepts clarifications where supported; they may be queued rather than immediately interrupting a command. Stop affects that chat. Switching sections or minimizing the phone does not stop the PC job.
 
-On Android, allow notifications to follow the last open chat while the app is minimized. **Chat results and questions** is a separate Android notification channel for completion, errors and requests for an answer. Tap an alert to return to its chat. Reopening old completed history does not send another alert. Tracking ends when you explicitly leave the chat; background delivery still requires a reachable PC and Android allowing the service to run.
+**Unreleased composer update:** the shared input grows with a multiline prompt up to a bounded height. Attachments, model/effort controls and compact send/stop buttons stay within the same surface. Fresh response characters softly fade into view; already loaded history and code blocks remain still. No artificial typing queue delays the response. The operating system's reduced-motion setting disables the effect.
 
-From 0.22.7, Pocket Code also notifies you when **any** chat on the PC finishes or is stopped, including chats started in Codex, Claude Code or Copilot CLI on the PC and never opened on the phone. The PC detects the end of each turn from the providers' session files; while the phone is paired, Android shows a silent **PC chat tracking** notification. Each chat has one alert that a later result replaces. Turn this off in **Settings → Connection → Notify when any PC chat finishes**. If Android closes the app, tracking resumes the next time you open it.
+Only one writer may work in an overlapping project folder. Up to three Pocket Code jobs per provider can run in separate non-overlapping folders. Use separate existing worktrees for isolated work; Pocket Code does not create or merge them automatically.
 
-<a id="project"></a>
-## Rules and Changelog
+## Attachments and history
 
-**Rules** and **Changelog** are separate sections on PC and phone. Choose a **Git project** inside the section: only repositories containing the appropriate Markdown documents appear. Changelog recognizes CHANGELOG.md, CHANGES.md and HISTORY.md at the root or in docs/. A single document opens directly; multiple documents appear as a list. Refresh beside the project rescans projects; refresh beside the document reloads its content. Choose a new chat's project inside that chat.
+Use the paperclip, or paste an image/file on Windows. Image attachments show thumbnails; other files show tiles. Remove an attachment with its cross before sending. A message accepts up to ten attachments, each at most 10 MB. Uploads are stored on the host; a missing file may need to be attached again.
 
-PC pairing is under **Settings → Connection**. The scanner recognizes both PC pairing and WorkSpace invitations and opens the appropriate flow. Keep Pocket Code up to date on both devices.
+The app shows recent history first and loads older pages as you scroll. Loading and history-boundary messages distinguish waiting from the end. Use the jump controls to reach the beginning or newer messages. Position is saved per chat. If the agent was working when you left, returning follows the new messages; idle chats retain the reading position.
 
-## Jira tasks and notifications
+Recent chat data is cached per PC/provider. Reconnecting refreshes it. The cache is limited and is not a complete offline archive or draft backup. A file preview shows the current file on the host, which may differ from the original result.
 
-Jira uses one shared PC connection, independent of the AI selected for a task. Select the existing Claude connection or the direct MCP path through Codex. Each source needs its own authorization; the Claude path can consume model usage. See [providers and accounts](PROVIDERS.md#jira-is-independent-of-the-task-ai).
+## Tool activity, subagents and results
 
-Open **Tasks** to search and filter your assigned issues. Open an issue for its description and available actions. Actions depend on the issue's workflow and your selected role. Starting work creates a chat in the chosen project; sending work for review is a separate action. Select several tasks, choose a project and press **Open task chat**. Full descriptions are loaded into one normal chat with a sequential execution prompt; large descriptions become an attachment. Follow progress, clarify requirements or stop work in that chat. Batch chat creation leaves Jira statuses and PR publication to separate task actions.
+Commands and edits appear as compact activity rows. Expand a row for details, output or errors. Available subagents open a child context; return to the parent with Back. Providers differ in whether they expose a full transcript, task/result summary or no child context. Unknown status is not proof of completion.
 
-The bell shows Pocket Code's task-change feed. It is not Jira's internal notification inbox or Android push. The host periodically checks assigned tasks while the connected interface requests updates. The feed is distinct from native Android chat alerts.
+**Results** scans available history independently of the visible messages. Choose Images, Documents or Links, then assistant results or your sources. Code and Tools are not result categories; inspect those in messages or Review. Scanning can continue gradually, reports errors and offers retry. It is not an inventory of every file on disk.
 
-<a id="settings"></a>
-## Appearance and disconnecting
+Select an image to zoom, pan or fit it to the screen. External images require explicit loading. Markdown and supported documents render in the viewer; arbitrary office/interactive provider artifacts do not have full native renderers. The eye in the chat hides surrounding controls for reading; use the restore control or Back to leave reading mode.
 
-Settings group appearance/language, provider access, integrations, updates, and connection details. Text size and interface scale serve different purposes; Review also has an independent code-size override.
+<a id="diff"></a>
+## Review changes
 
-**Disconnect and forget** is at the end of the main settings list. It clears this phone's saved pairing and cached conversations. It does not stop the PC host or delete your project. Use the PC stop launcher to stop the host; active work can prevent a graceful stop.
+Open **Review** from a chat when repository changes are available. Its heading identifies the repository and branch. Review is scoped to the chat project, including edits made outside that AI turn. Inside a larger Git repository, the project path limits the comparison.
 
-For troubleshooting, include app and host versions and reproduction steps in an [issue](https://github.com/Evgenie-Myasnikov/pocket-code/issues), with private data removed.
-## Shared Jira connection on the PC
+| Control | Meaning |
+| --- | --- |
+| All changes | Uncommitted changes, including eligible new files |
+| Staged changes | Changes already in the Git index |
+| Branch changes | Committed differences against the selected base |
+| Unified | Added/removed lines in one sequence |
+| Split | Old and new sides; a newly added file can have an empty old side |
+| Inline highlights (automatic) | Emphasize changed spans within lines when available |
+| File types | Hide selected extensions such as .png |
+| Code size / fit width | Adjust code independently of UI scale or fit long lines to the viewport |
 
-In the PC QR window, open **Jira · Connect / Settings**. Choose the existing Claude connection, or **Sign in to Atlassian** for direct MCP through Codex, then select that connection. Jira access is shared by Claude and Codex tasks; choosing a task AI does not change your Jira account.
+Scroll the file list and collapse individual file diffs. Long lines can still require horizontal scrolling when fit is disabled. Very long lines become small when fit is enabled. Refresh re-reads Git; a network error can leave a retained, stale comparison. Review does not stage, commit, approve, merge or publish.
 
-The Claude connection uses Claude's allowance. Direct MCP does not start a model turn, but requires its own Atlassian authorization. A site administrator may need to approve it. Signing into Claude does not authorize Codex. Complete login in the PC browser and refresh Tasks on the phone. Finish active tasks before changing the connection.
+## Boards, rules and changelogs
+
+**Board** lists repositories that already have a board or a connected Miro board. **Add project board** explicitly creates a board for a repository; projects without one stay out of the list. Long-press empty canvas, or right-click on PC, to create a note. Move notes between version columns; the target column is highlighted. Right-click a note or board card to delete with confirmation. [Full board guide](BOARDS.md)
+
+**Rules** and **Changelog** are separate sections. Select a Git project and open its Markdown document. The document view is separate from the index. Rules includes the built-in board-maintenance switch; disabling it does not disable project-native rules or authorize unrelated actions. A board is optional.
+
+## Activity, notifications and usage
+
+**Unreleased:** saved repository notes can start [isolated task runs](TASK-PIPELINE.md),
+with their own chat, pinned diff, verification commands and human approval. Miro AI
+read/write access has a [separate setup](MIRO-AI.md).
+
+Open the handle on the right edge to inspect active, waiting, failed and completed chats. Reading a completed result acknowledges it; a question stays actionable until answered. The Chats tab has a status indicator. Provider reporting and connection state determine how fresh these indicators are.
+
+Enable chat notifications in settings and grant Android's notification permission. The native background watcher can report completion, errors and questions while a host connection is available. Battery restrictions or a stopped app can delay delivery. This is not a hosted push service. The board bell is a separate private inbox for assignments/questions from compatible host boards, not Miro's notification inbox.
+
+The unreleased host journal retains up to 1,000 run events for seven days. Windows and
+Android remember their cursor, catch up after reconnect and open the exact job/chat from
+an alert. For runs started outside Pocket Code, only completion/stopped events supported
+by the transcript monitor are available; error/question events cover Pocket Code jobs.
+
+**Usage** shows the windows and reset times reported by the provider. The small ring near the composer summarizes the limiting applicable allowance. Missing or stale data is unavailable, not an invented 100% balance. Copilot capability coverage differs from Claude/Codex.
+
+<a id="updates"></a>
+## Updates
+
+1. Open **Settings → Updates** on either device and check for updates through the PC.
+2. The host reads release metadata and downloads verified packages. A compatible PC update restarts when active work permits it.
+3. Android downloads the matching APK from the connected PC. Confirm installation in the Android installer; silent APK installation is not supported.
+4. Reopen/reconnect after installation. Keep the PC available until transfer completes.
+
+The phone does not independently install a PC update or transfer credentials to GitHub. Installation preserves application data; **Disconnect and forget** is separate. An old client that cannot understand the current update source can be upgraded once by installing the released APK over the existing app. See [troubleshooting](TROUBLESHOOTING.md).
+
+## Settings and account separation
+
+Appearance controls theme, text/UI size and board grid spacing. Diff size is independent. Account settings show provider login/server state and logout. Signing out of an AI provider does not revoke a paired phone; disconnecting a phone does not sign out of the provider.
+
+**Disconnect and forget** is at the bottom of the main mobile settings index. It clears that saved connection and related caches. Use the PC device list to revoke another device. Never paste tokens into chats or screenshots.
+
+Jira settings and compatibility endpoints remain, but the old Tasks/Jira workflow page and WorkSpace administration are no longer primary navigation. Miro connects in its own settings category and retains its own authentication and access rules.

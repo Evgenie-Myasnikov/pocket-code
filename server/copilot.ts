@@ -21,7 +21,10 @@ type Run={view:JobView;session?:CopilotSession;pending:Map<string,(allow:boolean
 export class CopilotService{
  async refreshAuthentication(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');await this.client.stop();this.starting=undefined;}
  private closed=false;private client:CopilotClient;private starting?:Promise<void>;private runs=new Map<string,Run>();private authLogin=new CopilotLogin(async()=>{await this.client.stop();this.starting=undefined;return (await this.status()).authenticated;});
- constructor(private roots:string[],client?:CopilotClient){this.client=client||new CopilotClient({workingDirectory:roots[0],useLoggedInUser:true});}
+  private configuredRoots:string[];
+  constructor(private roots:string[],client?:CopilotClient){this.configuredRoots=[...roots];this.client=client||new CopilotClient({workingDirectory:roots[0],useLoggedInUser:true});}
+  /** Only verified host-owned task working copies may extend provider access. */
+  setManagedTaskRoots(roots:string[]){this.roots=[...this.configuredRoots,...roots];}
  private async connect(){if(this.closed)throw new HttpError(503,'Copilot host is stopping');if(!this.starting)this.starting=this.client.start().catch(error=>{this.starting=undefined;throw error;});await this.starting;return this.client;}
  async logout(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');await(await this.connect()).rpc.account.logout({});}
  private quota?:{at:number;value:CodexUsageSnapshot};

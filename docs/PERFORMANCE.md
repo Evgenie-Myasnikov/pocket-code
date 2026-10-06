@@ -2,6 +2,8 @@
 
 Audit date: 2026-10-01. Scope: chat typing, history updates, streaming snapshots, scrolling, large diffs, navigation, read concurrency, visibility and lifecycle cleanup.
 
+This is a historical benchmark, not a measurement of the current working tree. See the [2026-10-06 maintenance report](MAINTENANCE-2026-10-06.md) for later changes and actual validation. Do not reuse the numbers below as evidence for a newer build.
+
 ## Reproduce
 
 ```sh

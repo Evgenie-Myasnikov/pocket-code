@@ -18,6 +18,33 @@ using System.Runtime.InteropServices;
 public sealed class DesktopPreferences {
     public bool Connect=true, Internet=true, AutoReconnect=true, AutoUpdate=true;
     public string Source="";
+    public bool RunAlerts=true;
+    public string RunLanguage="en";
+    public long NotificationCursor=0;
+    public string[] NotificationSeen=new string[0];
+    public object[] PendingRunAlerts=new object[0];
+}
+/** Cursor/queue logic is independent of a visible WebView and can be checked without showing notifications. */
+public static class DesktopRunAlertBatch {
+    static string Field(Dictionary<string,object> item,string name){object value;return item.TryGetValue(name,out value)?Convert.ToString(value):"";}
+    public static bool Accept(DesktopPreferences preferences,Dictionary<string,object> body){
+        if(body==null||!body.ContainsKey("events")||!body.ContainsKey("now"))return false;
+        bool baseline=preferences.NotificationCursor==0;
+        var seen=new HashSet<string>(preferences.NotificationSeen??new string[0]);
+        var retained=new List<string>(preferences.NotificationSeen??new string[0]);
+        var waiting=new List<object>(preferences.PendingRunAlerts??new object[0]);
+        var events=body["events"] as System.Collections.IEnumerable;
+        if(events==null)return false;
+        foreach(object raw in events){
+            var item=raw as Dictionary<string,object>;if(item==null)continue;
+            string identity=Field(item,"id");if(identity==""||!seen.Add(identity))continue;retained.Add(identity);
+            if(!baseline&&Regex.IsMatch(Field(item,"provider"),@"^(claude|codex|copilot)$")&&Regex.IsMatch(Field(item,"status"),@"^(done|error|stopped|needs_input)$"))waiting.Add(item);
+        }
+        preferences.NotificationCursor=Convert.ToInt64(body["now"]);
+        if(retained.Count>1000)retained.RemoveRange(0,retained.Count-1000);
+        if(waiting.Count>100)waiting.RemoveRange(0,waiting.Count-100);
+        preferences.NotificationSeen=retained.ToArray();preferences.PendingRunAlerts=waiting.ToArray();return true;
+    }
 }
 public static class DesktopReadPolicy {
     public static bool AllowsMiroResource(string value,bool document){
@@ -28,12 +55,14 @@ public static class DesktopReadPolicy {
     public static bool AllowsWrite(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
+        if(Regex.IsMatch(path,@"^/(task-runs|task-runs/[a-f0-9-]+/(check|checks|approve|resume)|miro/(config|oauth/start|token|access|disconnect|items/update))$"))return true;
         return Regex.IsMatch(path,@"^/(jobs|uploads|project-rules|project-board|project-board/create|project-board/delete|project-board/miro|project-board/image|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
     }
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|project-board|project-board/image|repository-boards|repository-board|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|copilot/usage|updates/status|updates/latest|review|review/availability|project-artifact|document-projects|project-docs|project-rules|project-doc|files|file)$")||
+        if(Regex.IsMatch(path,@"^/(activity/events|task-runs(?:/[a-f0-9-]+(?:/(checks|result|board|review))?)?|miro/(status|items))$"))return true;
+        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|project-board|project-board/image|repository-boards|repository-board|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|claude/models|copilot/usage|updates/status|updates/latest|review|review/availability|project-artifact|document-projects|project-docs|project-rules|project-doc|files|file)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");
@@ -95,6 +124,8 @@ public sealed class PocketDesktop:Form {
     string status="Ready to connect",jiraUrl;
     object[] addresses=new object[0];
     readonly bool preview,reopen;
+    Dictionary<string,object> activeRunAlert,pendingChat;
+    DateTime nextRunPoll=DateTime.MinValue;
     public Task Ready{get{return initialized.Task;}}
 
     [STAThread] public static void Main(string[] args){
@@ -125,6 +156,7 @@ public sealed class PocketDesktop:Form {
         HandleCreated+=(_,e)=>ApplyWindowTheme(true,Color.FromArgb(17,21,18),Color.FromArgb(230,232,227),Color.FromArgb(42,48,43));
         var menu=new ContextMenuStrip();menu.Items.Add("Открыть",null,(_,e)=>RestoreWindow());menu.Items.Add("Подключить / отключить",null,async(_,e)=>await Toggle());menu.Items.Add(new ToolStripSeparator());menu.Items.Add("Выход",null,async(_,e)=>await ExitApp());
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
+        tray.BalloonTipClicked+=(_,e)=>{OpenRunAlert();CompleteRunAlert();};tray.BalloonTipClosed+=(_,e)=>CompleteRunAlert();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
         Resize+=(_,e)=>{if(WindowState==FormWindowState.Minimized)Hide();};timer.Tick+=async(_,e)=>await Poll();autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
         Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0&&!reopen)Hide();await InitializeWeb();}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);return;}
@@ -156,6 +188,15 @@ public sealed class PocketDesktop:Form {
             string action=message["action"] as string;object result;
             if(action=="window-theme"){
                 ApplyWindowTheme(message.ContainsKey("dark")&&message["dark"] is bool&&(bool)message["dark"],ThemeColor(message,"background"),ThemeColor(message,"foreground"),ThemeColor(message,"border"));result=true;
+            }else if(action=="run-alerts"){
+                if(preview){result=true;}else{
+                    preferences.RunAlerts=message.ContainsKey("enabled")&&message["enabled"] is bool&&(bool)message["enabled"];
+                    preferences.RunLanguage=message.ContainsKey("language")&&Convert.ToString(message["language"])=="ru"?"ru":"en";
+                    if(!preferences.RunAlerts){preferences.PendingRunAlerts=new object[0];preferences.NotificationCursor=0;preferences.NotificationSeen=new string[0];activeRunAlert=null;}
+                    Save();result=true;
+                }
+            }else if(action=="notification-pending"){
+                result=new{chat=pendingChat};pendingChat=null;
             }else if(action=="provider-logout"){
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"";
                 if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$"))throw new InvalidOperationException("Invalid provider.");
@@ -199,6 +240,37 @@ public sealed class PocketDesktop:Form {
     }
     void Reply(object message){if(exiting||IsDisposed)return;try{if(web.CoreWebView2!=null)web.CoreWebView2.PostWebMessageAsJson(json.Serialize(message));}catch(InvalidOperationException){}}
     void Push(){if(webReady&&!exiting)Reply(new{state=Snapshot()});}
+    static string Field(Dictionary<string,object> item,string name){object value;return item.TryGetValue(name,out value)?Convert.ToString(value):"";}
+    async Task PollRunNotifications(){
+        if(!preferences.RunAlerts||preview||DateTime.UtcNow<nextRunPoll)return;
+        nextRunPoll=DateTime.UtcNow.AddSeconds(8);
+        try{
+            var body=await Send(http,"/activity/events?since="+Math.Max(0,preferences.NotificationCursor-120000),false) as Dictionary<string,object>;
+            if(!DesktopRunAlertBatch.Accept(preferences,body))return;Save();ShowNextRunAlert();
+        }catch{/* A transient host failure keeps the cursor and queued targets for reconnect. */}
+    }
+    void ShowNextRunAlert(){
+        if(activeRunAlert!=null||!preferences.RunAlerts||preferences.PendingRunAlerts==null||preferences.PendingRunAlerts.Length==0)return;
+        activeRunAlert=preferences.PendingRunAlerts[0] as Dictionary<string,object>;
+        if(activeRunAlert==null){CompleteRunAlert();return;}
+        bool ru=preferences.RunLanguage=="ru";string state=Field(activeRunAlert,"status");
+        string text=state=="needs_input"?(ru?"Ожидает вашего ответа":"Waiting for your answer"):state=="error"?(ru?"Ошибка — подробности в чате":"Error — open the chat for details"):state=="stopped"?(ru?"Остановлено":"Stopped"):(ru?"Завершено — откройте результат":"Completed — open to view the result");
+        string title=Field(activeRunAlert,"title");if(title.Length>120)title=title.Substring(0,120);
+        tray.ShowBalloonTip(10000,title==""?"Pocket Code":title,text,state=="error"?ToolTipIcon.Error:state=="needs_input"?ToolTipIcon.Warning:ToolTipIcon.Info);
+    }
+    void CompleteRunAlert(){
+        if(activeRunAlert==null)return;
+        activeRunAlert=null;
+        var waiting=new List<object>(preferences.PendingRunAlerts??new object[0]);if(waiting.Count>0)waiting.RemoveAt(0);
+        preferences.PendingRunAlerts=waiting.ToArray();try{Save();}catch{}
+        // The next native poll presents the next item after Windows finishes its close/click events.
+    }
+    void OpenRunAlert(){
+        if(activeRunAlert==null)return;
+        pendingChat=new Dictionary<string,object>();
+        foreach(string name in new[]{"provider","sessionId","jobId","cwd","title"})pendingChat[name]=Field(activeRunAlert,name);
+        RestoreWindow();Reply(new{chatNotification=true});
+    }
     object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
     public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();web.Focus();}
     void Save(){if(preview)return;Directory.CreateDirectory(storage);string temp=settingsFile+".tmp";File.WriteAllText(temp,json.Serialize(preferences),Encoding.UTF8);
@@ -220,7 +292,7 @@ public sealed class PocketDesktop:Form {
     async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;if(runtime.ContainsKey("desktopCheckRequestedAt")){long requested=Convert.ToInt64(runtime["desktopCheckRequestedAt"]);if(requested>lastRequestedUpdate){lastRequestedUpdate=requested;StartUpdate();}}hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
     async Task Poll(){
         if(preview||polling||changing||exiting)return;polling=true;
-        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();tray.Text="Pocket Code · connected";return;}
+        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();await PollRunNotifications();tray.Text="Pocket Code · connected";return;}
             addresses=new object[0];jiraUrl=null;if(owner!=null&&owner.ActiveCount==0){owner.Dispose();owner=null;nextAttempt=DateTime.UtcNow.AddSeconds(Math.Min(60,5*Math.Pow(2,Math.Min(failures++,4))));}
             if(owner!=null){status="Starting the host / restoring connection…";return;}
             status=preferences.Connect&&preferences.AutoReconnect?"Host unavailable. Reconnecting…":"Disconnected";if(failures>0)status+=" See desktop-launch.log in the Pocket Code data folder.";tray.Text="Pocket Code · disconnected";

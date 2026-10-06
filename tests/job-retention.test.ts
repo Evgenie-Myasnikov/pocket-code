@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import {waitFor} from './wait-for';
 import { Jobs } from '../server/jobs.js';
 
 test('more than 100 completed chat turns retain running jobs and accept the next message', async () => {
@@ -14,7 +15,7 @@ test('more than 100 completed chat turns retain running jobs and accept the next
     let latest = '';
     for (let i = 0; i < 125; i++) {
       latest = randomUUID(); jobs.start({ ...input, id: latest });
-      await new Promise(resolve => setImmediate(resolve));
+      await waitFor(()=>jobs.get(latest).status!=='running');
     }
     assert.equal(jobs.get(latest).status, 'done');
     assert.equal(jobs.get(active.id).status, 'running');

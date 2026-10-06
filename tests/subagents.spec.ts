@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 
 const reviewer={id:'child-review',name:'Review access checks and navigation',status:'running',prompt:'Check access boundaries and navigation. Report findings only.',provider:'codex'};
@@ -26,7 +27,7 @@ async function mockHost(page:Page,options:{failure?:boolean;slow?:ReturnType<typ
 }
 async function openChat(page:Page,language='en',scale=100){
   await page.addInitScript(({language,scale,connection})=>{localStorage.setItem('pocket-code-language-v1',language);sessionStorage.setItem('connection',JSON.stringify(connection));localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',textSize:14,scale}));},{language,scale,connection});
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await page.locator('.workspace-picker-sidebar select').selectOption('codex');
   await page.getByRole('button',{name:/Agent activity example/}).click();
   await expect(page.getByText('Parent conversation remains here.')).toBeVisible();

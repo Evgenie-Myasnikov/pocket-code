@@ -9,9 +9,10 @@
     "0.25.6": "codex/project-0.25.6",
     "0.25.7": "codex/miro-0.25.7",
     "0.25.8": "codex/boards-0.25.8",
-    "0.25.9": "codex/chat-0.25.9",
     "0.25.10": "codex/cards-0.25.10",
-    "0.25.11": "codex/grid-0.25.11"
+    "0.25.9": "codex/chat-0.25.9",
+    "0.25.11": "codex/grid-0.25.11",
+    "0.26.0": "codex/task-pipeline-0.26.0"
   },
   "format": "pocket-code-board",
   "version": 1,
@@ -29,7 +30,8 @@
     "0.25.8",
     "0.25.9",
     "0.25.10",
-    "0.25.11"
+    "0.25.11",
+    "0.26.0"
   ],
   "notes": [
     {
@@ -118,8 +120,8 @@
       "branch": "0.25.2",
       "status": "done",
       "priority": "normal",
-      "x": 1068,
-      "y": 865.4892497750667,
+      "x": 1042.2857055664062,
+      "y": 670.6321025582698,
       "dependencies": []
     },
     {
@@ -151,8 +153,8 @@
       "branch": "0.25.3",
       "status": "done",
       "priority": "normal",
-      "x": 1384.8961035645173,
-      "y": 777.667350849083,
+      "x": 1380.8961035645173,
+      "y": 679.9530564154893,
       "dependencies": []
     },
     {
@@ -162,8 +164,8 @@
       "branch": "0.25.3",
       "status": "done",
       "priority": "normal",
-      "x": 1408,
-      "y": 1058.1219388712614,
+      "x": 1385.714111328125,
+      "y": 939.2648832071989,
       "dependencies": [
         "a329797d-297b-4210-afa1-a2b96db88765"
       ]
@@ -202,8 +204,8 @@
       "branch": "0.25.3",
       "status": "done",
       "priority": "high",
-      "x": 1408,
-      "y": 1332.938886342723,
+      "x": 1386.2857055664062,
+      "y": 1207.7961251122542,
       "dependencies": []
     },
     {
@@ -231,7 +233,7 @@
     {
       "id": "ed5528bd-8d43-49eb-a046-e391e33c530d",
       "title": "Одна доска на проект и переход из уведомления",
-      "description": "Проблема: несколько видов досок и лишние переключатели затрудняют работу. Результат: список проектов, создание и редактирование одной доски в репозитории, переход из уведомления на нужную заметку, одна кнопка обновления истории. Доска Pocket Code переведена на русский, оставлены только конкретные зависимости. Критерии: повторное создание не делает копию; устаревшее сохранение отклоняется; права участников соблюдаются; уведомление открывает исходную заметку. Реализация готова, итоговые проверки продолжаются. Основание: CHANGELOG.md, 0.25.6.\n\nДополнено: встроенное правило ведения доски и CHANGELOG.md с переключателем для проекта; явная отметка Git-ветки у версии; строка New создаёт чат после отправки. Проверены 14 серверных сценариев, 33 теста провайдеров и 31 сценарий интерфейса. Финальная сборка и публикация ещё не подтверждены.\n\nИтоговая проверка: версия 0.25.6 опубликована; сборки Android и Windows, проверка окна и трея Windows, проверки приватности исходников и архивов, GitHub CI успешны. Переключатель встроенного правила проверен в браузере. Проверка на физическом Android остаётся отдельной незавершённой задачей. Источник: CHANGELOG.md · 0.25.6.\n\nУточнение после 0.25.6: доска необязательна. В списке только проекты с существующей доской; создание выполняется явно через выбор проекта. AI не создаёт недостающую доску автоматически. Стрелка справа на карточке убрана. Проверки: сборка TypeScript/Vite, 3 серверных теста и 3 сценария браузера прошли. Изменения ещё не опубликованы. Источник: CHANGELOG.md · Unreleased. Новое требование: сетка карточек досок, только название доски и проекта, без иконок и служебных подписей. Реализовано: визуальные связи скрыты, зависимости сохранены; карточки досок показывают названия сеткой. Проверены сборка TypeScript/Vite, два сценария интерфейса и четыре проверки данных. Выпуск 0.25.8: сетка карточек, сохранение названия доски и скрытые связи. Три сценария интерфейса, четыре проверки данных и сборки Android/Windows прошли. Физический Android не проверялся. Текущее изменение: удалять доску проекта через контекстное действие и подтверждение. Критерии: проверка прав и актуальной ревизии, удаление только выбранного файла доски, сохранность остальных файлов и вложений; Miro отключается без удаления удалённой доски. Проверка текущего изменения: Удаление доски подтверждается из контекстного действия, удержания и клавиатуры; Miro отключается. Пять серверных проверок, два браузерных сценария удаления и нативный Windows smoke прошли. Ещё не опубликовано; физический Android не проверялся. \n\nRelease evidence: CHANGELOG.md, 0.25.9; published v0.25.9 from 24d105996df6d6d0fcc730d0df55b5c3ee3cbb13 on codex/chat-0.25.9. Passed 51 focused server tests, 6 browser scenarios, TypeScript/web/Android/Windows builds and final source/APK/desktop/host privacy checks. Published updater downloaded and checksum-verified the APK. Physical Android and private Miro authentication remain unverified.\n\nUnreleased follow-up: right-click a note card to request deletion with confirmation. Acceptance: cancel preserves the note; confirm removes only that note and references to it from dependencies, preserves image assets and other cards, and respects existing edit permissions and revision checks.\nValidation: TypeScript and the focused desktop browser scenario passed: right-click on drag handle/content, cancellation without writes, confirmed deletion, dependency cleanup, preserved remaining card coordinates and persistence after reopening. Unreleased; physical device not tested.\nUnreleased follow-up: snap newly created and moved cards to an eight-pixel canvas grid; retain branch boundaries and show the same scaled grid at every zoom. Validate creation, dragging and saved positions.\nEvidence: CHANGELOG.md, 0.25.10. Two placement checks and two focused browser scenarios passed. Release evidence: v0.25.10 published from d4a6369fee9bc7ead6fa0c73660f2f6c25ca7d1d on codex/cards-0.25.10. Passed six focused server/placement checks, two browser scenarios, TypeScript/web/Android/Windows builds, GitHub CI and final source/archive privacy audits. Published APK updater checksum verification passed. Physical Android remains unverified.\nUnreleased follow-up: local board grid setting with steps 8, 12, 16, 24, 32 and 64. Acceptance: persist across restart, apply to visible grid and placement, keep cards within columns even at coarse steps, share settings on Windows and mobile.\nEvidence: CHANGELOG.md, 0.25.11. Three placement checks, three browser scenarios and TypeScript/Vite passed. Final Windows/Android package checks pending; physical devices not tested.\nRelease preparation: 0.25.11 on the existing codex/grid-0.25.11 branch. Grid options and placement verified by seven data checks and three browser scenarios. Final publication evidence will be recorded in CHANGELOG.md.\nRelease evidence: v0.25.11 published from d77fba04593d9b80bf12fd4278786505cd784898 on codex/grid-0.25.11. Seven data/placement checks, three browser scenarios, TypeScript/web/Android/Windows builds, GitHub CI and final source/archive privacy checks passed. Published APK updater checksum verification passed. Physical device testing remains unverified.",
+      "description": "Проблема: несколько видов досок и лишние переключатели затрудняют работу. Результат: список проектов, создание и редактирование одной доски в репозитории, переход из уведомления на нужную заметку, одна кнопка обновления истории. Доска Pocket Code переведена на русский, оставлены только конкретные зависимости. Критерии: повторное создание не делает копию; устаревшее сохранение отклоняется; права участников соблюдаются; уведомление открывает исходную заметку. Реализация готова, итоговые проверки продолжаются. Основание: CHANGELOG.md, 0.25.6.\n\nДополнено: встроенное правило ведения доски и CHANGELOG.md с переключателем для проекта; явная отметка Git-ветки у версии; строка New создаёт чат после отправки. Проверены 14 серверных сценариев, 33 теста провайдеров и 31 сценарий интерфейса. Финальная сборка и публикация ещё не подтверждены.\n\nИтоговая проверка: версия 0.25.6 опубликована; сборки Android и Windows, проверка окна и трея Windows, проверки приватности исходников и архивов, GitHub CI успешны. Переключатель встроенного правила проверен в браузере. Проверка на физическом Android остаётся отдельной незавершённой задачей. Источник: CHANGELOG.md · 0.25.6.\n\nУточнение после 0.25.6: доска необязательна. В списке только проекты с существующей доской; создание выполняется явно через выбор проекта. AI не создаёт недостающую доску автоматически. Стрелка справа на карточке убрана. Проверки: сборка TypeScript/Vite, 3 серверных теста и 3 сценария браузера прошли. Изменения ещё не опубликованы. Источник: CHANGELOG.md · Unreleased. Новое требование: сетка карточек досок, только название доски и проекта, без иконок и служебных подписей. Реализовано: визуальные связи скрыты, зависимости сохранены; карточки досок показывают названия сеткой. Проверены сборка TypeScript/Vite, два сценария интерфейса и четыре проверки данных. Выпуск 0.25.8: сетка карточек, сохранение названия доски и скрытые связи. Три сценария интерфейса, четыре проверки данных и сборки Android/Windows прошли. Физический Android не проверялся. Текущее изменение: удалять доску проекта через контекстное действие и подтверждение. Критерии: проверка прав и актуальной ревизии, удаление только выбранного файла доски, сохранность остальных файлов и вложений; Miro отключается без удаления удалённой доски. Проверка текущего изменения: Удаление доски подтверждается из контекстного действия, удержания и клавиатуры; Miro отключается. Пять серверных проверок, два браузерных сценария удаления и нативный Windows smoke прошли. Ещё не опубликовано; физический Android не проверялся. \n\nRelease evidence: CHANGELOG.md, 0.25.9; published v0.25.9 from 24d105996df6d6d0fcc730d0df55b5c3ee3cbb13 on codex/chat-0.25.9. Passed 51 focused server tests, 6 browser scenarios, TypeScript/web/Android/Windows builds and final source/APK/desktop/host privacy checks. Published updater downloaded and checksum-verified the APK. Physical Android and private Miro authentication remain unverified.\n\nUnreleased follow-up: right-click a note card to request deletion with confirmation. Acceptance: cancel preserves the note; confirm removes only that note and references to it from dependencies, preserves image assets and other cards, and respects existing edit permissions and revision checks.\nValidation: TypeScript and the focused desktop browser scenario passed: right-click on drag handle/content, cancellation without writes, confirmed deletion, dependency cleanup, preserved remaining card coordinates and persistence after reopening. Unreleased; physical device not tested.\nUnreleased follow-up: snap newly created and moved cards to an eight-pixel canvas grid; retain branch boundaries and show the same scaled grid at every zoom. Validate creation, dragging and saved positions.\nEvidence: CHANGELOG.md, 0.25.10. Two placement checks and two focused browser scenarios passed. Release evidence: v0.25.10 published from d4a6369fee9bc7ead6fa0c73660f2f6c25ca7d1d on codex/cards-0.25.10. Passed six focused server/placement checks, two browser scenarios, TypeScript/web/Android/Windows builds, GitHub CI and final source/archive privacy audits. Published APK updater checksum verification passed. Physical Android remains unverified.\nUnreleased follow-up: local board grid setting with steps 8, 12, 16, 24, 32 and 64. Acceptance: persist across restart, apply to visible grid and placement, keep cards within columns even at coarse steps, share settings on Windows and mobile.\nEvidence: CHANGELOG.md, 0.25.11. Three placement checks, three browser scenarios and TypeScript/Vite passed. Local 0.25.11 Windows and Android packages built from ea02a0a8b8176ca3d741780e1a1d128e5446632c on codex/grid-0.25.11. Seven data/placement checks, three browser scenarios and final source/APK/desktop/host audits passed. Unpublished; physical devices not tested.\nRelease preparation: 0.25.11 on the existing codex/grid-0.25.11 branch. Grid options and placement verified by seven data checks and three browser scenarios. Final publication evidence will be recorded in CHANGELOG.md.\nRelease evidence: v0.25.11 published from d77fba04593d9b80bf12fd4278786505cd784898 on codex/grid-0.25.11. Seven data/placement checks, three browser scenarios, TypeScript/web/Android/Windows builds, GitHub CI and final source/archive privacy checks passed. Published APK updater checksum verification passed. Physical device testing remains unverified.",
       "branch": "0.25.11",
       "status": "done",
       "priority": "high",
@@ -245,7 +247,7 @@
     {
       "id": "3f8d9e7b-2c66-4da4-991e-a5238f45c319",
       "title": "Доски Miro внутри приложения",
-      "description": "Проблема: для готовых досок нужен оригинальный интерфейс Miro без ручного переноса заметок. Результат: подключение по ссылке в настройках, привязка к проекту на ПК, встроенная доска, открытие в браузере и отключение без удаления. WorkSpace убран из навигации; старые данные сохранены. Критерии: доступны только HTTPS-ссылки Miro, параметры приглашений не сохраняются, сторонний фрейм не вызывает локальные команды, привязка переживает повторное открытие. Вход и права определяет Miro. API для AI и офлайн-редактирование не включены. Источник: CHANGELOG.md · 0.25.7. Финальная проверка и публикация ожидаются. Validation: 10 focused server tests, 9 interface scenarios, Android build and Windows smoke passed. Private Miro authentication and physical Android remain unverified.",
+      "description": "Проблема: для готовых досок нужен оригинальный интерфейс Miro без ручного переноса заметок. Результат: подключение по ссылке в настройках, привязка к проекту на ПК, встроенная доска, открытие в браузере и отключение без удаления. WorkSpace убран из навигации; старые данные сохранены. Критерии: доступны только HTTPS-ссылки Miro, параметры приглашений не сохраняются, сторонний фрейм не вызывает локальные команды, привязка переживает повторное открытие. Вход и права определяет Miro. API для AI и офлайн-редактирование не включены. Источник: CHANGELOG.md · 0.25.7. Встроенная доска опубликована в 0.25.7 согласно CHANGELOG.md. Review сохранён для проверки реального входа и физического телефона; REST-доступ AI ведётся отдельной карточкой. Validation: 10 focused server tests, 9 interface scenarios, Android build and Windows smoke passed. Private Miro authentication and physical Android remain unverified.",
       "branch": "Далее",
       "status": "review",
       "priority": "high",
@@ -284,6 +286,94 @@
       "priority": "high",
       "x": 2740,
       "y": 1700,
+      "dependencies": []
+    },
+    {
+      "id": "472aa2af-66f4-4c8b-a7eb-f86879fbe1f1",
+      "title": "Выбор модели и версии Claude",
+      "description": "Реализовано: каталог установленного Claude, точные версии и ручной ID, сохранение выбора, общий интерфейс Windows/Android и передача ID в SDK без подмены. Проверено 2026-10-06: модульные/API и браузерные проверки каталога, изоляции и передачи версии; реальное чтение метаданных SDK без запроса к модели. Входит в 281 серверную/модульную проверку и 139 целевых браузерных сценариев. Ограничения: доступ аккаунта к каждой модели не проверен; изменения ещё не опубликованы. Подробности: docs/MAINTENANCE-2026-10-06.md и CHANGELOG.md, Unreleased.",
+      "branch": "0.26.0",
+      "status": "review",
+      "priority": "high",
+      "x": 5872,
+      "y": 80,
+      "dependencies": []
+    },
+    {
+      "id": "714adc37-6ba4-4023-b981-f08bdb0cba3c",
+      "title": "Аудит, рефакторинг и полная документация",
+      "description": "Выполнен широкий аудит и целевой рефакторинг: выделены компоненты ввода и выбора модели, исправлены жизненный цикл Claude, стоимость обработки потока, изоляция результатов, навигация подключения, прокрутка и сохранение досок. Обновлены руководства EN/RU, архитектура и проверка ссылок. Проверено 2026-10-06: 281 модульная/серверная проверка, 139 уникальных целевых браузерных сценариев, TypeScript/Vite, Windows/native smoke, Android debug и ссылки документации. Полный диагностический UI-прогон выявил устаревшие сценарии удалённых разделов; весь набор пока не зелёный, нужна дальнейшая миграция. Большой главный JS-модуль остаётся задачей дальнейшего разделения. Физические устройства и все живые аккаунты не проверены. Не опубликовано. Доказательства и границы: docs/MAINTENANCE-2026-10-06.md; CHANGELOG.md, Unreleased. Продолжение: привести проверку действующего интерфейса к чистому полному прогону, выделить границы новых модулей, обновить руководства и проверить сборки после интеграции конвейера задач.\n\nПроверка 2026-10-06: реализация готова к ревью. 319/319 серверных и модульных проверок; 283 актуальных UI-сценария прошли по полному прогону и повторной проверке двух исправленных ожиданий. Windows, Android debug и TypeScript/Vite собраны. Проверены установка локального пакета хоста и ссылки документации. Не опубликовано. Физический Android, живой Miro OAuth и все аккаунты провайдеров не проверены; диагностическая ошибка завершения node-pty требует отдельной проверки. Актуальные доказательства заменяют прежний промежуточный статус: docs/MAINTENANCE-2026-10-06.md и CHANGELOG.md, Unreleased.\n\nРелиз 0.26.0: подготовка Windows, Android и хоста к публикации; текущая сборка и проверка пакетов выполняются. Публикация пока не подтверждена.",
+      "branch": "0.26.0",
+      "status": "review",
+      "priority": "high",
+      "x": 5872,
+      "y": 400,
+      "dependencies": []
+    },
+    {
+      "id": "83ea89a0-d2f4-4bcd-99ae-7420ec98dc3d",
+      "title": "Поле промпта и плавное появление ответа",
+      "description": "Реализовано: единое растущее поле промпта, спокойная поверхность по теме, компактные круглые действия, превью вложений и выбор модели. Новые символы текста плавно проявляются без задержки данных; код и история не анимируются, число символов ограничено, системное уменьшение движения учитывается. Проверено 2026-10-06: Markdown и Unicode, исчезновение временных span, reduced motion, Ctrl/Cmd+Enter, отправка уточнений, отклонённый черновик, остановка, вложения и масштабы. Синтетические снимки поля просмотрены; общие Windows/Android сборки прошли. Физический телефон не проверен, выпуск не опубликован. Подробности: docs/MAINTENANCE-2026-10-06.md и CHANGELOG.md, Unreleased.",
+      "branch": "0.26.0",
+      "status": "review",
+      "priority": "high",
+      "x": 5872,
+      "y": 720,
+      "dependencies": []
+    },
+    {
+      "id": "960edb02-4603-4166-8e46-64851d95124c",
+      "title": "Связать карточку, чат и результат",
+      "description": "Проблема: обсуждение задачи и результат выполнения разобщены. Результат: сохраняемый запуск связывает карточку, конкретный чат, проверки и Git-результат; переходы работают в обе стороны на ПК и телефоне. Критерии: привязка переживает перезапуск, запуск из карточки открывает обычный чат, результат относится только к этому запуску, устаревшие ответы и чужие проекты не смешиваются. Личные данные запусков хранятся только у хоста.\n\nИстория: CHANGELOG.md → Unreleased. Реализация и проверки ещё выполняются; публикация не заявлена.\n\nПроверка 2026-10-06: реализация готова к ревью. 319/319 серверных и модульных проверок; 283 актуальных UI-сценария прошли по полному прогону и повторной проверке двух исправленных ожиданий. Windows, Android debug и TypeScript/Vite собраны. Проверены установка локального пакета хоста и ссылки документации. Не опубликовано. Физический Android, живой Miro OAuth и все аккаунты провайдеров не проверены; диагностическая ошибка завершения node-pty требует отдельной проверки. Актуальные доказательства заменяют прежний промежуточный статус: docs/MAINTENANCE-2026-10-06.md и CHANGELOG.md, Unreleased.\n\nРелиз 0.26.0: подготовка Windows, Android и хоста к публикации; текущая сборка и проверка пакетов выполняются. Публикация пока не подтверждена.",
+      "branch": "0.26.0",
+      "status": "review",
+      "priority": "high",
+      "x": 5872,
+      "y": 1040,
+      "dependencies": []
+    },
+    {
+      "id": "44b4ea80-8b91-4932-9c7a-9e93a6c5351b",
+      "title": "Изолировать параллельные задачи в Git",
+      "description": "Результат: каждый запуск задачи получает отдельную Git-рабочую копию и ветку от проверенного коммита, а исходная рабочая папка сохраняет свои изменения. Критерии: конкурентные запуски не делят изменяемые файлы; повтор запроса не создаёт дубликат; сбой подготовки и восстановление после перезапуска обрабатываются явно; очистка не удаляет пользовательские изменения. Автоматический merge и push не входят в запуск.\n\nИстория: CHANGELOG.md → Unreleased. Реализация и проверки ещё выполняются; публикация не заявлена.\n\nПроверка 2026-10-06: реализация готова к ревью. 319/319 серверных и модульных проверок; 283 актуальных UI-сценария прошли по полному прогону и повторной проверке двух исправленных ожиданий. Windows, Android debug и TypeScript/Vite собраны. Проверены установка локального пакета хоста и ссылки документации. Не опубликовано. Физический Android, живой Miro OAuth и все аккаунты провайдеров не проверены; диагностическая ошибка завершения node-pty требует отдельной проверки. Актуальные доказательства заменяют прежний промежуточный статус: docs/MAINTENANCE-2026-10-06.md и CHANGELOG.md, Unreleased.\n\nРелиз 0.26.0: подготовка Windows, Android и хоста к публикации; текущая сборка и проверка пакетов выполняются. Публикация пока не подтверждена.",
+      "branch": "0.26.0",
+      "status": "review",
+      "priority": "high",
+      "x": 5872,
+      "y": 1360,
+      "dependencies": []
+    },
+    {
+      "id": "166484f9-e19e-4bcf-acde-8f4f25a0fb92",
+      "title": "Подтверждать результат проверками и одобрением",
+      "description": "Результат: этапы уточнения, работы, проверок, ревью и человеческого одобрения имеют явные условия перехода. Критерии: завершение AI не равно принятию результата, команды проверки выполняются в рабочей копии и сохраняют факт выхода; ошибка блокирует успешное ревью; одобрение относится к конкретной ревизии/результату; изменение результата отменяет прежнее одобрение.\n\nИстория: CHANGELOG.md → Unreleased. Реализация и проверки ещё выполняются; публикация не заявлена.\n\nПроверка 2026-10-06: реализация готова к ревью. 319/319 серверных и модульных проверок; 283 актуальных UI-сценария прошли по полному прогону и повторной проверке двух исправленных ожиданий. Windows, Android debug и TypeScript/Vite собраны. Проверены установка локального пакета хоста и ссылки документации. Не опубликовано. Физический Android, живой Miro OAuth и все аккаунты провайдеров не проверены; диагностическая ошибка завершения node-pty требует отдельной проверки. Актуальные доказательства заменяют прежний промежуточный статус: docs/MAINTENANCE-2026-10-06.md и CHANGELOG.md, Unreleased.\n\nРелиз 0.26.0: подготовка Windows, Android и хоста к публикации; текущая сборка и проверка пакетов выполняются. Публикация пока не подтверждена.",
+      "branch": "0.26.0",
+      "status": "review",
+      "priority": "high",
+      "x": 5872,
+      "y": 1680,
+      "dependencies": []
+    },
+    {
+      "id": "bdc3365c-9fea-4a06-8e00-81847c7e35a0",
+      "title": "Доставлять уведомления о работе агентов",
+      "description": "Результат: при разрешённых уведомлениях вопрос, ошибка и завершение агента доставляются на Windows и Android, нажатие открывает нужный чат. Критерии: дедупликация, восстановление после переподключения, отсутствие уведомлений после явного отключения и корректный переход к цели. Проверять синтетически; физические ограничения и непроверенные сценарии отмечать отдельно.\n\nИстория: CHANGELOG.md → Unreleased. Реализация и проверки ещё выполняются; публикация не заявлена.\n\nПроверка 2026-10-06: реализация готова к ревью. 319/319 серверных и модульных проверок; 283 актуальных UI-сценария прошли по полному прогону и повторной проверке двух исправленных ожиданий. Windows, Android debug и TypeScript/Vite собраны. Проверены установка локального пакета хоста и ссылки документации. Не опубликовано. Физический Android, живой Miro OAuth и все аккаунты провайдеров не проверены; диагностическая ошибка завершения node-pty требует отдельной проверки. Актуальные доказательства заменяют прежний промежуточный статус: docs/MAINTENANCE-2026-10-06.md и CHANGELOG.md, Unreleased.\n\nРелиз 0.26.0: подготовка Windows, Android и хоста к публикации; текущая сборка и проверка пакетов выполняются. Публикация пока не подтверждена.",
+      "branch": "0.26.0",
+      "status": "review",
+      "priority": "high",
+      "x": 5872,
+      "y": 2000,
+      "dependencies": []
+    },
+    {
+      "id": "b303a52a-6521-4e84-820f-821745f78cf1",
+      "title": "Дать AI управляемый доступ к Miro",
+      "description": "Результат: отдельная интеграция с официальным REST API для чтения и изменения поддерживаемых элементов подключённой доски. Критерии: явное включение доступа, безопасное хранение авторизации на ПК, проверка принадлежности доски проекту, ограниченные и проверяемые операции, понятные ошибки входа/прав/лимитов; встроенная доска продолжает работать независимо. Не копировать токены и содержимое личных досок в Git.\n\nИстория: CHANGELOG.md → Unreleased. Реализация и проверки ещё выполняются; публикация не заявлена.\n\nПроверка 2026-10-06: реализация готова к ревью. 319/319 серверных и модульных проверок; 283 актуальных UI-сценария прошли по полному прогону и повторной проверке двух исправленных ожиданий. Windows, Android debug и TypeScript/Vite собраны. Проверены установка локального пакета хоста и ссылки документации. Не опубликовано. Физический Android, живой Miro OAuth и все аккаунты провайдеров не проверены; диагностическая ошибка завершения node-pty требует отдельной проверки. Актуальные доказательства заменяют прежний промежуточный статус: docs/MAINTENANCE-2026-10-06.md и CHANGELOG.md, Unreleased.\n\nРелиз 0.26.0: подготовка Windows, Android и хоста к публикации; текущая сборка и проверка пакетов выполняются. Публикация пока не подтверждена.",
+      "branch": "0.26.0",
+      "status": "review",
+      "priority": "high",
+      "x": 5872,
+      "y": 2320,
       "dependencies": []
     }
   ]

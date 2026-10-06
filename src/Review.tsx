@@ -10,7 +10,7 @@ import {ReviewFileDiff} from './ReviewFileDiff';
 const extension=(path:string)=>{const name=path.split(/[\\/]/).at(-1)||path;const dot=name.lastIndexOf('.');return dot>0?name.slice(dot).toLowerCase():'(none)';};
 
 type Data={files:ReviewFile[];current:string;base:string;branches:string[];patch:string;binary:boolean;repositoryRoot?:string;projectPath?:string;scope?:string};
-export function Review({connection,cwd,onClose,initialMode='working'}:{connection:Connection;cwd:string;onClose:()=>void;initialMode?:'working'|'branch'}){
+export function Review({connection,cwd,onClose,initialMode='working',taskRunId}:{connection:Connection;cwd:string;onClose:()=>void;initialMode?:'working'|'branch';taskRunId?:string}){
   const panel=useRef<HTMLElement|null>(null),diff=useRef<HTMLElement|null>(null),eye=useRef<HTMLButtonElement|null>(null),restore=useRef<HTMLButtonElement|null>(null),optionsButton=useRef<HTMLButtonElement|null>(null);
   const [reading,setReading]=useState(false),[options,setOptions]=useState(false);
   const optionsPanel=useRef<HTMLDivElement|null>(null);
@@ -32,7 +32,7 @@ export function Review({connection,cwd,onClose,initialMode='working'}:{connectio
       if(!background){setBusy(true);setError('');setData(previous=>previous?{...previous,patch:'',binary:false}:null);}
       const query=new URLSearchParams({cwd,mode,...(base?{base}:{})});
       try{
-        const value=await request<Data>(connection,'/review?'+query);
+        const value=await request<Data>(connection,taskRunId?'/task-runs/'+taskRunId+'/review':'/review?'+query);
         if(!active)return;
         setData(value);setError('');setUpdated(Date.now());
       }catch(error){if(active)setError((error as Error).message);}
@@ -42,7 +42,7 @@ export function Review({connection,cwd,onClose,initialMode='working'}:{connectio
     const resume=()=>{if(document.visibilityState==='visible')void load(true);};
     document.addEventListener('visibilitychange',resume);window.addEventListener('focus',resume);
     return()=>{active=false;clearInterval(timer);document.removeEventListener('visibilitychange',resume);window.removeEventListener('focus',resume);};
-  },[connection,cwd,mode,base,refresh]);
+  },[connection,cwd,mode,base,refresh,taskRunId]);
   useEffect(()=>{if(diff.current){diff.current.scrollTop=0;diff.current.scrollLeft=0;}},[mode,base]);
   const repository=data?.repositoryRoot||cwd,repoName=repository.split(/[\\/]/).filter(Boolean).at(-1)||repository;
   const extensions=[...new Set(data?.files.map(item=>extension(item.path))||[])].sort();
@@ -56,20 +56,20 @@ export function Review({connection,cwd,onClose,initialMode='working'}:{connectio
     </header>
     <div className="review-options-backdrop" hidden={!options||reading} onClick={()=>setOptions(false)}><div ref={optionsPanel} id="review-options" className="review-options" role="dialog" aria-modal="true" aria-label={t('Параметры ревью')} onClick={event=>event.stopPropagation()}>
       <div className="review-options-heading"><strong>{t('Параметры ревью')}</strong><button className="icon-button" aria-label={getLanguage()==='ru'?'Закрыть параметры':'Close review options'} onClick={()=>setOptions(false)}><X size={20}/></button></div>
-      <div className="review-controls"><label>{t('Сравнение')}<select aria-label={t('Сравнение')} value={mode} onChange={e=>{setMode(e.target.value);setData(null);}}><option value="working">{t('Все изменения')}</option><option value="staged">{t('Подготовленные изменения')}</option><option value="branch">{t('Изменения ветки')}</option></select></label><label>{t('Вид сравнения')}<select aria-label={t('Вид сравнения')} value={layout} onChange={e=>{setLayout(e.target.value);try{localStorage.setItem('pocket-code-diff-layout',e.target.value);}catch{}}}><option value="split">{t('Две колонки')}</option><option value="unified">{t('Одна колонка')}</option></select></label></div>
-      {mode==='branch'&&data&&<label className="review-base">{t('Базовая ветка')}<select aria-label={t('Базовая ветка')} value={base||data.base} onChange={e=>{setBase(e.target.value);}}>{[...new Set(['HEAD',...data.branches])].map(branch=><option key={branch}>{branch}</option>)}</select></label>}
+      <div className="review-controls"><label hidden={!!taskRunId}>{t('Сравнение')}<select aria-label={t('Сравнение')} value={mode} onChange={e=>{setMode(e.target.value);setData(null);}}><option value="working">{t('Все изменения')}</option><option value="staged">{t('Подготовленные изменения')}</option><option value="branch">{t('Изменения ветки')}</option></select></label><label>{t('Вид сравнения')}<select aria-label={t('Вид сравнения')} value={layout} onChange={e=>{setLayout(e.target.value);try{localStorage.setItem('pocket-code-diff-layout',e.target.value);}catch{}}}><option value="split">{t('Две колонки')}</option><option value="unified">{t('Одна колонка')}</option></select></label></div>
+      {!taskRunId&&mode==='branch'&&data&&<label className="review-base">{t('Базовая ветка')}<select aria-label={t('Базовая ветка')} value={base||data.base} onChange={e=>{setBase(e.target.value);}}>{[...new Set(['HEAD',...data.branches])].map(branch=><option key={branch}>{branch}</option>)}</select></label>}
       <label className="review-fit-width"><input type="checkbox" checked={fitWidth} onChange={event=>{setFitWidth(event.target.checked);try{localStorage.setItem('pocket-code-diff-fit-width',String(event.target.checked));}catch{}}}/>{t('Fit diff to width')}</label>
       <label className="review-font-size">{getLanguage()==='ru'?'Размер кода':'Code size'}<select aria-label={getLanguage()==='ru'?'Размер кода':'Code size'} value={fontSize??''} onChange={event=>{const value=event.target.value?Number(event.target.value):null;setFontSize(value);try{if(value===null)localStorage.removeItem('pocket-code-diff-font-size');else localStorage.setItem('pocket-code-diff-font-size',String(value));}catch{}}}><option value="">{getLanguage()==='ru'?'Как в чате, не меньше 14 px':'Match chat, minimum 14 px'}</option>{[4,6,8,10,12,14,16,18,20,22,24].map(size=><option key={size} value={size}>{size} px</option>)}</select></label>
       <fieldset className="review-extension-filters"><legend>{getLanguage()==='ru'?'Показывать типы файлов':'Show file types'}</legend>{extensions.map(ext=><label key={ext}><input type="checkbox" checked={!hiddenExtensions.includes(ext)} onChange={event=>setHiddenExtensions(old=>event.target.checked?old.filter(value=>value!==ext):[...old,ext])}/>{ext==='(none)'?(getLanguage()==='ru'?'Без расширения':'No extension'):ext}</label>)}</fieldset>
-      <p className="review-scope">{data?.projectPath||cwd}</p><p className="muted review-note">{t('Изменения Git в папке проекта, включая правки вне этого чата.')}</p>
+      <p className="review-scope">{data?.projectPath||cwd}</p><p className="muted review-note">{taskRunId?(getLanguage()==='ru'?'Изменения рабочей копии задачи относительно исходного коммита.':'Task working-copy changes since its starting commit.'):t('Изменения Git в папке проекта, включая правки вне этого чата.')}</p>
       <button className="review-refresh" disabled={busy} onClick={()=>{setRefresh(n=>n+1);}}><RefreshCw size={16}/>{t('Обновить')}</button>
     </div></div>
-    <div className="review-summary" hidden={reading}><span>{t(mode==='branch'?'Изменения ветки':mode==='staged'?'Подготовленные изменения':'Все изменения')} {'\u00b7'} {data?.files.length??0} {getLanguage()==='ru'?'файл.':'files'}</span><button className="icon-button" disabled={busy} aria-label={t('Обновить')} title={updated?new Date(updated).toLocaleTimeString():''} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={16}/></button></div>
+    <div className="review-summary" hidden={reading}><span>{taskRunId?(getLanguage()==='ru'?'Изменения задачи':'Task changes'):t(mode==='branch'?'Изменения ветки':mode==='staged'?'Подготовленные изменения':'Все изменения')} {'\u00b7'} {data?.files.length??0} {getLanguage()==='ru'?'файл.':'files'}</span><button className="icon-button" disabled={busy} aria-label={t('Обновить')} title={updated?new Date(updated).toLocaleTimeString():''} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={16}/></button></div>
     <div className="review-layout-switch" role="group" aria-label={getLanguage()==='ru'?'Режим дифа':'Diff layout'} hidden={reading}>
       {(['unified','split'] as const).map(value=><button key={value} aria-pressed={layout===value} onClick={()=>{setLayout(value);try{localStorage.setItem('pocket-code-diff-layout',value);}catch{}}}>{value==='unified'?(getLanguage()==='ru'?'Слитно':'Unified'):(getLanguage()==='ru'?'Раздельно':'Split')}</button>)}
     </div>
     {reading&&<button ref={restore} className="icon-button review-restore" aria-label={t('Показать управление ревью')} title={t('Показать управление ревью')} onClick={()=>toggleReading(false)}><EyeOff size={20}/></button>}
     {error&&<p className="error" role="alert">{t(error)}</p>}{busy&&<p role="status">{t('Загружаем изменения…')}</p>}
-    <div className="review-body"><section ref={diff} className="diff-content" aria-label={t('Изменённые файлы')} tabIndex={0}>{data?.files.length===0&&!busy&&<p>{t('Нет изменений')}</p>}{!!data?.files.length&&!visibleFiles.length&&<p>{getLanguage()==='ru'?'Все файлы скрыты фильтром. Измените типы файлов в параметрах.':'All files are hidden by the filter. Change file types in review options.'}</p>}<div className="review-file-list">{visibleFiles.map(item=><ReviewFileDiff key={[cwd,mode,base,item.path].join('|')} file={item} connection={connection} cwd={cwd} mode={mode} base={base} revision={updated} layout={layout} fontSize={fontSize} fitWidth={fitWidth} viewport={diff}/>)}</div></section></div>
+    <div className="review-body"><section ref={diff} className="diff-content" aria-label={t('Изменённые файлы')} tabIndex={0}>{data?.files.length===0&&!busy&&<p>{t('Нет изменений')}</p>}{!!data?.files.length&&!visibleFiles.length&&<p>{getLanguage()==='ru'?'Все файлы скрыты фильтром. Измените типы файлов в параметрах.':'All files are hidden by the filter. Change file types in review options.'}</p>}<div className="review-file-list">{visibleFiles.map(item=><ReviewFileDiff key={[cwd,mode,base,item.path].join('|')} file={item} taskRunId={taskRunId} connection={connection} cwd={cwd} mode={mode} base={base} revision={updated} layout={layout} fontSize={fontSize} fitWidth={fitWidth} viewport={diff}/>)}</div></section></div>
   </aside>;
 }

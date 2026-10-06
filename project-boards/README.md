@@ -10,6 +10,11 @@ Only product ideas, feature descriptions, statuses, priorities, version columns,
 
 Git carries product snapshots, not private collaboration events. Editing writes the project file with a revision check. Saving does not commit or push. A stale edit is rejected and must be refreshed before retrying.
 
+Unreleased task runs link a saved note to a private host chat, isolated Git working copy,
+checks and snapshot approval. Runtime records never belong in this JSON. Card status
+remains product planning; execution stages do not silently rewrite it. See the
+[task workflow](../docs/TASK-PIPELINE.md) and [Miro AI access](../docs/MIRO-AI.md).
+
 Interactive Claude, Codex and Copilot chats receive built-in board guidance from `server/board-instructions.ts`: discover the portable board, clarify ideas, preserve IDs and update relevant cards with evidence. New and resumed runs receive the guidance; already-running turns adopt it on their next run after the host is updated. Unsaved live boards are not exposed through these file instructions.
 
 Board assignments and clarification requests are private host data. The notification bell on Windows and mobile shows only the signed-in participant's inbox; opening a task marks that notification read. Approved participants can be assigned from the board. AI can use the bundled `scripts/board-cli.mjs` helper to list live boards/people, assign an existing participant or ask a specific question. This does not invite new members or bypass host approval. Notifications poll while the app is running; operating-system background delivery is not included in this board inbox.

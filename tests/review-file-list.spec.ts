@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect} from '@playwright/test';
 test('review scrolls through collapsible files and filters detected extensions',async({page})=>{
@@ -14,7 +15,7 @@ test('review scrolls through collapsible files and filters detected extensions',
   if(p==='/api/review'){const file=url.searchParams.get('file');if(file)calls.push(file);return route.fulfill({json:{files:files.map(path=>({path,added:2,removed:1,binary:path.endsWith('.png')})),current:'main',base:'main',branches:['main'],binary:file?.endsWith('.png'),patch:file?'@@ -1 +1,2 @@\n-old\n+'+file+' updated\n+done':''}});}
   return route.fulfill({status:404,json:{error:'Fixture endpoint'}});
  });
- await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Review fixture/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:/Review fixture/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
  const panel=page.getByRole('dialog',{name:'Review',exact:true});await expect(panel.locator('.review-file')).toHaveCount(3);await expect(panel).toContainText('src/second.ts updated');
  await expect(panel.locator('.review-filebar select')).toHaveCount(0);
  const first=panel.locator('.review-file').first();await first.getByRole('button').click();await expect(first.getByRole('button')).toHaveAttribute('aria-expanded','false');await expect(first.locator('.diff-table')).toHaveCount(0);
@@ -28,7 +29,7 @@ test('split gutters remain fixed across unequal files and layout modes are visib
  await page.setViewportSize({width:1600,height:1000});
  await page.route('**/api/review/availability?*',route=>route.fulfill({json:{available:true,mode:'working'}}));
  await page.route('**/api/review?*',route=>{const file=new URL(route.request().url()).searchParams.get('file');return route.fulfill({json:{files:['short.ts','long.ts'].map(path=>({path,added:1,removed:0})),current:'main',base:'main',branches:['main'],binary:false,patch:file?'@@ -1 +1,2 @@\n context\n+'+(file==='short.ts'?'short':'a longer synthetic example for the other file'):''}});});
- await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
  const panel=page.getByRole('dialog',{name:'Review',exact:true});await panel.getByRole('button',{name:'Split',exact:true}).click();await expect(panel.locator('.diff-table.split')).toHaveCount(2);
  await expect(panel).toContainText('a longer synthetic example');
  const positions=await panel.locator('.diff-table.split').evaluateAll(tables=>tables.map(table=>{const cells=table.querySelector('tr:not(.hunk):not(.diff-spacer)')!.children;return {gutter:cells[0].getBoundingClientRect().width,right:cells[2].getBoundingClientRect().left,left:cells[1].getBoundingClientRect().width,other:cells[3].getBoundingClientRect().width};}));
@@ -41,7 +42,7 @@ test('new files fill the width in split mode; modified files support inline repl
  await page.setViewportSize({width:1400,height:900});
  await page.route('**/api/review/availability?*',route=>route.fulfill({json:{available:true,mode:'working'}}));
  await page.route('**/api/review?*',route=>{const file=new URL(route.request().url()).searchParams.get('file');return route.fulfill({json:{files:['new.ts','changed.ts'].map(path=>({path,added:2,removed:path==='new.ts'?0:2})),current:'main',branches:['main'],binary:false,patch:file==='new.ts'?'@@ -0,0 +1,2 @@\n+new file one\n+new file two':file?'@@ -1,3 +1,3 @@\n context\n-old one\n-old two\n+new one\n+new two':''}});});
- await page.goto('http://127.0.0.1:5173');await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
  const panel=page.getByRole('dialog',{name:'Review',exact:true});await panel.getByRole('button',{name:'Split',exact:true}).click();
  const added=panel.locator('.review-file').filter({hasText:'new.ts'}),changed=panel.locator('.review-file').filter({hasText:'changed.ts'});
  await expect(added.locator('.diff-table.single-file')).toBeVisible();await expect(changed.locator('.diff-table.split')).toBeVisible();

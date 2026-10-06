@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 const connection={url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)};
 const cwd='C:\\Workspace\\example';
@@ -40,7 +41,7 @@ async function setup(page:Page,language='en',scale=100,options:{delay?:Promise<v
     return route.fulfill({status:404,json:{error:'Synthetic endpoint not configured'}});
   });
   await page.addInitScript(({connection,language,scale})=>{sessionStorage.setItem('connection',JSON.stringify(connection));localStorage.setItem('pocket-code-language-v1',language);localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',textSize:14,scale}));},{connection,language,scale});
-  await page.goto('http://127.0.0.1:5173');await page.locator('.workspace-picker-sidebar select').selectOption('codex');await page.getByRole('button',{name:/Results example/}).click();
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);await page.locator('.workspace-picker-sidebar select').selectOption('codex');await page.getByRole('button',{name:/Results example/}).click();
   await expect(page.getByText('const result = 42;', {exact:true})).toBeVisible();
 }
 const panel=(page:Page)=>page.locator('.chat-outputs-panel');
@@ -91,7 +92,7 @@ test('image gallery decodes only nearby authenticated thumbnails with bounded re
     await route.fulfill({json:{name:'image.png',mimeType:'image/png',data:image}});active--;
   });
   await page.addInitScript(()=>{(window as any).__releasedThumbnails=0;const revoke=URL.revokeObjectURL;URL.revokeObjectURL=function(url){(window as any).__releasedThumbnails++;revoke.call(URL,url);};});
-  await page.reload();await page.getByRole('button',{name:/Results example/}).click();await page.getByRole('button',{name:'Results',exact:true}).click();await panel(page).getByRole('button',{name:/^Images \d/}).click();
+  await page.reload();await openChatList(page);await page.getByRole('button',{name:/Results example/}).click();await page.getByRole('button',{name:'Results',exact:true}).click();await panel(page).getByRole('button',{name:/^Images \d/}).click();
   await expect.poll(()=>calls.length).toBe(2);await page.waitForTimeout(150);expect(calls.length).toBe(2);release();
   await expect(panel(page).getByRole('button',{name:'Asset 0',exact:true}).locator('img')).toBeVisible();
   await expect(panel(page).getByRole('button',{name:'Asset 29',exact:true}).locator('img')).toHaveCount(0);

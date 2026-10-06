@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {openChatList} from './chat-navigation';
 
 // CSS working areas, not a claim that every phone uses a fixed browser density.
 // Native system bars are excluded by the app's SystemBars/adjustResize setup.
@@ -43,7 +44,8 @@ async function openFixture(page:Page,profile:Profile,scale:number,language:'en'|
     return route.fulfill({status:404,json:{error:'Synthetic endpoint'}});
   });
   await page.goto('http://127.0.0.1:5173');
-  await expect(page.locator('.session-row')).toBeVisible();
+  await openChatList(page);
+  await expect(page.getByRole('button',{name:new RegExp(title)})).toBeVisible();
 }
 async function withinViewport(page:Page,selector:string,width:number,height?:number) {
   const failures=await page.locator(selector).evaluateAll((nodes,{width,height})=>nodes.flatMap(node=>{
@@ -69,12 +71,13 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   expect((await page.locator('.search').boundingBox())!.height).toBeLessThanOrEqual(52);
   await withinViewport(page,'.sidebar button,.sidebar select,.sidebar input',profile.width);
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-list.png`});
-  await page.locator('.session-row').click();
+  await page.getByRole('button',{name:new RegExp(title)}).click();
   await expect(page.locator('.message').last()).toBeVisible();
   await withinViewport(page,'.chat-header button,.chat-header select,.chat-header strong,.composer-tools button,.composer-tools select,.mobile-nav',profile.width,profile.height);
   await targets(page,'.chat-header button,.chat-header select,.composer-tools button,.composer-tools select,.mobile-nav button');
-  const titleBox=await page.locator('.header-title strong').boundingBox(),projectBox=await page.locator('.project-picker').boundingBox();
-  if(profile.width<=760)expect(titleBox!.y+titleBox!.height).toBeLessThanOrEqual(projectBox!.y+1);
+  const titleBox=await page.locator('.header-title strong').boundingBox(),projectBox=await page.locator('.chat-context').boundingBox();
+  if(profile.width<=760&&profile.height>540)expect(titleBox!.y+titleBox!.height).toBeLessThanOrEqual(projectBox!.y+1);
+  else if(profile.width<=760)await expect(page.locator('.chat-context')).toBeHidden();
   expect((await page.locator('.conversation').boundingBox())!.height).toBeGreaterThan(65);
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-chat.png`});
   await page.locator('.reading-entry').click();
@@ -92,7 +95,7 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   await page.locator('.review-panel').getByRole('button',{name:language==='en'?'Back to chat':'Вернуться в чат',exact:true}).click();
   const settings=language==='en'?'Settings':'Настройки';
   await (profile.width<=760?page.locator('.mobile-nav').getByRole('button',{name:settings,exact:true}):page.locator('.desktop-tabs').getByRole('button',{name:settings,exact:true})).click();
-  await expect(page.locator('.settings-index .settings-category')).toHaveCount(7);
+  await expect(page.locator('.settings-index .settings-category')).toHaveCount(9);
   await expect(page.locator('.chat-header .review-button')).toHaveCount(0);
   await expect(page.locator('.chat-header .project-picker')).toHaveCount(0);
   await withinViewport(page,'.settings-panel button',profile.width);

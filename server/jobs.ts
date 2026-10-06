@@ -57,8 +57,11 @@ export class Jobs {
     return this.view(job);
   }
   async execute(job: Job, input: Parameters<Jobs['start']>[0]) {
+    let stream: ReturnType<Run> | undefined;
+    let historySize = JSON.stringify(job.messages).length;
+    let historyCount = job.messages.length;
     try {
-      const stream = this.run({ prompt: job.inputs, options: {
+      stream = this.run({ prompt: job.inputs, options: {
         cwd: input.cwd, resume: input.sessionId, model: input.model || undefined,
         permissionMode: input.mode, maxBudgetUsd: input.maxBudgetUsd,
         abortController: job.controller, includePartialMessages: true,
@@ -95,7 +98,13 @@ export class Jobs {
           else{job.acceptingInput=false;job.inputs.close();}
         }
         job.revision++;
-        if (JSON.stringify(job.messages).length + job.partial.length > 4_000_000)
+        // Token deltas only change partial text. Avoid serializing the entire
+        // retained transcript on every token in a long conversation.
+        if (event.type !== 'stream_event' || historyCount !== job.messages.length) {
+          historySize = JSON.stringify(job.messages).length;
+          historyCount = job.messages.length;
+        }
+        if (historySize + job.partial.length > 4_000_000)
           throw new Error('Достигнут лимит отображения задачи. История сохранена Claude на ПК.');
       }
       if (job.status === 'running') job.status = job.controller.signal.aborted ? 'stopped' : 'done';
@@ -105,6 +114,7 @@ export class Jobs {
       job.controller.abort();
     } finally {
       job.acceptingInput=false;job.inputs.close();
+      try {stream?.close?.();} catch { /* Preserve the original job outcome. */ }
       // A missing completion event is not proof that a historical agent is active.
       for (const block of job.messages.flatMap(m => m.blocks)) if (block.agent?.status === 'running') block.agent.status = job.status === 'stopped' ? 'stopped' : 'unknown';
       for (const resolve of [...job.pending.values()]) resolve({ behavior: 'deny', message: 'Задача завершена' });

@@ -50,7 +50,7 @@ const copilot=new CopilotService(roots);
 let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
-const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines } = await createApp({ runs,devices,refreshPairing:()=>writePairingPage(local,devices.pairingToken,host,port,internetAddress,jiraSetupKey,true).then(()=>{}),copilot,pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
+const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines, closeTaskServices } = await createApp({ runs,devices,refreshPairing:()=>writePairingPage(local,devices.pairingToken,host,port,internetAddress,jiraSetupKey,true).then(()=>{}),copilot,pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
 runtimeReady = true;updater.start();
 const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
 void maintainEngines().catch(()=>{});
@@ -95,7 +95,7 @@ const server = app.listen(port, host, () => {
 let shutdownPromise: Promise<void> | undefined;
 function shutdown(preserveTunnel = false): Promise<void> {
   if (shutdownPromise) return shutdownPromise;
-  closing = true; runtimeReady = false; hostUpdater.close(); updater.close(); clearInterval(workflowTimer); clearInterval(engineTimer);
+  closing = true; runtimeReady = false; hostUpdater.close(); updater.close(); clearInterval(workflowTimer); clearInterval(engineTimer); clearInterval(runTimer);
   app.locals.providerConnections?.close();
   const stopped = new Promise<void>(resolve => server.close(() => resolve()));
   const queues = [queue?.close(), codexQueue?.close(),copilotQueue?.close(),copilot.close()];
@@ -103,7 +103,7 @@ function shutdown(preserveTunnel = false): Promise<void> {
   // Keep shutdown bounded if a network client fails to finish closing, but let
   // local workflow writes and owned tunnel termination settle before exit.
   const fallback = setTimeout(() => { server.closeAllConnections(); process.exit(0); }, 10000); fallback.unref();
-  shutdownPromise = Promise.allSettled([stopped, ...queues, workflow?.sync(), jira.close(), preserveTunnel ? undefined : tunnel?.close()]).then(() => {
+  shutdownPromise = Promise.allSettled([stopped, ...queues, closeTaskServices(), workflow?.sync(), jira.close(), preserveTunnel ? undefined : tunnel?.close()]).then(() => {
     clearTimeout(fallback); process.exit(0);
   });
   return shutdownPromise;

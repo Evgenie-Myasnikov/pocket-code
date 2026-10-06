@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import { test, expect, type Page } from '@playwright/test';
 
 const root = 'C:\\Workspace\\typography';
@@ -29,7 +30,7 @@ async function openChat(page: Page, provider: 'codex' | 'claude', language: 'en'
     if (endpoint.endsWith('/subagents')) return route.fulfill({ json: [] });
     return route.fulfill({ status: 404, json: { error: 'Synthetic endpoint not configured' } });
   });
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await page.getByRole('button', { name: /Typography test/ }).click();
   await expect(page.locator('[data-message-id="typography-message"]')).toBeVisible();
   await page.locator('[data-message-id="typography-message"] details').evaluateAll(details => details.forEach(element => element.setAttribute('open', '')));

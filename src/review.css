@@ -36,7 +36,7 @@
 .review-extension-filters{border:0;padding:0;margin:18px 0;display:flex;flex-wrap:wrap;gap:8px 16px}.review-extension-filters legend{margin-bottom:8px}.review-options .review-extension-filters label{flex-direction:row;align-items:center;min-height:44px;gap:8px}.review-extension-filters input{width:20px;height:20px;accent-color:var(--accent)}
 .review-fit-width{display:flex;align-items:center;gap:10px;min-height:48px;cursor:pointer}.review-fit-width input{width:20px;height:20px;flex-shrink:0;accent-color:var(--accent)}
 .review-layout-switch{display:flex;gap:4px;padding:4px 12px;border-bottom:1px solid var(--line);flex-shrink:0}
-.review-layout-switch button{min-height:36px;padding:5px 14px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:inherit}
+.review-layout-switch button{min-width:44px;min-height:44px;padding:5px 14px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:inherit}
 .review-layout-switch button[aria-pressed=true]{background:var(--surface);color:var(--text)}
 .review-layout-switch[hidden]{display:none}
 .diff-table .hunk td{text-align:left!important}

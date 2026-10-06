@@ -1,23 +1,24 @@
 import {test,expect} from '@playwright/test';
 import QRCode from 'qrcode';
-test('Workspace QR scanned from Connection joins the workspace using the real host route',async({page,request})=>{
+test('PC connection rejects workspace QR while legacy join API preserves password, approval and revocation',async({page,request})=>{
  const url='http://127.0.0.1:4319',headers={Authorization:'Bearer '+'test-only-'.repeat(5)};
  const health=await (await request.get(url+'/api/health',{headers})).json();
  const ws=await (await request.post(url+'/api/workspaces',{headers,data:{name:'QR routing '+Date.now(),password:'synthetic-password',roots:[health.roots[0]]}})).json();
  const invitation=await request.post(url+'/api/workspaces/'+ws.id+'/invitation',{headers,data:{role:'viewer'}});expect(invitation.ok()).toBeTruthy();const {token}=await invitation.json();
  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'PC connection',exact:true}).click();
  const buffer=await QRCode.toBuffer(JSON.stringify({type:'pocket-workspace',version:1,url,token,workspaceId:ws.id}),{width:640,margin:4});await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer});
- await page.getByLabel('Workspace password',{exact:true}).fill('wrong-password');await page.getByRole('button',{name:'Join',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Incorrect workspace password');await page.getByLabel('Workspace password',{exact:true}).fill('synthetic-password');await page.getByRole('button',{name:'Join',exact:true}).click();
- await expect.poll(()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}').workspaceId)).toBe(ws.id);await expect(page.getByLabel('What is your name?')).toBeVisible();
- await page.getByLabel('What is your name?').fill('Taylor');await page.getByLabel('Last name',{exact:true}).fill('Example');await page.getByRole('button',{name:'Continue',exact:true}).click();
- await expect(page.getByRole('dialog',{name:'Your workspace name'})).not.toBeVisible();
- await expect(page.getByRole('heading',{name:'Waiting for host approval'})).toBeVisible();
+ await expect(page.getByRole('alert')).toContainText(/workspace|WorkSpace/i);await expect(page.getByLabel('Workspace password',{exact:true})).toHaveCount(0);expect(await page.evaluate(()=>sessionStorage.getItem('connection'))).toBeNull();
+ const invitationHeaders={Authorization:'Bearer '+token};expect((await request.post(url+'/api/workspace-join',{headers:invitationHeaders,data:{password:'wrong-password'}})).status()).toBe(401);
+ const joined=await request.post(url+'/api/workspace-join',{headers:invitationHeaders,data:{password:'synthetic-password'}});expect(joined.ok()).toBe(true);const access=await joined.json(),memberHeaders={Authorization:'Bearer '+access.token};expect(access.workspaceId).toBe(ws.id);
+ expect((await request.get(url+'/api/health',{headers:memberHeaders})).status()).toBe(403);
+ expect((await request.post(url+'/api/workspaces/'+ws.id+'/profile',{headers:memberHeaders,data:{name:'Taylor Example',firstName:'Taylor',lastName:'Example'}})).ok()).toBe(true);
  const catalog=await (await request.get(url+'/api/workspaces',{headers})).json();const member=catalog.workspaces.find((w:any)=>w.id===ws.id).members.find((m:any)=>m.name==='Taylor Example');expect(member.approval).toBe('pending');
  expect((await request.post(url+'/api/workspaces/'+ws.id+'/member',{headers,data:{memberId:member.id,approval:'approved'}})).ok()).toBeTruthy();
- await page.getByRole('button',{name:'Check status'}).click();await expect(page.getByRole('heading',{name:'Waiting for host approval'})).toHaveCount(0);await expect(page.getByRole('button',{name:'Participants: 1'})).toBeVisible();
- await page.reload();await expect(page.getByLabel('Workspace password',{exact:true})).toHaveCount(0);await expect(page.getByLabel('What is your name?')).toHaveCount(0);await expect(page.getByRole('button',{name:'Participants: 1'})).toBeVisible();
+ expect((await request.get(url+'/api/health',{headers:memberHeaders})).ok()).toBe(true);
+ const resumed=await (await request.post(url+'/api/workspace-join',{headers:invitationHeaders,data:{previousToken:access.token}})).json();expect(resumed.token).toBe(access.token);
  expect((await request.post(url+'/api/workspaces/'+ws.id+'/member',{headers,data:{memberId:member.id,remove:true}})).ok()).toBeTruthy();
- const access=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}'));expect((await request.get(url+'/api/workspaces',{headers:{Authorization:'Bearer '+access.token}})).status()).toBe(401);
+ expect((await request.get(url+'/api/workspaces',{headers:memberHeaders})).status()).toBe(401);
+ expect((await request.post(url+'/api/workspaces/'+ws.id+'/delete',{headers,data:{}})).ok()).toBe(true);
 });
 test('Pairing retries exchange the QR again after the previous credential is revoked',async({page})=>{
  let attempts=0;await page.route('**/api/devices/pair',route=>route.fulfill({json:{deviceId:'device-'+(++attempts),token:'synthetic-device-token-'.repeat(3)}}));await page.goto('http://127.0.0.1:5173');

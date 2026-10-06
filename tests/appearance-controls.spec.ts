@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 test('sliders and native frame follow palette and theme',async({page})=>{
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.goto('http://127.0.0.1:5173');
- await page.locator('.connect-page').waitFor();
+ await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {AppearanceSettings,useAppearance}=await import('/src/Appearance.tsx' as string);
@@ -11,7 +11,7 @@ test('sliders and native frame follow palette and theme',async({page})=>{
   const root=document.createElement('div');root.id='appearance-fixture';root.style.cssText='padding:24px;max-width:480px;background:var(--bg)';document.body.replaceChildren(root);
   function Fixture(){return React.createElement(AppearanceSettings,useAppearance());}createRoot(root).render(React.createElement(Fixture));
  });
- const slider=page.locator('input[type=range]').first();await expect(slider).toBeVisible();await expect(slider).toHaveCSS('appearance','none');await expect(slider).toHaveCSS('height','44px');
+ const slider=page.locator('input[type=range]').first();await expect(slider).toBeVisible();await expect(slider).toHaveCSS('appearance','none');await expect(slider).toHaveCSS('height','48px');
  const theme=page.locator('select').first();await theme.selectOption('light');
  await expect.poll(()=>page.evaluate(()=>(window as any).themeCalls.at(-1)?.dark)).toBe(false);
  const before=await page.evaluate(()=>(window as any).themeCalls.at(-1).background);await page.locator('.palette-options button').nth(2).click();

@@ -1,6 +1,6 @@
-import {connectByQr} from './qr-connect';
+import {connectByQr,openConnectionSettings} from './qr-connect';
+import {openChatList} from './chat-navigation';
 import { test, expect } from '@playwright/test';
-import pkg from '../package.json' with { type: 'json' };
 
 const saved = { url: 'https://saved-pc.example', token: 'saved-test-key-'.repeat(4) };
 async function delayedConnection(page: import('@playwright/test').Page) {
@@ -27,6 +27,7 @@ async function delayedConnection(page: import('@playwright/test').Page) {
   });
   await page.goto('http://127.0.0.1:5173');
   await expect.poll(() => page.evaluate(() => typeof (window as any).releaseSavedConnection)).toBe('function');
+  await openConnectionSettings(page);
 }
 
 test('saved connection retries without exposing address or key fields', async ({page})=>{
@@ -36,31 +37,34 @@ test('saved connection retries without exposing address or key fields', async ({
   await expect(page.getByRole('button',{name:'Reconnect',exact:true})).toHaveCount(0);
   await page.evaluate(connection=>(window as any).releaseSavedConnection(connection),saved);
   await expect(page.getByRole('alert')).toBeVisible();
-  await expect(page.locator('.connect-brand .version')).toHaveText('ANDROID / '+pkg.version);
+  await expect(page.locator('.connect-page')).toBeVisible();
+  const before=await page.evaluate(()=>(window as any).connectionRequests.filter((request:any)=>request.url.endsWith('/api/health')).length);
   await page.getByRole('button',{name:'Reconnect',exact:true}).click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).connectionRequests.length)).toBe(2);
+  await expect.poll(()=>page.evaluate(()=>(window as any).connectionRequests.filter((request:any)=>request.url.endsWith('/api/health')).length)).toBe(before+1);
   expect(await page.evaluate(()=>(window as any).connectionRequests.every((request:any)=>request.headers.Authorization==='Bearer '+('saved-test-key-'.repeat(4))))).toBe(true);
-  await expect(page.locator('input:not([type=file])')).toHaveCount(0);
+  await expect(page.locator('.connect-page input:not([type=file])')).toHaveCount(0);
 });
 
 for(const language of ['en','ru'])test('QR-only entry is usable on a narrow phone in '+language,async({page})=>{
   await page.setViewportSize({width:320,height:740});
   await page.addInitScript(language=>localStorage.setItem('pocket-code-language-v1',language),language);
   await page.goto('http://127.0.0.1:5173');
+  await openConnectionSettings(page);
   await expect(page.locator('.connect-page input:not([type=file])')).toHaveCount(0);
   await expect(page.locator('.qr-divider')).toHaveCount(0);
   await expect(page.locator('.qr-connect button')).toHaveCount(2);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   if(language==='en')await page.screenshot({path:'artifacts/screenshots/connect-qr-only.png',fullPage:true});
-  await connectByQr(page);await expect(page.locator('.connect-page')).toHaveCount(0);
+  await connectByQr(page);await expect(page.getByRole('button',{name:/^(Reconnect|Повторить подключение)$/,exact:true})).toBeVisible();await openChatList(page);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
 });
 
 test('invalid QR image keeps scanning available, then a valid QR connects',async({page})=>{
   await page.goto('http://127.0.0.1:5173');
+  await openConnectionSettings(page);
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'invalid.png',mimeType:'image/png',buffer:Buffer.from('not an image')});
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.getByRole('button',{name:'Scan QR code',exact:true})).toBeEnabled();
-  await connectByQr(page);await expect(page.locator('.connect-page')).toHaveCount(0);
+  await connectByQr(page);await expect(page.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();await openChatList(page);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
 });
 
 test('failed QR connection can retry without rescanning or entering credentials',async({page})=>{

@@ -12,7 +12,7 @@ export function Connect({ initial, onConnect,onAlternateCode, onDemo, busy, erro
   const [scanned,setScanned]=useState<Connection|null>(null),[localError,setError]=useState('');
   const [scanning,setScanning]=useState(false),qrFile=useRef<HTMLInputElement>(null);
   const retry=scanned||initial;
-  function acceptCode(raw:string){const connection=parsePairingCode(raw);if(!!connection.workspaceInvite!==(kind==='workspace')){if(onAlternateCode){setScanned(null);onAlternateCode(connection);return;}throw Error(t(kind==='workspace'?'Это QR подключения к ПК. Откройте Настройки → Подключение к ПК.':'Это QR рабочей области. Откройте WorkSpace.'));}setScanned(connection);onConnect(connection);}
+  function acceptCode(raw:string){const connection=parsePairingCode(raw);if(!!connection.workspaceInvite!==(kind==='workspace')){if(onAlternateCode){setScanned(null);onAlternateCode(connection);return;}throw Error(t(kind==='workspace'?'Это QR подключения к ПК. Откройте Настройки → Подключение к ПК.':'Это QR рабочей области. Используйте QR подключения к ПК из настроек компьютера.'));}setScanned(connection);onConnect(connection);}
   async function scan() {
     if (!Capacitor.isNativePlatform()) {qrFile.current?.click();return;}
     setScanning(true);setError('');

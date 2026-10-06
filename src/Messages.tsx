@@ -7,11 +7,11 @@ function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
 }
-type MessageProps={message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean};
+type MessageProps={message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean};
 export const MessageList=memo(function MessageList({messages,runningMessages,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];runningMessages?:Set<ChatMessage>|null}){
   return messages.map(message=><Message key={message.id} message={message} running={runningMessages?.has(message)||false} {...shared}/>);
 });
-export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false }: MessageProps) {
+export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false }: MessageProps) {
   useLanguage();
   const plain = message.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
   if(message.blocks.length&&message.blocks.every(b=>b.type==='tool_result'&&b.tool_use_id&&toolResults?.has(b.tool_use_id)))return null;
@@ -24,7 +24,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
       // or separate results remain visible; no content is discarded or reordered.
       if(block.type==='tool_result' && previous?.type==='tool_use' && previous.id && previous.id===block.tool_use_id)return null;
       const result=block.type==='tool_use' && block.id ? toolResults?.get(block.id)||(next?.type==='tool_result'&&next.tool_use_id===block.id?next:undefined):undefined;
-      return <RichBlock key={i} running={running} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
+      return <RichBlock key={i} running={running} streaming={streaming&&message.role==='assistant'} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
   return <article data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{content}</div></> : <>
@@ -33,7 +33,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
     </>}
   </article>;
 },(before,after)=>{
-  if(before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.onSubagent!==after.onSubagent)return false;
+  if(before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.streaming!==after.streaming||before.onSubagent!==after.onSubagent)return false;
   // A result or agent update affects only the messages that refer to it.
   return after.message.blocks.every(block=>{
     if(block.agent&&before.agents?.get(block.agent.id)!==after.agents?.get(block.agent.id))return false;

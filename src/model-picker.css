@@ -1,0 +1,6 @@
+.model-picker { position: relative; display: flex; align-items: center; flex: 1 1 10em; min-width: 4em; max-width: min(24em, 65%); }
+.composer-tools .model-picker > select { width: 100%; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+.model-catalog-hint { color: var(--muted); padding-inline: .25em; }
+.model-custom { position: absolute; bottom: calc(100% + .6em); left: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: .5em; width: min(26em, 80vw); padding: 1em; border: 1px solid var(--line); border-radius: 1em; background: var(--panel); box-shadow: 0 .25em 1em #0003; }
+.model-custom label { width: 100%; display: grid; gap: .5em; }
+.model-custom input { min-width: 0; width: 100%; }

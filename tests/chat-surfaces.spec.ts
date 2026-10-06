@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 
 const project='C:\\Workspace\\chat-surfaces';
@@ -27,7 +28,7 @@ async function openChat(page:Page,language:string,textSize:number){
     if(path==='/updates/latest')return route.fulfill({json:{enabled:false}});
     return route.fulfill({status:404,json:{error:'Synthetic endpoint not configured'}});
   });
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await page.getByRole('button',{name:/Surface example/}).click();
   await expect(page.locator('[data-message-id="agents-only"]')).toBeVisible();
 }

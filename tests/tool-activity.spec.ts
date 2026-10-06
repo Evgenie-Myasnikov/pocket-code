@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import { test, expect } from '@playwright/test';
 
@@ -10,8 +11,8 @@ test('matching tool call and result use one disclosure without hiding errors or 
     {type:'tool_result',tool_use_id:'other',content:'Unrelated output stays visible'},
     {type:'codexItem',content:{type:'futureActivity',text:'Preserved extra activity'}},
   ]}],previous:null,next:null}}));
-  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
-  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
+  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await page.getByRole('button',{name:/Tool activity/}).click();
   const paired=page.locator('.tool-card.combined');
   await expect(page.locator('[data-message-id=activity] .message-label')).toHaveCount(0);await expect(paired).toHaveCount(1);await expect(paired).toHaveClass(/failed/);

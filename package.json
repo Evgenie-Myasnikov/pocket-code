@@ -1,15 +1,16 @@
 {
   "name": "pocket-code",
-  "version": "0.25.11",
+  "version": "0.26.0",
   "description": "Android companion for local Claude Code and Codex workspaces",
   "scripts": {
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
     "dev": "vite",
     "server": "tsx server/index.ts",
     "build": "tsc --noEmit && vite build",
     "android:sync": "npm run build && cap sync android",
     "test:ui": "playwright test",
-    "android:build": "powershell -NoProfile -File scripts/build-android.ps1"
+    "android:build": "powershell -NoProfile -File scripts/build-android.ps1",
+    "check:docs": "node scripts/check-docs.mjs"
   },
   "license": "UNLICENSED",
   "type": "module",

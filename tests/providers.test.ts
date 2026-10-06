@@ -75,7 +75,7 @@ test('provider routes isolate history and dispatch jobs, approvals and stop to t
     const codexJira=await request('/jira/start',{id:randomUUID(),provider:'codex',site:'fixture-site',key:'TEST-3',cwd:root,codexAccess:'ask'});
     assert.equal(codexJira.status,200);const result=await codexJira.json();assert.equal(result.provider,'codex');assert.equal(result.jira.key,'TEST-3');
     assert.equal(codexInputs.at(-1).codexAccess,'ask');
-  }finally{runtime.queue?.close();runtime.codexQueue?.close();engine.close();claude.close();runtime.terminals.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(temporary,{recursive:true,force:true});}
+  }finally{await runtime.closeTaskServices();await runtime.queue?.close();await runtime.codexQueue?.close();engine.close();claude.close();runtime.terminals.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(temporary,{recursive:true,force:true});}
 });
 
 
@@ -85,7 +85,7 @@ test('shared projects include both providers while excluding out-of-scope and mi
   await Promise.all([mkdir(claudeRoot, {recursive:true}), mkdir(codexRoot, {recursive:true}), mkdir(outside)]);
   const token = 'p'.repeat(43);
   let claudeFails = false, codexFails = false;
-  const codex:any = {sessions: async () => {
+  const codex:any = {list:()=>[],sessions: async () => {
     if (codexFails) throw new Error('Synthetic unavailable provider');
     return [{cwd:codexRoot}, {cwd:claudeRoot}, {cwd:outside}, {cwd:path.join(root, 'missing')}];
   }};
@@ -112,6 +112,7 @@ test('shared projects include both providers while excluding out-of-scope and mi
     codexFails = true;
     assert.deepEqual(await list(), [root]);
   } finally {
+    await runtime.closeTaskServices();
     runtime.jobs.close();runtime.terminals.close();
     await new Promise<void>(resolve=>server.close(()=>resolve()));
     assert.ok(path.resolve(temporary).startsWith(path.resolve(os.tmpdir())+path.sep));

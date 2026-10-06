@@ -1,12 +1,18 @@
 import {test,expect} from '@playwright/test';
-test('a local roadmap starts with examples, planned versions, state styling and navigation',async({page,request})=>{
+import {mkdir,mkdtemp,rm} from 'node:fs/promises';
+import path from 'node:path';
+test('a repository roadmap starts with examples, planned versions, state styling and navigation',async({page,request})=>{
  const token='test-only-'.repeat(5),url='http://127.0.0.1:4319',headers={Authorization:'Bearer '+token};const health=await (await request.get(url+'/api/health',{headers})).json();
- const created=await (await request.post(url+'/api/boards',{headers,data:{name:'Local roadmap regression',root:health.roots[0]}})).json();expect(created.notes).toHaveLength(6);expect(created.versionSource).toBe('planned');
+ const fixtureRoot=path.resolve('.local/integration-project');expect(path.resolve(health.roots[0])).toBe(fixtureRoot);await mkdir(fixtureRoot,{recursive:true});const root=await mkdtemp(path.join(fixtureRoot,'roadmap-example-'));
+ try{
+ const response=await request.post(url+'/api/project-board/create',{headers,data:{root,language:'en'}});expect(response.ok()).toBe(true);const created=await response.json();expect(created.notes).toHaveLength(6);expect(created.versionSource).toBe('planned');expect(created.repositoryRevision).toHaveLength(64);
+ await page.route('**/api/projects',route=>route.fulfill({json:[root]}));
  await page.addInitScript(({url,token})=>{const listeners:((e:any)=>void)[]=[];(window as any).chrome={webview:{addEventListener(_t:string,fn:(e:any)=>void){listeners.push(fn);},postMessage(message:any){if(message.action==='window-theme')return;const reply=(value:any)=>listeners.forEach(fn=>fn({data:{id:message.id,value}}));if(message.action==='state'){reply({online:true,busy:false,status:'Connected',startup:false,autoReconnect:true,internet:false,addresses:[],jira:false});return;}void fetch(url+'/api'+message.endpoint,{method:message.action==='write'?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:message.action==='write'?JSON.stringify(message.data):undefined}).then(r=>r.json()).then(reply);}}};},{url,token});
- await page.setViewportSize({width:1366,height:900});await page.goto('http://127.0.0.1:5173/?desktop=1');await page.getByRole('navigation').getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:/Local roadmap regression/}).click();
+ await page.setViewportSize({width:1366,height:900});await page.goto('http://127.0.0.1:5173/?desktop=1');await page.getByRole('navigation').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row .board-index-item').filter({hasText:path.basename(root)}).click();
  await expect(page.locator('.board-note')).toHaveCount(6);await expect(page.locator('.board-roadmap-links')).toHaveCount(0);await expect(page.getByText('Planned · Git not linked')).toBeVisible();expect(await page.locator('.board-note').evaluateAll(items=>new Set(items.map(el=>getComputedStyle(el).borderTopColor)).size)).toBe(6);
  const viewport=page.locator('.board-viewport');await viewport.hover();await page.keyboard.down('Control');await page.mouse.wheel(0,300);await page.keyboard.up('Control');await page.screenshot({path:'artifacts/screenshots/pocket-code-board-example.png'});
  await page.getByRole('button',{name:'Create version',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Create version'});await dialog.getByLabel('Version name').fill('2.0');await dialog.getByRole('button',{name:'Create',exact:true}).click();await expect(page.getByRole('button',{name:'2.0',exact:true})).toBeVisible();
- const read=await (await request.get(url+'/api/boards/'+created.id,{headers})).json();expect(read.versions).toEqual(['0.1','0.2','1.0','2.0']);expect(read.branches).toEqual([]);
- await page.getByRole('button',{name:'Back to boards',exact:true}).click();await expect(page.getByRole('button',{name:/Local roadmap regression/})).toBeVisible();
+ const {board:read}=await (await request.get(url+'/api/project-board?root='+encodeURIComponent(root),{headers})).json();expect(read.versions).toEqual(['0.1','0.2','1.0','2.0']);expect(read.branches).toEqual([]);expect(read.repositoryRevision).not.toBe(created.repositoryRevision);
+ await page.getByRole('button',{name:'Back to boards',exact:true}).click();await expect(page.locator('.project-board-row .board-index-item').filter({hasText:path.basename(root)})).toBeVisible();
+ }finally{expect(path.dirname(path.resolve(root))).toBe(fixtureRoot);await rm(root,{recursive:true,force:true});}
 });

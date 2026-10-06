@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 import type {ActivityItem,ChatMessage} from '../server/types';
 
@@ -37,14 +38,14 @@ async function open(page:Page,scale=100){
     sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)}));
     localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({scale,textSize:14}));
   },{scale});
-  await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:'New chat',exact:false}).click();await expect(page.getByLabel('Message Claude')).toBeVisible();
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);await newChat(page);await expect(page.getByLabel('Message Claude')).toBeVisible();
 }
 
 test('activity groups work across providers and closes without losing a draft',async({page})=>{
   await host(page);await page.setViewportSize({width:390,height:844});await open(page);await page.getByLabel('Message Claude').fill('Keep this draft');await openDrawer(page);
   await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toBeVisible();await expect(drawer(page).getByRole('button',{name:'claude question',exact:true})).toBeVisible();await expect(drawer(page).getByRole('button',{name:'codex working',exact:true})).toBeVisible();
   await expect(drawer(page).locator('.activity-group')).toHaveCount(3);await page.keyboard.press('Escape');await expect(drawer(page)).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');await expect(page.locator('.app > .activity-entry')).toBeFocused();
-  await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'All chats',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');await page.getByRole('button',{name:'Back to chats',exact:true}).click();await expect(drawer(page)).toHaveCount(0);await expect(page.getByRole('button',{name:'New chat',exact:false})).toBeVisible();
+  await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'All chats',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');await page.getByRole('button',{name:'Back to chats',exact:true}).click();await expect(drawer(page)).toHaveCount(0);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
 });
 
 test('a completed result is acknowledged only after loading and stays viewed after reload',async({page})=>{
@@ -124,7 +125,7 @@ for(const scale of [60,130])test(`activity fits a narrow phone at ${scale}% scal
 
 test('right activity drawer remains available in every main section',async({page})=>{
  await host(page);await page.setViewportSize({width:390,height:844});await open(page);
- for(const name of ['Tasks','Chats','Project','Settings']){
+ for(const name of ['Board','Chats','Rules','Changelog','Settings']){
   await page.locator('.mobile-nav').getByRole('button',{name,exact:true}).click();
   await expect(page.locator('.app-header')).toHaveCount(0);await expect(page.locator('.app > .activity-entry')).toBeVisible();
   await expect(page.locator('.activity-entry:visible')).toHaveCount(1);
@@ -137,11 +138,11 @@ test('Chats tab preserves the open conversation until explicit Back and shows ac
  const state=await host(page);await page.setViewportSize({width:390,height:844});await open(page);
  const nav=page.locator('.mobile-nav'),chats=nav.getByRole('button',{name:'Chats',exact:true});
  await page.getByLabel('Message Claude').fill('Remember my open chat');
- for(const name of ['Tasks','Project','Settings']){await nav.getByRole('button',{name,exact:true}).click();await chats.click();await expect(page.getByLabel('Message Claude')).toHaveValue('Remember my open chat');}
+ for(const name of ['Board','Rules','Changelog','Settings']){await nav.getByRole('button',{name,exact:true}).click();await chats.click();await expect(page.getByLabel('Message Claude')).toHaveValue('Remember my open chat');}
  await expect(chats.locator('.chat-tab-status-needs_input')).toBeVisible();
  for(const status of ['error','running','done'] as const){state.items=[item('badge','codex',status)];await expect(chats.locator('.chat-tab-status-'+status)).toBeVisible({timeout:6000});}
- await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'New chat',exact:false})).toBeVisible();
- await nav.getByRole('button',{name:'Settings',exact:true}).click();await chats.click();await expect(page.getByRole('button',{name:'New chat',exact:false})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
+ await nav.getByRole('button',{name:'Settings',exact:true}).click();await chats.click();await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
 });
 
 test('edge handle supports taps, keyboard and left swipes without opening on vertical gestures',async({page})=>{

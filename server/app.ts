@@ -22,6 +22,8 @@ import { listSessions, getSessionMessages } from '@anthropic-ai/claude-agent-sdk
 import { z } from 'zod';
 import { allowedPath, HttpError, safeFilename, validToken, within } from './security.js';
 import { Jobs } from './jobs.js';
+import {ClaudeModelCatalog} from './claude-models.js';
+import {claudeFallbackModels, modelIdPattern} from './provider-model.js';
 import { normalize } from './types.js';
 import { Terminals } from './terminals.js';
 import { desktopIndexes, readDesktopSessions } from './desktop-sessions.js';
@@ -36,16 +38,23 @@ import { EngineUpdates, pocketSource } from './engine-updates.js';
 import { coalesceReads } from './read-coalescer.js';
 import {jiraLoginPage,type JiraLogin} from './jira-login.js';
 import type {JiraConnection} from './jira-connection.js';
+import {TaskRuntime} from './task-runtime.js';
+import {mountRunNotifications} from './run-notifications.js';
+import {MiroIntegration} from './miro-integration.js';
+import {WindowsMiroStore} from './miro-vault.js';
+import {mountMiro} from './miro-routes.js';
 
-export type Config = { runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
 const providerSchema = z.enum(['claude', 'codex','copilot']).default('claude');
 export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages }, terminals = new Terminals()) {
   const roots = await Promise.all(config.roots.map(p => realpath(p)));
+  const claudeCatalog = config.claudeModels || new ClaudeModelCatalog();
   const workspaceAccess=await createWorkspaceAccess(path.join(config.uploads,'.boards','workspaces.json'));
-  const accessRoots=()=>workspaceAccess.current()?.ws.roots||roots;
+  let taskRuntime:TaskRuntime|undefined;
+  const accessRoots=()=>workspaceAccess.current()?.ws.roots||[...roots,...(taskRuntime?.roots()||[])];
   const visibleRoot=(_cwd?:string)=>!workspaceAccess.current();
   const codex = () => { if (!config.codex) throw new HttpError(503, 'Codex is unavailable. Update and restart the PC bridge.'); return config.codex; };
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
@@ -119,7 +128,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/devices',(_req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');res.json(devices().list());});
   app.post('/api/devices/:id/disconnect',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');await devices().revoke(uuid.parse(req.params.id));await config.refreshPairing?.();res.json({ok:true});});
   let activeMutations = 0, runtimeStopping = false, jiraChanging=false;
-  const isBusy = () => activeMutations > 0 || providerConnections.isSigningIn() || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!copilotQueue?.hasWork() || !!workflow?.isBusy();
+  const isBusy = () => activeMutations > 0 || !!taskRuntime?.hasWork() || providerConnections.isSigningIn() || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!copilotQueue?.hasWork() || !!workflow?.isBusy();
   app.use('/api', (req, res, next) => {
     if (req.method === 'GET' || req.path === '/runtime/stop') { next(); return; }
     if(providerConnections.isSigningIn()&&['/jobs','/terminals','/jira/start','/jira/queue','/jira/queue/control','/jira/workflow/action','/jira/workflow/recover','/copilot/login'].includes(req.path)){res.status(409).json({error:'Complete provider sign-in before starting new work.'});return;}
@@ -134,6 +143,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.once('finish', release); next();
   });
   await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}});
+  mountMiro(app,{integration:new MiroIntegration(new WindowsMiroStore(path.join(config.uploads,'.miro','credentials.vault'))),roots,access:workspaceAccess});
+  taskRuntime=new TaskRuntime({directory:path.join(config.uploads,'.tasks'),roots,access:workspaceAccess,jobs:()=>allJobs().map(job=>jobView(job.id)),managedRoots:managed=>{config.codex?.setManagedTaskRoots?.(managed);config.copilot?.setManagedTaskRoots?.(managed);}});
+  await taskRuntime.initialize();taskRuntime.mount(app);
+  const disposeNotifications=mountRunNotifications(app,{file:path.join(config.uploads,'.notifications','runs.json'),jobs:()=>allJobs().map(job=>jobView(job.id)),external:()=>config.runs?.events(0)||[]});
   const sourceRoot = await pocketSource(roots);
   const engineStatus = async () => config.engineUpdates ? { supported: true, sourceRoot, ...(await config.engineUpdates.status()) } : { supported: false };
   app.get('/api/engine-updates', async (_req,res) => res.json(await engineStatus()));
@@ -284,7 +297,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const permitted = [];
     for (const s of merged.values()) {
       let readOnly = true;
-      if (s.cwd) try { await allowedPath(roots, s.cwd, true); readOnly = false; } catch { /* History import never grants project file access. */ }
+      if (s.cwd) try { await allowedPath(accessRoots(), s.cwd, true); readOnly = false; } catch { /* History import never grants project file access. */ }
       if (!readOnly || s.source === 'desktop') permitted.push({ ...s, readOnly, provider: 'claude' as const });
     }
     return permitted.sort((a, b) => b.lastModified - a.lastModified);
@@ -333,9 +346,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     try{const file=await config.updater.download(z.coerce.number().int().positive().parse(req.query.release));res.type('application/vnd.android.package-archive');res.sendFile(file,{dotfiles:'allow'});}catch(error){release();throw error;}
   });
   app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots:accessRoots(), version: packageJson.version, protocol: 1, processId: process.pid }));
+  app.get('/api/claude/models', async (req, res) => {
+    const cwd = await allowedPath(accessRoots(), text.parse(req.query.cwd), true);
+    res.json(await claudeCatalog.read(cwd));
+  });
   app.get('/api/providers', async (_req, res) => {
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
-    res.json([{ id: 'claude', name: 'Claude', available: true, models: [{ id: 'sonnet', name: 'Sonnet' }, { id: 'opus', name: 'Opus' }, { id: 'haiku', name: 'Haiku' }] }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
+    res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
   });
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
   app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));
@@ -416,7 +433,6 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({ id, name, size: buffer.length });
   });
   // Completions of every PC chat, including ones started outside Pocket Code, for phone notifications.
-  app.get('/api/activity/events', (req, res) => {const since=Number(req.query.since);res.json({now:Date.now(),events:config.runs?config.runs.events(Number.isFinite(since)?since:Date.now()):[]});});
   app.get('/api/activity', (_req, res) => {
     // In-memory jobs started by this bridge only. Reading activity must never
     // initialize a provider, inspect desktop history or request model output.
@@ -431,16 +447,20 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.post('/api/jobs', async (req, res) => {
     const body = z.object({ provider: providerSchema, id: uuid, cwd: text, sessionId: uuid.optional(), text: z.string().max(100000),
-      attachments: z.array(uuid).max(10).default([]), model: z.string().max(128).regex(/^[a-zA-Z0-9._/-]*$/).default(''),
+      attachments: z.array(uuid).max(10).default([]), model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
       mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
-      takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
+      taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
     const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const engine = engineFor(body.provider);
-    if (body.provider === 'claude') z.enum(['', 'sonnet', 'opus', 'haiku']).parse(body.model);
     if (body.provider !== 'codex' && body.reasoningEffort) throw new HttpError(400, 'Reasoning effort is available for Codex chats only.');
+    const replyToRetry=async(existing:ReturnType<typeof allJobs>[number])=>{
+      if((existing.provider||'claude')!==body.provider||await realpath(existing.cwd)!==cwd||body.sessionId&&existing.sessionId&&body.sessionId!==existing.sessionId)throw new HttpError(409,'This request identifier belongs to another chat or project.');
+      if(body.taskRunId){const run=await taskRuntime!.get(body.taskRunId);if(run.jobId!==existing.id||run.worktree?.cwd!==cwd)throw new HttpError(409,'This request identifier belongs to another task run.');}
+      res.json(jobView(body.id));
+    };
     const existing = allJobs().find(j => j.id === body.id);
-    if (existing) { if ((existing.provider || 'claude') !== body.provider) throw new HttpError(409, 'Task belongs to another workspace'); res.json(jobView(body.id)); return; }
+    if (existing) { await replyToRetry(existing);return; }
     if (terminals.list().some(t => t.cwd === cwd && t.status === 'running')) throw new HttpError(409, 'В проекте открыт живой терминал. Завершите его перед запуском обычного чата.');
     if (body.sessionId) {
       const s = await session(body.sessionId, body.provider);
@@ -456,9 +476,11 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const prompt = body.text + (attached.length ? '\n\nFiles attached by the user (read these local files as needed):\n' + attached.map(f => JSON.stringify(f.path)).join('\n') : '');
     const baseMessageCount = body.sessionId ? (body.provider === 'copilot' ? (await copilot().messages(body.sessionId)).length : body.provider === 'codex' ? await codex().messageCount(body.sessionId) : (await sdk.getSessionMessages(body.sessionId, { dir: cwd })).length) : 0;
     const raced = allJobs().find(j => j.id === body.id);
-    if (raced) { if ((raced.provider || 'claude') !== body.provider) throw new HttpError(409, 'Task belongs to another workspace'); res.json(jobView(body.id)); return; }
+    if (raced) { await replyToRetry(raced);return; }
     guardProject(cwd, body.id);
-    res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text + attached.map(f => `\n📎 ${f.name}`).join('') }));
+    const bound=await taskRuntime!.bindJob({...body,cwd});
+    try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text + attached.map(f => `\n📎 ${f.name}`).join('') }));}
+    catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
   });
   app.post('/api/jobs/:id/messages',async(req,res)=>{
     const id=uuid.parse(req.params.id),body=z.object({id:uuid,text:z.string().max(100000),attachments:z.array(uuid).max(10).default([])}).parse(req.body);
@@ -554,5 +576,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       engine.start({id,cwd:sourceRoot,text:prompt,displayText:'Check Pocket Code compatibility after an AI runtime update.',mode:'default',codexAccess:'full',maxBudgetUsd:5});
     });
   }
-  return { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines };
+  const closeTaskServices=async()=>{await disposeNotifications();await taskRuntime!.close();};
+  app.locals.closeTaskServices=closeTaskServices;
+  return { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines, closeTaskServices, taskRuntime };
 }

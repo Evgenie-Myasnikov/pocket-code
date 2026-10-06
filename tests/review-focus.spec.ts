@@ -1,3 +1,4 @@
+import {openChatList,newChat} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 
@@ -34,11 +35,12 @@ async function connect(page:Page,language='en',scale=100){
     localStorage.setItem('pocket-code-language-v1',language);
     localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({scale,textSize:14}));
   },{language,scale});
-  await page.goto('http://127.0.0.1:5173');
-  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await page.getByRole('button',{name:/Chat repository test/}).click();
   await page.getByRole('button',{name:'Review',exact:true}).click();
-  await expect(review(page).locator('.diff-content')).toContainText('src/first.ts new 0');
+  // Unified mode groups removals first; additions can be outside the virtual window.
+  await expect(review(page).locator('.diff-content')).toContainText('src/first.ts old 0');
 }
 
 test('Review uses the selected chat repository and keeps comparison options out of the header',async({page})=>{
@@ -62,7 +64,7 @@ test('Review reading mode preserves the diff position and draft, and Back restor
   await review(page).getByRole('button',{name:'Back to chat',exact:true}).click();
   await page.getByLabel('Message Claude').fill('Keep my review draft');
   await page.getByRole('button',{name:'Review',exact:true}).click();
-  const panel=review(page),content=panel.locator('.diff-content');await expect(content).toContainText('src/first.ts new 0');
+  const panel=review(page),content=panel.locator('.diff-content');await expect(content).toContainText('src/first.ts old 0');
   await content.evaluate(element=>{element.scrollTop=480;});const before=await content.evaluate(element=>element.scrollTop);
   await panel.getByRole('button',{name:'Reading mode',exact:true}).click();
   const restore=panel.getByRole('button',{name:'Show review controls',exact:true});await expect(restore).toBeVisible();await expect(restore).toBeFocused();
@@ -109,7 +111,7 @@ test('Review refreshes changed content without losing scroll and keeps options o
   await expect(panel.locator('.diff-table').first()).toHaveCSS('font-size','18px');
   expect(await content.evaluate(element=>element.scrollTop)).toBe(240);
   await page.route('**/api/review?*',route=>route.fulfill({json:{files:[{path:paths[0],added:91,removed:90}],current:'feature/mobile-review',base:'main',branches:['main'],patch:patch('updated'),binary:false}}));
-  await expect(content).toContainText('updated new 0',{timeout:9000});
+  await expect(content).toContainText('updated old 0',{timeout:9000});
   expect(await content.evaluate(element=>element.scrollTop)).toBe(240);
   await panel.getByRole('button',{name:'Back to chat',exact:true}).click();
   await page.getByRole('button',{name:'Review',exact:true}).click();

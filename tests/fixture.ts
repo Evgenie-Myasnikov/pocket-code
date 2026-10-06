@@ -18,8 +18,8 @@ const sdk: any = {
   getSessionMessages: async () => [{ type: 'user', uuid: 'first', message: { content: 'Синтетическая история для проверки' } }],
 };
 const spawn: typeof pty.spawn = (_exe, _args, options) => pty.spawn(process.execPath, ['-e', 'process.stdout.write("POCKET INTEGRATION TERMINAL\\r\\n");process.stdin.setEncoding("utf8");process.stdin.on("data",s=>process.stdout.write("RECEIVED:"+s));'], options);
-const { app, jobs, terminals } = await createApp({ desktopSessionIndexes: [], roots: [root], token: 'test-only-'.repeat(5), hostName: 'Тестовый ПК', uploads: path.resolve('.local/integration-uploads') }, new Jobs(run), sdk, new Terminals(spawn));
+const { app, jobs, terminals, closeTaskServices } = await createApp({ desktopSessionIndexes: [], roots: [root], token: 'test-only-'.repeat(5), hostName: 'Тестовый ПК', uploads: path.resolve('.local/integration-uploads') }, new Jobs(run), sdk, new Terminals(spawn));
 app.get('/ready', (_req, res) => res.send('ready'));
 const server = app.listen(4319, '127.0.0.1');
-function close() { jobs.close(); terminals.close(); server.close(); setTimeout(() => process.exit(), 1000).unref(); }
+function close() { jobs.close(); terminals.close(); server.close(); void closeTaskServices().finally(()=>process.exit()); setTimeout(() => process.exit(), 1000).unref(); }
 process.on('SIGTERM', close); process.on('SIGINT', close);
