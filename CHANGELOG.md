@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.0 (Unreleased)
+## [0.26.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.11...v0.26.0) (2026-10-06)
 
 ### Features
 - tasks: link saved board cards to private, persistent task runs with an isolated Git worktree, provider chat, pinned-base diff, automatic executable checks and explicit human snapshot approval; preserve source files and interrupted work without automatic merge or relaunch.
@@ -32,6 +32,9 @@
 - 2026-10-06: 281 unit/server checks and 139 distinct focused browser scenarios passed across scoped runs; TypeScript/Vite, Windows/native smoke and Android debug build passed. Verified local documentation references and working source/documentation text with the privacy guard rules.
 - Follow-up: 319/319 unit/server checks passed. The full current browser run passed 281/283; two obsolete navigation/copy assertions were updated, and both passed in a five-scenario rerun (including documentation captures). Thus all 283 current scenarios passed across these runs, not in one uninterrupted green run. Retired interface contracts are explicitly archived with replacement coverage.
 - TypeScript/Vite, Windows build, native notification smoke checks and Android debug build passed; the actual host bundle was source-matched and verified through its installer. Documentation links and synthetic screenshots were checked. Physical Android and authenticated Miro/all live provider combinations remain unverified. A Windows node-pty cleanup helper emitted an AttachConsole error although the PTY lifecycle assertion passed; this remains a follow-up. No new release, installation or publication.
+
+- Release validation: 281 current UI scenarios passed in one clean release-checkout run; two documentation screenshot scenarios were verified separately. The clean unit/server rerun passed 318/319, followed by 3/3 device checks after a transient Windows EPERM. Windows/Android builds, APK signing continuity, source-matched host installation, archive privacy checks and GitHub CI passed. Published Android, Windows, host and checksum manifest.
+- Release source: [41e30eb](https://github.com/Evgenie-Myasnikov/pocket-code/commit/41e30ebcb57fd3bee0aec5e0679d1d45ca201321), branch [codex/task-pipeline-0.26.0](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/task-pipeline-0.26.0). Physical-device/Miro-account and node-pty diagnostic limitations above remain.
 
 ## [0.25.11](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.10...v0.25.11) (2026-10-03)
 
