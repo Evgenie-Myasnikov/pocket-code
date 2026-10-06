@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.2 (Unreleased)
+## [0.26.2](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.1...v0.26.2) (2026-10-06)
 
 ### Bug Fixes
 - notifications: integrate the bell into mobile section/chat headers and Windows navigation instead of a separate strip; use a 48px target and 24px icon, preserve unread badges and render the inbox outside header layout.
@@ -10,6 +10,9 @@
 
 ### Validation
 - Five focused browser checks passed on 320/390px and desktop; modal focus, navigation, card open/delete and chat width verified. Synthetic captures inspected; TypeScript/Vite build passed. Not released; physical-device check remains outstanding.
+
+- Release validation: five browser checks passed again in the release checkout; Android/Windows builds, APK signing continuity, source-matched host, archive privacy, downloaded checksums and GitHub CI passed. Earlier unreleased note above records pre-release validation.
+- Release source: [3095d8e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/3095d8e83474784cdd55de8ab9537a2b2e98b7ea), branch [codex/board-preview-0.26.2](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/board-preview-0.26.2). Physical-device validation remains outstanding.
 
 ## [0.26.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.0...v0.26.1) (2026-10-06)
 
