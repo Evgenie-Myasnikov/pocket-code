@@ -1,0 +1,4 @@
+.project-board-grid .board-index-item.has-preview{position:relative;isolation:isolate;overflow:hidden;min-height:164px;justify-content:flex-end}
+.board-card-preview{position:absolute;inset:8px 8px 38px;width:calc(100% - 16px);height:calc(100% - 46px);pointer-events:none;color:var(--text);opacity:.8;z-index:-2}
+.project-board-grid .board-index-item.has-preview::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 15%,var(--panel) 84%);z-index:-1;pointer-events:none}
+.project-board-grid .board-index-item.has-preview>span{flex:0 0 auto;width:100%;text-align:left}

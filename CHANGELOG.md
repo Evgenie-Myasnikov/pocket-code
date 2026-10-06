@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.26.1 (Unreleased)
+
+### Features
+- chat: present structured provider questions in a dedicated accessible dialog with option descriptions, supported multiple selection, custom answers, draft retention, retry and expiry handling; preserve Codex question IDs and Copilot freeform restrictions. Existing enabled native alerts notify waiting questions for all three providers without repeated polling duplicates.
+- appearance: persist slow, normal, fast or instant letter reveal speed and apply changes during live responses; reduced motion remains immediate.
+- boards: display lightweight content miniatures behind repository board names using already loaded geometry and status colors; preserve open/delete actions. Miro keeps its existing card because the connection supplies no preview.
+- chat: keep model selection and effort side by side in one row in the shared phone/desktop composer, including narrow screens; truncate long labels without wrapping the controls vertically.
+- chat: progressively reveal live response letters, including the first network fragment, with soft glyph fading; retain full provider text and immediately display saved history or reduced-motion output. Frequent deltas share a presentation queue instead of restarting it.
+
+### Bug Fixes
+- chat: replace the provider/computer footer with a concise working or waiting-for-response status.
+
+### Validation
+- Questions, reveal settings and board previews: 20 targeted browser checks and 44 provider/streaming/notification tests passed; TypeScript/Vite build passed. Synthetic phone previews inspected. Windows notification queue passed 11 assertions; Android notification identity passed 7 assertions. Physical-device delivery remains unverified; not released.
+- Six existing composer browser checks passed, including 320px at 60%/130%, phone/desktop widths, shortcuts and reduced motion; synthetic phone and desktop layouts inspected. Not released.
+- Letter streaming: nine browser checks and two glyph/Unicode unit checks passed; TypeScript/Vite build passed. Includes first-fragment progression, frequent deltas and reduced-motion bypass. Not released.
+
 ## [0.26.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.11...v0.26.0) (2026-10-06)
 
 ### Features

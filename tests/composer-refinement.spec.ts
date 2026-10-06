@@ -32,8 +32,53 @@ test('new characters fade in with Markdown intact, then collapse to plain nodes;
  await page.evaluate(()=>(window as any).setSyntheticStream('A replaced history snapshot.'));
  await expect(page.locator('#synthetic-stream')).toHaveText('A replaced history snapshot.');await expect(page.locator('.stream-glyph')).toHaveCount(0);
 });
+
+test('first live fragment reveals letters progressively and catches up without changing text',async({page})=>{
+ await setup(page);
+ const text='Плавный ответ 👨‍👩‍👧‍👦 без рывков.';
+ await page.evaluate(text=>(window as any).setFreshStream(text),text);
+ await expect.poll(async()=>{const value=await page.locator('#fresh-stream').innerText();return value.length>0&&value.length<text.length;}).toBe(true);
+ await expect(page.locator('#fresh-stream .stream-glyph').first()).toBeAttached();
+ await expect(page.locator('#fresh-stream')).toHaveText(text);
+ await page.evaluate(text=>(window as any).setFreshStream(text+' Ещё один фрагмент.'),text);
+ await expect(page.locator('#fresh-stream')).toHaveText(text+' Ещё один фрагмент.');
+});
+
+test('reduced motion bypasses letter pacing for a fresh response',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await setup(page);
+ await page.evaluate(()=>(window as any).setFreshStream('Полный ответ сразу.'));
+ await expect(page.locator('#fresh-stream')).toHaveText('Полный ответ сразу.');
+ await expect(page.locator('#fresh-stream .stream-glyph')).toHaveCount(0);
+});
+
+test('frequent deltas do not restart or starve the letter queue',async({page})=>{
+ await setup(page);
+ const progress=await page.evaluate(async()=>{
+  let text='',intermediate=false;
+  for(let i=0;i<70;i++){
+   text+='a';(window as any).setFreshStream(text);
+   await new Promise(resolve=>setTimeout(resolve,8));
+   const shown=document.querySelector('#fresh-stream')?.textContent||'';
+   if(i>10&&shown.length>0&&shown.length<text.length)intermediate=true;
+  }
+  return {text,intermediate};
+ });
+ expect(progress.intermediate).toBe(true);
+ await expect(page.locator('#fresh-stream')).toHaveText(progress.text);
+});
 test('reduced motion displays all new text immediately with no animated glyphs',async({page})=>{
  await page.emulateMedia({reducedMotion:'reduce'});await setup(page);
  await page.evaluate(()=>(window as any).setSyntheticStream('Saved text. New text without animation.'));
  await expect(page.locator('#synthetic-stream')).toHaveText('Saved text. New text without animation.');await expect(page.locator('.stream-glyph')).toHaveCount(0);
+});
+
+test('letter speed persists and instant mode flushes a pending answer without fades',async({page})=>{
+ await setup(page);const speed=page.getByLabel('Letter reveal speed');
+ await expect(speed).toHaveValue('40');await speed.selectOption('20');
+ const text='A long synthetic answer. '.repeat(20);
+ await page.evaluate(text=>(window as any).setFreshStream(text),text);
+ await expect.poll(async()=>{const value=await page.locator('#fresh-stream').innerText();return value.length>0&&value.length<text.trim().length;}).toBe(true);
+ await speed.selectOption('0');await expect(page.locator('#fresh-stream')).toHaveText(text.trim());await expect(page.locator('#fresh-stream .stream-glyph')).toHaveCount(0);
+ await setup(page);await expect(page.getByLabel('Letter reveal speed')).toHaveValue('0');
+ await page.evaluate(()=>(window as any).setFreshStream('Immediate answer'));await expect(page.locator('#fresh-stream')).toHaveText('Immediate answer');await expect(page.locator('#fresh-stream .stream-glyph')).toHaveCount(0);
 });

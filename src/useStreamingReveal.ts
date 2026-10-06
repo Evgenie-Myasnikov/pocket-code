@@ -1,9 +1,9 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {revealCharacterLimit,revealLifetime,type RevealRange,type RevealOptions} from './streaming-reveal';
 
-export function useStreamingReveal(text:string,streaming:boolean):RevealOptions|undefined{
+export function useStreamingReveal(text:string,streaming:boolean,animateInitial=false):RevealOptions|undefined{
   const [reduced,setReduced]=useState(()=>typeof window==='undefined'||window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const [revision,setRevision]=useState(0),previous=useRef({text,ranges:[] as RevealRange[]});
+  const [revision,setRevision]=useState(0),previous=useRef({text:animateInitial?'':text,ranges:[] as RevealRange[]});
   useEffect(()=>{
     if(!streaming)return;
     const media=window.matchMedia('(prefers-reduced-motion: reduce)'),change=()=>setReduced(media.matches);

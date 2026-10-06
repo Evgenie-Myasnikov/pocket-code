@@ -6,11 +6,11 @@
 .prompt-composer .composer-input:has(.usage-indicator) textarea{padding-right:78px}
 .prompt-composer .usage-indicator{right:1px;top:-4px;font-size:clamp(11px,calc(11px * var(--ui-scale,1)),14px);opacity:.85}
 .prompt-composer .composer-tools{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:4px;align-items:center}
-.prompt-composer .composer-models{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px;min-width:0}
-.prompt-composer .composer-models .model-picker{flex:1 1 110px;min-width:48px;max-width:100%}
+.prompt-composer .composer-models{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:0 8px;min-width:0}
+.prompt-composer .composer-models .model-picker{flex:1 1 0;min-width:0;max-width:100%}
 .prompt-composer .composer-tools select{min-height:48px;padding:7px 4px;background:transparent;border:0;color:var(--muted);font-size:clamp(11px,calc(11px * var(--ui-scale,1)),15px);border-radius:8px;text-overflow:ellipsis}
 .prompt-composer .composer-tools select:hover{background:var(--surface);color:var(--text)}
-.prompt-composer .composer-tools .effort-picker{flex:0 0 auto;width:auto;min-width:6.5em;max-width:100%}
+.prompt-composer .composer-tools .effort-picker{flex:0 1 auto;width:auto;min-width:0;max-width:45%}
 .prompt-composer .composer-actions{display:flex;align-items:center;gap:0}
 :root[data-theme] .prompt-composer .composer-tools :is(.icon-button,.send-button){position:relative;isolation:isolate;display:grid;place-items:center;width:48px;min-width:48px;height:48px;min-height:48px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted);flex-shrink:0}
 :root[data-theme] .prompt-composer .composer-tools .composer-attach:hover{background:var(--surface);color:var(--text)}

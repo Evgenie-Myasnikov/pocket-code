@@ -1,5 +1,6 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Ждёт вашего ответа':'Waiting for your response',
   'Доска':'Board',
   'Подключение досок проектов':'Connect project boards',
   'Аккаунты AI':'AI accounts',

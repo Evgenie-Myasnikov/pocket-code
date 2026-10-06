@@ -1,3 +1,4 @@
+import type {BoardPreviewData} from './BoardPreview';
 import {ProjectBoardCard} from './ProjectBoardCard';
 import {DeleteProjectBoard} from './DeleteProjectBoard';
 import {MiroBoard} from './MiroBoard';
@@ -12,11 +13,11 @@ export function RepositoryBoards({connection,roots,onOpen}:{connection:Connectio
  const [miro,setMiro]=useState<{root:string;url:string}|null>(null),[boardNames,setBoardNames]=useState<Record<string,string>>({}),[kind,setKind]=useState<'repository'|'miro'>('repository'),[miroUrl,setMiroUrl]=useState('');
  const [existing,setExisting]=useState<string[]>([]),[missing,setMissing]=useState<string[]>([]),[failed,setFailed]=useState<string[]>([]);
  const [adding,setAdding]=useState(false),[selected,setSelected]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(''),[loading,setLoading]=useState(true),[revision,setRevision]=useState(0);
- const [deleting,setDeleting]=useState<string|null>(null),[records,setRecords]=useState<Record<string,{miro:boolean;revision?:string;canEdit:boolean}>>({});
+ const [deleting,setDeleting]=useState<string|null>(null),[records,setRecords]=useState<Record<string,{miro:boolean;revision?:string;canEdit:boolean;preview?:BoardPreviewData}>>({});
  const epoch=useRef(0),lock=useRef(false);
  useEffect(()=>{const generation=++epoch.current;setMiro(null);setDeleting(null);setRecords({});setBoardNames({});setExisting([]);setMissing([]);setFailed([]);setAdding(false);setSelected('');setError('');setLoading(true);
-  const queue=[...new Set(roots)],found:string[]=[],titles:Record<string,string>={},metadata:Record<string,{miro:boolean;revision?:string;canEdit:boolean}>={},absent:string[]=[],unavailable:string[]=[];let cursor=0;
-  void Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{while(cursor<queue.length&&generation===epoch.current){const root=queue[cursor++];try{const result=await request<{board:BoardView|null;miro?:{root:string;url:string};canEdit?:boolean}>(connection,'/project-board?root='+encodeURIComponent(root));(result.board||result.miro?found:absent).push(root);if(result.board||result.miro){titles[root]=result.miro?'Miro':result.board!.name;metadata[root]={miro:!!result.miro,revision:result.board?.repositoryRevision,canEdit:result.canEdit!==false};}}catch{unavailable.push(root);}}})).then(()=>{if(generation!==epoch.current)return;setBoardNames(titles);setRecords(metadata);setExisting(queue.filter(r=>found.includes(r)));setMissing(queue.filter(r=>absent.includes(r)));setFailed(unavailable);setLoading(false);});
+  const queue=[...new Set(roots)],found:string[]=[],titles:Record<string,string>={},metadata:Record<string,{miro:boolean;revision?:string;canEdit:boolean;preview?:BoardPreviewData}>={},absent:string[]=[],unavailable:string[]=[];let cursor=0;
+  void Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{while(cursor<queue.length&&generation===epoch.current){const root=queue[cursor++];try{const result=await request<{board:BoardView|null;miro?:{root:string;url:string};canEdit?:boolean}>(connection,'/project-board?root='+encodeURIComponent(root));(result.board||result.miro?found:absent).push(root);if(result.board||result.miro){titles[root]=result.miro?'Miro':result.board!.name;metadata[root]={preview:result.board?{versions:result.board.versions,notes:result.board.notes.map(({x,y,branch,status})=>({x,y,branch,status}))}:undefined,miro:!!result.miro,revision:result.board?.repositoryRevision,canEdit:result.canEdit!==false};}}catch{unavailable.push(root);}}})).then(()=>{if(generation!==epoch.current)return;setBoardNames(titles);setRecords(metadata);setExisting(queue.filter(r=>found.includes(r)));setMissing(queue.filter(r=>absent.includes(r)));setFailed(unavailable);setLoading(false);});
   return()=>{epoch.current++;};
  },[connection.url,connection.token,roots.join('|'),revision]);
  async function open(root:string,create=false){if(lock.current)return;lock.current=true;setBusy(root);setError('');const generation=epoch.current;
@@ -34,7 +35,7 @@ export function RepositoryBoards({connection,roots,onOpen}:{connection:Connectio
   {error&&<p role="alert">{error}</p>}{loading&&<p role="status">{l('Loading boards…','Загружаем доски…')}</p>}
   {!!failed.length&&<p role="alert">{l('Some projects could not be checked. Refresh to retry.','Некоторые проекты не удалось проверить. Обновите список, чтобы повторить.')}</p>}
   {!loading&&!existing.length&&<p>{l('No project boards yet. Add one when you need it.','Досок проектов пока нет. Добавьте доску, когда она понадобится.')}</p>}
-  <div className="project-board-grid">{existing.map(root=><div key={root} className="project-board-row"><ProjectBoardCard name={boardNames[root]} project={name(root)} disabled={!!busy} busy={busy===root} onOpen={()=>void open(root)} onDelete={records[root]?.canEdit?()=>setDeleting(root):undefined}/></div>)}</div>
+  <div className="project-board-grid">{existing.map(root=><div key={root} className="project-board-row"><ProjectBoardCard name={boardNames[root]} project={name(root)} preview={records[root]?.preview} disabled={!!busy} busy={busy===root} onOpen={()=>void open(root)} onDelete={records[root]?.canEdit?()=>setDeleting(root):undefined}/></div>)}</div>
   {deleting&&<DeleteProjectBoard connection={connection} root={deleting} name={boardNames[deleting]} miro={records[deleting].miro} repositoryRevision={records[deleting].revision} onClose={()=>setDeleting(null)} onDeleted={()=>{setDeleting(null);setRevision(v=>v+1);}}/>}
  </div>;
 }

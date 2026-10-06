@@ -4,6 +4,8 @@ import { Capacitor } from '@capacitor/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {useStreamingReveal} from './useStreamingReveal';
+import {usePacedText} from './usePacedText';
+import {useStreamSpeed} from './stream-speed';
 import {rehypeStreamingReveal,type RevealOptions} from './streaming-reveal';
 import './streaming-reveal.css';
 import type { Block, SubagentView } from '../server/types';
@@ -31,9 +33,9 @@ const MarkdownBody=memo(function MarkdownBody({text,reveal}:{text:string;reveal?
   useLanguage();
   return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={reveal?[[rehypeStreamingReveal,reveal]]:[]} components={{a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<Picture src={safeWebUrl(src as string)!} alt={alt||t('Изображение')}/>:<span>📎 {alt||t('Изображение')}</span>}}>{text}</ReactMarkdown></div>;
 });
-function StreamingMarkdown({text}:{text:string}){return <MarkdownBody text={text} reveal={useStreamingReveal(text,true)}/>;}
-export const Markdown=memo(function Markdown({text,streaming=false}:{text:string;streaming?:boolean}){
-  return streaming?<StreamingMarkdown text={text}/>:<MarkdownBody text={text}/>;
+function StreamingMarkdown({text,animateInitial}:{text:string;animateInitial:boolean}){const speed=useStreamSpeed(),visible=usePacedText(text,animateInitial,speed);return <MarkdownBody text={visible} reveal={useStreamingReveal(visible,speed!==0,animateInitial)}/>;}
+export const Markdown=memo(function Markdown({text,streaming=false,animateInitial=false}:{text:string;streaming?:boolean;animateInitial?:boolean}){
+  return streaming?<StreamingMarkdown text={text} animateInitial={animateInitial}/>:<MarkdownBody text={text}/>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.
@@ -52,7 +54,7 @@ function ToolResultContent({block,depth}:{block:Block;depth:number}) {
 }
 export function RichBlock({block,depth=0,result,onSubagent,running=false,streaming=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;onSubagent?(agent:SubagentView):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;
-  if(block.type==='text')return <Markdown text={block.text || ''} streaming={streaming}/>;
+  if(block.type==='text')return <Markdown text={block.text || ''} streaming={streaming} animateInitial={streaming}/>;
   if(block.type==='subagent' && block.agent) {
     const agent=block.agent,label=t(({running:'Работает',completed:'Завершён',error:'Ошибка',stopped:'Остановлен',unknown:'Статус неизвестен'} as const)[agent.status]);
     return onSubagent?<button className={`subagent-card subagent-${agent.status}`} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span><ChevronRight className="subagent-chevron" size={16} aria-hidden="true"/></button>:<Disclosure className="subagent-inline" summary={<>{agent.name} · {label}</>}>{()=> <>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</>}</Disclosure>;

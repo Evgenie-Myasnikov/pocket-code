@@ -361,7 +361,7 @@ export class CodexService {
     const questions = Array.isArray(p.questions) ? p.questions : [];
     if (questionRequest && (!questions.length || questions.some((q: any) => q.isSecret))) { rpc.respond(id, { answers: {} }); return; }
     const approval: Approval = { id: randomUUID(), tool: questionRequest ? 'AskUserQuestion' : request.method === 'item/commandExecution/requestApproval' ? 'Codex command' : 'Codex file changes',
-      input: questionRequest ? { questions: questions.map((q: any) => ({ question: q.question, options: q.options || [] })) } : {
+      input: questionRequest ? { questions: questions.map((q: any) => ({ id:q.id,header:q.header,question: q.question, options: q.options || [] })) } : {
         command: p.command, cwd: p.cwd, reason: p.reason, grantRoot: p.grantRoot,
         changes: (job.messages.find(m => m.id === p.itemId)?.blocks.find(b => b.type === 'tool_use')?.input as any)?.changes,
         permissions: p.additionalPermissions, network: p.networkApprovalContext, availableDecisions: p.availableDecisions },
@@ -372,7 +372,7 @@ export class CodexService {
       job.pending.delete(approval.id); job.approvals = job.approvals.filter(a => a.id !== approval.id); job.revision++;
       if (questionRequest) {
         const mapped: Record<string, { answers: string[] }> = {};
-        if (allow) for (const q of questions) { const answer = answers?.[q.question]?.trim(); if (answer) mapped[q.id] = { answers: [answer] }; }
+        if (allow) for (const q of questions) { const answer = (answers?.[q.id]??answers?.[q.question])?.trim(); if (answer) mapped[q.id] = { answers: [answer] }; }
         rpc.respond(id, { answers: mapped });
       } else {
         // Only one action is approved: no session-wide or persistent permission amendment.

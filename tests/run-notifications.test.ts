@@ -61,3 +61,13 @@ test('synchronous provider failure is contained at startup and the feed recovers
   try{assert.equal((await fetch(endpoint)).status,503);unavailable=false;const response=await fetch(endpoint);assert.equal(response.status,200);assert.deepEqual((await response.json()).events,[]);}
   finally{await close();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 }));
+
+for(const provider of ['claude','codex','copilot'] as const)test(`${provider} questions notify once and a new question notifies again`,()=>fixture(async file=>{
+ const journal=new RunNotificationJournal(file,()=>1000);
+ await journal.sync([job({provider})]);
+ const question=(id:string)=>job({provider,approvals:[{id,tool:'AskUserQuestion',input:{questions:[{question:'Synthetic clarification'}]},expiresAt:3000}]});
+ await journal.sync([question('first')]);await journal.sync([question('first')]);
+ assert.equal(journal.snapshot(0).events.length,1);
+ await journal.sync([question('second')]);
+ assert.deepEqual(journal.snapshot(0).events.map(e=>[e.provider,e.status,e.jobId]),[[provider,'needs_input','fixture-run'],[provider,'needs_input','fixture-run']]);
+}));

@@ -257,6 +257,11 @@ test('Codex routes single-use approvals and question answers and denies unsuppor
   const question = service.get(input.id).approvals[0]; assert.equal(question.tool, 'AskUserQuestion');
   service.approve(input.id, question.id, true, { 'Which?': 'First' });
   assert.deepEqual(rpc.responses[1], { id: 11, result: { answers: { choice: { answers: ['First'] } } } });
+  rpc.serverRequest(13, 'item/tool/requestUserInput', { questions: [{ id: 'one', header:'First setting', question: 'Which?' },{id:'two',question:'Which?'}] });
+  const repeated=service.get(input.id).approvals[0];
+  assert.equal((repeated.input.questions as any[])[0].header,'First setting');
+  service.approve(input.id,repeated.id,true,{one:'A',two:'B'});
+  assert.deepEqual(rpc.responses[2],{id:13,result:{answers:{one:{answers:['A']},two:{answers:['B']}}}});
   rpc.serverRequest(12, 'item/permissions/requestApproval', { permissions: { network: { enabled: true } } });
   assert.deepEqual(rpc.rejections, [12]); assert.equal(service.get(input.id).approvals.length, 0);
 });
