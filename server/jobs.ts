@@ -37,7 +37,7 @@ export class Jobs {
     });
     return this.view(job);
   }
-  start(input: { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; jira?: JobView['jira'] }) {
+  start(input: { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; claudeAccess?:'default'|'acceptEdits'|'bypassPermissions'; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; jira?: JobView['jira'] }) {
     const existing = this.jobs.get(input.id);
     if (existing) return this.view(existing);
     for (const [id, j] of this.jobs) if (j.status !== 'running' && Date.now() - j.startedAt > 86400000) this.jobs.delete(id);
@@ -63,7 +63,8 @@ export class Jobs {
     try {
       stream = this.run({ prompt: job.inputs, options: {
         cwd: input.cwd, resume: input.sessionId, model: input.model || undefined,
-        permissionMode: input.mode, maxBudgetUsd: input.maxBudgetUsd,
+        permissionMode: input.mode==='plan'?'plan':input.claudeAccess||'default',
+        allowDangerouslySkipPermissions: input.mode!=='plan'&&input.claudeAccess==='bypassPermissions', maxBudgetUsd: input.maxBudgetUsd,
         abortController: job.controller, includePartialMessages: true,
         settingSources: ['user', 'project', 'local'],
         systemPrompt: { type: 'preset', preset: 'claude_code', append: await projectBoardInstructions(input.cwd) },

@@ -3,6 +3,7 @@
 ## 0.26.1 (Unreleased)
 
 ### Features
+- claude: add persisted permission choices in mobile and Windows settings: ask for approval, accept file edits, or full access. Pass the selected native mode to new/resumed runs, retain active-run policy and enforce plan-mode precedence. API/SDK mapping and browser persistence checks passed; a live account was not exercised.
 - chat: present structured provider questions in a dedicated accessible dialog with option descriptions, supported multiple selection, custom answers, draft retention, retry and expiry handling; preserve Codex question IDs and Copilot freeform restrictions. Existing enabled native alerts notify waiting questions for all three providers without repeated polling duplicates.
 - appearance: persist slow, normal, fast or instant letter reveal speed and apply changes during live responses; reduced motion remains immediate.
 - boards: display lightweight content miniatures behind repository board names using already loaded geometry and status colors; preserve open/delete actions. Miro keeps its existing card because the connection supplies no preview.

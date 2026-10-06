@@ -399,6 +399,17 @@
       "x": 2744,
       "y": 3960,
       "dependencies": []
+    },
+    {
+      "id": "4d959643-1b60-4792-996d-0eaeafd70eab",
+      "title": "Claude access settings",
+      "description": "Authorized for 0.26.1: expose native default, acceptEdits and bypassPermissions modes in shared mobile/desktop settings, persist the choice and pass it to new or resumed Claude runs. Existing active runs retain their policy. Validate SDK options, persistence and permission questions.\nValidated: API-to-SDK mode mapping, invalid-mode rejection, plan precedence, browser persistence/help and TypeScript/Vite build passed. Live Claude account not exercised. Release pending.",
+      "branch": "0.26.1",
+      "status": "review",
+      "priority": "high",
+      "x": 3084,
+      "y": 3960,
+      "dependencies": []
     }
   ]
 }

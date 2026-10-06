@@ -1,3 +1,4 @@
+import {useClaudeAccess} from './claude-access';
 import {ChatComposer} from './ChatComposer';
 import {ModelPicker,useClaudeModels} from './ModelPicker';
 import {useChatReturn} from './use-chat-return';
@@ -115,6 +116,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [settingsPage,setSettingsPage]=useState<SettingsPage>('index');
   const [draft, setDraft] = useStateForWorkspace(''),[search, setSearch] = useStateForWorkspace(''),[model, setModel] = useStateForWorkspace(id=>preferences(id).model);
   const codexEffort=useCodexEffort(provider==='codex'?providerInfo?.models:undefined,model);
+  const claudeAccess=useClaudeAccess();
   const [codexAccess,setCodexAccess]=useStateForWorkspace(id=>preferences(id).codexAccess);
   const [error, setError] = useStateForWorkspace(''),[networkError, setNetworkError] = useStateForWorkspace(''),[busy, setBusy] = useStateForWorkspace(false),[loading, setLoading] = useStateForWorkspace(false);
   const [hostRestarting,setHostRestarting] = useState(false);
@@ -540,7 +542,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if (sessionId && !confirmed) {setPendingTakeover(true);return;}
     sending.current = true;setBusy(true);setError('');
     const epoch = ++navigation.current;
-    const data = { provider, cwd, sessionId, ...(taskRun?{taskRunId:taskRun.id}:{}), text: draft, attachments: attachments.map((a) => a.id), model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: "default", ...(provider==='claude'?{maxBudgetUsd:budget}:provider==='codex'?{codexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), takeoverConfirmed: confirmed };
+    const data = { provider, cwd, sessionId, ...(taskRun?{taskRunId:taskRun.id}:{}), text: draft, attachments: attachments.map((a) => a.id), model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: "default", ...(provider==='claude'?{maxBudgetUsd:budget,claudeAccess}:provider==='codex'?{codexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), takeoverConfirmed: confirmed };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {

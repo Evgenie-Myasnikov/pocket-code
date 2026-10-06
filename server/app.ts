@@ -210,7 +210,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json(await jira(requestProvider(req)).issue(query.site, query.key));
   });
   const codexAccessSchema = z.enum(['full', 'ask', 'auto']).optional();
-  const jiraStartSchema = z.object({ provider: providerSchema, id: uuid, site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i), cwd: text, mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5) });
+  const jiraStartSchema = z.object({ provider: providerSchema, id: uuid, site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i), cwd: text, claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5) });
   async function startJira(body: z.infer<typeof jiraStartSchema>) {
     const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const issue = await jira(body.provider).issue(body.site, body.key);
