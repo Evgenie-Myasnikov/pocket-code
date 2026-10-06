@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';import {randomUUID} from 'node:crypto';
 import {Jobs} from '../server/jobs';import {createApp} from '../server/app';import {waitFor} from './wait-for';
-test('Claude access survives API validation into SDK options, preserves planning and asks clarification in full access',async()=>{
+test('Claude access survives API validation into SDK options, preserves planning and retains the question callback in full access',async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'pocket-access-'));const captured:any[]=[];
  const jobs=new Jobs((({options}:any)=>{captured.push(options);return (async function*(){yield {type:'result',subtype:'success',is_error:false,total_cost_usd:0};})();}) as any);
  const token='x'.repeat(43),sdk:any={listSessions:async()=>[],getSessionMessages:async()=>[]};

@@ -210,7 +210,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json(await jira(requestProvider(req)).issue(query.site, query.key));
   });
   const codexAccessSchema = z.enum(['full', 'ask', 'auto']).optional();
-  const jiraStartSchema = z.object({ provider: providerSchema, id: uuid, site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i), cwd: text, claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5) });
+  const jiraStartSchema = z.object({ provider: providerSchema, id: uuid, site: z.string().min(1).max(100), key: z.string().regex(/^[A-Z][A-Z0-9_]*-\d+$/i), cwd: text, mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5) });
   async function startJira(body: z.infer<typeof jiraStartSchema>) {
     const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const issue = await jira(body.provider).issue(body.site, body.key);
@@ -449,7 +449,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const body = z.object({ provider: providerSchema, id: uuid, cwd: text, sessionId: uuid.optional(), text: z.string().max(100000),
       attachments: z.array(uuid).max(10).default([]), model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
-      mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
+      claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
       taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
     const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const engine = engineFor(body.provider);

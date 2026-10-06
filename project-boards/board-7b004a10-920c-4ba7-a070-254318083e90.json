@@ -403,7 +403,7 @@
     {
       "id": "4d959643-1b60-4792-996d-0eaeafd70eab",
       "title": "Claude access settings",
-      "description": "Authorized for 0.26.1: expose native default, acceptEdits and bypassPermissions modes in shared mobile/desktop settings, persist the choice and pass it to new or resumed Claude runs. Existing active runs retain their policy. Validate SDK options, persistence and permission questions.\nValidated: API-to-SDK mode mapping, invalid-mode rejection, plan precedence, browser persistence/help and TypeScript/Vite build passed. Live Claude account not exercised. Release pending.",
+      "description": "Authorized for 0.26.1: expose native default, acceptEdits and bypassPermissions modes in shared mobile/desktop settings, persist the choice and pass it to new or resumed Claude runs. Existing active runs retain their policy. Validate SDK options, persistence and permission questions.\nValidated: API-to-SDK mode mapping, invalid-mode rejection, plan precedence, browser persistence/help and TypeScript/Vite build passed. Live Claude account not exercised. Release pending.\nInitial API test exposed a dropped access field; corrected the jobs schema and reran the original test successfully. This supersedes the premature validation statement above.",
       "branch": "0.26.1",
       "status": "review",
       "priority": "high",
