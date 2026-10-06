@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.1 (Unreleased)
+## [0.26.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.0...v0.26.1) (2026-10-06)
 
 ### Features
 - claude: add persisted permission choices in mobile and Windows settings: ask for approval, accept file edits, or full access. Pass the selected native mode to new/resumed runs, retain active-run policy and enforce plan-mode precedence. API/SDK mapping and browser persistence checks passed; a live account was not exercised.
@@ -20,6 +20,9 @@
 - Questions, reveal settings and board previews: 20 targeted browser checks and 44 provider/streaming/notification tests passed; TypeScript/Vite build passed. Synthetic phone previews inspected. Windows notification queue passed 11 assertions; Android notification identity passed 7 assertions. Physical-device delivery remains unverified; not released.
 - Six existing composer browser checks passed, including 320px at 60%/130%, phone/desktop widths, shortcuts and reduced motion; synthetic phone and desktop layouts inspected. Not released.
 - Letter streaming: nine browser checks and two glyph/Unicode unit checks passed; TypeScript/Vite build passed. Includes first-fragment progression, frequent deltas and reduced-motion bypass. Not released.
+
+- Published validation: 21 browser, 45 provider/server/streaming and 5 privacy checks passed. Android and Windows built; APK signing continuity, source-matched host, archive privacy and downloaded release checksums verified. Earlier unreleased notes above record intermediate checks.
+- Release source: [bbdb282](https://github.com/Evgenie-Myasnikov/pocket-code/commit/bbdb282791d26302e0d62a9da77d137d90137804), branch [codex/chat-polish-0.26.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/chat-polish-0.26.1). Physical Android delivery and live Claude account checks remain unverified.
 
 ## [0.26.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.25.11...v0.26.0) (2026-10-06)
 
