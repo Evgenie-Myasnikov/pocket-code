@@ -10,6 +10,9 @@
 - chat: keep model selection and effort side by side in one row in the shared phone/desktop composer, including narrow screens; truncate long labels without wrapping the controls vertically.
 - chat: progressively reveal live response letters, including the first network fragment, with soft glyph fading; retain full provider text and immediately display saved history or reduced-motion output. Frequent deltas share a presentation queue instead of restarting it.
 
+### Code Refactoring
+- release checks: read Git blobs in one validated binary batch per tree, retaining all file, credential, denylist and historical-commit checks; malformed batches fail closed.
+
 ### Bug Fixes
 - chat: replace the provider/computer footer with a concise working or waiting-for-response status.
 

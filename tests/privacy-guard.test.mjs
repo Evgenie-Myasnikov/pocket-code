@@ -38,3 +38,14 @@ test('the guard checks staged blobs, historical commits and refuses the parent r
   rmSync(resolved,{recursive:true,force:true});
  }
 });
+
+test('batch blob reads preserve binary boundaries and UTF-16 denylist detection across files',()=>{
+ const dir=mkdtempSync(path.join(tmpdir(),'pocket-privacy-batch-')),script=fileURLToPath(new URL('../scripts/privacy-guard.mjs',import.meta.url));
+ const git=(...args)=>execFileSync('git',args,{cwd:dir,stdio:'pipe'});
+ try{
+  git('init');writeFileSync(path.join(dir,'a.txt'),'odd');writeFileSync(path.join(dir,'b.bin'),Buffer.from('safe'.repeat(1000),'utf16le'));git('add','a.txt','b.bin');
+  assert.equal(spawnSync(process.execPath,[script,'--staged'],{cwd:dir}).status,0);
+  writeFileSync(path.join(dir,'.privacy-denylist.local.json'),JSON.stringify(['synthetic-marker']));writeFileSync(path.join(dir,'b.bin'),Buffer.from('synthetic-marker','utf16le'));git('add','b.bin');
+  const result=spawnSync(process.execPath,[script,'--staged'],{cwd:dir,encoding:'utf8'});assert.equal(result.status,1);assert.ok(!result.stderr.includes('synthetic-marker'));
+ }finally{if(!path.resolve(dir).startsWith(path.resolve(tmpdir())+path.sep))throw Error('Unsafe cleanup');rmSync(dir,{recursive:true,force:true});}
+});

@@ -15,7 +15,23 @@ export function checkContent(name,bytes,deny=[]){
   return [...new Set(findings)];
 }
 
-export function run(args,git=(...args)=>execFileSync('git',args,{maxBuffer:128*1024*1024})){
+const readGit=(...args)=>execFileSync('git',args,{maxBuffer:128*1024*1024});
+function readBlobs(files){
+  const ids=[...new Set(files.filter(file=>file.mode==='100644'||file.mode==='100755').map(file=>file.oid))];
+  if(!ids.length)return new Map();
+  const output=execFileSync('git',['cat-file','--batch'],{input:ids.join('\n')+'\n',maxBuffer:128*1024*1024}),blobs=new Map();let offset=0;
+  for(const id of ids){
+    const end=output.indexOf(10,offset);if(end<0)throw Error('Incomplete Git batch header');
+    const match=/^([a-f0-9]+) blob (\d+)$/.exec(output.subarray(offset,end).toString('ascii'));
+    if(!match||match[1]!==id)throw Error('Unexpected Git object');
+    const size=Number(match[2]),start=end+1,limit=start+size;
+    if(!Number.isSafeInteger(size)||limit>=output.length||output[limit]!==10)throw Error('Incomplete Git blob');
+    blobs.set(id,Buffer.from(output.subarray(start,limit)));offset=limit+1;
+  }
+  if(offset!==output.length)throw Error('Unexpected Git batch remainder');
+  return blobs;
+}
+export function run(args,git=readGit){
   const root=git('rev-parse','--show-toplevel').toString().trim();
   if(path.resolve(root)!==path.resolve(process.cwd()))throw Error('Run from the actual repository root; parent repositories are refused');
   let configured;
@@ -34,8 +50,9 @@ export function run(args,git=(...args)=>execFileSync('git',args,{maxBuffer:128*1
     files=git('ls-tree','-rz',sha).toString().split('\0').filter(Boolean).map(line=>{const match=/^(\d+) (\w+) ([a-f0-9]+)\t([\s\S]+)$/.exec(line);if(!match)throw Error('Invalid Git tree');return{mode:match[1],oid:match[3],name:match[4]};});
     if(checkContent('commit',git('show','-s','--format=%B%n%an%n%ae%n%cn%n%ce',sha),deny).length){console.error('Privacy guard: commit metadata rejected');failures++;}
   }else throw Error('Use --staged or --tree <commit>');
+  const blobs=git===readGit?readBlobs(files):null;
   for(const [index,file]of files.entries()){
-    const issues=file.mode==='100644'||file.mode==='100755'?checkContent(file.name,git('cat-file','blob',file.oid),deny):['unsupported-file-mode'];
+    const issues=file.mode==='100644'||file.mode==='100755'?checkContent(file.name,blobs?blobs.get(file.oid):git('cat-file','blob',file.oid),deny):['unsupported-file-mode'];
     if(issues.length){failures++;console.error(`Privacy guard: entry ${index+1} rejected (${issues.join(', ')}). Values and paths are redacted.`);}
   }
   if(failures)throw Error('Publication blocked by privacy guard');
