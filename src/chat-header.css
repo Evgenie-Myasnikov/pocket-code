@@ -27,3 +27,9 @@ header.chat-header.chat-header-conversation .header-title>strong{display:block;m
 }
 
 .chat-header-conversation .chat-header-actions>button>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.chat-header-actions .header-agent-count{display:none;font:inherit;font-variant-numeric:tabular-nums}
+@container chat-workspace (max-width:420px){
+  .chat-header-conversation .chat-header-actions>button{flex:none;min-width:48px}
+  .chat-header-conversation .chat-header-actions>button>span{display:none}
+  .chat-header-actions .header-agent-count{display:inline}
+}

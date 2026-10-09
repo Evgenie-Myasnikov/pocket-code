@@ -1,0 +1,5 @@
+.activity-group-items{padding-left:18px}
+.activity-group-items>.tool-card{margin-block:4px}
+.activity-group-items>.thinking{margin-block:8px}
+.activity-group-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
+.activity-message-anchor{position:absolute;top:0;left:0;width:1px;height:1px;pointer-events:none}

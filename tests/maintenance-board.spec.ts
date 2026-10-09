@@ -25,9 +25,10 @@ async function setup(page:Page){
  await page.goto('http://127.0.0.1:5173');await page.locator('.project-board-row .board-index-item').click();await expect(page.locator('.board-note')).toBeVisible();return state;
 }
 async function drag(page:Page){const handle=page.locator('.note-drag'),box=(await handle.boundingBox())!;await page.mouse.move(box.x+20,box.y+14);await page.mouse.down();await page.mouse.move(box.x+44,box.y+54,{steps:4});await page.mouse.up();}
-test('board view choice survives leaving and reopening its repository',async({page})=>{
- await setup(page);await page.getByRole('button',{name:'People',exact:true}).click();await expect(page.getByRole('button',{name:'People',exact:true})).toHaveAttribute('aria-pressed','true');
- await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row .board-index-item').click();await expect(page.getByRole('button',{name:'People',exact:true})).toHaveAttribute('aria-pressed','true');
+test('obsolete People preference opens the canvas without people categories',async({page})=>{
+ await page.addInitScript(root=>localStorage.setItem('pocket-board-view:'+root+':11111111-1111-4111-8111-111111111111','people'),root);
+ await setup(page);await expect(page.locator('.board-viewport')).toBeVisible();await expect(page.locator('.board-view-switch,.board-people,.note-assignees')).toHaveCount(0);
+ await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row .board-index-item').click();await expect(page.locator('.board-viewport')).toBeVisible();await expect(page.getByRole('button',{name:'People',exact:true})).toHaveCount(0);
 });
 test('rejected board drag restores the original visible and saved position',async({page})=>{
  const state=await setup(page);state.reject=true;await drag(page);await expect(page.getByRole('alert')).toContainText('Synthetic revision conflict');

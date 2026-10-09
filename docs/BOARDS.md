@@ -22,7 +22,7 @@ Right-click a note for deletion with confirmation. References to the deleted not
 
 Repository boards use `pocket-code-board` version 1 JSON in `project-boards/`. Images are content-addressed files under `project-boards/assets/`. Commit the board and referenced assets together after reviewing them. Saving in the app writes files with revision checks; it does not commit, push or resolve Git conflicts. Refresh rejects/reloads stale data before retrying an edit.
 
-Only product information belongs in portable boards: ideas, criteria, statuses, priorities, positions, versions and dependency IDs. Do not put people, assignments, private messages, accounts, credentials or connection details in Git. Compatible legacy live host boards keep private participant and inbox information outside the portable file; the People view is useful only where that private data exists.
+Only product information belongs in portable boards: ideas, criteria, statuses, priorities, positions, versions and dependency IDs. Do not put people, assignments, private messages, accounts, credentials or connection details in Git. Boards open directly on their canvas, without a People view, participant list or assignment controls. Legacy private membership data remains outside the portable file.
 
 ## AI workflow
 

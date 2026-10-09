@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.26.4 (Unreleased)
+
+### Features
+- chat: collapse consecutive matching command, file-edit, tool and reasoning rows into counted disclosures; preserve every call/result, keep errors separate and retain message anchors. Move the aggregate subagent entry beside Review and Results in the shared header; hide it for chats without agents and use compact icon actions on narrow screens.
+- chat: remove trailing chevrons from activity disclosures and inline subagent entries; retain row activation, keyboard controls and visible focus.
+- boards: remove the People view/category, participant controls and note assignee UI; always open the canvas, including when an obsolete People preference exists. Keep note status, priority and saved data intact.
+
+### Validation
+- Thirteen focused browser scenarios passed, including disclosure contents, error visibility, child context navigation, header absence in a new chat and 320/360/844/1280px layouts; five grouping/activity unit checks and TypeScript/Vite passed. Final header changes passed all eleven header/subagent scenarios again. Synthetic captures inspected. Physical-device validation and publication remain outstanding.
+- Chevron removal passed ten activity/subagent browser scenarios, including keyboard disclosure. Board simplification passed five browser scenarios for obsolete preferences, editing, drag/zoom, save conflicts and reopening; TypeScript/Vite passed. Updated the board guide; no release performed.
+
 ## [0.26.3](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.2...v0.26.3) (2026-10-06)
 
 ### Bug Fixes

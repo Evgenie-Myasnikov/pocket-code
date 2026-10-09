@@ -1,4 +1,6 @@
 import { RichBlock } from './RichBlocks';
+import {ActivityGroup} from './ActivityGroup';
+import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey} from './activity-groups';
 import { t, useLanguage } from "./i18n";import { memo, useState } from 'react';
 import { Copy, Check, ShieldCheck, X } from 'lucide-react';
 import type { ChatMessage, Approval, SubagentView, Block } from '../server/types';
@@ -10,7 +12,12 @@ function CopyButton({ text }: {text: string;}) {
 }
 type MessageProps={message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean};
 export const MessageList=memo(function MessageList({messages,runningMessages,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];runningMessages?:Set<ChatMessage>|null}){
-  return messages.map(message=><Message key={message.id} message={message} running={runningMessages?.has(message)||false} {...shared}/>);
+  return groupActivityMessages(messages,shared.toolResults,runningMessages).map(run=>run.message?
+    <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} {...shared}/>:
+    <article key={run.key} className="message assistant tool-result" data-message-id={run.items![0].messageId}>
+      {[...new Set(run.items!.map(item=>item.messageId))].slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
+      <ActivityGroup items={run.items!}/>
+    </article>);
 });
 export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false }: MessageProps) {
   useLanguage();
@@ -18,14 +25,10 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   if(message.blocks.length&&message.blocks.every(b=>b.type==='tool_result'&&b.tool_use_id&&toolResults?.has(b.tool_use_id)))return null;
   const toolOnly = message.blocks.length > 0 && message.blocks.every((b) => ['tool_result','tool_use','thinking','codexItem','subagent'].includes(b.type));
   const isUser = message.role === 'user' && !toolOnly;
-  const content = message.blocks.map((block,i) => {
-      if(block.type==='tool_result'&&block.tool_use_id&&toolResults?.has(block.tool_use_id))return null;
-      const previous=message.blocks[i-1],next=message.blocks[i+1];
-      // Keep a call and its adjacent matching result in one disclosure. Unknown
-      // or separate results remain visible; no content is discarded or reordered.
-      if(block.type==='tool_result' && previous?.type==='tool_use' && previous.id && previous.id===block.tool_use_id)return null;
-      const result=block.type==='tool_use' && block.id ? toolResults?.get(block.id)||(next?.type==='tool_result'&&next.tool_use_id===block.id?next:undefined):undefined;
-      return <RichBlock key={i} running={running} streaming={streaming&&message.role==='assistant'} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
+  const content = groupActivityBlocks(visibleMessageBlocks(message,toolResults,running)).map(run => {
+      const {block,result}=run.items[0];
+      if(activityGroupKey(run.items[0]))return <ActivityGroup key={run.key} items={run.items}/>;
+      return <RichBlock key={run.key} running={running} streaming={streaming&&message.role==='assistant'} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
   return <article data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{content}</div></> : <>

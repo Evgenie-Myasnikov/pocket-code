@@ -10,7 +10,7 @@ import {rehypeStreamingReveal,type RevealOptions} from './streaming-reveal';
 import './streaming-reveal.css';
 import type { Block, SubagentView } from '../server/types';
 import { t, useLanguage } from './i18n';
-import {Terminal, Pencil, ChevronRight, Wrench} from 'lucide-react';
+import {Terminal, Pencil,  Wrench} from 'lucide-react';
 import {toolActivity} from './tool-activity';
 import {ImageViewer} from './ImageViewer';
 
@@ -58,14 +58,14 @@ export function RichBlock({block,depth=0,result,onSubagent,running=false,streami
   if(block.type==='text')return <Markdown text={block.text || ''} streaming={streaming} animateInitial={streaming}/>;
   if(block.type==='subagent' && block.agent) {
     const agent=block.agent,label=t(({running:'Работает',completed:'Завершён',error:'Ошибка',stopped:'Остановлен',unknown:'Статус неизвестен'} as const)[agent.status]);
-    return onSubagent?<button className={`subagent-card subagent-${agent.status}`} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span><ChevronRight className="subagent-chevron" size={16} aria-hidden="true"/></button>:<Disclosure className="subagent-inline" summary={<>{agent.name} · {label}</>}>{()=> <>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</>}</Disclosure>;
+    return onSubagent?<button className={`subagent-card subagent-${agent.status}`} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span></button>:<Disclosure className="subagent-inline" summary={<>{agent.name} · {label}</>}>{()=> <>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</>}</Disclosure>;
   }
   if(block.type==='image'){const src=imageSource(block);return src?<Picture src={src} alt={block.title||t('Изображение')}/>:<span className="attachment-chip">📎 {t('Изображение недоступно в сохранённой истории')}</span>;}
   if(block.type==='document')return <Document block={block}/>;
   if(block.type==='tool_result')return <Disclosure className={`tool-card result ${block.is_error?'failed':''}`} summary={block.is_error?t('Ошибка инструмента'):t('Результат инструмента')}>{()=> <ToolResultContent block={block} depth={depth}/>}</Disclosure>;
   if(block.type==='tool_use'){
     const activity=toolActivity(block,result,running),Icon=activity.kind==='command'?Terminal:activity.kind==='edit'?Pencil:Wrench;
-    return <Disclosure className={`tool-card activity-row ${result?'combined':''} ${activity.failed?'failed':''}`} summary={<><Icon size={16}/><span>{t(activity.label)}{activity.kind==='tool'&&block.name?` · ${block.name}`:''}</span><ChevronRight className="activity-chevron" size={14}/></>}>{()=> <div className="activity-details"><strong>{block.name}</strong><pre>{JSON.stringify(block.input,null,2)}</pre>{result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}</div>}</Disclosure>;
+    return <Disclosure className={`tool-card activity-row ${result?'combined':''} ${activity.failed?'failed':''}`} summary={<><Icon size={16}/><span>{t(activity.label)}{activity.kind==='tool'&&block.name?` · ${block.name}`:''}</span></>}>{()=> <div className="activity-details"><strong>{block.name}</strong><pre>{JSON.stringify(block.input,null,2)}</pre>{result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}</div>}</Disclosure>;
   }
   if(block.type==='thinking')return <Disclosure className="thinking" summary={t('Рассуждения')}>{()=> <p>{block.thinking}</p>}</Disclosure>;
   if(block.type==='redacted_thinking')return <p className="muted">{t('Этот блок размышлений скрыт провайдером')}</p>;

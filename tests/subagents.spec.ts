@@ -20,6 +20,7 @@ async function mockHost(page:Page,options:{failure?:boolean;slow?:ReturnType<typ
     if(endpoint==='/sessions/parent-session/subagents/child-research/messages')return route.fulfill({json:{messages:[message('research-message','Research details from the child chat.')]}});
     if(endpoint==='/sessions/parent-session/messages')return route.fulfill({json:{messages:[{id:'parent-message',role:'assistant',blocks:[{type:'text',text:'Parent conversation remains here.'},{type:'subagent',agent:{...reviewer,result:'Saved review summary remains available.'}}]}],previous:null,next:null}});
     if(endpoint==='/jobs')return route.fulfill({json:[]});
+    if(endpoint==='/review/availability')return route.fulfill({json:{available:true,mode:'working'}});
     if(endpoint==='/updates/latest')return route.fulfill({json:{enabled:false}});
     if(endpoint==='/jira/status')return route.fulfill({json:{connected:false,sites:[]}});
     return route.fulfill({status:404,json:{error:'Synthetic endpoint not configured'}});
@@ -46,6 +47,7 @@ test('agent activity opens read-only child messages and Back restores list and p
   await panel(page).getByRole('button',{name:'Back to chat',exact:true}).click();
   await expect(panel(page)).toHaveCount(0);await expect(page.getByLabel('Message Codex')).toHaveValue('Keep the parent draft');
   await expect(page.locator('.subagent-card')).toBeFocused();
+  await newChat(page);await expect(page.locator('.chat-header-actions .subagents-entry')).toHaveCount(0);
 });
 
 test('saved task and result remain readable when child history is unavailable',async({page})=>{
@@ -79,7 +81,12 @@ test('late child responses cannot replace a different selected agent and polling
 for(const profile of [{width:320,height:640,language:'en',scale:130},{width:360,height:760,language:'ru',scale:100},{width:844,height:390,language:'en',scale:100},{width:1280,height:800,language:'en',scale:100}]){
   test(`agent panel fits ${profile.width}x${profile.height} ${profile.language} ${profile.scale}%`,async({page})=>{
     await page.setViewportSize(profile);await mockHost(page,{long:true});await openChat(page,profile.language,profile.scale);
-    await page.locator('.subagent-activity button').click();await expect(panel(page).locator('.subagent-row')).toHaveCount(2);
+    await expect(page.locator('.chat-header-actions>button')).toHaveCount(4);
+    for(const button of await page.locator('.chat-header-actions>button').all()){
+      const box=(await button.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(profile.width);expect(box.width).toBeGreaterThanOrEqual(48);
+    }
+    await page.screenshot({path:`.local/subagents-header-${profile.width}.png`});
+    await expect(page.locator('.subagent-activity')).toHaveCount(0);await page.locator('.chat-header-actions .subagents-entry').click();await expect(panel(page).locator('.subagent-row')).toHaveCount(2);
     const metrics=await panel(page).evaluate(element=>{const box=element.getBoundingClientRect();return{left:box.left,right:box.right,bottom:box.bottom,width:box.width,spill:element.scrollWidth-element.clientWidth,targets:[...element.querySelectorAll('button')].map(button=>button.getBoundingClientRect().height)};});
     expect(metrics.left).toBeGreaterThanOrEqual(0);expect(metrics.right).toBeLessThanOrEqual(profile.width);expect(metrics.bottom).toBeLessThanOrEqual(profile.height);expect(metrics.spill).toBeLessThanOrEqual(1);expect(metrics.targets.every(height=>height>=48)).toBeTruthy();
     if(profile.width>760)expect(metrics.width).toBeLessThan(profile.width);
