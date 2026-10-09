@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.4 (Unreleased)
+## [0.26.4](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.3...v0.26.4) (2026-10-09)
 
 ### Features
 - chat: collapse consecutive matching command, file-edit, tool and reasoning rows into counted disclosures; preserve every call/result, keep errors separate and retain message anchors. Move the aggregate subagent entry beside Review and Results in the shared header; hide it for chats without agents and use compact icon actions on narrow screens.
@@ -8,8 +8,10 @@
 - boards: remove the People view/category, participant controls and note assignee UI; always open the canvas, including when an obsolete People preference exists. Keep note status, priority and saved data intact.
 
 ### Validation
-- Thirteen focused browser scenarios passed, including disclosure contents, error visibility, child context navigation, header absence in a new chat and 320/360/844/1280px layouts; five grouping/activity unit checks and TypeScript/Vite passed. Final header changes passed all eleven header/subagent scenarios again. Synthetic captures inspected. Physical-device validation and publication remain outstanding.
-- Chevron removal passed ten activity/subagent browser scenarios, including keyboard disclosure. Board simplification passed five browser scenarios for obsolete preferences, editing, drag/zoom, save conflicts and reopening; TypeScript/Vite passed. Updated the board guide; no release performed.
+- Thirteen focused browser scenarios passed, including disclosure contents, error visibility, child context navigation, header absence in a new chat and 320/360/844/1280px layouts; five grouping/activity unit checks and TypeScript/Vite passed. Final header changes passed all eleven header/subagent scenarios again. Synthetic captures inspected. These checks preceded release; physical-device validation was not performed.
+- Chevron removal passed ten activity/subagent browser scenarios, including keyboard disclosure. Board simplification passed five browser scenarios for obsolete preferences, editing, drag/zoom, save conflicts and reopening; TypeScript/Vite passed. Updated the board guide before release.
+- Release validation: all 18 focused browser scenarios and 5 unit checks passed on the release checkout; TypeScript/Vite, Android (versionCode 79) and Windows builds passed. Source privacy guard and 309 host files, 501 APK entries and 376 Windows archive entries passed artifact audits. APK signer matches 0.26.3; downloaded GitHub packages match the manifest hashes and exact source tag. GitHub privacy CI passed. Physical-device checks remain unperformed.
+- Published [v0.26.4](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.26.4) from [dbe63bd511cdb16c1e95dad0fa9a3ff3bc79563a](https://github.com/Evgenie-Myasnikov/pocket-code/commit/dbe63bd511cdb16c1e95dad0fa9a3ff3bc79563a) on [codex/chat-activity-0.26.4](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/chat-activity-0.26.4); APK, Windows package, host bundle and update manifest are available.
 
 ## [0.26.3](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.2...v0.26.3) (2026-10-06)
 
