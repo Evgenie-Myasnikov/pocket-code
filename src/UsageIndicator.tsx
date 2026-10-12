@@ -11,6 +11,7 @@ export function UsageIndicator({connection,provider,models,onOpen}:{connection:C
   const [visible,setVisible]=useState(false),[snapshot,setSnapshot]=useState<CodexUsageSnapshot|null>(null),[failed,setFailed]=useState(false);
   useEffect(()=>{const node=button.current;if(!node)return;const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)));observer.observe(node);return()=>observer.disconnect();},[]);
   useEffect(()=>{
+    setSnapshot(null);setFailed(false);
     if(!visible||provider==='copilot')return;let active=true;
     const stop=startVisiblePoll(async()=>{
       try{const value=await request<CodexUsageSnapshot>(connection,`/${provider}/usage`);if(active){setSnapshot(value);setFailed(false);}}

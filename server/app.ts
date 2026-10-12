@@ -1,3 +1,4 @@
+import {messageAttachment} from './message-attachment.js';
 import {projectRuleSettings,saveProjectRuleSettings} from './project-rules.js';
 import {mountBoards,createWorkspaceAccess,workspaceRequest} from './boards.js';
 import {DeviceRegistry} from './devices.js';
@@ -449,7 +450,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const body = z.object({ provider: providerSchema, id: uuid, cwd: text, sessionId: uuid.optional(), text: z.string().max(100000),
       attachments: z.array(uuid).max(10).default([]), model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
-      claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
+      claudeEffort:z.enum(['low','medium','high','xhigh','max']).optional(),claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
       taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
     const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const engine = engineFor(body.provider);
@@ -461,6 +462,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     };
     const existing = allJobs().find(j => j.id === body.id);
     if (existing) { await replyToRetry(existing);return; }
+    if(body.claudeEffort){
+      if(body.provider!=='claude')throw new HttpError(400,'Claude effort is only available for Claude');
+      const catalog=await claudeCatalog.read(cwd);
+      const selected=catalog.models.find(model=>model.id===(body.model||'sonnet'));
+      if(catalog.source!=='sdk'||!selected?.reasoningEfforts?.includes(body.claudeEffort))throw new HttpError(400,'This Claude model does not advertise the selected effort. Refresh its model catalog.');
+    }
     if (terminals.list().some(t => t.cwd === cwd && t.status === 'running')) throw new HttpError(409, 'В проекте открыт живой терминал. Завершите его перед запуском обычного чата.');
     if (body.sessionId) {
       const s = await session(body.sessionId, body.provider);
@@ -479,7 +486,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if (raced) { await replyToRetry(raced);return; }
     guardProject(cwd, body.id);
     const bound=await taskRuntime!.bindJob({...body,cwd});
-    try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text + attached.map(f => `\n📎 ${f.name}`).join('') }));}
+    try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text }));}
     catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
   });
   app.post('/api/jobs/:id/messages',async(req,res)=>{
@@ -488,7 +495,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const attached=body.attachments.map(id=>{const file=uploads.get(id);if(!file||file.cwd!==cwd||file.expires<Date.now())throw new HttpError(400,'Вложение недоступно. Прикрепите файл ещё раз.');return file;});
     if(!body.text.trim()&&!attached.length)throw new HttpError(400,'Введите сообщение или прикрепите файл');
     const prompt=body.text+(attached.length?'\n\nFiles attached by the user (read these local files as needed):\n'+attached.map(file=>JSON.stringify(file.path)).join('\n'):'');
-    res.json(await engine.followup(id,{id:body.id,text:prompt,displayText:body.text+attached.map(file=>`\n📎 ${file.name}`).join(''),attachmentPaths:attached.map(file=>file.path)}));
+    res.json(await engine.followup(id,{id:body.id,text:prompt,displayText:body.text,attachmentPaths:attached.map(file=>file.path)}));
   });
   app.post('/api/jobs/:id/stop', (req, res) => { const id = uuid.parse(req.params.id); engineForJob(id).stop(id); res.json({ ok: true }); });
   app.post('/api/jobs/:id/approvals/:approval', (req, res) => {
@@ -535,6 +542,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/project-docs', async (req, res) => {
     const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);
     res.json(await projectDocuments(cwd));
+  });
+  app.get('/api/message-attachment', async (req,res) => {
+    const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);
+    res.json(await messageAttachment(cwd,config.uploads,text.parse(req.query.path)));
   });
   app.get('/api/project-artifact', async (req, res) => {
     const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);

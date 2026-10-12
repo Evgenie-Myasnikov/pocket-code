@@ -1,3 +1,4 @@
+import { userInputBlocks } from './user-input-blocks.js';
 import {randomUUID} from 'node:crypto';
 import {projectBoardInstructions} from './project-rules.js';
 import {CopilotLogin} from './copilot-login.js';
@@ -60,7 +61,7 @@ export class CopilotService{
   if([...this.runs.values()].some(run=>run.view.status==='running'&&(run.view.cwd===input.cwd||input.sessionId&&run.view.sessionId===input.sessionId)))throw new HttpError(409,'Copilot is already working in this project.');
   for(const [id,run] of this.runs)if(run.view.status!=='running'&&this.runs.size>=90)this.runs.delete(id);
   if(this.runs.size>=100||this.list().filter(job=>job.status==='running').length>=3)throw new HttpError(429,'Too many Copilot jobs.');
-  const view:JobView={id:input.id,provider:'copilot',cwd:input.cwd,sessionId:input.sessionId,status:'running',messages:[{id:randomUUID(),role:'user',blocks:[{type:'text',text:input.displayText||input.text}]}],partial:'',approvals:[],startedAt:Date.now(),revision:0,baseMessageCount:input.baseMessageCount||0,jira:input.jira};
+  const view:JobView={id:input.id,provider:'copilot',cwd:input.cwd,sessionId:input.sessionId,status:'running',messages:[{id:randomUUID(),role:'user',blocks:userInputBlocks(input)}],partial:'',approvals:[],startedAt:Date.now(),revision:0,baseMessageCount:input.baseMessageCount||0,jira:input.jira};
   const run:Run={view,pending:new Map(),followups:new Followups()};this.runs.set(input.id,run);void this.execute(run,input);return view;
  }
  private ask(run:Run,tool:string,input:Record<string,unknown>){return new Promise<{allow:boolean;answers?:Record<string,string>}>(resolve=>{
@@ -80,7 +81,7 @@ export class CopilotService{
   if(run.view.status==='running')run.view.status='done';
  }catch(error){if(run.view.status!=='stopped'){run.view.status='error';run.view.error=error instanceof Error?error.message:'Copilot failed';}}
  finally{unsubscribe?.();for(const finish of run.pending.values())finish(false);run.view.partial='';run.view.revision++;await run.session?.disconnect().catch(()=>{});}}
- async followup(id:string,input:FollowupInput){const run=this.runs.get(id);if(!run)throw new HttpError(404,'Copilot task not found');await run.followups.run(input,async()=>{if(run.view.status!=='running'||!run.session)throw new HttpError(409,'Copilot is not ready for a follow-up. Your draft is preserved.');await run.session.send({prompt:input.text,mode:'enqueue',attachments:input.attachmentPaths?.map(file=>({type:'file' as const,path:file}))});run.view.messages.push({id:input.id,role:'user',blocks:[{type:'text',text:input.displayText||input.text}]});run.view.revision++;});return run.view;}
+ async followup(id:string,input:FollowupInput){const run=this.runs.get(id);if(!run)throw new HttpError(404,'Copilot task not found');await run.followups.run(input,async()=>{if(run.view.status!=='running'||!run.session)throw new HttpError(409,'Copilot is not ready for a follow-up. Your draft is preserved.');await run.session.send({prompt:input.text,mode:'enqueue',attachments:input.attachmentPaths?.map(file=>({type:'file' as const,path:file}))});run.view.messages.push({id:input.id,role:'user',blocks:userInputBlocks(input)});run.view.revision++;});return run.view;}
  stop(id:string){const run=this.runs.get(id);if(!run)return;run.view.status='stopped';run.view.revision++;for(const finish of run.pending.values())finish(false);void run.session?.abort().catch(()=>{});}
  approve(id:string,approval:string,allow:boolean,answers?:Record<string,string>){const run=this.runs.get(id),finish=run?.pending.get(approval);if(!finish)throw new HttpError(404,'This question is no longer pending');finish(allow,answers);}
  loginStatus(){return this.authLogin.status();}

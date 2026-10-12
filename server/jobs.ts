@@ -1,3 +1,4 @@
+import { userInputBlocks } from './user-input-blocks.js';
 import { randomUUID } from 'node:crypto';
 import { query, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { HttpError } from './security.js';
@@ -33,11 +34,11 @@ export class Jobs {
     await job.followups.run(input,async()=>{
       if(job.status!=='running'||job.controller.signal.aborted||!job.acceptingInput)throw new HttpError(409,'The active turn has ended. Your draft is preserved.');
       job.queued.push(input);job.pendingInputIds=job.queued.map(message=>message.id);
-      job.messages.push({id:input.id,role:'user',blocks:[{type:'text',text:input.displayText||input.text}]});job.revision++;
+      job.messages.push({id:input.id,role:'user',blocks:userInputBlocks(input)});job.revision++;
     });
     return this.view(job);
   }
-  start(input: { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; claudeAccess?:'default'|'acceptEdits'|'bypassPermissions'; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; jira?: JobView['jira'] }) {
+  start(input: { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; claudeEffort?:'low'|'medium'|'high'|'xhigh'|'max'; claudeAccess?:'default'|'acceptEdits'|'bypassPermissions'; maxBudgetUsd: number; displayText?: string; attachmentPaths?: string[]; baseMessageCount?: number; jira?: JobView['jira'] }) {
     const existing = this.jobs.get(input.id);
     if (existing) return this.view(existing);
     for (const [id, j] of this.jobs) if (j.status !== 'running' && Date.now() - j.startedAt > 86400000) this.jobs.delete(id);
@@ -47,7 +48,7 @@ export class Jobs {
     if ([...this.jobs.values()].filter(j => j.status === 'running').length >= 3 || this.jobs.size >= 100)
       throw new HttpError(429, 'Лимит задач сервера. Завершите текущие задачи; старые записи хранятся 24 часа.');
     const job: Job = { provider: 'claude', id: input.id, cwd: input.cwd, sessionId: input.sessionId, status: 'running',
-      messages: [{ id: randomUUID(), role: 'user', blocks: [{ type: 'text', text: input.displayText || input.text }] }],
+      messages: [{ id: randomUUID(), role: 'user', blocks: userInputBlocks(input) }],
       partial: '', approvals: [], startedAt: Date.now(), revision: 0, baseMessageCount: input.baseMessageCount || 0, jira: input.jira,
       controller: new AbortController(), pending: new Map(),inputs:new PromptStream(),queued:[],followups:new Followups(),acceptingInput:true };
     job.inputs.push(job.messages[0].id,input.text,input.sessionId);
@@ -62,7 +63,7 @@ export class Jobs {
     let historyCount = job.messages.length;
     try {
       stream = this.run({ prompt: job.inputs, options: {
-        cwd: input.cwd, resume: input.sessionId, model: input.model || undefined,
+        cwd: input.cwd, resume: input.sessionId, model: input.model || undefined, effort:input.claudeEffort,
         permissionMode: input.mode==='plan'?'plan':input.claudeAccess||'default',
         allowDangerouslySkipPermissions: input.mode!=='plan'&&input.claudeAccess==='bypassPermissions', maxBudgetUsd: input.maxBudgetUsd,
         abortController: job.controller, includePartialMessages: true,

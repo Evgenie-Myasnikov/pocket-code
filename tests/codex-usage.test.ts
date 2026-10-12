@@ -37,13 +37,13 @@ test('Codex limits use legacy view when multi-bucket data is unavailable', () =>
   }
 });
 
-test('Codex limits clamp percentages and reject malformed numbers and labels', () => {
+test('Codex limits reject percentages and reject malformed numbers and labels', () => {
   const result = normalizeCodexUsage({ ordinaryUsageAllowed: 'true', rateLimitsByLimitId: {
     'private@example.com': { limitName: 'private@example.com', primary: { usedPercent: -10, resetsAt: -1, windowDurationMins: 0 }, secondary: { usedPercent: 125, resetsAt: Infinity, windowDurationMins: '300' } },
     good: { primary: { usedPercent: NaN }, secondary: { usedPercent: '0' } },
   } });
   assert.equal(result.buckets[0].name, 'Codex');
-  assert.deepEqual(result.buckets[0].windows.map(window => window.remainingPercent), [100, 0]);
+  assert.deepEqual(result.buckets[0].windows.map(window => window.remainingPercent), [null, null]);
   assert.deepEqual(result.buckets[0].windows.map(window => window.resetsAt), [null, null]);
   assert.deepEqual(result.buckets[0].windows.map(window => window.windowDurationMins), [null, null]);
   assert.deepEqual(result.buckets[1].windows.map(window => window.remainingPercent), [null, null]);

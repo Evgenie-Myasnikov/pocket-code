@@ -6,18 +6,19 @@ export type {ProviderModel as EffortModel} from '../server/provider-model';
 import type {ProviderModel as EffortModel} from '../server/provider-model';
 type Choices=Record<string,string>;
 const storageKey='pocket-code-codex-effort-v1';
-function load():Choices{
+function load(storageKey:string):Choices{
   try{
     const saved:unknown=JSON.parse(localStorage.getItem(storageKey)||'{}');
     if(!saved||typeof saved!=='object'||Array.isArray(saved))return{};
     return Object.fromEntries(Object.entries(saved).filter(([key,value])=>key.length<=200&&typeof value==='string'&&value.length<=40));
   }catch{return{};}
 }
-function persist(value:Choices){try{localStorage.setItem(storageKey,JSON.stringify(value));}catch{/* Keep this choice for the current session. */}}
+function persist(value:Choices,storageKey:string){try{localStorage.setItem(storageKey,JSON.stringify(value));}catch{/* Keep this choice for the current session. */}}
 
 /** Resolve against the current advertised model before exposing an effort to send(). */
-export function useCodexEffort(models:EffortModel[]|undefined,model:string){
-  const [choices,setChoices]=useState<Choices>(load);
+export function useCodexEffort(models:EffortModel[]|undefined,model:string,provider:'codex'|'claude'='codex'){
+  const key=provider==='codex'?storageKey:'pocket-code-claude-effort-v1';
+  const [choices,setChoices]=useState<Choices>(()=>load(key));
   const effective=model?models?.find(item=>item.id===model):models?.find(item=>item.isDefault)||(models?.length===1?models[0]:undefined);
   const options=[...new Set((effective?.reasoningEfforts||[]).filter(value=>typeof value==='string'&&value.length>0&&value.length<=40))];
   const id=effective?.id||'',stored=Object.hasOwn(choices,id)?choices[id]:'';
@@ -25,14 +26,14 @@ export function useCodexEffort(models:EffortModel[]|undefined,model:string){
   const signature=JSON.stringify(options);
   useEffect(()=>{
     if(!id||!stored||value)return;
-    setChoices(previous=>{const next={...previous};delete next[id];persist(next);return next;});
+    setChoices(previous=>{const next={...previous};delete next[id];persist(next,key);return next;});
   },[id,stored,value,signature]);
   const onChange=(nextValue:string)=>{
     if(!id||nextValue&&!options.includes(nextValue))return;
     setChoices(previous=>{
       const next={...previous};
       if(nextValue)Object.defineProperty(next,id,{value:nextValue,enumerable:true,writable:true,configurable:true});else delete next[id];
-      persist(next);return next;
+      persist(next,key);return next;
     });
   };
   const defaultValue=effective?.defaultReasoningEffort&&options.includes(effective.defaultReasoningEffort)?effective.defaultReasoningEffort:undefined;
@@ -43,9 +44,9 @@ function label(value:string){
   const names:Record<string,string>={none:'Без рассуждений',minimal:'Минимальная',low:'Низкая',medium:'Средняя',high:'Высокая',xhigh:'Очень высокая',max:'Максимальная',ultra:'Ультра'};
   return Object.hasOwn(names,value)?t(names[value]):value;
 }
-export function EffortPicker({value,options,defaultValue,onChange,disabled=false}:ReturnType<typeof useCodexEffort>&{disabled?:boolean}){
+export function EffortPicker({value,options,defaultValue,onChange,disabled=false,provider='Codex'}:ReturnType<typeof useCodexEffort>&{disabled?:boolean;provider?:string}){
   if(!options.length)return null;
-  return <select className="effort-picker" aria-label={t('Глубина рассуждений Codex')} title={t('Глубина рассуждений Codex')} value={value||defaultValue||''} disabled={disabled} onChange={event=>onChange(event.target.value)}>
+  return <select className="effort-picker" aria-label={provider==='Codex'?t('Глубина рассуждений Codex'):`${provider} effort`} title={provider==='Codex'?t('Глубина рассуждений Codex'):`${provider} effort`} value={value||defaultValue||''} disabled={disabled} onChange={event=>onChange(event.target.value)}>
     {!defaultValue&&<option value="">—</option>}
     {options.map(option=><option key={option} value={option}>{label(option)}</option>)}
   </select>;

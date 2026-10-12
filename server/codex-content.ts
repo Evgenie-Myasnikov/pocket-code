@@ -25,7 +25,7 @@ export async function localImageBlock(roots: string[], file: string): Promise<Bl
     const resolved = await allowedPath(roots, file), mime = imageTypes[path.extname(resolved).toLowerCase()];
     if (!mime || (await stat(resolved)).size > 8_000_000) return null;
     const data = await readFile(resolved);
-    return { type: 'image', source: { type: 'base64', media_type: mime, data: data.toString('base64') } };
+    return { type: 'image', attachmentPath:file, source: { type: 'base64', media_type: mime, data: data.toString('base64') } };
   } catch { return null; }
 }
 function outputBlocks(content: unknown): Block[] {

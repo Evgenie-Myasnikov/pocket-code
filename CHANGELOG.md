@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.26.6 (Unreleased)
+
+### Features
+- chat: show user attachments as compact image thumbnails with zoom and file cards with on-demand previews; separate generated file lists from displayed prose while preserving provider prompts. Load nearby thumbnails with bounded concurrency and preserve access checks for project/upload files on mobile and Windows.
+- chat: use a transparent menu control and soft alpha edges on the transcript; keep controls and dialogs fully opaque, preserve reading/high-contrast modes.
+- claude: expose only SDK-advertised effort levels and validate them before starting a run; persist choices separately from Codex. Remove synthesized model-version entries and shorten the model label while retaining the exact ID in its hint.
+
+### Bug Fixes
+- usage: reject out-of-range percentages instead of clamping them into apparent full/empty quotas. Hide expired or failed readings in details and include the selected Claude catalog metadata when matching quota buckets. The compact ring remains the minimum reported applicable account allowance, not context usage.
+
+### Documentation
+- providers: document capability and quota rules in AGENTS.md and the English/Russian provider guides.
+
+### Validation
+- Validated 2026-10-12: 10 distinct browser scenarios passed across focused runs (compact attachments at 320/1280px, image zoom/document opening/focus, menu and transcript following, Claude model/effort controls, expired/failed quota display). 31 targeted unit/API checks and a separate four-check follow-up/API run passed. TypeScript/Vite and Windows shell compilation passed. Synthetic chat captures inspected. Live Claude metadata/usage reads succeeded without a model prompt; no physical Android checks or live model turn was performed. Unreleased.
+- Initial browser failures were fixture issues (obsolete navigation helper and invalid synthetic PNG); corrected the fixtures without relaxing assertions. Build reports existing bundle-size and static/dynamic import warnings. Test listeners exited; production host was not restarted.
+
 ## [0.26.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.4...v0.26.5) (2026-10-12)
 
 ### Bug Fixes

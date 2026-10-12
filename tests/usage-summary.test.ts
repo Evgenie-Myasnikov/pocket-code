@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {remainingUsage} from '../src/usage-summary';
+import {remainingUsage,validRemaining} from '../src/usage-summary';
 import type {CodexUsageSnapshot} from '../server/codex-usage';
 const now=1_800_000_000_000;
 const bucket=(name:string,values:(number|null)[])=>({id:name,name,windows:values.map((remainingPercent,index)=>({id:index?'secondary' as const:'primary' as const,usedPercent:null,remainingPercent,windowDurationMins:index?10080:300,resetsAt:null}))});
@@ -20,4 +20,12 @@ test('missing, expired, stale and ambiguous quotas never become a full allowance
   assert.equal(remainingUsage(expired,'codex',[],now),null);
   assert.equal(remainingUsage({...snapshot(),ordinaryUsageAllowed:false},'codex',[],now),0);
   assert.equal(remainingUsage(snapshot(bucket('Codex',[NaN])),'codex',[],now),null);
+});
+
+test('usage details reject expired, future, stale and out-of-range readings',()=>{
+ const sample=bucket('Claude',[60]).windows[0];assert.equal(validRemaining(sample,now,now),60);
+ assert.equal(validRemaining({...sample,remainingPercent:101},now,now),null);
+ assert.equal(validRemaining({...sample,resetsAt:now/1000},now,now),null);
+ assert.equal(validRemaining(sample,now-120001,now),null);
+ assert.equal(validRemaining(sample,now+60001,now),null);
 });

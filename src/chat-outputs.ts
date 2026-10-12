@@ -1,3 +1,4 @@
+import {userAttachmentBlocks} from './user-attachments';
 import type {Block,ChatMessage} from '../server/types';
 
 export type OutputCategory='images'|'documents'|'code'|'links'|'tools';
@@ -75,6 +76,7 @@ export function extractChatOutputs(messages:ChatMessage[],limit=OUTPUT_LIMIT):Ch
     const walk=(raw:unknown,source:OutputSource,location:string,depth=0)=>{
       if(depth>6||++visited>15000||output.length>=limit)return;
       const block=record(raw);if(!block)return;const type=string(block.type),payload=record(block.source);
+      if(type==='attachment'&&typeof block.attachmentPath==='string'){link(block.attachmentPath,string(block.title),source,location);return;}
       if(type==='text'){markdown(string(block.text)||'',source,location);return;}
       if(type==='image'||type==='document'){
         const title=string(block.title)||string(block.name)||(type==='image'?'Image':'Document');
@@ -113,7 +115,8 @@ export function extractChatOutputs(messages:ChatMessage[],limit=OUTPUT_LIMIT):Ch
       }
       if(type==='codexContent'||type==='codexItem'||type==='codexInput')walk(block.content,source,`${location}-content`,depth+1);
     };
-    for(let index=message.blocks.length-1;index>=0;index--)walk(message.blocks[index],baseSource,String(index));
+    const blocks=message.role==='user'?userAttachmentBlocks(message.blocks):message.blocks;
+    for(let index=blocks.length-1;index>=0;index--)walk(blocks[index],baseSource,String(index));
   }
   return output;
 }

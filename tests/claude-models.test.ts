@@ -10,7 +10,7 @@ const advertised=[{value:'sonnet',displayName:'Sonnet fixture',description:'Alia
 test('Claude catalog retains aliases, exposes resolved versions and deduplicates IDs',()=>{
   assert.deepEqual(claudeModels(advertised).map(m=>m.id),['sonnet','claude-sonnet-fixture']);
   assert.equal(claudeModels(advertised)[0].resolvedModel,'claude-sonnet-fixture');
-  assert.equal(claudeModels(advertised.slice(0,1))[1].id,'claude-sonnet-fixture');
+  assert.equal(claudeModels(advertised.slice(0,1)).length,1); // Resolved aliases do not invent extra choices.
   assert.equal(claudeModels([{value:'bad\nmodel',displayName:'Invalid',description:''}]).length,0);
   for(const id of ['claude-sonnet-fixture[1m]','arn:aws:bedrock:region:account:inference-profile/fixture','deployment-01'])assert.ok(validModelId(id));
   for(const id of ['$(command)','--option','bad\nvalue','x'.repeat(201)])assert.equal(validModelId(id),false);
@@ -36,4 +36,11 @@ test('a pinned Claude model reaches the SDK and query closes after completion an
     const jobs=new Jobs(run),id=randomUUID();
     try{jobs.start({id,cwd:'/synthetic',text:'Hello',model:'claude-sonnet-fixture[1m]',mode:'default',maxBudgetUsd:1});await waitFor(()=>jobs.get(id).status!=='running');assert.equal(model,'claude-sonnet-fixture[1m]');assert.equal(jobs.get(id).status,fail?'error':'done');assert.equal(closed,1);}finally{jobs.close();}
   }
+});
+
+test('Claude effort is exposed only when the SDK confirms support and exact levels',()=>{
+ const model={value:'sonnet',displayName:'Sonnet',description:'Fixture',resolvedModel:'claude-fixture',supportedEffortLevels:['low','high','unknown'] as any};
+ assert.deepEqual(claudeModels([model])[0].reasoningEfforts,[]);
+ assert.deepEqual(claudeModels([{...model,supportsEffort:true}])[0].reasoningEfforts,['low','high']);
+ assert.equal(claudeModels([{...model,supportsEffort:true}]).length,1);
 });

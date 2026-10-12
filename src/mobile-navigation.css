@@ -14,3 +14,7 @@
  .app:not(.embedded-chat){padding-bottom:env(safe-area-inset-bottom)}
  .app:not(.embedded-chat)>.sidebar,.app:not(.embedded-chat)>.workspace{padding-bottom:0}
 }
+
+:root[data-theme] .app .mobile-menu-button{background:transparent;border:0;box-shadow:none;border-radius:50%}
+:root[data-theme] .app .mobile-menu-button:hover{background:transparent}
+.app .mobile-menu-button:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}

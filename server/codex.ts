@@ -1,3 +1,4 @@
+import { userInputBlocks } from './user-input-blocks.js';
 import { randomUUID } from 'node:crypto';
 import {projectBoardInstructions} from './project-rules.js';
 import path from 'node:path';
@@ -249,7 +250,7 @@ export class CodexService {
       }
       if(job.status!=='running'||job.cancelled||job.turnId!==turnId)throw new HttpError(409,'The active turn has ended. Your draft is preserved.');
       await (await this.connect()).request('turn/steer',{threadId:job.sessionId,expectedTurnId:turnId,input:parts,clientUserMessageId:input.id});
-      job.messages.push({id:input.id,role:'user',blocks:[{type:'text',text:input.displayText||input.text}]});job.revision++;
+      job.messages.push({id:input.id,role:'user',blocks:userInputBlocks(input)});job.revision++;
     });
     return this.view(job);
   }
@@ -268,7 +269,7 @@ export class CodexService {
       throw new HttpError(409, 'Codex is already working in this project. Wait or stop that task first.');
     if ([...this.jobs.values()].filter(job => job.status === 'running').length >= 3 || this.jobs.size >= 100) throw new HttpError(429, 'Too many Codex jobs. Finish an existing task first.');
     const job: CodexJob = { id: input.id, cwd: input.cwd, sessionId: input.sessionId, provider: 'codex', status: 'running',
-      messages: [{ id: randomUUID(), role: 'user', blocks: [{ type: 'text', text: input.displayText || input.text }] }],
+      messages: [{ id: randomUUID(), role: 'user', blocks: userInputBlocks(input) }],
       partial: '', approvals: [], startedAt: Date.now(), revision: 0, baseMessageCount: input.baseMessageCount || 0, jira: input.jira,
       pending: new Map(), acceptingEvents: false, cancelled: false, eventQueue: Promise.resolve() };
     this.jobs.set(job.id, job); void this.execute(job, input); return this.view(job);

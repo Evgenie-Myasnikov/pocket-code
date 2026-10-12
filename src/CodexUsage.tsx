@@ -4,6 +4,7 @@ import { request, type Connection } from './api';
 import { locale, t, useLanguage } from './i18n';
 import type { CodexUsageSnapshot, CodexUsageWindow } from '../server/codex-usage';
 import './codex-usage.css';
+import {validRemaining} from './usage-summary';
 
 function windowLabel(window: CodexUsageWindow, provider: 'claude' | 'codex' | 'copilot') {
   const minutes = window.windowDurationMins;
@@ -30,7 +31,7 @@ export function CodexUsage({ connection, provider = 'codex' }: { connection: Con
       try {
         const result = await request<CodexUsageSnapshot>(connection!, `/${provider}/usage`);
         if (active) setSnapshot(result);
-      } catch { if (active) setFailed(true); }
+      } catch { if (active) {setFailed(true);setSnapshot(null);} }
       finally { pending = false; if (active) setBusy(false); }
     }
     refresh.current = () => { void load(); };
@@ -49,11 +50,11 @@ export function CodexUsage({ connection, provider = 'codex' }: { connection: Con
     {snapshot && !snapshot.buckets.length && <><p>{t('{0} не передал данные о лимитах для этого аккаунта.', providerName)}</p>{provider === 'claude' && <p className="muted">{t('Для API-ключей и сторонних провайдеров лимиты подписки Claude недоступны.')}</p>}</>}
     {snapshot?.buckets.map(bucket => <div className="codex-usage-bucket" key={bucket.id}>
       <h4>{t(bucket.name)}</h4>
-      <div className="codex-usage-windows">{bucket.windows.map(window => <div className="codex-usage-window" key={window.id}>
-        <div className="codex-usage-window-heading"><span>{windowLabel(window, provider)}</span><strong>{window.remainingPercent === null ? t('Нет данных') : t('Осталось {0}%', new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(window.remainingPercent))}</strong></div>
-        {window.remainingPercent !== null && <progress max={100} value={window.remainingPercent} aria-label={t('Оставшийся лимит: {0}', windowLabel(window, provider))}/>}
+      <div className="codex-usage-windows">{bucket.windows.map(window => {const remaining=validRemaining(window,snapshot.checkedAt);return <div className="codex-usage-window" key={window.id}>
+        <div className="codex-usage-window-heading"><span>{windowLabel(window, provider)}</span><strong>{remaining === null ? t('Нет данных') : t('Осталось {0}%', new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(remaining!))}</strong></div>
+        {remaining !== null && <progress max={100} value={remaining!} aria-label={t('Оставшийся лимит: {0}', windowLabel(window, provider))}/>}
         <small>{window.resetsAt === null ? t('Время сброса неизвестно') : t('Сброс: {0}', dateLabel(window.resetsAt * 1000))}</small>
-      </div>)}</div>
+      </div>;})}</div>
     </div>)}
     {snapshot && <p className="codex-usage-checked muted">{t('Проверено: {0}', dateLabel(snapshot.checkedAt))}{busy ? ` · ${t('Обновляем…')}` : ''}</p>}
   </section>;

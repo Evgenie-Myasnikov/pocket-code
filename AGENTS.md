@@ -36,6 +36,19 @@ private chat content or credentials. Follow the board README for validation and
 refresh/import behavior. A file edit alone does not update every live board.
 Interactive providers receive the same guidance from `server/board-instructions.ts`.
 
+# Provider capability and usage contract
+
+Model choices and effort levels must come from the selected installed provider's
+catalog. Keep a resolved alias version as metadata rather than inventing another
+catalog entry. Manual model IDs remain an explicit advanced override, not proof
+of account access. Never copy Codex effort choices to Claude or Copilot. Claude
+effort requires both advertised support and a supported level; validate it at
+the host boundary before launching a run. Store effort choices per provider/model.
+Subscription percentages must come from the provider usage API, with their actual
+window and reset time. Missing, malformed, expired or failed reads are unavailable,
+not 0% or 100%. Never infer quota from chat length, token counts or request cost.
+Keep context-window usage distinct from account quota and model-specific windows.
+
 # Release branch continuity
 
 Every actual release must identify its existing Git branch and exact source commit

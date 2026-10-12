@@ -62,7 +62,7 @@ public static class DesktopReadPolicy {
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
         if(Regex.IsMatch(path,@"^/(activity/events|task-runs(?:/[a-f0-9-]+(?:/(checks|result|board|review))?)?|miro/(status|items))$"))return true;
-        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|project-board|project-board/image|repository-boards|repository-board|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|claude/models|copilot/usage|updates/status|updates/latest|review|review/availability|project-artifact|document-projects|project-docs|project-rules|project-doc|files|file)$")||
+        return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(health|project-board|project-board/image|repository-boards|repository-board|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|claude/models|copilot/usage|updates/status|updates/latest|review|review/availability|message-attachment|project-artifact|document-projects|project-docs|project-rules|project-doc|files|file)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");

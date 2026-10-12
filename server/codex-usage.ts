@@ -19,7 +19,7 @@ function positiveInteger(value: unknown) {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 function percent(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
+  return typeof value === 'number' && Number.isFinite(value) && value>=0 && value<=100 ? value : null;
 }
 function displayName(...values: unknown[]) {
   for (const value of values) {

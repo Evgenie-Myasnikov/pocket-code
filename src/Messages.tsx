@@ -1,3 +1,6 @@
+import {MessageAttachment} from './MessageAttachment';
+import {userAttachmentBlocks} from './user-attachments';
+import type {Connection} from './api';
 import { RichBlock } from './RichBlocks';
 import {ActivityGroup} from './ActivityGroup';
 import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey} from './activity-groups';
@@ -10,7 +13,7 @@ function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
 }
-type MessageProps={message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean};
+type MessageProps={connection?:Connection|null;cwd?:string;message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean};
 export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'animateInitial'>&{text:string}){
   const startedEmpty=useRef(!text);
   return text?<Message {...shared} animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
@@ -26,25 +29,28 @@ export const MessageList=memo(function MessageList({messages,runningMessages,...
       <ActivityGroup items={run.items!}/>
     </article>);
 });
-export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false }: MessageProps) {
+export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd }: MessageProps) {
   useLanguage();
-  const plain = message.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
   if(message.blocks.length&&message.blocks.every(b=>b.type==='tool_result'&&b.tool_use_id&&toolResults?.has(b.tool_use_id)))return null;
   const toolOnly = message.blocks.length > 0 && message.blocks.every((b) => ['tool_result','tool_use','thinking','codexItem','subagent'].includes(b.type));
   const isUser = message.role === 'user' && !toolOnly;
-  const content = groupActivityBlocks(visibleMessageBlocks(message,toolResults,running)).map(run => {
+  const displayBlocks=isUser?userAttachmentBlocks(message.blocks):message.blocks;
+  const plain=displayBlocks.filter(block=>block.type==='text').map(block=>block.text).join('\n');
+  const attachments=isUser?displayBlocks.filter(block=>['attachment','image','document'].includes(block.type)):[];
+  const displayMessage=isUser?{...message,blocks:displayBlocks.filter(block=>!attachments.includes(block))}:message;
+  const content = groupActivityBlocks(visibleMessageBlocks(displayMessage,toolResults,running)).map(run => {
       const {block,result}=run.items[0];
       if(activityGroupKey(run.items[0]))return <ActivityGroup key={run.key} items={run.items}/>;
       return <RichBlock key={run.key} running={running} streaming={streaming&&message.role==='assistant'} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
   return <article data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
-    {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{content}</div></> : <>
+    {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{attachments.length>0&&<div className="message-attachments">{attachments.map((block,index)=><MessageAttachment key={block.attachmentPath||index} block={block} connection={connection} cwd={cwd}/>)}</div>}{content}</div></> : <>
       {!toolOnly && <div className="message-label">{message.role === 'assistant' ? <><span className="claude-mark">{provider === 'codex' ? '⌘' : '✳'}</span> {provider.toUpperCase()}</> : t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
       {content}
     </>}
   </article>;
 },(before,after)=>{
-  if(before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.streaming!==after.streaming||before.animateInitial!==after.animateInitial||before.onSubagent!==after.onSubagent)return false;
+  if(before.connection!==after.connection||before.cwd!==after.cwd||before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.streaming!==after.streaming||before.animateInitial!==after.animateInitial||before.onSubagent!==after.onSubagent)return false;
   // A result or agent update affects only the messages that refer to it.
   return after.message.blocks.every(block=>{
     if(block.agent&&before.agents?.get(block.agent.id)!==after.agents?.get(block.agent.id))return false;

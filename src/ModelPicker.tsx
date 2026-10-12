@@ -27,15 +27,15 @@ export function ModelPicker({provider, name, models = [], value, onChange, disab
   const [custom, setCustom] = useState(false), [draft, setDraft] = useState(value);
   useEffect(() => {setCustom(false);setDraft(value);}, [provider, value]);
   const selected = models.find(item => item.id === value);
-  const label = (model: ProviderModel) => model.name + (model.resolvedModel && model.id !== model.resolvedModel ? ` · ${model.resolvedModel}` : '');
+  const label = (model: ProviderModel) => model.name;
   const defaultModel = models.find(item => item.isDefault) || (models.length === 1 ? models[0] : undefined);
   const defaultName = provider === 'copilot' ? 'Auto' : defaultModel ? label(defaultModel) : '—';
   return <div className="model-picker">
-    <select aria-label={t('Модель {0}', name)} value={custom ? '__custom__' : value} disabled={disabled}
+    <select aria-label={t('Модель {0}', name)} value={custom ? '__custom__' : value||(provider==='claude'?defaultModel?.id:'')||''} disabled={disabled}
       title={selected?.resolvedModel || value || defaultName}
       onChange={event => {if (event.target.value === '__custom__') {setCustom(true);setDraft(value);} else onChange(event.target.value);}}>
-      <option value="">{defaultName}</option>
-      {models.map(model => <option key={model.id} value={model.id}>{label(model)}</option>)}
+      {!(provider==='claude'&&defaultModel)&&<option value="">{defaultName}</option>}
+      {models.map(model => <option key={model.id} value={model.id} title={model.resolvedModel||model.id}>{label(model)}</option>)}
       {value && !selected && <option value={value}>{value}</option>}
       {provider === 'claude' && <option value="__custom__">{ru ? 'Другая версия…' : 'Other version…'}</option>}
     </select>

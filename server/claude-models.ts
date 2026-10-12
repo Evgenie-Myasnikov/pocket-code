@@ -11,13 +11,8 @@ export function claudeModels(models: ModelInfo[]): ProviderModel[] {
       id: model.value, name: model.displayName || model.value,
       ...(validModelId(model.resolvedModel) ? {resolvedModel: model.resolvedModel} : {}),
       description: model.description, isDefault: model.value === 'sonnet',
+      reasoningEfforts: model.supportsEffort === true ? [...new Set((model.supportedEffortLevels||[]).filter(value=>['low','medium','high','xhigh','max'].includes(value)))] : [],
     });
-  }
-  // A resolved ID pins the version; aliases continue following the provider default.
-  for (const model of [...result.values()]) {
-    if (model.resolvedModel && !result.has(model.resolvedModel)) {
-      result.set(model.resolvedModel, {id: model.resolvedModel, name: model.resolvedModel});
-    }
   }
   return [...result.values()];
 }
