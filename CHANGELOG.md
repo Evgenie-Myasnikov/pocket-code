@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.5 (Unreleased)
+## [0.26.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.4...v0.26.5) (2026-10-12)
 
 ### Bug Fixes
 - chat: show received run messages and partial-response snapshots immediately when reopening a conversation; animate only subsequently received content. Follow rendered transcript height during letter pacing and late image layout, while preserving intentional upward scrolling and saved positions.
@@ -10,7 +10,9 @@
 - navigation: replace mobile bottom tabs with a header menu and left section drawer. Preserve draft/chat return, status indicators, aligned headers, focus containment and Back/Escape dismissal; desktop navigation remains available.
 
 ### Validation
-- Validated 2026-10-12: 27 targeted browser scenarios passed across focused runs, including running snapshot reentry, first partial response, alpha progression, word pause, manual scroll, late layout growth, history paging/cache, draft recovery, menu/back/focus and aligned 60/100/130% headers. Three Unicode/reveal/position unit checks and TypeScript/Vite passed. Synthetic 320/390px menu captures inspected. Earlier navigation-test failures were traced to removed bottom-tab selectors and updated in shared helpers. Physical Android and live-provider checks were not performed; not released.
+- Validated 2026-10-12: 27 targeted browser scenarios passed across focused runs, including running snapshot reentry, first partial response, alpha progression, word pause, manual scroll, late layout growth, history paging/cache, draft recovery, menu/back/focus and aligned 60/100/130% headers. Three Unicode/reveal/position unit checks and TypeScript/Vite passed. Synthetic 320/390px menu captures inspected. Earlier navigation-test failures were traced to removed bottom-tab selectors and updated in shared helpers. These checks preceded release; physical Android and live-provider checks were not performed.
+- Release validation: 3 unit checks passed; 26 of 27 browser scenarios passed initially. The timing-sensitive word-pause scenario failed once during a concurrent build, then passed unchanged in one isolated run and three repeated runs; the cause remains unconfirmed. TypeScript/Vite, Android (versionCode 80) and Windows builds passed. Source privacy checks, 312 host files, 501 APK entries and 379 Windows archive entries passed audits. APK signer matches 0.26.4. Downloaded GitHub assets match manifest hashes and the exact source tag; GitHub privacy CI passed. Physical Android and live-provider checks remain unperformed.
+- Published [v0.26.5](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.26.5) from [3b73567763018d5e6a8e01dbd1648127e61b8c4d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/3b73567763018d5e6a8e01dbd1648127e61b8c4d) on [codex/mobile-navigation-0.26.5](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/mobile-navigation-0.26.5); APK, Windows package, host bundle and update manifest are available.
 
 ## [0.26.4](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.3...v0.26.4) (2026-10-09)
 
