@@ -89,7 +89,7 @@ async function desktop(page:Page){
    if(/^\/boards\/[^/]+\/delete$/.test(p)){(window as any).testBoards=[];reply(id,{ok:true});return;}
    if(/^\/boards\/[^/]+$/.test(p)){reply(id,(window as any).testBoards?.find((b:any)=>b.id===p.split('/')[2]));return;}
    if(p==='/uploads'){reply(id,{id:'pasted-image',name:message.data.name,size:100});return;}
-   if(p==='/activity'){reply(id,[]);return;}
+   if(p==='/activity'){reply(id,(window as any).testActivity||[]);return;}
    if(p==='/task-notifications'){reply(id,{items:[],unread:0});return;}
    if(p==='/jobs'&&action==='write'){const run={...message.data,provider:message.data.provider||'claude',sessionId:'alpha',status:'running',messages:[],partial:'Working on your request',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0};(window as any).testRuns=[run];reply(id,run);return;}
    if(p==='/sessions'){reply(id,[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}]);return;}
@@ -205,7 +205,7 @@ test('personal chats stay visible independently of the shared board workspace',a
 
 test('desktop board inbox shows a targeted question and marks it read after opening',async({page})=>{
  await page.addInitScript(()=>{const boardId='22222222-2222-4222-8222-222222222222',noteId='33333333-3333-4333-8333-333333333333';(window as any).testBoards=[{id:boardId,name:'Example',root:'C:\\Demo\\Atlas',revision:0,versions:[],versionSource:'planned',notes:[{id:noteId,title:'Example feature',description:'Acceptance criteria',branch:'',status:'idea',owner:'',dependencies:[],x:1200,y:900}]}];(window as any).testBoardNotices=[{id:'notice',boardId,noteId,recipientId:'host',kind:'question',title:'Example feature',message:'Which format should be supported?',at:1}];});
- await desktop(page);await page.getByRole('button',{name:'Board notifications',exact:true}).click();await page.screenshot({path:'.local/notifications-0255.png'});await page.getByRole('button',{name:/Clarification requested.*Example feature/}).click();await expect(page.getByRole('dialog',{name:'Note details'})).toBeVisible();await expect(page.getByLabel('Title',{exact:true})).toHaveValue('Example feature');await expect(page.getByRole('dialog',{name:'Note details'})).toContainText('Which format should be supported?');await expect(page.getByRole('heading',{name:'Example',exact:true})).toBeVisible();await expect.poll(()=>page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeTruthy();await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('.board-note-highlight')).toBeInViewport();await page.screenshot({path:'.local/notification-board-0256.png'});
+ await desktop(page);await page.getByRole('button',{name:'Notifications and activity',exact:true}).click();await page.screenshot({path:'.local/notifications-0255.png'});await page.getByRole('button',{name:/Clarification requested.*Example feature/}).click();await expect(page.getByRole('dialog',{name:'Note details'})).toBeVisible();await expect(page.getByLabel('Title',{exact:true})).toHaveValue('Example feature');await expect(page.getByRole('dialog',{name:'Note details'})).toContainText('Which format should be supported?');await expect(page.getByRole('heading',{name:'Example',exact:true})).toBeVisible();await expect.poll(()=>page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeTruthy();await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('.board-note-highlight')).toBeInViewport();await page.screenshot({path:'.local/notification-board-0256.png'});
 });
 
 test('desktop pastes an image attachment using the native clipboard event',async({page,context})=>{
@@ -313,5 +313,37 @@ test('right-click note deletion confirms, preserves other cards and removes dang
 
 test('desktop notifications sit with navigation and retain a full-size touch target',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await desktop(page);
- const bell=page.locator('.desktop-rail nav').getByRole('button',{name:'Board notifications'});await expect(bell).toBeVisible();expect((await bell.boundingBox())!.height).toBeGreaterThanOrEqual(48);await expect(page.locator('.desktop-rail > .board-notifications')).toHaveCount(0);await bell.click();await expect(page.getByRole('dialog',{name:'Board notifications'})).toBeVisible();
+ const bell=page.locator('.desktop-rail nav').getByRole('button',{name:'Notifications and activity'});await expect(bell).toBeVisible();expect((await bell.boundingBox())!.height).toBeGreaterThanOrEqual(48);await expect(page.locator('.desktop-rail > .board-notifications')).toHaveCount(0);await bell.click();await expect(page.getByRole('dialog',{name:'Notifications and activity'})).toBeVisible();
+});
+
+
+test('desktop bell shares process state with chats and is available outside chat',async({page})=>{
+ await page.addInitScript(()=>{
+  const run={id:'inbox-run',sessionId:'inbox-session',provider:'codex',cwd:'C:\\Demo\\Atlas',title:'Synthetic process',status:'done',startedAt:1,version:'done-1'};
+  (window as any).testActivity=[run,{...run,id:'question-run',sessionId:'question-session',title:'Synthetic question',status:'needs_input',version:'question-1'}];
+  (window as any).testRuns=[{...run,messages:[{id:'finished-result',role:'assistant',blocks:[{type:'text',text:'Synthetic completed result'}]}],partial:'',approvals:[],revision:2}];
+ });
+ await desktop(page);
+ const bell=page.getByRole('button',{name:'Notifications and activity',exact:true});
+ await expect(bell.locator('b')).toHaveText('2');await bell.click();
+ const inbox=page.getByRole('dialog',{name:'Notifications and activity'});
+ await expect(inbox.getByRole('button',{name:'Synthetic process',exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(bell.locator('b')).toHaveText('2');
+ await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await bell.click();
+ await inbox.getByRole('button',{name:'Synthetic process',exact:true}).click();
+ await expect(page.getByText('Synthetic completed result',{exact:true})).toBeVisible();
+ await expect(bell.locator('b')).toHaveText('1');await bell.click();
+ await expect(inbox.getByRole('button',{name:'Synthetic question',exact:true})).toBeVisible();
+ await expect(inbox.getByRole('button',{name:'Synthetic process',exact:true})).toHaveCount(0);
+ await expect(page.locator('.activity-entry,.activity-drawer')).toHaveCount(0);
+});
+
+test('desktop edge fade preference persists and applies to shared chat',async({page})=>{
+ await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();
+ await page.getByRole('button',{name:/Appearance and language/}).click();
+ const slider=page.getByRole('slider',{name:'Chat edge fade',exact:true});await expect(slider).toHaveValue('100');await slider.fill('0');
+ await expect(page.locator('html')).toHaveAttribute('data-chat-edge-fade','off');
+ await page.reload();await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:/Appearance and language/}).click();await expect(slider).toHaveValue('0');
+ await page.locator('.desktop-sessions').getByRole('button',{name:'New',exact:true}).click();
+ await expect(page.locator('.conversation')).toBeVisible();expect(await page.locator('.conversation').evaluate(el=>getComputedStyle(el).maskImage)).toBe('none');
 });

@@ -16,7 +16,7 @@ Results offers Images, Documents and Links, with source/assistant filtering. It 
 <a id="activity"></a>
 ## Activity
 
-Use the right-edge drawer for running, waiting, failed and completed chats. Read the final result to acknowledge completion; answer questions explicitly. [Notifications and saved state](USER_GUIDE.md#activity-notifications-and-usage)
+Use the bell for running, waiting, failed and completed chats, alongside board notifications. Filter All, Processes or Notifications. Read the final result to acknowledge completion; answer questions explicitly. This unified inbox replaces the right-edge drawer in 0.26.8. [Notifications and saved state](USER_GUIDE.md#activity-notifications-and-usage)
 
 <a id="tasks"></a>
 ## Product tasks

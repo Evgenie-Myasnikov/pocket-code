@@ -62,7 +62,7 @@ test('documents load on selection while visible local image cards load authentic
   let release!:()=>void;const delay=new Promise<void>(resolve=>{release=resolve;}),calls:string[]=[];
   await page.setViewportSize({width:390,height:844});await setup(page,'en',100,{calls,delay});await page.getByRole('button',{name:'Results',exact:true}).click();expect(calls).not.toContain('docs/report.md');
   await panel(page).getByRole('button',{name:/Project report/}).click();await expect(panel(page).getByText('Loading…')).toBeVisible();
-  await page.keyboard.press('Escape');await panel(page).getByRole('button',{name:/Generated chart/}).click();await expect(panel(page).locator('.image-viewer-image')).toBeVisible();release();
+  await page.keyboard.press('Escape');await panel(page).getByRole('button',{name:/Generated chart/}).click();await expect(page.getByRole('dialog',{name:'Image',exact:true}).locator('.image-viewer-image')).toBeVisible();release();
   await expect(panel(page).getByRole('heading',{name:'Project result'})).toHaveCount(0);
   await page.keyboard.press('Escape');await panel(page).getByRole('button',{name:/Project report/}).click();await expect(panel(page).getByRole('heading',{name:'Project result'})).toBeVisible();await expect(panel(page).locator('strong').filter({hasText:'formatted'})).toBeVisible();
   // React StrictMode replays mount effects in the development test server.
@@ -75,9 +75,9 @@ test('external media requires an explicit load and nested image Back keeps the R
   await panel(page).getByRole('button',{name:/^Images \d/}).click();expect(remoteRequests).toBe(0);
   await panel(page).getByRole('button',{name:/External sample/}).click();expect(remoteRequests).toBe(0);
   await expect(page.locator('.image-overlay')).toBeVisible();
-  await panel(page).getByRole('button',{name:/Load external image/}).click();await expect(panel(page).locator('.image-viewer-image')).toBeVisible();expect(remoteRequests).toBe(1);
-  await panel(page).getByRole('button',{name:'Zoom in',exact:true}).click();await expect(page.locator('.image-viewer-stage')).toHaveAttribute('data-zoom','1.50');
-  await panel(page).getByRole('button',{name:'Fit to screen',exact:true}).click();await expect(page.locator('.image-viewer-stage')).toHaveAttribute('data-zoom','1.00');
+  await page.getByRole('dialog',{name:'Image',exact:true}).getByRole('button',{name:/Load external image/}).click();await expect(page.getByRole('dialog',{name:'Image',exact:true}).locator('.image-viewer-image')).toBeVisible();expect(remoteRequests).toBe(1);
+  await page.getByRole('dialog',{name:'Image',exact:true}).getByRole('button',{name:'Zoom in',exact:true}).click();await expect(page.locator('.image-viewer-stage')).toHaveAttribute('data-zoom','1.50');
+  await page.getByRole('dialog',{name:'Image',exact:true}).getByRole('button',{name:'Fit to screen',exact:true}).click();await expect(page.locator('.image-viewer-stage')).toHaveAttribute('data-zoom','1.00');
   await page.keyboard.press('Escape');await expect(page.locator('.image-overlay')).toHaveCount(0);await expect(panel(page).getByRole('button',{name:'External sample',exact:true})).toBeFocused();
 });
 

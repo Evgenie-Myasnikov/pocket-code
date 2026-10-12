@@ -50,8 +50,8 @@ test('real chat overlays preserve menus, notifications and section navigation',a
  const canvas=page.locator('.chat-canvas'),chat=page.locator('.conversation');
  expect(await chat.boundingBox()).toEqual(await canvas.boundingBox());
  await page.locator('.composer textarea').fill('Keep this draft while changing sections');
- await page.locator('.chat-header .board-notifications-trigger').click();await expect(page.getByRole('dialog',{name:'Board notifications'})).toBeVisible();
- await page.keyboard.press('Escape');await expect(page.getByRole('dialog',{name:'Board notifications'})).toHaveCount(0);
+ await page.locator('.chat-header .board-notifications-trigger').click();await expect(page.getByRole('dialog',{name:'Notifications and activity'})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(page.getByRole('dialog',{name:'Notifications and activity'})).toHaveCount(0);
  const menu=()=>page.getByRole('button',{name:'Navigation menu',exact:true}).filter({visible:true});
  await menu().click();await page.getByRole('dialog',{name:'App sections'}).getByRole('button',{name:'Settings',exact:true}).click();
  await expect(page.locator('.chat-overlay')).toHaveCount(0);await expect(page.locator('.workspace>header')).toBeVisible();

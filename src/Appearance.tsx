@@ -3,6 +3,8 @@ import './appearance.css';
 import './neutral-themes.css';
 import {BoardGridSettings} from './BoardGridSettings';
 import {StreamSpeedSettings} from './StreamSpeedSettings';
+import {EdgeFadeSettings} from './EdgeFadeSettings';
+import {useApplyEdgeFade} from './chat-edge-fade';
 
 const palettes = [
 { id: 'neutral', name: 'Нейтральная', color: '#a6a6a6', hue: 0 },
@@ -30,6 +32,7 @@ function load(): Appearance {
   } catch {return defaults;}
 }
 export function useAppearance() {
+  useApplyEdgeFade();
   const [appearance, setAppearance] = useState(load);
   const [saveError, setSaveError] = useState('');
   useEffect(() => {
@@ -58,6 +61,7 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
     <label>{t("Межстрочный интервал ")}<output>{appearance.spacing.toFixed(2)}</output><input aria-label={t("Межстрочный интервал")} type="range" min="1.1" max="2.2" step="0.05" value={appearance.spacing} onChange={(e) => setAppearance((p) => ({ ...p, spacing: Number(e.target.value) }))} /></label>
     <label className="compact-toggle"><input type="checkbox" checked={appearance.compact} onChange={(e) => setAppearance((p) => ({ ...p, compact: e.target.checked }))} />{t("Компактные отступы")}</label>
     <StreamSpeedSettings/>
+    <EdgeFadeSettings/>
     <BoardGridSettings/>
     <div className="appearance-preview"><span className="eyebrow">{t("ПРИМЕР СООБЩЕНИЯ")}</span><p>{t("Так будет выглядеть ваш чат.")}</p><button type="button" className="primary" onClick={() => setAppearance({ ...defaults })}>{t("Сбросить оформление")}</button></div>
     {saveError && <p role="alert" className="error">{t(saveError)}</p>}

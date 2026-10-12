@@ -2,8 +2,8 @@
 .workspace.chat-canvas{position:relative;isolation:isolate;--chat-overlay-top:100px;--chat-overlay-bottom:170px}
 .workspace.chat-canvas>.conversation{position:absolute;inset:0;min-height:0;width:100%;
   scroll-padding-block:calc(var(--chat-overlay-top) + 20px) calc(var(--chat-overlay-bottom) + 20px);
-  mask-image:linear-gradient(to bottom,transparent,rgba(0,0,0,.08) calc(var(--chat-overlay-top) * .7),#000 calc(var(--chat-overlay-top) + 24px),#000 calc(100% - var(--chat-overlay-bottom) - 24px),rgba(0,0,0,.08) calc(100% - var(--chat-overlay-bottom) * .7),transparent);
-  -webkit-mask-image:linear-gradient(to bottom,transparent,rgba(0,0,0,.08) calc(var(--chat-overlay-top) * .7),#000 calc(var(--chat-overlay-top) + 24px),#000 calc(100% - var(--chat-overlay-bottom) - 24px),rgba(0,0,0,.08) calc(100% - var(--chat-overlay-bottom) * .7),transparent)}
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,var(--chat-edge-floor,0)),rgba(0,0,0,var(--chat-edge-soft,.08)) calc(var(--chat-overlay-top) * .7),#000 calc(var(--chat-overlay-top) + 24px),#000 calc(100% - var(--chat-overlay-bottom) - 24px),rgba(0,0,0,var(--chat-edge-soft,.08)) calc(100% - var(--chat-overlay-bottom) * .7),rgba(0,0,0,var(--chat-edge-floor,0)));
+  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,var(--chat-edge-floor,0)),rgba(0,0,0,var(--chat-edge-soft,.08)) calc(var(--chat-overlay-top) * .7),#000 calc(var(--chat-overlay-top) + 24px),#000 calc(100% - var(--chat-overlay-bottom) - 24px),rgba(0,0,0,var(--chat-edge-soft,.08)) calc(100% - var(--chat-overlay-bottom) * .7),rgba(0,0,0,var(--chat-edge-floor,0)))}
 .workspace.chat-canvas>.conversation>.conversation-inner{padding-top:calc(var(--chat-overlay-top) + 24px);padding-bottom:calc(var(--chat-overlay-bottom) + 24px);min-height:100%}
 .chat-overlay{position:absolute;inset-inline:0;z-index:3;display:flex;flex-direction:column;pointer-events:none}
 .chat-overlay>*{pointer-events:auto}
@@ -33,3 +33,5 @@
   .workspace.chat-canvas>.conversation{mask-image:none;-webkit-mask-image:none}
   .chat-overlay{background:Canvas}
 }
+
+:root[data-chat-edge-fade=off] .workspace>.conversation{mask-image:none;-webkit-mask-image:none}

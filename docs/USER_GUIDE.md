@@ -86,13 +86,15 @@ Scroll the file list and collapse individual file diffs. Long lines can still re
 
 ## Activity, notifications and usage
 
+**Chat appearance (0.26.8):** Settings → Appearance → Chat edge fade adjusts the opacity at both transcript edges from 0 (off) to 100% (the current default). It is saved on this device, shared by desktop/mobile layouts, and leaves transcript spacing unchanged. Reading and forced-colors modes keep the text unfaded.
+
 **Unreleased:** saved repository notes can start [isolated task runs](TASK-PIPELINE.md),
 with their own chat, pinned diff, verification commands and human approval. Miro AI
 read/write access has a [separate setup](MIRO-AI.md).
 
-Open the handle on the right edge to inspect active, waiting, failed and completed chats. Reading a completed result acknowledges it; a question stays actionable until answered. The Chats tab has a status indicator. Provider reporting and connection state determine how fresh these indicators are.
+The bell combines active, waiting, failed and completed chats with board notifications, replacing the separate right-edge handle. Choose All, Processes or Notifications. Opening the inbox does not mark results read: reading a completed result acknowledges it; a question stays actionable until answered. The Chats tab has a status indicator. Provider reporting and connection state determine how fresh these indicators are; failed refreshes retain the last known states with an error and Retry.
 
-Enable chat notifications in settings and grant Android's notification permission. The native background watcher can report completion, errors and questions while a host connection is available. Battery restrictions or a stopped app can delay delivery. This is not a hosted push service. The board bell is a separate private inbox for assignments/questions from compatible host boards, not Miro's notification inbox.
+Enable chat notifications in settings and grant Android's notification permission. The native background watcher can report completion, errors and questions while a host connection is available. Battery restrictions or a stopped app can delay delivery. This is not a hosted push service. Board assignments/questions from compatible host boards appear in the same bell; Miro's notification inbox is not imported.
 
 The unreleased host journal retains up to 1,000 run events for seven days. Windows and
 Android remember their cursor, catch up after reconnect and open the exact job/chat from

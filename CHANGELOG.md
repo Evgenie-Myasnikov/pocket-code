@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.26.8 (Unreleased)
+
+### Features
+- appearance: add a per-device chat edge-fade intensity control from 0 (off) to 100%, shared by mobile and desktop. Preserve transcript geometry, reading mode and forced-colors accessibility.
+- notifications: combine chat processes, statuses and board notices behind the bell, with All / Processes / Notifications filters. Remove the separate activity handle/drawer; share desktop activity with the embedded chat so viewing a result updates the bell immediately. Keep questions actionable, failed opens unread and stale refreshes visible with Retry.
+
+### Documentation
+- guide: document the unified inbox, viewing/acknowledgement behavior and edge-fade setting in English and Russian.
+
+### Bug Fixes
+- images: render the shared full-screen viewer at the document root so chat edge masks and stacking contexts cannot reveal the underlying interface. Keep its background opaque and suspend focus/Back handlers in underlying inert dialogs while preserving zoom and focus restoration.
+
+### Validation
+- Image viewer, 2026-10-12: reproduced inherited transcript masking before the fix. TypeScript/Vite and 19 distinct browser scenarios across focused runs passed, covering mobile/desktop viewport coverage with fade on/off, attachments, nested Results, board images, zoom/pinch/pan and focus restoration. Updated Results selectors for the root-level viewer and inspected a synthetic phone capture. Physical-device verification remains pending.
+- Validated 2026-10-12: TypeScript/Vite build, 61 distinct browser scenarios across focused runs, five activity-state tests and documentation link checks passed. Covered cross-provider navigation, acknowledgement only after viewing, errors/retry, inbox filters, desktop feed sharing, fade persistence/geometry, narrow layouts, reading/forced-colors modes and header alignment. Updated obsolete drawer/navigation selectors in tests; inspected synthetic inbox captures. Physical device verification and release remain pending.
+
 ## [0.26.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.6...v0.26.7) (2026-10-12)
 
 ### Features

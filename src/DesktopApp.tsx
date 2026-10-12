@@ -1,3 +1,4 @@
+import {useActivity} from './useActivity';
 import {useDesktopRunNotifications,type WatchedChat} from './chat-notifications';
 import {BoardNotifications,type BoardNoticeTarget} from './BoardNotifications';
 import {useChatShortcuts} from './use-chat-shortcuts';
@@ -68,14 +69,17 @@ export function DesktopApp(){
   const [localBoards,setLocalBoards]=useState(true);
   const [boardChat,setBoardChat]=useState<BoardChat|undefined>();
   const [creating,setCreating]=useState(false);
+  const activity=useActivity(state.online?connection:null);
+  const [inboxOpen,setInboxOpen]=useState(false);
   const [notificationChat,setNotificationChat]=useState<WatchedChat|null>(null);
   const [selected,setSelected]=useState<Session|null>(null),[loading,setLoading]=useState(false),[revision,setRevision]=useState(0),[address,setAddress]=useState(0);
   useEffect(()=>{const unwatch=watchDesktop(setState);let active=true;void desktopCall<DesktopState>('state').then(value=>{if(active)setState(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;unwatch();};},[]);
-  useDesktopRunNotifications(state.online?connection:null,language,chat=>{
+  function openNotificationChat(chat:WatchedChat){
     if(!['claude','codex','copilot'].includes(chat.provider))return;
     setBoardChat(undefined);setNotificationChat(chat);setProvider(chat.provider as Provider);
     setSelected({sessionId:chat.sessionId||`pending-${chat.jobId}`,cwd:chat.cwd,summary:chat.title,lastModified:Date.now()});setCreating(false);setPage('chats');
-  });
+  }
+  useDesktopRunNotifications(state.online?connection:null,language,openNotificationChat);
   useEffect(()=>{
     persist('provider',provider);setSessions(readChatCache<Session[]>('desktop-local',provider,'sessions')||[]);setJobs([]);
     const boardTarget=boardChat&&(boardChat.taskRun?.provider||boardChat.note.chat?.provider)===provider?boardChat:null;
@@ -102,7 +106,7 @@ export function DesktopApp(){
   return <div className="desktop-app" style={railWidth===null?undefined:{['--desktop-rail-width' as string]:railWidth+'px'}}>
     {page==='workspace'&&<WorkspaceIdentity connection={state.online?connection:null} value={projectSpaces}/>}
     <aside className="desktop-rail"><RailResizer width={railWidth} onChange={setRailWidth}/>
-      <nav aria-label={label('Navigation','Навигация')}>{([['work',Folder,label('Board','\u0414\u043e\u0441\u043a\u0430')],['rules',BookOpen,label('Rules','Правила')],['changelog',FileText,label('Changelog','История изменений')],['settings',Settings,label('Settings','Настройки')]] as const).map(([id,Icon,title])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={19}/>{title}</button>)}<BoardNotifications connection={state.online?connection:null} onOpen={target=>{setNoticeTarget(target);setPage('work');}}/></nav>
+      <nav aria-label={label('Navigation','Навигация')}>{([['work',Folder,label('Board','\u0414\u043e\u0441\u043a\u0430')],['rules',BookOpen,label('Rules','Правила')],['changelog',FileText,label('Changelog','История изменений')],['settings',Settings,label('Settings','Настройки')]] as const).map(([id,Icon,title])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={19}/>{title}</button>)}<BoardNotifications activity={activity} onOpenChange={setInboxOpen} onOpenActivity={item=>openNotificationChat({provider:item.provider,jobId:item.id,sessionId:item.sessionId,cwd:item.cwd,title:item.title})} connection={state.online?connection:null} onOpen={target=>{setNoticeTarget(target);setPage('work');}}/></nav>
       <div className="desktop-library"><label>{label('Provider','Провайдер')}<select aria-label={label('Provider','Провайдер')} value={provider} onChange={event=>setProvider(event.target.value as Provider)}><option value="claude">Claude</option><option value="codex">Codex</option><option value="copilot">GitHub Copilot</option></select></label>
       <div className="desktop-search"><Search size={16}/><input aria-label={label('Find a chat','Найти чат')} placeholder={label('Find a chat','Найти чат')} value={search} onChange={event=>setSearch(event.target.value)}/></div>
       <div className="desktop-list-caption"><span>{label('Conversations','Переписки')} · {visible.length}</span><button className="icon-button" aria-label={label('Refresh','Обновить')} onClick={()=>setRevision(value=>value+1)}><RefreshCw size={15}/></button></div>
@@ -110,7 +114,7 @@ export function DesktopApp(){
       <button className="desktop-connection-status" onClick={()=>setPage('connection')}><span className={'desktop-chat-dot '+(state.online?'done':'idle')}/>{state.online?label('PC connected','ПК подключён'):label('Not connected','Нет подключения')}<ChevronRight size={15}/></button>
     </aside>
     <main className="desktop-main">{error&&<div className="desktop-error" role="alert">{error}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setError('')}><X size={16}/></button></div>}
-    {(selected||creating)&&<div className="desktop-chat-host" hidden={page!=='chats'}><SharedChat key={provider+(selected?.sessionId||'new:'+projectRoot)+(boardChat?':'+boardChat.boardId+':'+boardChat.note.id:'')} embedded={{visible:page==='chats',connection,provider,session:selected||undefined,cwd:selected?.cwd||projectRoot,boardChat,jobId:selected?(notificationChat?.provider===provider&&selected.sessionId===(notificationChat.sessionId||`pending-${notificationChat.jobId}`)?notificationChat.jobId:latestJobs.get(selected.sessionId)?.id):undefined,onBoard:target=>{setNoticeTarget(target);setPage('work');},onCreated:(session,run)=>{setJobs(old=>[run,...old.filter(j=>j.id!==run.id)]);setSelected(session);setCreating(false);},onBack:()=>{setSelected(null);setCreating(false);}}}/></div>}
+    {(selected||creating)&&<div className="desktop-chat-host" hidden={page!=='chats'}><SharedChat key={provider+(selected?.sessionId||'new:'+projectRoot)+(boardChat?':'+boardChat.boardId+':'+boardChat.note.id:'')} embedded={{activity,inboxOpen,visible:page==='chats',connection,provider,session:selected||undefined,cwd:selected?.cwd||projectRoot,boardChat,jobId:selected?(notificationChat?.provider===provider&&selected.sessionId===(notificationChat.sessionId||`pending-${notificationChat.jobId}`)?notificationChat.jobId:latestJobs.get(selected.sessionId)?.id):undefined,onBoard:target=>{setNoticeTarget(target);setPage('work');},onCreated:(session,run)=>{setJobs(old=>[run,...old.filter(j=>j.id!==run.id)]);setSelected(session);setCreating(false);},onBack:()=>{setSelected(null);setCreating(false);}}}/></div>}
     {page==='workspace'?<DesktopWorkspaces connection={connection} value={projectSpaces} roots={allFolders} addresses={state.addresses} onBoard={()=>{setLocalBoards(false);setPage('work');}}/>:page==='work'?<div className="desktop-board-section"><WorkBoards focusTarget={noticeTarget} local connection={connection} roots={allFolders} workspaces={projectSpaces} onChat={target=>{setNotificationChat(null);setBoardChat(target);setProject(target.root);if(target.taskRun)setProvider(target.taskRun.provider);if(target.note.chat){setProvider(target.note.chat.provider);setSelected({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});setCreating(false);}else{setSelected(null);setCreating(true);}setPage('chats');}}/></div>:page==='chats'?(selected||creating?null:<div className="desktop-empty"><MessageSquare size={36}/><h1>{label('Your workspace, at a glance','Ваше рабочее пространство')}</h1><p>{label('Choose a conversation to read replies, review changes and explore AI results.','Выберите чат, чтобы читать ответы, смотреть изменения и результаты AI.')}</p><span>{label('Chat here or continue from your phone','Пишите здесь или на телефоне')}</span>{!state.online&&<button className="primary" onClick={()=>setPage('connection')}>{label('Set up connection','Настроить подключение')}</button>}</div>):(page==='rules'||page==='changelog')?<div className="desktop-project"><header className="document-section-heading"><h1>{page==='rules'?label('Rules','Правила'):label('Changelog','История изменений')}</h1></header><DocumentLibrary connection={connection} kind={page}/></div>:<DesktopSettings roots={allFolders} key={page} initialPage={page==='connection'?'connection':'index'} connectionPanel={connectionPanel} state={state} connection={connection} appearance={appearance} action={action}/>}
     </main>
   </div>;

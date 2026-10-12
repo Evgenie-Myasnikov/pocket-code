@@ -1,6 +1,6 @@
 .desktop-app{height:100dvh;display:grid;grid-template-columns:var(--desktop-rail-width,290px) minmax(0,1fr);background:var(--bg);color:inherit;font-size:1rem}
 .desktop-main>.embedded-chat{height:100%;min-height:0;padding:0;display:flex;flex:1;width:100%}
-.embedded-chat>.sidebar,.embedded-chat>.mobile-nav,.embedded-chat>.activity-entry{display:none!important}
+.embedded-chat>.sidebar,.embedded-chat>.mobile-nav{display:none!important}
 .embedded-chat>.workspace{display:flex;min-width:0;width:100%;flex:1}
 .embedded-chat .mobile-back{display:flex}
 .desktop-new-chat{width:100%;margin:12px 0}
