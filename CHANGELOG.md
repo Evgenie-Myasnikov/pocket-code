@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.7 (Unreleased)
+## [0.26.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.6...v0.26.7) (2026-10-12)
 
 ### Features
 - chat: extend the transcript behind floating header and input controls, with gradual alpha fades at both edges. Measure control heights to keep the first and last messages readable as drafts, alerts and viewport sizes change; preserve reading/high-contrast modes and shared desktop navigation.
@@ -11,6 +11,9 @@
 
 ### Validation
 - Validated 2026-10-12: 49 distinct browser scenarios passed across focused runs, including 320/390/1280px overlay geometry, growing drafts, 400px keyboard-sized viewports, simulated safe areas, manual scrolling, reading/high-contrast modes, attachments, navigation, aligned headers and desktop integration. TypeScript/Vite and Android builds passed; synthetic phone/desktop captures inspected. Initial checks exposed padding-observation and resize-following defects, which were fixed. Physical Android keyboard/system-bar behavior remains unverified; not released.
+
+- Release validation: all 49 browser scenarios passed in one run from the release checkout. TypeScript/Vite, Android (versionCode 82) and Windows builds passed. Source privacy checks, 318 host files, 501 APK entries and 385 Windows archive entries passed audits; host sources match the reviewed inputs. APK signer matches 0.26.6. Downloaded GitHub assets match the manifest hashes and exact source tag; GitHub privacy CI passed. Physical Android keyboard/system-bar behavior remains unverified.
+- Published [v0.26.7](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.26.7) from [0e459fa1a1b7eafc4825bcbed48cc1078180971f](https://github.com/Evgenie-Myasnikov/pocket-code/commit/0e459fa1a1b7eafc4825bcbed48cc1078180971f) on [codex/edge-chat-0.26.7](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/edge-chat-0.26.7); APK, Windows package, host bundle and update manifest are available.
 
 ## [0.26.6](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.5...v0.26.6) (2026-10-12)
 
