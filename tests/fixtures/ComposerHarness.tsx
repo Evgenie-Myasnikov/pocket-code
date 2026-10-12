@@ -10,7 +10,7 @@ export function ComposerHarness(){
  useEffect(()=>{(window as any).setSyntheticStream=setStream;return()=>{delete (window as any).setSyntheticStream;};},[]);
  return <main style={{maxWidth:850,margin:'auto',padding:'24px 10px',color:'var(--text)'}}>
   <h2>Conversation</h2><div className="message assistant" id="synthetic-stream"><Markdown text={stream} streaming/></div>
-  <div id="fresh-stream">{fresh&&<RichBlock block={{type:'text',text:fresh}} streaming/>}</div>
+  <div id="fresh-stream">{fresh&&<RichBlock block={{type:'text',text:fresh}} streaming animateInitial/>}</div>
   <ChatComposer text={draft} onText={setDraft} label="Synthetic prompt" placeholder="What would you like to create?" uploading={false} canSend={!!draft.trim()} attachments={[]}
     controls={<><ModelPicker provider="claude" name="Claude" models={[{id:'sonnet',name:'Sonnet · current version',isDefault:true},{id:'opus',name:'Opus'}]} value={model} onChange={setModel}/><select className="effort-picker" aria-label="Effort"><option>High</option><option>Medium</option></select></>}
     onRemove={()=>{}} onFiles={()=>{}} onSend={()=>{setSent(count=>count+1);setDraft('');}} stopLabel="Stop synthetic" onStop={stopped?undefined:()=>setStopped(true)}/>

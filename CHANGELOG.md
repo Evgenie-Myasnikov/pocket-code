@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.26.5 (Unreleased)
+
+### Bug Fixes
+- chat: show received run messages and partial-response snapshots immediately when reopening a conversation; animate only subsequently received content. Follow rendered transcript height during letter pacing and late image layout, while preserving intentional upward scrolling and saved positions.
+
+### Features
+- chat: fade new graphemes from transparent to opaque over 420 ms with a 60 ms inter-word pause. Preserve Unicode, Markdown, reveal-speed controls, instant mode and reduced-motion behavior; provider data is unchanged.
+- navigation: replace mobile bottom tabs with a header menu and left section drawer. Preserve draft/chat return, status indicators, aligned headers, focus containment and Back/Escape dismissal; desktop navigation remains available.
+
+### Validation
+- Validated 2026-10-12: 27 targeted browser scenarios passed across focused runs, including running snapshot reentry, first partial response, alpha progression, word pause, manual scroll, late layout growth, history paging/cache, draft recovery, menu/back/focus and aligned 60/100/130% headers. Three Unicode/reveal/position unit checks and TypeScript/Vite passed. Synthetic 320/390px menu captures inspected. Earlier navigation-test failures were traced to removed bottom-tab selectors and updated in shared helpers. Physical Android and live-provider checks were not performed; not released.
+
 ## [0.26.4](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.3...v0.26.4) (2026-10-09)
 
 ### Features

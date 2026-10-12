@@ -1,7 +1,7 @@
 import { RichBlock } from './RichBlocks';
 import {ActivityGroup} from './ActivityGroup';
 import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey} from './activity-groups';
-import { t, useLanguage } from "./i18n";import { memo, useState } from 'react';
+import { t, useLanguage } from "./i18n";import { memo, useRef, useState } from 'react';
 import { Copy, Check, ShieldCheck, X } from 'lucide-react';
 import type { ChatMessage, Approval, SubagentView, Block } from '../server/types';
 import './messages.css';
@@ -10,16 +10,23 @@ function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
 }
-type MessageProps={message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean};
+type MessageProps={message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean};
+export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'animateInitial'>&{text:string}){
+  const startedEmpty=useRef(!text);
+  return text?<Message {...shared} animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
+}
 export const MessageList=memo(function MessageList({messages,runningMessages,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];runningMessages?:Set<ChatMessage>|null}){
+  // Messages already present when this transcript mounts are a snapshot, even
+  // if their run is still active. Only newly arriving messages start from empty.
+  const initialIds=useRef(new Set(messages.map(message=>message.id)));
   return groupActivityMessages(messages,shared.toolResults,runningMessages).map(run=>run.message?
-    <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} {...shared}/>:
+    <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} {...shared} animateInitial={!initialIds.current.has(run.message.id)}/>:
     <article key={run.key} className="message assistant tool-result" data-message-id={run.items![0].messageId}>
       {[...new Set(run.items!.map(item=>item.messageId))].slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
     </article>);
 });
-export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false }: MessageProps) {
+export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false }: MessageProps) {
   useLanguage();
   const plain = message.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
   if(message.blocks.length&&message.blocks.every(b=>b.type==='tool_result'&&b.tool_use_id&&toolResults?.has(b.tool_use_id)))return null;
@@ -28,7 +35,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   const content = groupActivityBlocks(visibleMessageBlocks(message,toolResults,running)).map(run => {
       const {block,result}=run.items[0];
       if(activityGroupKey(run.items[0]))return <ActivityGroup key={run.key} items={run.items}/>;
-      return <RichBlock key={run.key} running={running} streaming={streaming&&message.role==='assistant'} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
+      return <RichBlock key={run.key} running={running} streaming={streaming&&message.role==='assistant'} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
   return <article data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{content}</div></> : <>
@@ -37,7 +44,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
     </>}
   </article>;
 },(before,after)=>{
-  if(before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.streaming!==after.streaming||before.onSubagent!==after.onSubagent)return false;
+  if(before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.streaming!==after.streaming||before.animateInitial!==after.animateInitial||before.onSubagent!==after.onSubagent)return false;
   // A result or agent update affects only the messages that refer to it.
   return after.message.blocks.every(block=>{
     if(block.agent&&before.agents?.get(block.agent.id)!==after.agents?.get(block.agent.id))return false;

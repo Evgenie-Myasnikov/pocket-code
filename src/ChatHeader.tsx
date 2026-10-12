@@ -3,11 +3,11 @@ import {t} from './i18n';
 import type {ReactNode} from 'react';
 import './chat-header.css';
 
-type Props={title:string;project:string;provider:string;branch?:string;notifications?:ReactNode;onBack():void;review?:{disabled:boolean;open():void};outputs?:{disabled:boolean;open():void};subagents?:{count:number;running:number;disabled:boolean;open():void};reading?:{disabled:boolean;open():void}};
-export function ChatHeader({title,project,provider,branch,notifications,onBack,review,outputs,subagents,reading}:Props){
+type Props={title:string;project:string;provider:string;branch?:string;notifications?:ReactNode;navigation?:ReactNode;onBack():void;review?:{disabled:boolean;open():void};outputs?:{disabled:boolean;open():void};subagents?:{count:number;running:number;disabled:boolean;open():void};reading?:{disabled:boolean;open():void}};
+export function ChatHeader({title,project,provider,branch,notifications,navigation,onBack,review,outputs,subagents,reading}:Props){
   const agentsLabel=subagents?t('Субагенты · {0}',subagents.count)+(subagents.running?' · '+t('Работают: {0}',subagents.running):''):'';
   return <header className="chat-header chat-header-conversation" data-section="chats">
-    <div className="chat-header-main"><button className="icon-button mobile-back" aria-label={t('К списку чатов')} onClick={onBack}><ArrowLeft size={21}/></button>
+    <div className="chat-header-main">{navigation}<button className="icon-button mobile-back" aria-label={t('К списку чатов')} onClick={onBack}><ArrowLeft size={21}/></button>
       <div className="header-title"><strong title={title}>{title}</strong><div className="chat-context" title={[provider,project,branch].filter(Boolean).join(' · ')}><span className="chat-context-provider">{provider}</span>{project&&<><span aria-hidden="true">·</span><span className="chat-context-project">{project}</span></>}{branch&&<span className="chat-context-branch"><GitBranch size={12}/><span>{branch}</span></span>}</div></div>
       {notifications}
     </div>

@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 test('completion drains letter queue and latest action replaces dotted footer',async({page})=>{
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().waitFor();
+ await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-menu-button:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {LivePresentationHarness}=await import('/tests/fixtures/LivePresentationHarness.tsx' as string);

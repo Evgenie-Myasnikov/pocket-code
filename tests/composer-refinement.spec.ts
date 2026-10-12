@@ -2,7 +2,7 @@ import {test,expect,type Page} from '@playwright/test';
 async function setup(page:Page,width=390,scale=100){
  await page.setViewportSize({width,height:844});
  await page.addInitScript(scale=>{localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({theme:'dark',palette:'neutral',scale,textSize:16}));},scale);
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().waitFor();
+ await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-menu-button:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {ComposerHarness}=await import('/tests/fixtures/ComposerHarness.tsx' as string);
@@ -42,6 +42,24 @@ test('first live fragment reveals letters progressively and catches up without c
  await expect(page.locator('#fresh-stream')).toHaveText(text);
  await page.evaluate(text=>(window as any).setFreshStream(text+' Ещё один фрагмент.'),text);
  await expect(page.locator('#fresh-stream')).toHaveText(text+' Ещё один фрагмент.');
+});
+
+test('letters fade from transparent and word boundaries add a short visual pause',async({page})=>{
+ await setup(page);await page.getByLabel('Letter reveal speed').selectOption('40');
+ await page.evaluate(()=>{
+  const target=document.querySelector('#fresh-stream')!;const samples:{text:string;at:number}[]=[];(window as any).revealSamples=samples;
+  new MutationObserver(()=>{const text=target.textContent||'';if(samples.at(-1)?.text!==text)samples.push({text,at:performance.now()});}).observe(target,{subtree:true,childList:true,characterData:true});
+  (window as any).setFreshStream('ab cd ef');
+ });
+ await expect(page.locator('#fresh-stream .stream-glyph').first()).toBeAttached();
+ const alpha=await page.locator('#fresh-stream .stream-glyph').first().evaluate(el=>{
+  const animation=el.getAnimations()[0];animation.pause();const values:number[]=[],delay=animation.effect!.getTiming().delay||0;
+  for(const time of [0,210,420]){animation.currentTime=delay+time;values.push(Number(getComputedStyle(el).opacity));}return values;
+ });
+ expect(alpha[0]).toBe(0);expect(alpha[1]).toBeGreaterThan(0);expect(alpha[1]).toBeLessThan(1);expect(alpha[2]).toBe(1);
+ await expect(page.locator('#fresh-stream')).toHaveText('ab cd ef');
+ const pause=await page.evaluate(()=>{const samples=(window as any).revealSamples as {text:string;at:number}[];const space=samples.find(s=>s.text.trimEnd()==='ab'),next=samples.find(s=>s.text.startsWith('ab c'));return space&&next?next.at-space.at:0;});
+ expect(pause).toBeGreaterThanOrEqual(55);
 });
 
 test('reduced motion bypasses letter pacing for a fresh response',async({page})=>{

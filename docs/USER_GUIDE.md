@@ -4,6 +4,16 @@
 
 Pocket Code is a Windows host and Android companion for local AI coding tools. Windows and Android can both send chat messages. The host must be running for fresh history, AI requests, files, repository edits and update downloads.
 
+## Mobile navigation
+
+Use the menu button at the left of the header to open Board, Chats, Rules,
+Changelog or Settings. There is no persistent bottom bar. Back/Escape or a tap
+outside closes the menu. Returning to Chats preserves the selected conversation
+and draft. A running answer follows its rendered height until you scroll upward.
+Already received text appears immediately on entry; new letters fade in with a
+short pause between words. Appearance controls the reveal speed; Instant and
+reduced motion bypass the effect.
+
 <a id="qr"></a>
 ## Install and connect
 

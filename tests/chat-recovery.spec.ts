@@ -155,8 +155,8 @@ test('chat position and jump controls survive downward scrolling, tab changes an
  await scroller.evaluate(el=>{el.scrollTop=1900;el.dispatchEvent(new Event('scroll'));});
  await expect(page.getByRole('button',{name:'Go to beginning'})).toBeVisible();
  const before=await scroller.evaluate(el=>el.scrollTop);
- await page.locator('.mobile-nav').getByRole('button',{name:'Settings'}).click();
- await page.locator('.mobile-nav').getByRole('button',{name:'Chats'}).click();
+ await page.getByRole('button',{name:'Navigation menu',exact:true}).filter({visible:true}).click();await page.locator('.mobile-nav').getByRole('button',{name:'Settings'}).click();
+ await openChatList(page);
  await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
  await page.getByRole('button',{name:'Back to chats',exact:true}).click();
  await page.getByRole('button',{name:'Saved claude chat'}).click();
