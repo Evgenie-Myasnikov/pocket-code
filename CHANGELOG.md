@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.8 (Unreleased)
+## [0.26.8](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.7...v0.26.8) (2026-10-12)
 
 ### Features
 - appearance: add a per-device chat edge-fade intensity control from 0 (off) to 100%, shared by mobile and desktop. Preserve transcript geometry, reading mode and forced-colors accessibility.
@@ -15,6 +15,9 @@
 ### Validation
 - Image viewer, 2026-10-12: reproduced inherited transcript masking before the fix. TypeScript/Vite and 19 distinct browser scenarios across focused runs passed, covering mobile/desktop viewport coverage with fade on/off, attachments, nested Results, board images, zoom/pinch/pan and focus restoration. Updated Results selectors for the root-level viewer and inspected a synthetic phone capture. Physical-device verification remains pending.
 - Validated 2026-10-12: TypeScript/Vite build, 61 distinct browser scenarios across focused runs, five activity-state tests and documentation link checks passed. Covered cross-provider navigation, acknowledgement only after viewing, errors/retry, inbox filters, desktop feed sharing, fade persistence/geometry, narrow layouts, reading/forced-colors modes and header alignment. Updated obsolete drawer/navigation selectors in tests; inspected synthetic inbox captures. Physical device verification and release remain pending.
+
+- Release validation: all 79 browser scenarios and five activity-state tests passed from the release checkout. TypeScript/Vite, Android (versionCode 83), Windows and documentation checks passed. Source privacy checks and audits of 319 host files, 501 APK entries and 386 Windows entries passed; host sources match the reviewed inputs. APK signer matches 0.26.7. Downloaded GitHub assets match manifest hashes and the exact source tag; GitHub privacy CI passed. Physical-device verification remains pending.
+- Published [v0.26.8](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.26.8) from [c6dbd87baf7087c6cc75e38f53417a470a136623](https://github.com/Evgenie-Myasnikov/pocket-code/commit/c6dbd87baf7087c6cc75e38f53417a470a136623) on [codex/unified-inbox-0.26.8](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/unified-inbox-0.26.8); APK, Windows package, host bundle and update manifest are available.
 
 ## [0.26.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.6...v0.26.7) (2026-10-12)
 
