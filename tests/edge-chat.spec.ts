@@ -1,0 +1,61 @@
+import {test,expect} from '@playwright/test';
+import {newChat} from './chat-navigation';
+for(const width of [320,390,1280])test(`full-height chat behind controls at ${width}px`,async({page})=>{
+ await page.setViewportSize({width,height:844});
+ await page.addInitScript(()=>localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({theme:'dark',palette:'neutral',scale:100,textSize:16})));
+ await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-menu-button:visible,.desktop-tabs:visible').first().waitFor();
+ await page.evaluate(async()=>{
+  const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
+  const {EdgeChatHarness}=await import('/tests/fixtures/EdgeChatHarness.tsx' as string);const root=document.createElement('div');document.body.replaceChildren(root);createRoot(root).render(React.createElement(EdgeChatHarness));
+ });
+ const chat=page.locator('.conversation'),top=page.locator('.chat-overlay-top'),bottom=page.locator('.chat-overlay-bottom');
+ const gap=()=>chat.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop);
+ await expect.poll(gap).toBeLessThan(3);
+ const assertGeometry=async()=>{
+  const canvas=(await page.locator('.chat-canvas').boundingBox())!,box=(await chat.boundingBox())!;
+  expect(box.y).toBe(canvas.y);expect(box.height).toBe(canvas.height);
+  const chrome=(await bottom.boundingBox())!,end=(await page.locator('[data-message-id="last"]').boundingBox())!;
+  expect(end.y+end.height).toBeLessThanOrEqual(chrome.y);expect(end.y+end.height).toBeGreaterThan(chrome.y-70);
+  expect(await page.locator('.chat-header').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toContain('linear-gradient');
+ };
+ await assertGeometry();
+ await page.screenshot({path:`.local/edge-chat-${width}.png`});
+ await page.getByLabel('Synthetic prompt').fill('A longer draft\n'.repeat(12));await expect.poll(gap).toBeLessThan(3);await assertGeometry();
+ await page.getByLabel('Synthetic prompt').press('Control+Enter');await expect(page.getByLabel('Sent')).toHaveText('1');
+ await page.setViewportSize({width,height:400});await expect.poll(gap).toBeLessThan(3);await assertGeometry();
+ expect((await page.getByLabel('Synthetic prompt').boundingBox())!.y).toBeGreaterThan((await top.boundingBox())!.height);
+ await page.setViewportSize({width,height:844});await expect.poll(gap).toBeLessThan(3);
+ await chat.hover();await page.mouse.wheel(0,-440);
+ await expect(page.getByRole('button',{name:'Latest message'})).toBeVisible();
+ const position=await chat.evaluate(el=>el.scrollTop);await page.evaluate(()=>(window as any).edgeAppend());
+ await expect(page.locator('[data-message-id="answer"]')).toContainText('A new paragraph');expect(await chat.evaluate(el=>el.scrollTop)).toBeCloseTo(position,0);
+ await chat.evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
+ const first=(await page.locator('[data-message-id="first"]').boundingBox())!;expect(first.y).toBeGreaterThanOrEqual((await top.boundingBox())!.height);
+ await page.getByRole('button',{name:'Latest message'}).click();await expect.poll(gap).toBeLessThan(3);
+ await page.evaluate(()=>{document.documentElement.style.setProperty('--safe-area-inset-top','28px');document.documentElement.style.setProperty('--safe-area-inset-bottom','24px');});
+ await expect.poll(gap).toBeLessThan(3);await assertGeometry();
+ expect((await page.locator('.chat-header').boundingBox())!.y).toBeGreaterThanOrEqual(28);
+ expect((await page.locator('.composer-area').boundingBox())!.y+(await page.locator('.composer-area').boundingBox())!.height).toBeLessThanOrEqual(820);
+ await page.evaluate(()=>(window as any).edgeReading(true));await expect(top).toBeHidden();await expect(bottom).toBeHidden();expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toBe('none');
+ await page.evaluate(()=>(window as any).edgeReading(false));await expect(bottom).toBeVisible();await expect.poll(gap).toBeLessThan(3);
+ await page.emulateMedia({forcedColors:'active'});expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toBe('none');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('real chat overlays preserve menus, notifications and section navigation',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.addInitScript(()=>sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)})));
+ await page.goto('http://127.0.0.1:5173');await newChat(page);
+ const canvas=page.locator('.chat-canvas'),chat=page.locator('.conversation');
+ expect(await chat.boundingBox()).toEqual(await canvas.boundingBox());
+ await page.locator('.composer textarea').fill('Keep this draft while changing sections');
+ await page.locator('.chat-header .board-notifications-trigger').click();await expect(page.getByRole('dialog',{name:'Board notifications'})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(page.getByRole('dialog',{name:'Board notifications'})).toHaveCount(0);
+ const menu=()=>page.getByRole('button',{name:'Navigation menu',exact:true}).filter({visible:true});
+ await menu().click();await page.getByRole('dialog',{name:'App sections'}).getByRole('button',{name:'Settings',exact:true}).click();
+ await expect(page.locator('.chat-overlay')).toHaveCount(0);await expect(page.locator('.workspace>header')).toBeVisible();
+ await menu().click();await page.getByRole('dialog',{name:'App sections'}).getByRole('button',{name:'Chats',exact:true}).click();
+ await expect(page.locator('.composer textarea')).toHaveValue('Keep this draft while changing sections');
+ expect(await chat.boundingBox()).toEqual(await canvas.boundingBox());
+});

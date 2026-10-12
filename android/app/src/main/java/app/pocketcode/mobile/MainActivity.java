@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NavigationPlugin.class);
         registerPlugin(ChatNotificationsPlugin.class);
         super.onCreate(savedInstanceState);
+        androidx.activity.EdgeToEdge.enable(this);
         // External frames must never inherit Capacitor's legacy JavaScript interface.
         if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.WEB_MESSAGE_LISTENER)
             && !getBridge().getConfig().isUsingLegacyBridge()) {

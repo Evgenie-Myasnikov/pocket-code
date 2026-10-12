@@ -1,0 +1,35 @@
+/* The transcript fills the canvas; only controls float above it. */
+.workspace.chat-canvas{position:relative;isolation:isolate;--chat-overlay-top:100px;--chat-overlay-bottom:170px}
+.workspace.chat-canvas>.conversation{position:absolute;inset:0;min-height:0;width:100%;
+  scroll-padding-block:calc(var(--chat-overlay-top) + 20px) calc(var(--chat-overlay-bottom) + 20px);
+  mask-image:linear-gradient(to bottom,transparent,rgba(0,0,0,.08) calc(var(--chat-overlay-top) * .7),#000 calc(var(--chat-overlay-top) + 24px),#000 calc(100% - var(--chat-overlay-bottom) - 24px),rgba(0,0,0,.08) calc(100% - var(--chat-overlay-bottom) * .7),transparent);
+  -webkit-mask-image:linear-gradient(to bottom,transparent,rgba(0,0,0,.08) calc(var(--chat-overlay-top) * .7),#000 calc(var(--chat-overlay-top) + 24px),#000 calc(100% - var(--chat-overlay-bottom) - 24px),rgba(0,0,0,.08) calc(100% - var(--chat-overlay-bottom) * .7),transparent)}
+.workspace.chat-canvas>.conversation>.conversation-inner{padding-top:calc(var(--chat-overlay-top) + 24px);padding-bottom:calc(var(--chat-overlay-bottom) + 24px);min-height:100%}
+.chat-overlay{position:absolute;inset-inline:0;z-index:3;display:flex;flex-direction:column;pointer-events:none}
+.chat-overlay>*{pointer-events:auto}
+.chat-overlay-top{top:0;padding-top:var(--safe-area-inset-top,env(safe-area-inset-top));max-height:40%;overflow:auto;scrollbar-width:thin}
+.chat-overlay-bottom{bottom:0;padding-bottom:var(--safe-area-inset-bottom,env(safe-area-inset-bottom));max-height:50%;overflow:auto;scrollbar-width:thin}
+.chat-overlay{padding-left:var(--safe-area-inset-left,env(safe-area-inset-left));padding-right:var(--safe-area-inset-right,env(safe-area-inset-right))}
+.chat-overlay> *{flex-shrink:0}
+:root[data-theme] .chat-overlay header.chat-header-conversation{background:transparent;border:0;box-shadow:none;pointer-events:none}
+.chat-overlay header.chat-header-conversation :is(button,select,a){pointer-events:auto}
+.chat-overlay .chat-start-context{border:0}
+.chat-overlay .chat-scroll-actions{background:transparent;border:0}
+.chat-overlay .chat-scroll-actions button{background:var(--panel)}
+.chat-overlay .followup-status{align-self:center;margin:0 12px;background:var(--panel);border-radius:12px;padding:6px 12px}
+.chat-overlay .composer-area{background:transparent;pointer-events:none}
+.chat-overlay .composer-area>*{pointer-events:auto}
+.chat-overlay .prompt-composer{box-shadow:none}
+.chat-overlay .chat-task-entry{align-self:center;max-width:calc(100% - 24px)}
+.app.chat-edge-to-edge:not(.embedded-chat){padding-top:0;padding-bottom:0}
+@media(max-width:760px){
+  .chat-overlay header.chat-header.chat-header-conversation{padding:0 var(--section-header-inset)}
+  .workspace.chat-canvas>.conversation>.conversation-inner{padding-left:max(16px,var(--safe-area-inset-left,env(safe-area-inset-left)));padding-right:max(16px,var(--safe-area-inset-right,env(safe-area-inset-right)))}
+}
+.reading-mode .workspace.chat-canvas>.conversation{mask-image:none;-webkit-mask-image:none;scroll-padding-block:68px 24px}
+.reading-mode .workspace.chat-canvas>.conversation>.conversation-inner{padding-top:68px;padding-bottom:24px}
+.reading-mode .chat-overlay{display:none}
+@media(forced-colors:active){
+  .workspace.chat-canvas>.conversation{mask-image:none;-webkit-mask-image:none}
+  .chat-overlay{background:Canvas}
+}

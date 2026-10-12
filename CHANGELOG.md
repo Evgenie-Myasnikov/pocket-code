@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.26.7 (Unreleased)
+
+### Features
+- chat: extend the transcript behind floating header and input controls, with gradual alpha fades at both edges. Measure control heights to keep the first and last messages readable as drafts, alerts and viewport sizes change; preserve reading/high-contrast modes and shared desktop navigation.
+- android: enable edge-to-edge rendering with Capacitor safe-area handling, retaining system-bar and keyboard space for interactive controls.
+
+### Bug Fixes
+- chat: observe transcript padding changes and distinguish layout-driven scroll clamping from intentional history reading, so growing/shrinking drafts and keyboard-sized viewports retain follow mode.
+
+### Validation
+- Validated 2026-10-12: 49 distinct browser scenarios passed across focused runs, including 320/390/1280px overlay geometry, growing drafts, 400px keyboard-sized viewports, simulated safe areas, manual scrolling, reading/high-contrast modes, attachments, navigation, aligned headers and desktop integration. TypeScript/Vite and Android builds passed; synthetic phone/desktop captures inspected. Initial checks exposed padding-observation and resize-following defects, which were fixed. Physical Android keyboard/system-bar behavior remains unverified; not released.
+
 ## [0.26.6](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.5...v0.26.6) (2026-10-12)
 
 ### Features
