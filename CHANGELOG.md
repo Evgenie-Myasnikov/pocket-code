@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.6 (Unreleased)
+## [0.26.6](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.5...v0.26.6) (2026-10-12)
 
 ### Features
 - chat: show user attachments as compact image thumbnails with zoom and file cards with on-demand previews; separate generated file lists from displayed prose while preserving provider prompts. Load nearby thumbnails with bounded concurrency and preserve access checks for project/upload files on mobile and Windows.
@@ -16,6 +16,9 @@
 ### Validation
 - Validated 2026-10-12: 10 distinct browser scenarios passed across focused runs (compact attachments at 320/1280px, image zoom/document opening/focus, menu and transcript following, Claude model/effort controls, expired/failed quota display). 31 targeted unit/API checks and a separate four-check follow-up/API run passed. TypeScript/Vite and Windows shell compilation passed. Synthetic chat captures inspected. Live Claude metadata/usage reads succeeded without a model prompt; no physical Android checks or live model turn was performed. Unreleased.
 - Initial browser failures were fixture issues (obsolete navigation helper and invalid synthetic PNG); corrected the fixtures without relaxing assertions. Build reports existing bundle-size and static/dynamic import warnings. Test listeners exited; production host was not restarted.
+
+- Release validation: 34 unit/API checks and 10 browser scenarios passed. TypeScript/Vite, Android (versionCode 81) and Windows builds passed. Source privacy checks, 316 host files, 501 APK entries and 383 Windows archive entries passed audits; host sources match the reviewed inputs. APK signer matches 0.26.5. Downloaded GitHub assets match manifest hashes and the exact source tag; GitHub privacy CI passed. Physical Android and live model-generation checks remain unperformed.
+- Published [v0.26.6](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.26.6) from [63a9e549ee5b756f12c8b6e78459c5fb355ca149](https://github.com/Evgenie-Myasnikov/pocket-code/commit/63a9e549ee5b756f12c8b6e78459c5fb355ca149) on [codex/compact-chat-0.26.6](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/compact-chat-0.26.6); APK, Windows package, host bundle and update manifest are available.
 
 ## [0.26.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.4...v0.26.5) (2026-10-12)
 

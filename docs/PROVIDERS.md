@@ -17,7 +17,7 @@ Pairing does not sign you into the other services. A GitHub CLI login alone is n
 
 The composer loads the installed Claude Code catalog. Aliases show their resolved version when reported. **Other version…** accepts an explicit provider-qualified ID; the account still decides model access. Selection survives reload. Discovery submits no model prompt and closes its metadata process. When discovery fails, aliases and manual IDs remain. Runtime version in account settings is separate from model version. See [Claude model configuration](https://code.claude.com/docs/en/model-config).
 
-**Unreleased refinement:** resolved aliases no longer generate duplicate model entries. Claude effort appears only when the SDK advertises supported levels for that model; the host validates the selection before starting work. Unknown/manual models and fallback catalogs expose no inferred effort choices. Claude and Codex choices are stored separately. See [Claude effort](https://platform.claude.com/docs/en/build-with-claude/effort).
+**Since 0.26.6:** resolved aliases no longer generate duplicate model entries. Claude effort appears only when the SDK advertises supported levels for that model; the host validates the selection before starting work. Unknown/manual models and fallback catalogs expose no inferred effort choices. Claude and Codex choices are stored separately. See [Claude effort](https://platform.claude.com/docs/en/build-with-claude/effort).
 
 Sign in to Claude Code on the PC, then choose **Claude** in Pocket Code. The app uses the Agent SDK for structured chats and supported local Code histories. Ordinary cloud-only Claude conversations are not imported.
 
@@ -64,6 +64,6 @@ The direct MCP path calls available Jira tools without a model turn. The existin
 
 The usage screen shows reported windows and reset times for Claude/Codex. The small ring near the composer summarizes the lowest applicable remaining allowance. Missing data is **unavailable**, not zero consumption; provider plans and runtime support determine which windows exist.
 
-**Unreleased validation:** out-of-range percentages are rejected rather than clamped; failed refreshes and snapshots older than two minutes do not display an apparently current allowance. The ring is account quota, not conversation context capacity. Open it for separate reported windows and reset times. Real-account availability still depends on the installed runtime and login.
+**Since 0.26.6:** out-of-range percentages are rejected rather than clamped; failed refreshes and snapshots older than two minutes do not display an apparently current allowance. The ring is account quota, not conversation context capacity. Open it for separate reported windows and reset times. Real-account availability still depends on the installed runtime and login.
 
 Each provider can run up to three Pocket Code jobs simultaneously in different non-overlapping project folders. The host prevents overlapping project writers, including across providers. Different Git branches in the same folder are not isolated. Separate existing worktrees can be selected as separate folders; automatic creation/merging of worktrees is not implemented. Each chat has its own stop action. Provider service limits can be lower than the app's concurrency cap.
