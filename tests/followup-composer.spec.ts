@@ -34,6 +34,12 @@ for(const provider of ['claude','codex'])test(`${provider} accepts clarification
   await draft.fill('Focus on tests');await expect(send).toBeEnabled();await send.click();await expect(draft).toHaveValue('');
   expect(sent[0].text).toBe('Focus on tests');await expect(page.locator('.conversation')).toContainText('Focus on tests');
   const fits=await page.locator('.composer-tools').evaluate(el=>Array.from(el.querySelectorAll('button,select')).every(child=>{const r=child.getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.width>=40;}));expect(fits).toBe(true);
-  fail=true;await draft.fill('Keep this clarification');await send.click();await expect(page.getByRole('alert')).toContainText('draft is preserved');await expect(draft).toHaveValue('Keep this clarification');
-  await page.locator('.mobile-nav').getByRole('button',{name:'Board',exact:true}).click();await expect(page.getByRole('heading',{name:'Board',exact:true})).toBeVisible();await expect(page.getByText('Assigned to me',{exact:true})).toHaveCount(0);
+  fail=true;await draft.fill('Keep this clarification');await send.click();await expect(page.getByRole('alert')).toContainText(provider==='claude'?'Your draft will be sent':'draft is preserved');await expect(draft).toHaveValue('Keep this clarification');
+  if(provider==='claude'){
+    job={...job,status:'done',partial:'',revision:job.revision+1};fail=false;
+    await expect(draft).toHaveValue('');
+    await expect(page.locator('.conversation')).toContainText('Keep this clarification');
+  }
+  await page.getByRole('button',{name:'Navigation menu',exact:true}).click();
+  await page.locator('.mobile-nav:visible').getByRole('button',{name:'Board',exact:true}).click();await expect(page.getByRole('heading',{name:'Board',exact:true})).toBeVisible();await expect(page.getByText('Assigned to me',{exact:true})).toHaveCount(0);
 });

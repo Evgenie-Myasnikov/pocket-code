@@ -1,5 +1,6 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Claude ????????? ???. ???????? ?????????? ????? ??????????.': 'Claude is finishing the current turn. Your draft will be sent when it finishes.',
   'Ждёт вашего ответа':'Waiting for your response',
   'Доска':'Board',
   'Подключение досок проектов':'Connect project boards',
@@ -19,6 +20,13 @@ export const english: Record<string, string> = {
   'Подключение к сервису задач': 'Task service connection',
   'QR и подключённый компьютер': 'QR code and connected computer',
   'Уведомления': 'Notifications',
+  'Уведомление о фоновых задачах': 'Background task notification',
+  'Фоновые задачи выполняются': 'Background tasks running',
+  'Фоновые задачи завершены': 'Background tasks completed',
+  'Ошибка фоновых задач': 'Background task error',
+  'Фоновые задачи остановлены': 'Background tasks stopped',
+  'Количество фоновых задач': 'Background tasks',
+  'Обрабатывается уведомление о фоновых задачах': 'Processing background task notification',
   'Завершение, ошибки и вопросы агента': 'Completion, errors and agent questions',
 "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044f \u0447\u0430\u0442\u0430":"Chat actions",
 "\u0427\u0442\u0435\u043d\u0438\u0435":"Read",

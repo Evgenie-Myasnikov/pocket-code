@@ -200,7 +200,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const navigation = useRefForWorkspace(0),sending = useRefForWorkspace(false),nearBottom = useRefForWorkspace(true);
   const retry = useRefForWorkspace<{signature: string;id: string;} | null>(null);
   const [menuOpen,setMenuOpen]=useState(false);
+  const retryClosedFollowup = useRefForWorkspace<{jobId:string;epoch:number}|null>(null);
   const running = job?.status === 'running';
+  useEffect(()=>{
+    const pending=retryClosedFollowup.current;
+    if(!pending||pending.jobId!==job?.id||pending.epoch!==navigation.current||busy||running||!job)return;
+    retryClosedFollowup.current=null;
+    void send(true);
+  },[busy,running,job?.id,job?.status]);
   function acknowledgeVisibleActivity(){
     const element=scroll.current;
     if(!element||!element.getClientRects().length||element.closest('[inert]')||document.visibilityState==='hidden'||tab!=='chats'||loading||loadingOlder||error||historyError||activityOpen||embedded?.inboxOpen||activityTarget||reviewOpen||agentPanel||outputsOpen||pendingTakeover)return;
@@ -503,6 +510,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   useEffect(()=>{if(!boardChat||boardChat.taskRun||!job?.sessionId||!connection)return;const target=boardChat;setBoardChat(null);void (async()=>{try{const b=await request<any>(connection,'/boards/'+target.boardId);await request(connection,'/boards/'+b.id,{revision:b.revision,versions:b.versions,notes:b.notes.map((n:any)=>n.id===target.note.id?{...n,chat:{provider,sessionId:job.sessionId}}:n)});}catch(e){setError((e as Error).message);}})();},[job?.sessionId,boardChat,connection]);
   async function openSession(s: Session, activeJob?: Pick<JobView,'id'|'sessionId'>) {
     if (busy || uploading) return;
+    retryClosedFollowup.current=null;
     rememberPosition();rememberDraft();setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
     const savedPosition=positionOnOpen(positionKey(cacheScope,provider,s.sessionId));pendingPosition.current=savedPosition;
@@ -525,6 +533,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   }
   function newChat(project = cwd) {
     if (busy || uploading) return;
+    retryClosedFollowup.current=null;
     rememberPosition();
     rememberDraft();setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;navigation.current++;setSelected(null);setHistory([]);setJob(null);restoreDraft(`new:${project}`);setError('');setHasMore(null);
     historyWindow.current = 100;setHistoryError('');setFromStart(false);setShowScrollActions(false);lastScrollTop.current = 0;
@@ -539,8 +548,23 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       try{
         const next=await api<JobView>(`/jobs/${job.id}/messages`,{...data,id});
         if(epoch!==navigation.current)return;
-        setJob(next);setDraft('');setAttachments([]);drafts.current!.delete(currentDraftKey());retry.current=null;nearBottom.current=true;
-      }catch(error){if(epoch===navigation.current)setError((error as Error).message);}
+        retryClosedFollowup.current=null;setJob(next);setDraft('');setAttachments([]);drafts.current!.delete(currentDraftKey());retry.current=null;nearBottom.current=true;
+      }catch(error){
+        if(provider==='claude'&&epoch===navigation.current&&(error as {status?:number}).status===409){
+          try{
+            const latest=await api<JobView>(`/jobs/${job.id}`);
+            if(epoch===navigation.current){
+              setJob(latest);
+              // The SDK can close input before the final status is observable.
+              // Resume the preserved draft only after this exact job ends.
+              retryClosedFollowup.current={jobId:job.id,epoch};
+              setError(latest.status==='running'?t('Claude ????????? ???. ???????? ?????????? ????? ??????????.'):'');
+              return;
+            }
+          }catch{/* Preserve the original rejection when refreshing fails. */}
+        }
+        if(epoch===navigation.current)setError((error as Error).message);
+      }
       finally{sending.current=false;setBusy(false);}
       return;
     }
@@ -655,7 +679,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             disabled={demo||busy||selected?.readOnly} uploading={uploading}
             canSend={!(demo||!canRun||selected?.readOnly||busy||loading||uploading||!draft.trim()&&!attachments.length)}
             attachments={attachments} onRemove={id=>setAttachments(old=>old.filter(a=>a.id!==id))} onFiles={files=>void upload(files)} onSend={()=>void send()}
-            stopLabel={t("Остановить {0}",engineName)} onStop={running?async()=>{try{await api(`/jobs/${job!.id}/stop`,{});}catch(e){setError((e as Error).message);}}:undefined}
+            stopLabel={t("Остановить {0}",engineName)} onStop={running?async()=>{retryClosedFollowup.current=null;try{await api(`/jobs/${job!.id}/stop`,{});}catch(e){setError((e as Error).message);}}:undefined}
             controls={<><ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>{(provider==='codex'||provider==='claude')&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly}/>}</>}
             usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||'sonnet')).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}/>
         </div></ChatOverlay>

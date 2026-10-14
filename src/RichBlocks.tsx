@@ -13,6 +13,7 @@ import { t, useLanguage } from './i18n';
 import {Terminal, Pencil,  Wrench} from 'lucide-react';
 import {toolActivity} from './tool-activity';
 import {ImageViewer} from './ImageViewer';
+import {isClaudeTaskNotificationPrefix, parseClaudeTaskNotification} from './claude-task-notification';
 
 import {Installer as Documents} from './native-update';
 export function safeWebUrl(value?: string) {
@@ -55,7 +56,16 @@ function ToolResultContent({block,depth}:{block:Block;depth:number}) {
 }
 export function RichBlock({block,depth=0,result,onSubagent,running=false,streaming=false,animateInitial=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;animateInitial?:boolean;onSubagent?(agent:SubagentView):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;
-  if(block.type==='text')return <Markdown text={block.text || ''} streaming={streaming} animateInitial={streaming&&animateInitial}/>;
+  if(block.type==='text'){
+    const text=block.text || '', notification=parseClaudeTaskNotification(text);
+    if(notification)return <aside className={`claude-task-notification status-${notification.status}`} aria-label={t('Уведомление о фоновых задачах')}>
+      <strong>{t(({running:'Фоновые задачи выполняются',completed:'Фоновые задачи завершены',failed:'Ошибка фоновых задач',stopped:'Фоновые задачи остановлены',unknown:'Уведомление о фоновых задачах'} as const)[notification.status])}</strong>
+      {notification.taskCount>0&&<small>{t('Количество фоновых задач')}: {notification.taskCount}</small>}
+      <p>{notification.summary}</p>{notification.note&&<p className="claude-task-note">{notification.note}</p>}
+    </aside>;
+    if(isClaudeTaskNotificationPrefix(text))return <aside className="claude-task-notification pending" aria-live="polite">{t('Обрабатывается уведомление о фоновых задачах')}</aside>;
+    return <Markdown text={text} streaming={streaming} animateInitial={streaming&&animateInitial}/>;
+  }
   if(block.type==='subagent' && block.agent) {
     const agent=block.agent,label=t(({running:'Работает',completed:'Завершён',error:'Ошибка',stopped:'Остановлен',unknown:'Статус неизвестен'} as const)[agent.status]);
     return onSubagent?<button className={`subagent-card subagent-${agent.status}`} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span></button>:<Disclosure className="subagent-inline" summary={<>{agent.name} · {label}</>}>{()=> <>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</>}</Disclosure>;
