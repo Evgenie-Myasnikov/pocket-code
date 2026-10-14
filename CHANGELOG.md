@@ -1,13 +1,13 @@
 # Changelog
 
-## 0.26.9 (2026-10-14)
+## [0.26.9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/7e752dda8bc4030299d7f67770790703f19a1669) (2026-10-14)
 
 ### Bug Fixes
 - claude: render background-task notifications as compact status cards with task count and readable summary instead of raw transport markup.
 - chat: recover Claude follow-up drafts that race turn completion by refreshing the exact job and continuing after it ends; cancel recovery on explicit stop or chat switch. Release stale model and effort locks after completion.
 
 ### Validation
-- TypeScript/Vite build and two focused browser scenarios passed, including clarification during active Claude/Codex turns and automatic recovery after Claude closes input. Updated an obsolete test navigation selector. Android/Windows build and artifact audits pending; live model turns and physical Android checks were not performed.
+- TypeScript/Vite build and two focused browser scenarios passed, including clarification during active Claude/Codex turns and automatic recovery after Claude closes input. Updated an obsolete test navigation selector. Android and Windows builds passed. Privacy audits passed for 611 source entries and decoded artifacts (320 host files, 501 APK entries, 387 Windows entries); APK signer matches 0.26.8. Live model turns and physical Android checks were not performed.
 
 ## 0.26.8 (Unreleased)
 
