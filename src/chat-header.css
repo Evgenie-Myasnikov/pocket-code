@@ -33,3 +33,6 @@ header.chat-header.chat-header-conversation .header-title>strong{display:block;m
   .chat-header-conversation .chat-header-actions>button>span{display:none}
   .chat-header-actions .header-agent-count{display:inline}
 }
+
+/* Chrome over the transcript sits on an opaque band so titles and controls never print over messages. */
+header.chat-header-conversation{background:var(--bg);position:relative;z-index:2}

@@ -200,12 +200,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const navigation = useRefForWorkspace(0),sending = useRefForWorkspace(false),nearBottom = useRefForWorkspace(true);
   const retry = useRefForWorkspace<{signature: string;id: string;} | null>(null);
   const [menuOpen,setMenuOpen]=useState(false);
-  const retryClosedFollowup = useRefForWorkspace<{jobId:string;epoch:number}|null>(null);
+  const retryClosedFollowup = useRefForWorkspace<{jobId:string;epoch:number;signature:string}|null>(null);
   const running = job?.status === 'running';
   useEffect(()=>{
     const pending=retryClosedFollowup.current;
     if(!pending||pending.jobId!==job?.id||pending.epoch!==navigation.current||busy||running||!job)return;
     retryClosedFollowup.current=null;
+    // Resend only the message the user submitted; an edited draft stays unsent.
+    if(JSON.stringify({text:draft,attachments:attachments.map(item=>item.id)})!==pending.signature){setError('');return;}
     void send(true);
   },[busy,running,job?.id,job?.status]);
   function acknowledgeVisibleActivity(){
@@ -557,8 +559,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
               setJob(latest);
               // The SDK can close input before the final status is observable.
               // Resume the preserved draft only after this exact job ends.
-              retryClosedFollowup.current={jobId:job.id,epoch};
-              setError(latest.status==='running'?t('Claude ????????? ???. ???????? ?????????? ????? ??????????.'):'');
+              retryClosedFollowup.current={jobId:job.id,epoch,signature:JSON.stringify(data)};
+              setError(latest.status==='running'?t('Claude завершает ход. Черновик отправится после завершения.'):'');
               return;
             }
           }catch{/* Preserve the original rejection when refreshing fails. */}
@@ -572,7 +574,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if (sessionId && !confirmed) {setPendingTakeover(true);return;}
     sending.current = true;setBusy(true);setError('');
     const epoch = ++navigation.current;
-    const data = { provider, cwd, sessionId, ...(taskRun?{taskRunId:taskRun.id}:{}), text: draft, attachments: attachments.map((a) => a.id), model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: "default", ...(provider==='claude'?{maxBudgetUsd:budget,claudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), takeoverConfirmed: confirmed };
+    const data = { provider, cwd, sessionId, ...(taskRun?{taskRunId:taskRun.id}:{}), text: draft, attachments: attachments.map((a) => a.id), model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: "default", ...(provider==='claude'?{maxBudgetUsd:Number.isFinite(budget)&&budget>=0.1?Math.min(100,budget):5,claudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), takeoverConfirmed: confirmed };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {
@@ -648,7 +650,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
       {historyError && tab==='chats' && <div className="network-banner" role="status">{t("История не обновилась: ")}{t(historyError)}</div>}
       {networkError && !hostRestarting && <div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
-      {!canRun && !demo && tab==='chats' && connection && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить рабочее пространство Codex.")}</div>}
+      {!canRun && !demo && !offline && tab==='chats' && connection && (providerInfo || provider==='codex') && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить рабочее пространство Codex.")}</div>}
       <Updates connection={connection} expanded={tab === 'settings'&&settingsPage === 'updates'} />
       {tab==='chats'&&taskRun&&!readingMode&&<button className="chat-task-entry" onClick={()=>setTaskPanel(true)}>{taskRun.title} · {taskStageLabel(taskRun.stage,locale().startsWith('ru'))}</button>}
       </ChatOverlay>

@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+- i18n: restore the Russian follow-up recovery message and the external-image button label that were saved as question marks in 0.26.9.
+- pairing: treat a 401 as device revocation only from the health and heartbeat checks, so a Jira or Miro sign-in error no longer unpairs the phone and wipes its cache.
+- chat: a Claude follow-up rejected with 409 is resent after the turn ends only if the draft is unchanged; an edited draft stays unsent.
+- claude: send a request budget within $0.10–$100, falling back to $5 when the field is empty or zero.
+- task runs: tie the result-polling lock to its own request so a remount or mutation cannot leave polling stuck.
+- desktop: rename the failed chat status class so the global error banner style no longer turns it into a pink block.
+- chat: show tool output as preformatted monospace text instead of Markdown, keeping line breaks and "> command" lines intact.
+- chat: place the conversation header on an opaque band so titles and controls no longer print over messages, including with edge fade off.
+- chat: stop showing "update the PC server to enable Codex" while offline or in Claude/Copilot chats when provider status is simply not loaded yet.
+
+### Validation
+- TypeScript check passed; no remaining question-mark placeholders in src. Browser scenarios passed: device pairing (including a Miro 401 that keeps the pairing), follow-up composer and task pipeline (12), edge/compact chat layout (7). Transcript specs tool-activity/activity-groups/rich-updates/chat-surfaces show the same 5 failures with and without these changes (height and navigation assertions). Device checks not run.
+
 ## [0.26.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.8...v0.26.9) (2026-10-14)
 
 ### Bug Fixes

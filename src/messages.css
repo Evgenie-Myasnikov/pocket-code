@@ -50,3 +50,5 @@
 
 .message-attachments{align-items:flex-end}
 @media(forced-colors:active){.workspace>.conversation{mask-image:none;-webkit-mask-image:none}}
+
+.tool-output{white-space:pre-wrap;overflow-wrap:anywhere;max-height:min(50dvh,480px);overflow:auto;font:calc(12px * var(--ui-scale,1))/1.5 Consolas,"Cascadia Mono",ui-monospace,monospace;margin:4px 0}

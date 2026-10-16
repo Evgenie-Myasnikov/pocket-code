@@ -52,7 +52,8 @@ function Document({block}:{block:Block}) {
   return <section className="document-card"><strong>📎 {title}</strong>{source?.text && <pre>{source.text}</pre>}{pdf && (Capacitor.isNativePlatform()?<button className="secondary" onClick={()=>void Documents.openDocument({data:pdf,name:title}).catch(e=>setError(e.message))}>{t('Открыть PDF')}</button>:<a href={`data:application/pdf;base64,${pdf}`} download="document.pdf">{t('Скачать PDF')}</a>)}{safeWebUrl(source?.url) && <a href={safeWebUrl(source?.url)!} target="_blank" rel="noopener noreferrer">{t('Открыть документ')}</a>}{error && <p className="error">{t(error)}</p>}</section>;
 }
 function ToolResultContent({block,depth}:{block:Block;depth:number}) {
-  return <>{Array.isArray(block.content)?block.content.map((item:any,i:number)=>item && typeof item==='object' && typeof item.type==='string'?<RichBlock block={item} depth={depth+1} key={i}/>:<pre key={i}>{JSON.stringify(item,null,2)}</pre>):<Markdown text={typeof block.content==='string'?block.content:JSON.stringify(block.content,null,2)||''}/>}</>;
+  // Command output keeps its exact text: Markdown would merge lines and turn "> cmd" into quotes.
+  return <>{Array.isArray(block.content)?block.content.map((item:any,i:number)=>item?.type==='text'&&typeof item.text==='string'?<pre className="tool-output" key={i}>{item.text}</pre>:item && typeof item==='object' && typeof item.type==='string'?<RichBlock block={item} depth={depth+1} key={i}/>:<pre key={i}>{JSON.stringify(item,null,2)}</pre>):<pre className="tool-output">{typeof block.content==='string'?block.content:JSON.stringify(block.content,null,2)||''}</pre>}</>;
 }
 export function RichBlock({block,depth=0,result,onSubagent,running=false,streaming=false,animateInitial=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;animateInitial?:boolean;onSubagent?(agent:SubagentView):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;

@@ -67,7 +67,9 @@ export async function request<T>(connection: Connection, endpoint: string, data?
   if (status === 204) return null as T;
   if (typeof body === 'string') {try {body = JSON.parse(body);} catch {body = null;}}
   if (status >= 500) throw Object.assign(new Error(t("Сервер или интернет-туннель пока недоступен (HTTP {0}). Убедитесь, что окно сервера открыто; повторите подключение или отсканируйте новый QR после перезапуска.", status)),{status});
-  if(status===401||status===403){await clearConnectionOffline(connection);if(status===401&&connection.deviceId)window.dispatchEvent(new CustomEvent('pocket-device-revoked',{detail:connection.deviceId}));}
+  // Only pairing endpoints prove revocation; integration 401s (Jira, Miro sign-in) must not unpair the phone.
+  const pairingCheck=endpoint==='/health'||endpoint.startsWith('/devices/heartbeat');
+  if((status===401||status===403)&&pairingCheck){await clearConnectionOffline(connection);if(status===401&&connection.deviceId)window.dispatchEvent(new CustomEvent('pocket-device-revoked',{detail:connection.deviceId}));}
   if (status < 200 || status >= 300) throw Object.assign(new Error(body?.error || t("Ошибка подключения ({0})", status)),{status});
   if (body === null || typeof body !== 'object') throw new Error(t("По этому адресу ответил другой сервис. Отсканируйте свежий QR Pocket Code."));
   if(data===undefined&&cacheable(endpoint)){if(endpoint.startsWith('/workspaces')&&body.workspaces?.some((ws:any)=>ws.me?.approval&&ws.me.approval!=='approved'))await clearConnectionOffline(connection);await writeOffline(connection,endpoint,body);window.dispatchEvent(new CustomEvent('pocket-online-read'));}

@@ -1,6 +1,6 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
-  'Claude ????????? ???. ???????? ?????????? ????? ??????????.': 'Claude is finishing the current turn. Your draft will be sent when it finishes.',
+  'Claude завершает ход. Черновик отправится после завершения.': 'Claude is finishing the current turn. Your draft will be sent when it finishes.',
   'Ждёт вашего ответа':'Waiting for your response',
   'Доска':'Board',
   'Подключение досок проектов':'Connect project boards',
