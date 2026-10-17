@@ -3,7 +3,7 @@ import { realpath, stat } from 'node:fs/promises';
 import { timingSafeEqual, createHash } from 'node:crypto';
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public code?: string) { super(message); }
 }
 export function validToken(actual: string, expected: string) {
   const hash = (s: string) => createHash('sha256').update(s).digest();

@@ -45,7 +45,7 @@ import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 
-export type Config = { claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -104,7 +104,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if (entry && entry.reset > now && entry.count >= 20) { res.status(429).json({ error: 'Слишком много попыток. Подождите минуту.' }); return; }
     if (config.devices||!validToken((req.headers.authorization || '').replace(/^Bearer /, ''), config.token)) {
       failures.set(ip, { count: entry && entry.reset > now ? entry.count + 1 : 1, reset: entry && entry.reset > now ? entry.reset : now + 60000 });
-      res.status(401).json({ error: 'Неверный ключ подключения' }); return;
+      res.status(401).json({ error: 'Неверный ключ подключения', code: 'device_unauthorized' }); return;
     }
     failures.delete(ip); next();
   });
@@ -113,7 +113,14 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   let pairingChange:Promise<unknown>=Promise.resolve();
   app.get('/api/pairing-role',(_req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');res.json(workspaceAccess.store.invitation());});
   app.post('/api/pairing-role',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');const invite=workspaceAccess.parseInvitation(req.body);const next=pairingChange.then(async()=>{await devices().rotatePairing();await workspaceAccess.store.mutate(data=>{data.invitation=invite;});await config.refreshPairing?.();return invite;});pairingChange=next.catch(()=>{});res.json(await next);});
-  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);await pairingChange;const key=(req.headers.authorization||'').replace(/^Bearer /,'');if(!devices().isPairing(key))throw new HttpError(401,'Pairing code expired');res.json(await devices().pair(key,input));});
+  app.post('/api/devices/pair',async(req,res)=>{const input=z.object({name:z.string().trim().min(1).max(80),platform:z.enum(['android','browser']),version:z.string().max(32),model:z.string().trim().max(80).optional(),installation:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional()}).parse(req.body);await pairingChange;const key=(req.headers.authorization||'').replace(/^Bearer /,'');if(!devices().isPairing(key))throw new HttpError(401,'Pairing code expired. Scan the current QR on the PC.','pairing_expired');
+    const remote=req.socket.remoteAddress||'',tunnel=Boolean(req.headers['cf-connecting-ip']||req.headers['x-forwarded-for']||req.headers.forwarded),via=tunnel?'internet' as const:/^(::ffff:)?100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(remote)?'tailscale' as const:'lan' as const;
+    if(via==='internet')await devices().approval({name:input.name,platform:input.platform,version:input.version,...(input.model?{model:input.model}:{}),via});
+    const paired=await devices().pair(key,{...input,via});
+    // A used QR stops working: a photo of it cannot pair another device later.
+    const rotate=pairingChange.then(async()=>{await devices().rotatePairing();await config.refreshPairing?.();});pairingChange=rotate.catch(()=>{});await rotate;res.json(paired);});
+  app.post('/api/pairing/rotate',async(_req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage pairing on the PC');const next=pairingChange.then(async()=>{await devices().rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;res.json({ok:true});});
+  for(const decision of ['approve','reject'])app.post('/api/devices/:id/'+decision,async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');devices().decide(uuid.parse(req.params.id),decision==='approve');res.json({ok:true});});
   const workspaceJoinAttempts=new Map<string,{at:number;count:number}>();
   app.post('/api/workspace-join',async(req,res)=>{
     const ip=req.socket.remoteAddress||'unknown',now=Date.now(),attempt=workspaceJoinAttempts.get(ip);if(attempt&&now-attempt.at<60000){if(++attempt.count>20)throw new HttpError(429,'Too many workspace joins. Try again in a minute.');}else{if(workspaceJoinAttempts.size>1000)workspaceJoinAttempts.clear();workspaceJoinAttempts.set(ip,{at:now,count:1});}
@@ -346,7 +353,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     activeMutations++;let released=false;const release=()=>{if(!released){released=true;activeMutations--;}};res.once('finish',release);res.once('close',release);
     try{const file=await config.updater.download(z.coerce.number().int().positive().parse(req.query.release));res.type('application/vnd.android.package-archive');res.sendFile(file,{dotfiles:'allow'});}catch(error){release();throw error;}
   });
-  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots:accessRoots(), version: packageJson.version, protocol: 1, processId: process.pid }));
+  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots:accessRoots(), version: packageJson.version, protocol: 1, processId: process.pid, ...(config.devices?{hostId:config.devices.hostId}:{}), ...(res.locals.deviceId&&config.routes?{routes:config.routes()}:{}) }));
   app.get('/api/claude/models', async (req, res) => {
     const cwd = await allowedPath(accessRoots(), text.parse(req.query.cwd), true);
     res.json(await claudeCatalog.read(cwd));
@@ -574,7 +581,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   if (config.webDir) app.use(express.static(config.webDir));
   app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status = error instanceof z.ZodError ? 400 : error.status || 500;
-    res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message });
+    res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message, ...(error instanceof HttpError&&error.code?{code:error.code}:{}) });
   });
   async function maintainEngines() {
     if(!config.engineUpdates||runtimeStopping||config.hostUpdater?.draining)return;

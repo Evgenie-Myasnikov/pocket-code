@@ -7,6 +7,7 @@ test('mobile exchanges a v2 QR for a device credential and leaves after revocati
  await page.route('**/api/**',route=>{const p=new URL(route.request().url()).pathname;return route.fulfill({json:p==='/api/health'?{protocol:1,roots:['C:\\Demo'],name:'Test host'}:p==='/api/providers'?[]:[]});});
  await page.route('**/api/devices/pair',route=>{expect(route.request().headers().authorization).toBe('Bearer '+qr);pairs++;bodies.push(route.request().postDataJSON());return route.fulfill({json:{deviceId,token}});});
  await page.route('**/api/devices/heartbeat',route=>{expect(route.request().headers().authorization).toBe('Bearer '+token);return route.fulfill({json:{ok:true}});});
+ let forgets=0;await page.route('**/api/devices/self/forget',route=>{forgets++;return route.fulfill({status:401,json:{error:'Unknown device'}});});
  await page.route('**/api/revoked-probe',route=>route.fulfill({status:401,json:{error:'Sign in to Miro on the PC'}}));
  await page.goto('http://127.0.0.1:5173');await expect.poll(()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}').deviceId)).toBe(deviceId);expect(pairs).toBe(1);
  expect(bodies[0]).toMatchObject({name:'Browser',platform:'browser'});expect(bodies[0].installation).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
@@ -17,6 +18,7 @@ test('mobile exchanges a v2 QR for a device credential and leaves after revocati
  await page.unroute('**/api/devices/heartbeat');await page.route('**/api/devices/heartbeat',route=>route.fulfill({status:401,json:{error:'Disconnected by PC'}}));
  await page.evaluate(async()=>{const api=await import('/src/api.ts' as string);await api.request(JSON.parse(sessionStorage.getItem('connection')!),'/devices/heartbeat',{}).catch(()=>{});});
  await expect.poll(()=>page.evaluate(()=>sessionStorage.getItem('connection'))).toBe(null);
- await expect(page.getByText('Connect to the PC in Settings',{exact:true})).toBeVisible();
- await openConnectionSettings(page);await expect(page.getByRole('button',{name:'Scan QR code',exact:true})).toBeVisible();expect(pairs).toBe(1);
+ // The phone explains why it is empty and does not send the revoked key again.
+ await expect(page.locator('.connect-notice')).toContainText('Test host disconnected this phone');expect(forgets).toBe(0);
+ await openConnectionSettings(page);await expect(page.getByRole('button',{name:'Choose a QR image',exact:true})).toBeVisible();expect(pairs).toBe(1);
 });

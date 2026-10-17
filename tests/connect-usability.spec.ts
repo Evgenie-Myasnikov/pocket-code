@@ -27,7 +27,6 @@ async function delayedConnection(page: import('@playwright/test').Page) {
   });
   await page.goto('http://127.0.0.1:5173');
   await expect.poll(() => page.evaluate(() => typeof (window as any).releaseSavedConnection)).toBe('function');
-  await openConnectionSettings(page);
 }
 
 test('saved connection retries without exposing address or key fields', async ({page})=>{
@@ -35,8 +34,11 @@ test('saved connection retries without exposing address or key fields', async ({
   await expect(page.getByLabel('Computer address')).toHaveCount(0);
   await expect(page.getByLabel('Connection key')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Reconnect',exact:true})).toHaveCount(0);
+  // A saved connection shows that it is being restored instead of inviting a new scan.
+  await expect(page.locator('.connect-progress')).toContainText('Restoring the connection');await expect(page.getByRole('button',{name:'Preview without connecting'})).toHaveCount(0);
   await page.evaluate(connection=>(window as any).releaseSavedConnection(connection),saved);
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.connect-progress')).toHaveCount(0);await openConnectionSettings(page);
+  await expect(page.getByRole('alert')).toContainText('PC unreachable');
   await expect(page.locator('.connect-page')).toBeVisible();
   const before=await page.evaluate(()=>(window as any).connectionRequests.filter((request:any)=>request.url.endsWith('/api/health')).length);
   await page.getByRole('button',{name:'Reconnect',exact:true}).click();
@@ -52,10 +54,11 @@ for(const language of ['en','ru'])test('QR-only entry is usable on a narrow phon
   await openConnectionSettings(page);
   await expect(page.locator('.connect-page input:not([type=file])')).toHaveCount(0);
   await expect(page.locator('.qr-divider')).toHaveCount(0);
-  await expect(page.locator('.qr-connect button')).toHaveCount(2);
+  // In a browser both scan actions open the same file picker, so only one is offered.
+  await expect(page.locator('.qr-connect button')).toHaveCount(1);await expect(page.getByRole('button',{name:/^(Choose a QR image|Выбрать изображение с QR)$/})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   if(language==='en')await page.screenshot({path:'artifacts/screenshots/connect-qr-only.png',fullPage:true});
-  await connectByQr(page);await expect(page.getByRole('button',{name:/^(Reconnect|Повторить подключение)$/,exact:true})).toBeVisible();await openChatList(page);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
+  await connectByQr(page);await expect(page.locator('.connect-status')).toContainText(/Connected|Подключено/);await expect(page.getByRole('button',{name:/^(Reconnect|Повторить подключение)$/,exact:true})).toHaveCount(0);await openChatList(page);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
 });
 
 test('invalid QR image keeps scanning available, then a valid QR connects',async({page})=>{
@@ -63,8 +66,8 @@ test('invalid QR image keeps scanning available, then a valid QR connects',async
   await openConnectionSettings(page);
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'invalid.png',mimeType:'image/png',buffer:Buffer.from('not an image')});
   await expect(page.getByRole('alert')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Scan QR code',exact:true})).toBeEnabled();
-  await connectByQr(page);await expect(page.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();await openChatList(page);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Choose a QR image',exact:true})).toBeEnabled();
+  await connectByQr(page);await expect(page.getByRole('button',{name:'Check connection',exact:true})).toBeVisible();await openChatList(page);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
 });
 
 test('failed QR connection can retry without rescanning or entering credentials',async({page})=>{

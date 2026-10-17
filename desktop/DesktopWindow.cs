@@ -19,6 +19,7 @@ public sealed class DesktopPreferences {
     public bool Connect=true, Internet=true, AutoReconnect=true, AutoUpdate=true;
     public string Source="";
     public bool RunAlerts=true;
+    public bool KeepAwake=false;
     public string RunLanguage="en";
     public long NotificationCursor=0;
     public string[] NotificationSeen=new string[0];
@@ -70,6 +71,9 @@ public static class DesktopReadPolicy {
 }
 public sealed class PocketDesktop:Form {
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
+    [DllImport("kernel32.dll")] static extern uint SetThreadExecutionState(uint flags);
+    const uint ContinuousState=0x80000000,SystemRequired=0x00000001;
+    readonly Dictionary<string,string> deviceStates=new Dictionary<string,string>();bool devicesLoaded,phoneOnline;DateTime nextDevicePoll=DateTime.MinValue;
     void WindowAttribute(int attribute,int value){try{DwmSetWindowAttribute(Handle,attribute,ref value,4);}catch(DllNotFoundException){}catch(EntryPointNotFoundException){}}
     void ApplyWindowTheme(bool dark,Color background,Color foreground,Color border){
         BackColor=background;web.DefaultBackgroundColor=background;
@@ -218,10 +222,13 @@ public sealed class PocketDesktop:Form {
                       string role=message.ContainsKey("role")?message["role"] as string:"host";string workspaceId=message.ContainsKey("workspaceId")?message["workspaceId"] as string:null;
                       if(preview||!Regex.IsMatch(role??"",@"^(host|viewer|developer|reviewer|qa)$"))throw new InvalidOperationException("Invalid invitation role.");
                       await Send(reader,"/pairing-role",true,json.Serialize(new{role=role,workspaceId=workspaceId}));LoadPairing();
-                  }else if(action=="device-disconnect"||action=="device-rename"){
+                  }else if(action=="pairing-rotate"){if(!preview&&online){await Send(reader,"/pairing/rotate",true);LoadPairing();}
+                  }else if(action=="open-logs"){if(!preview){Directory.CreateDirectory(storage);Process.Start(new ProcessStartInfo("explorer.exe","\""+storage+"\""){UseShellExecute=true});}
+                  }else if(action=="device-disconnect"||action=="device-rename"||action=="device-approve"||action=="device-reject"){
                     string deviceId=message.ContainsKey("deviceId")?message["deviceId"] as string:null;Guid parsed;
                     if(preview||!Guid.TryParse(deviceId,out parsed))throw new InvalidOperationException("Invalid device.");
                     if(action=="device-disconnect"){result=await Send(reader,"/devices/"+parsed+"/disconnect",true);LoadPairing();}
+                    else if(action=="device-approve"||action=="device-reject"){result=await Send(reader,"/devices/"+parsed+(action=="device-approve"?"/approve":"/reject"),true);}
                     else{string deviceName=message.ContainsKey("name")?message["name"] as string:null;if(String.IsNullOrWhiteSpace(deviceName)||deviceName.Length>80)throw new InvalidOperationException("Invalid device name.");result=await Send(reader,"/devices/"+parsed+"/rename",true,json.Serialize(new{name=deviceName}));}
                 }
                 else if(action=="toggle")await Toggle();
@@ -232,6 +239,7 @@ public sealed class PocketDesktop:Form {
                     if(message.ContainsKey("autoUpdate"))preferences.AutoUpdate=(bool)message["autoUpdate"];
                     if(message.ContainsKey("startup"))SetStartup((bool)message["startup"]);
                     if(message.ContainsKey("autoReconnect"))preferences.AutoReconnect=(bool)message["autoReconnect"];
+                    if(message.ContainsKey("keepAwake")){preferences.KeepAwake=(bool)message["keepAwake"];UpdateKeepAwake();}
                     if(message.ContainsKey("internet")){if(online||owner!=null)throw new InvalidOperationException("Disconnect before changing connection mode.");preferences.Internet=(bool)message["internet"];}
                     Save();
                 }else if(action!="state")throw new InvalidOperationException("Unknown desktop action.");result=Snapshot();
@@ -271,7 +279,7 @@ public sealed class PocketDesktop:Form {
         foreach(string name in new[]{"provider","sessionId","jobId","cwd","title"})pendingChat[name]=Field(activeRunAlert,name);
         RestoreWindow();Reply(new{chatNotification=true});
     }
-    object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
+    object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,keepAwake=preferences.KeepAwake,logs=failures>0,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
     public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();web.Focus();}
     void Save(){if(preview)return;Directory.CreateDirectory(storage);string temp=settingsFile+".tmp";File.WriteAllText(temp,json.Serialize(preferences),Encoding.UTF8);
         // Right after an update handoff another process can briefly hold desktop.json without delete sharing.
@@ -292,10 +300,11 @@ public sealed class PocketDesktop:Form {
     async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;if(runtime.ContainsKey("desktopCheckRequestedAt")){long requested=Convert.ToInt64(runtime["desktopCheckRequestedAt"]);if(requested>lastRequestedUpdate){lastRequestedUpdate=requested;StartUpdate();}}hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
     async Task Poll(){
         if(preview||polling||changing||exiting)return;polling=true;
-        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();await PollRunNotifications();tray.Text="Pocket Code · connected";return;}
+        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();await PollRunNotifications();await PollDevices();UpdateKeepAwake();tray.Text="Pocket Code · connected";return;}
+            phoneOnline=false;UpdateKeepAwake();
             addresses=new object[0];jiraUrl=null;if(owner!=null&&owner.ActiveCount==0){owner.Dispose();owner=null;nextAttempt=DateTime.UtcNow.AddSeconds(Math.Min(60,5*Math.Pow(2,Math.Min(failures++,4))));}
             if(owner!=null){status="Starting the host / restoring connection…";return;}
-            status=preferences.Connect&&preferences.AutoReconnect?"Host unavailable. Reconnecting…":"Disconnected";if(failures>0)status+=" See desktop-launch.log in the Pocket Code data folder.";tray.Text="Pocket Code · disconnected";
+            status=preferences.Connect&&preferences.AutoReconnect?"Host unavailable. Reconnecting…":"Disconnected";tray.Text="Pocket Code · disconnected";
             if(preferences.Connect&&(autoStartPending||preferences.AutoReconnect)&&DateTime.UtcNow>=nextAttempt){autoStartPending=false;Launch();}
         }catch(Exception error){status=error.Message;nextAttempt=DateTime.UtcNow.AddSeconds(30);}finally{polling=false;Push();}
     }
@@ -316,6 +325,23 @@ public sealed class PocketDesktop:Form {
         string file=Path.Combine(storage,"pairing.html");if(!File.Exists(file))return;string html=File.ReadAllText(file);var items=new List<object>();
         foreach(Match match in Regex.Matches(html,"src=\"(data:image/png;base64,[^\"]+)\"[^>]*>\\s*<code>([^<]+)</code>"))items.Add(new{image=match.Groups[1].Value,url=System.Net.WebUtility.HtmlDecode(match.Groups[2].Value)});
         addresses=items.ToArray();var setup=Regex.Match(html,"href=\"(http://127\\.0\\.0\\.1:4318/setup/jira#[^\"]+)\"");jiraUrl=setup.Success?System.Net.WebUtility.HtmlDecode(setup.Groups[1].Value):null;
+    }
+    /** Sleep is blocked only on mains power while agents run or a phone is online; closing the lid still sleeps. */
+    void UpdateKeepAwake(){bool awake=preferences.KeepAwake&&online&&(hostBusy||phoneOnline)&&SystemInformation.PowerStatus.PowerLineStatus==PowerLineStatus.Online;try{SetThreadExecutionState(awake?ContinuousState|SystemRequired:ContinuousState);}catch(EntryPointNotFoundException){}}
+    /** A newly paired or waiting device is announced on the PC, so an unexpected pairing does not go unnoticed. */
+    async Task PollDevices(){
+        if(preview||DateTime.UtcNow<nextDevicePoll)return;nextDevicePoll=DateTime.UtcNow.AddSeconds(10);
+        try{var list=await Send(http,"/devices",false) as object[];if(list==null)return;bool ru=preferences.RunLanguage=="ru",any=false;var seen=new HashSet<string>();
+            foreach(object item in list){var device=item as Dictionary<string,object>;if(device==null)continue;string id=Field(device,"id"),state=Field(device,"status"),via=Field(device,"via");if(state=="online")any=true;
+                seen.Add(id);string previous;deviceStates.TryGetValue(id,out previous);deviceStates[id]=state;bool waiting=state=="pending"&&previous!="pending",added=state!="pending"&&(previous==null||previous=="pending");
+                if(devicesLoaded&&activeRunAlert==null&&(waiting||added)){
+                    string route=via=="internet"?(ru?"через интернет":"through the internet"):via=="tailscale"?"Tailscale":via=="lan"?"Wi-Fi":"";string name=Field(device,"name")+(route==""?"":" ("+route+")");
+                    if(state=="pending")tray.ShowBalloonTip(10000,ru?"Подтвердите новое устройство":"Confirm a new device",name+(ru?". Откройте Настройки → Подключение и нажмите «Разрешить» или «Отклонить».":". Open Settings → Connection and choose Allow or Decline."),ToolTipIcon.Warning);
+                    else tray.ShowBalloonTip(10000,ru?"Новое устройство":"New device",name+(ru?". Не вы? Отключите его в Настройки → Подключение.":". Not you? Disconnect it in Settings → Connection."),ToolTipIcon.Info);
+                }}
+            foreach(string key in new List<string>(deviceStates.Keys))if(!seen.Contains(key))deviceStates.Remove(key);
+            phoneOnline=any;devicesLoaded=true;
+        }catch{/* Older hosts without device management keep working. */}
     }
     void OpenUrl(string url){Process.Start(new ProcessStartInfo(url){UseShellExecute=true});}
     protected override void Dispose(bool disposing){if(disposing){timer.Dispose();tray.Dispose();web.Dispose();http.Dispose();reader.Dispose();if(owner!=null)owner.Dispose();}base.Dispose(disposing);}

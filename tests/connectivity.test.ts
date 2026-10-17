@@ -6,8 +6,10 @@ import { tunnelAddress } from '../server/tunnel.js';
 
 test('VPN and LAN errors explain remote access without promising an unimplemented retry', () => {
   const vpn = networkFailure('http://100.80.1.2:4318', new Error('timeout'));
-  assert.match(vpn, /не обязательно принадлежит Tailscale/);
-  assert.match(vpn, /Internet.cmd/); assert.doesNotMatch(vpn, /автоматически/);
+  assert.match(vpn, /Адрес Tailscale недоступен/);
+  assert.match(vpn, /Подключение через интернет/); assert.doesNotMatch(vpn, /.cmd|автоматически/);
+  assert.match(networkFailure('http://localhost:4318', new Error('timeout')), /только на самом ПК/);
+  assert.doesNotMatch(networkFailure('http://172.200.1.2:4318', null), /домашней сети/);
   assert.match(networkFailure('http://192.168.1.20:4318', null), /только в домашней сети/);
   assert.match(networkFailure('https://example.com', new Error('CertPath invalid')), /сертификат/);
 });

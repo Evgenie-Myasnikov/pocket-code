@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Features
+- connection: show a connected-PC card on the phone with address, PC version, last contact, a latency check and copyable diagnostics; keep scanning a new QR as a secondary action.
+- connection: explain pairing failures by cause (expired or used QR, rejected or unconfirmed device, device limit, localhost or LAN-only address, Android HTTP block, version mismatch, another service) with one next step each.
+- connection: after the PC revokes this phone, show which PC disconnected it and how to reconnect; do not send the revoked key again.
+- connection: "Disconnect and forget" now asks for confirmation, names the PC and lists what is removed; it is hidden when nothing is connected.
+- security: a pairing QR stops working after one use and rotates; the PC can rotate it manually. Pairing through the internet tunnel waits for approval on the PC, and the desktop tray announces new or waiting devices.
+- desktop: optional keep-awake while agents run or a phone is online on mains power; open the logs folder from the app.
+
 ### Bug Fixes
 - i18n: restore the Russian follow-up recovery message and the external-image button label that were saved as question marks in 0.26.9.
 - pairing: treat a 401 as device revocation only from the health and heartbeat checks, so a Jira or Miro sign-in error no longer unpairs the phone and wipes its cache.
@@ -15,6 +23,7 @@
 
 ### Validation
 - TypeScript check passed; no remaining question-mark placeholders in src. Browser scenarios passed: device pairing (including a Miro 401 that keeps the pairing), follow-up composer and task pipeline (12), edge/compact chat layout (7). Transcript specs tool-activity/activity-groups/rich-updates/chat-surfaces show the same 5 failures with and without these changes (height and navigation assertions). Device checks not run.
+- Connection area: TypeScript check and unit tests passed (332/333; the board-evidence test failure predates this work). 48 of 52 browser scenarios passed across connect-usability, device-pairing, qr-routing, workspace-recovery, settings-navigation, language and desktop-ui; qr-routing, settings-navigation and workspace-recovery fail identically on the previous commit, and the desktop note-deletion scenario passed on rerun. The C# shell was not compiled; no physical Android or Windows checks.
 
 ## [0.26.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.8...v0.26.9) (2026-10-14)
 

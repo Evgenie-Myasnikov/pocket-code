@@ -4,7 +4,8 @@ import { english } from './translations';
 export type Language = 'en' | 'ru';
 const storageKey = 'pocket-code-language-v1';
 let language: Language = 'en';
-try { if (localStorage.getItem(storageKey) === 'ru') language = 'ru'; } catch { /* Storage can be unavailable. */ }
+// Until the person picks a language, follow the device language.
+try { const stored = localStorage.getItem(storageKey); if (stored === 'ru' || !stored && typeof navigator !== 'undefined' && /^ru\b/i.test(navigator.language || '')) language = 'ru'; } catch { /* Storage can be unavailable. */ }
 const listeners = new Set<() => void>();
 const catalog = Object.fromEntries(Object.entries(english).map(([ru, en]) => [ru.trim(), en.trim()]));
 const reverse = new Map(Object.entries(catalog).map(([ru, en]) => [en, ru]));

@@ -44,19 +44,26 @@ import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
 import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { BookOpen, FileText, ArrowUp, ArrowLeft, Plus, Search, MessageSquare, Folder, Settings, Terminal, Wifi, ChevronDown, X, GitBranch, RefreshCw, Laptop, LogOut, ShieldCheck, ClipboardList, Eye, EyeOff, PanelsTopLeft } from 'lucide-react';
-import { Connect } from './Connect';
+import { Connect, type ConnectedPc } from './Connect';
+import { connectionProblem as classifyProblem, type ConnectionProblem } from './connection-errors';
 import { useAppearance } from './Appearance';
 import {SettingsPanel,type SettingsPage} from './SettingsPanel';
 import { PartialMessage, MessageList, ApprovalCard } from './Messages';
 
 import { DocumentLibrary } from './DocumentLibrary';
 
-import { fileBase64, loadConnection, pairDevice, request, saveConnection, type Connection } from './api';
+import { fileBase64, loadConnection, normalizeUrl, pairDevice, request, saveConnection, type Connection } from './api';
 import { demoMessages, demoSessions } from './demo';
 import type { ChatMessage, JobView, SubagentView,ActivityItem } from '../server/types';
 
 import type {Session} from './session';
-type Health = {name: string;roots: string[];version: string;protocol: number;};
+type Health = {name: string;roots: string[];version: string;protocol: number;hostId?:string;routes?:string[]};
+// Remembers across the remount that the PC revoked this phone, so the next screen can say why it is empty.
+const revokedKey='pocket-code-revoked';
+function readRevoked(){try{return localStorage.getItem(revokedKey);}catch{return null;}}
+function setRevoked(name:string|null){try{if(name===null)localStorage.removeItem(revokedKey);else localStorage.setItem(revokedKey,name);}catch{/* The notice is optional. */}}
+/** A cached /health answer means the PC was not reached, even though the request returned. */
+async function freshHealth(c:Connection){let stale=false;const mark=()=>{stale=true;};window.addEventListener('pocket-offline-read',mark);try{return {health:await request<Health>(c,'/health'),stale};}finally{window.removeEventListener('pocket-offline-read',mark);}}
 type ProviderInfo = {id: WorkspaceProvider;name: string;available: boolean;authenticated?: boolean;models?: EffortModel[];error?: string;};
 type Attachment = DraftAttachment;
 type Draft = {text: string;attachments: Attachment[];};
@@ -92,12 +99,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [fromStart, setFromStart] = useStateForWorkspace(false);
   const lastScrollTop = useRefForWorkspace(0);
   const [connection, setConnection] = useState<Connection | null>(null),[saved, setSaved] = useState<Connection | null>(null);
-  const [connecting,setConnecting]=useState(false),[connectionError,setConnectionError]=useState('');
+  const [connecting,setConnecting]=useState(false),[connectionError,setConnectionError]=useState(''),[connectionProblem,setConnectionProblem]=useState<ConnectionProblem|undefined>();
+  const [connected,setConnected]=useState(false),[paired,setPaired]=useState(false),[restoring,setRestoring]=useState(!embedded),[lastContact,setLastContact]=useState(0),[revokedFrom,setRevokedFrom]=useState(readRevoked);
+  const disconnecting=useRef(false),pcName=useRef('');
   const [workspaceConnection,setWorkspaceConnection]=useState<Connection|null>(null),[workspaceScanner,setWorkspaceScanner]=useState(false);
   const projectSpaces=useProjectWorkspaces(embedded?connection:workspaceConnection);
   const personalBoards=useProjectWorkspaces(connection);const [localBoards,setLocalBoards]=useState(true);
   const [offline,setOffline]=useState(false);
-  useEffect(()=>{const stale=()=>setOffline(true),fresh=()=>setOffline(false);window.addEventListener('pocket-offline-read',stale);window.addEventListener('pocket-online-read',fresh);return()=>{window.removeEventListener('pocket-offline-read',stale);window.removeEventListener('pocket-online-read',fresh);};},[]);
+  useEffect(()=>{const stale=()=>setOffline(true),fresh=()=>{setOffline(false);setLastContact(Date.now());};window.addEventListener('pocket-offline-read',stale);window.addEventListener('pocket-online-read',fresh);return()=>{window.removeEventListener('pocket-offline-read',stale);window.removeEventListener('pocket-online-read',fresh);};},[]);
   const canRun = !offline && !!connection && providerInfo?.available === true && providerInfo.authenticated !== false && !connection?.workspaceId;
   const [boardChat,setBoardChat]=useState<BoardChat|null>(embedded?.boardChat||null);
   const [noticeTarget,setNoticeTarget]=useState<BoardNoticeTarget|null>(null);
@@ -297,22 +306,31 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     setDraft([draft,rejectedDraft.text].filter(Boolean).join('\n\n'));setAttachments(combined);
     setRejectedDrafts(old=>({...old,[currentDraftKey()]:{...rejectedDraft,restored:true}}));
   }
-  useEffect(()=>{if(!connection?.deviceId)return;const beat=()=>void request(connection,'/devices/heartbeat',{}).catch(()=>{});beat();const timer=setInterval(beat,15000);const revoked=(event:Event)=>{if((event as CustomEvent).detail===connection.deviceId)void disconnect();};window.addEventListener('pocket-device-revoked',revoked);return()=>{clearInterval(timer);window.removeEventListener('pocket-device-revoked',revoked);};},[connection]);
-  async function connect(c: Connection) {
+  useEffect(()=>{if(!connection?.deviceId)return;const beat=()=>void request(connection,'/devices/heartbeat',{}).then(()=>setLastContact(Date.now())).catch(()=>{});beat();const timer=setInterval(beat,15000);const revoked=(event:Event)=>{if((event as CustomEvent).detail===connection.deviceId)void disconnect('revoked');};window.addEventListener('pocket-device-revoked',revoked);return()=>{clearInterval(timer);window.removeEventListener('pocket-device-revoked',revoked);};},[connection]);
+  // Another known route (Wi-Fi, Tailscale, tunnel) can replace an unreachable one without a new QR.
+  async function reachableRoute(c:Connection){for(const url of c.routes||[]){if(url===c.url)continue;try{const next={...c,url:normalizeUrl(url)},{stale}=await freshHealth(next);if(!stale)return next;}catch{/* Try the next route. */}}return null;}
+  function cancelConnect(){++connectEpoch.current;setConnecting(false);setRestoring(false);}
+  async function connect(c: Connection,restored=false) {
     const epoch=++connectEpoch.current;
-    setConnecting(true);setConnectionError('');
+    setConnecting(true);setConnectionError('');setConnectionProblem(undefined);setConnected(false);
+    if(!restored&&(c.pairing||c.url!==saved?.url||c.token!==saved?.token))setPaired(false);
     try {
-      if(c.workspaceOnly||c.workspaceInvite)throw Error('Use Connection QR to access personal PC chats. WorkSpace invitations only open shared boards.');
+      if(c.workspaceOnly||c.workspaceInvite)throw Error(t('Для личных чатов ПК используйте QR подключения. Приглашение WorkSpace открывает только общие доски.'));
       const original=c;c=await pairDevice(c,packageVersion);if(epoch!==connectEpoch.current)return;
       const scope=await chatCacheScope(c),access=workspaceConnection||original.workspaceAccess,accesses=workspaceAccesses.length?workspaceAccesses:savedWorkspaces(original);
-      if(!embedded)await saveConnection({...c,...(access?{workspaceAccess:access}:{}),workspaceAccesses:accesses});
+      const stored={...c,...(access?{workspaceAccess:access}:{}),workspaceAccesses:accesses};
+      if(!embedded)await saveConnection(stored);
       if(epoch!==connectEpoch.current)return;
       if(scope!==cacheScope){rememberPosition();rememberDraft();setProjects(null);setProviders([]);setBoardChat(null);setBoardLaunch(null);setActivityTarget(null);}
       setCacheScope(scope);setSaved(c);setConnection(c);setDemo(false);
-      const h=await request<Health>(c,'/health');if(epoch!==connectEpoch.current)return;if(h.protocol!==1)throw Error(t('Обновите приложение и сервер до одной версии'));setHealth(h);
-    }catch(e){if(epoch===connectEpoch.current){setConnectionError((e as Error).message);setOffline(true);}}finally{if(epoch===connectEpoch.current)setConnecting(false);}
+      const {health:h,stale}=await freshHealth(c);if(epoch!==connectEpoch.current)return;if(h.protocol!==1)throw Object.assign(Error(t('Обновите приложение и сервер до одной версии')),{problem:'incompatible'});setHealth(h);
+      if(stale){setPaired(true);const alternate=await reachableRoute(c);if(alternate&&epoch===connectEpoch.current){void connect(alternate,true);return;}if(epoch===connectEpoch.current){setConnectionProblem('unreachable');setOffline(true);}return;}
+      setConnected(true);setPaired(true);setLastContact(Date.now());setRevoked(null);setRevokedFrom(null);
+      // The PC name, identity and other routes are kept so the next start can name the PC and fall back to another route.
+      if(!embedded&&(h.name!==c.name||h.hostId!==c.hostId||h.routes&&JSON.stringify(h.routes)!==JSON.stringify(c.routes))){const next={...stored,name:h.name,...(h.hostId?{hostId:h.hostId}:{}),...(h.routes?{routes:h.routes}:{})};await saveConnection(next);if(epoch===connectEpoch.current)setSaved(next);}
+    }catch(e){if(epoch===connectEpoch.current){const problem=classifyProblem(e);if(problem==='unreachable'&&!c.pairing){const alternate=await reachableRoute(c);if(alternate&&epoch===connectEpoch.current){void connect(alternate,true);return;}}if(epoch===connectEpoch.current){setConnectionError((e as Error).message);setConnectionProblem(problem);if(problem==='unreachable')setOffline(true);}}}finally{if(epoch===connectEpoch.current){setConnecting(false);if(restored)setRestoring(false);}}
   }
-  useEffect(()=>{if(embedded){void connect(embedded.connection);return;}loadConnection().then(c=>{if(!c)return;setSaved(c);if(c.workspaceOnly){setTab('settings');setSettingsPage('connection');}else void connect(c);}).catch(()=>setConnectionError(locale().startsWith('ru')?'Не удалось восстановить подключение. Отсканируйте QR-код ПК снова.':'Could not restore the connection. Scan the PC QR code again.'));},[]);
+  useEffect(()=>{if(embedded){void connect(embedded.connection);return;}loadConnection().then(c=>{if(!c){setRestoring(false);return;}setSaved(c);if(c.workspaceOnly){setRestoring(false);setTab('settings');setSettingsPage('connection');}else{setPaired(true);void connect(c,true);}}).catch(()=>{setRestoring(false);setConnectionError(locale().startsWith('ru')?'Не удалось восстановить подключение. Отсканируйте QR-код ПК снова.':'Could not restore the connection. Scan the PC QR code again.');});},[]);
   async function switchWorkspace(access:WorkspaceAccess){
     setWorkspaceConnection(access);setLocalBoards(false);setWorkspaceScanner(false);setError('');
     await saveConnection(connection?{...connection,workspaceAccess:access,workspaceAccesses}:{...access,workspaceOnly:true,workspaceAccesses});
@@ -600,13 +618,20 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       }
     } catch (e) {setError((e as Error).message);} finally {setUploading(false);}
   }
-  function startDemo() {setDemo(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.10.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
+  function startDemo() {setDemo(true);setTab('chats');setMobileChat(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.10.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
   // Leaving on the phone also removes it from the PC's device list; an unreachable or older PC is not a blocker.
-  async function disconnect() {try {if(workspaceConnection&&!workspaceConnection.deviceId)await request(workspaceConnection,'/workspace-logout',{}).catch(()=>{});if(connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);clearOffline();try{localStorage.removeItem("pocket-own-profile");}catch{}clearChatCache();persistPosition.current=()=>{};clearPositions();onDisconnect();}catch(e){setError((e as Error).message);}}
+  // A revoked key is not sent again: the PC already removed it, and a second 401 would restart this flow.
+  async function disconnect(reason:'user'|'revoked'='user') {if(disconnecting.current)return;disconnecting.current=true;++connectEpoch.current;try {if(workspaceConnection&&!workspaceConnection.deviceId)await request(workspaceConnection,'/workspace-logout',{}).catch(()=>{});if(reason==='user'&&connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);clearOffline();try{localStorage.removeItem("pocket-own-profile");}catch{}clearChatCache();persistPosition.current=()=>{};clearPositions();setRevoked(reason==='revoked'?pcName.current:null);onDisconnect();}catch(e){disconnecting.current=false;setError((e as Error).message);}}
   if(workspacePasswordRequest)return <WorkspacePassword busy={busy} error={error} onCancel={()=>{setWorkspacePasswordRequest(null);setError('');}} onSubmit={password=>void joinWorkspace(workspacePasswordRequest,password)}/>;
   // Without a reachable PC the phone still checks, downloads and offers the latest release itself.
   if(!health&&embedded)return <div className="desktop-empty" role="status">{error||t("Loading...")}{error&&<button className="secondary" onClick={()=>void connect(embedded.connection)}>{t("Retry")}</button>}</div>;
   if (!health) return <><Connect initial={saved} onConnect={connect} onDemo={startDemo} busy={connecting} error={connectionError} /><Updates connection={null} expanded={false} /></>;
+  pcName.current=saved?.name||(connected?health?.name||'':'');
+  // Until a PC answers once, Board and Chats explain how to pair instead of showing empty lists.
+  const onboardingVisible=!embedded&&!demo&&(!connection||!paired)&&(tab==='workspace'||tab==='chats');
+  const connectionScreen=onboardingVisible||tab==='connection'||tab==='settings'&&settingsPage==='connection';
+  const pcStatus:ConnectedPc|null=connection&&connected&&health&&!connection.workspaceOnly?{name:health.name,url:connection.url,version:health.version,online:!offline&&!networkError,lastContact,check:async()=>{const start=performance.now(),{stale}=await freshHealth(connection);if(stale)throw Error(t('ПК не ответил. Проверьте сеть и повторите.'));setOffline(false);setLastContact(Date.now());return Math.round(performance.now()-start);}}:null;
+  const connectView=(onboarding=false)=><Connect initial={saved?.workspaceOnly?null:saved} onConnect={c=>void connect(c)} busy={connecting} error={connectionError} problem={connectionProblem} status={pcStatus} onDisconnect={()=>void disconnect()} onCancel={cancelConnect} onUpdates={()=>{setSettingsPage('updates');setTab('settings');setMobileChat(true);}} revoked={revokedFrom} onboarding={onboarding} restoring={restoring} target={saved?.name} onDemo={onboarding?startDemo:undefined}/>;
   const visible = sessions.filter((s) => `${s.customTitle || ""} ${s.summary} ${s.cwd}`.toLowerCase().includes(search.toLowerCase()));
   const workspacePicker = (location:'sidebar'|'header'|'settings') => <label className={`workspace-picker workspace-picker-${location}`}>{location==='settings'&&<span>{t("Провайдер")}</span>}<select aria-label={t("Провайдер")} value={provider} disabled={demo} onChange={event=>setProvider(event.target.value as WorkspaceProvider)}><option value="claude">Claude</option><option value="codex">Codex</option><option value="copilot">GitHub Copilot</option></select></label>;
   const chatStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>item.status===status));
@@ -623,10 +648,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       <nav className="desktop-tabs"><button className={tab === 'workspace' ? 'active' : ''} onClick={() => {setTab('workspace');setMobileChat(true);}}><ClipboardList size={17} />{(locale().startsWith('ru')?'Доска':'Board')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={17} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><BookOpen size={17} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} onClick={()=>{setTab('changelog');setMobileChat(true);}}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
       <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти в чатах")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
       <div className="session-list"><div className="list-label">{t("ВАШИ ЧАТЫ ")}<span>{visible.length}</span></div>
-        <button className={`session-row ${!selected&&!job?'selected':''}`} aria-label="New" disabled={busy||uploading} onClick={()=>newChat()}><MessageSquare size={16}/><div><strong>New</strong></div></button>
+        {connection&&<button className={`session-row ${!selected&&!job?'selected':''}`} aria-label="New" disabled={busy||uploading} onClick={()=>newChat()}><MessageSquare size={16}/><div><strong>New</strong></div></button>}
         {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><span className="pulse-dot" /><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}</small></div></button>)}
         {visible.map((s) => <button className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} disabled={busy || uploading} key={s.sessionId} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span>·</span>{new Date(s.lastModified).toLocaleDateString(locale(), { day: 'numeric', month: 'short' })}</small></div>{jobs.some((j) => j.sessionId === s.sessionId && j.status === 'running') && <span className="pulse-dot" />}</button>)}
-        {!visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : t("Здесь появятся чаты {0} из разрешённых папок.",engineName)}</p></div>}
+        {!visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : connection ? t("Здесь появятся чаты {0} из разрешённых папок.",engineName) : t('Подключите ПК, чтобы видеть чаты.')}</p>{!connection&&!search&&!demo&&<button className="primary" onClick={()=>setMobileChat(true)}>{t('Подключить компьютер')}</button>}</div>}
       </div></aside>
     <main className={`workspace ${tab==='chats'?'chat-canvas':''}`}>
       {reviewOpen && connection && reviewCwd && <Review key={reviewContext} connection={connection} cwd={reviewCwd} taskRunId={taskRun?.id} initialMode={availableReview?.mode} onClose={()=>setReviewOpen(false)}/>}
@@ -646,15 +671,15 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
 
         {!embedded&&!readingMode&&<BoardNotifications activity={activity} busy={busy||uploading||Boolean(activityTarget)} onOpenActivity={openActivity} onOpenChange={setActivityOpen} connection={workspaceConnection||connection} onOpen={target=>{setNoticeTarget(target);setLocalBoards(!workspaceConnection);setWorkspaceScanner(false);setTab('workspace');setMobileChat(true);}}/>}
       </header>}
-      {offline&&<div className="network-banner" role="status">{locale().startsWith('ru')?'Офлайн · сохранённые данные, только просмотр':'Offline · saved data, read-only'}</div>}
+      {offline&&!connectionScreen&&<div className="network-banner" role="status">{locale().startsWith('ru')?'Офлайн · сохранённые данные, только просмотр':'Offline · saved data, read-only'}</div>}
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
       {historyError && tab==='chats' && <div className="network-banner" role="status">{t("История не обновилась: ")}{t(historyError)}</div>}
-      {networkError && !hostRestarting && <div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
+      {networkError && !hostRestarting && !connectionScreen && <div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
       {!canRun && !demo && !offline && tab==='chats' && connection && (providerInfo || provider==='codex') && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить рабочее пространство Codex.")}</div>}
       <Updates connection={connection} expanded={tab === 'settings'&&settingsPage === 'updates'} />
       {tab==='chats'&&taskRun&&!readingMode&&<button className="chat-task-entry" onClick={()=>setTaskPanel(true)}>{taskRun.title} · {taskStageLabel(taskRun.stage,locale().startsWith('ru'))}</button>}
       </ChatOverlay>
-      {tab === 'connection' ? <Connect initial={saved?.workspaceOnly?null:saved} onConnect={connect} busy={connecting} error={connectionError}/> : tab === 'workspace' ? connection?<WorkBoards focusTarget={noticeTarget} compactContext local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={tab==='files'?'rules':'changelog'}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={<Connect initial={saved?.workspaceOnly?null:saved} onConnect={connect} busy={connecting} error={connectionError}/>} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget} onDisconnect={()=>void disconnect()}/> : <>
+      {tab === 'connection' ? connectView() : onboardingVisible ? connectView(true) : tab === 'workspace' ? connection?<WorkBoards focusTarget={noticeTarget} compactContext local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={tab==='files'?'rules':'changelog'}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={connectView()} online={!!pcStatus?.online} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget}/> : <>
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}<div className="conversation-date"><span />{demo ? t("ПРИМЕР РАЗГОВОРА") : t("РАБОЧЕЕ ПРОСТРАНСТВО")}<span /></div>
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}

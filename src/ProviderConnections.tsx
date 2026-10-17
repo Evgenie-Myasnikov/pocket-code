@@ -6,7 +6,7 @@ import {useLanguage} from './i18n';
 import {startVisiblePoll} from './visible-poll';
 import './provider-connections.css';
 import type {DesktopState} from './desktop-bridge';
-export function HostStatus({state}:{state:DesktopState}){const ru=useLanguage()==='ru';return <dl className="host-status"><div><dt>{ru?'Сервер ПК':'PC host'}</dt><dd>{state.online?(state.hostBusy?(ru?'В работе':'Working'):(ru?'В сети':'Online')):(ru?'Не в сети':'Offline')}</dd></div><div><dt>{ru?'Интернет-туннель':'Internet tunnel'}</dt><dd>{state.tunnelOnline?(ru?'Подключён':'Connected'):(ru?'Не подключён':'Not connected')}</dd></div></dl>;}
+export function HostStatus({state}:{state:DesktopState}){const ru=useLanguage()==='ru';return <dl className="host-status"><div><dt><span className={'host-dot'+(state.online?' on':'')} aria-hidden="true"/>{ru?'Сервер ПК':'PC host'}</dt><dd>{state.online?(state.hostBusy?(ru?'В работе':'Working'):(ru?'В сети':'Online')):(ru?'Не в сети':'Offline')}</dd></div>{state.internet&&<div><dt><span className={'host-dot'+(state.tunnelOnline?' on':'')} aria-hidden="true"/>{ru?'Интернет-туннель':'Internet tunnel'}</dt><dd>{state.tunnelOnline?(ru?'Подключён':'Connected'):(ru?'Не подключён':'Not connected')}</dd></div>}</dl>;}
 
 type Provider='claude'|'codex'|'copilot';
 type Status={id:Provider;installed:boolean;version:string;server:string;authenticated:boolean|null;access?:string;busy:boolean;login:{state:string;reason?:string;method?:string};methods:string[]};

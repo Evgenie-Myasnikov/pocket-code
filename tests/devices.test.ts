@@ -28,13 +28,13 @@ test('only PC admin manages devices; pairing keys cannot read data and remote sh
  const server=result.app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));const base=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
  const req=(url:string,key:string,body?:unknown,headers={})=>fetch(base+url,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
  try{assert.equal((await req('/health',registry.pairingToken)).status,401);assert.equal((await req('/health',admin,undefined,{'X-Forwarded-For':'192.0.2.1'})).status,401);
- const paired=await(await req('/devices/pair',registry.pairingToken,{name:'Synthetic phone',platform:'android',version:'1'})).json();assert.ok(paired.deviceId);
+ const firstQr=registry.pairingToken,paired=await(await req('/devices/pair',firstQr,{name:'Synthetic phone',platform:'android',version:'1'})).json();assert.ok(paired.deviceId);assert.notEqual(registry.pairingToken,firstQr);assert.equal(qrUpdates,1);assert.equal((await req('/devices/pair',firstQr,{name:'Synthetic copy',platform:'android',version:'1'})).status,401);
  assert.equal((await req('/health',paired.token)).status,200);assert.equal((await req('/devices',paired.token)).status,403);
  assert.equal((await req('/devices/'+paired.deviceId+'/disconnect',paired.token,{})).status,403);
  assert.equal((await req('/devices/heartbeat',paired.token,{})).status,200);
  assert.equal((await req('/devices/'+paired.deviceId+'/rename',admin,{name:'Renamed test phone'})).status,200);
  assert.equal((await(await req('/devices',admin)).json())[0].name,'Renamed test phone');
- assert.equal((await req('/devices/'+paired.deviceId+'/disconnect',admin,{})).status,200);assert.equal(qrUpdates,1);
+ assert.equal((await req('/devices/'+paired.deviceId+'/disconnect',admin,{})).status,200);assert.equal(qrUpdates,2);
  assert.equal((await req('/health',paired.token)).status,401);
  const other=await(await req('/devices/pair',registry.pairingToken,{name:'Synthetic tablet',platform:'android',version:'1',model:'Example X2',installation:'synthetic-installation-0003'})).json();
  assert.equal((await req('/devices/self/forget',admin,{})).status,403);
@@ -59,4 +59,19 @@ test('a phone pairing again keeps one entry, removals leave no trace and legacy 
  await writeFile(file,JSON.stringify({pairing:'synthetic-legacy-pairing-key',devices:[{id:'legacy-1',name:'Revoked synthetic',platform:'android',version:'1',hash:'a',pairedAt:1,lastSeen:1,revokedAt:2},{id:'legacy-2',name:'Kept synthetic',platform:'android',version:'1',hash:'b',pairedAt:1,lastSeen:1}]}));
  assert.deepEqual((await new DeviceRegistry(file,()=>now).load()).list().map(d=>d.name),['Kept synthetic']);
  }finally{await rm(root,{recursive:true,force:true});}
+});
+test('pairing through the internet tunnel waits for the PC, which can allow or decline it',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'pocket-devices-tunnel-')),registry=await new DeviceRegistry(path.join(root,'devices.json')).load();const admin='synthetic-admin-key-'.repeat(3);
+ const result=await createApp({devices:registry,refreshPairing:async()=>{},roots:[root],token:admin,hostName:'Test host',uploads:path.join(root,'uploads'),desktopSessionIndexes:[]},new Jobs(),{listSessions:async()=>[],getSessionMessages:async()=>[]} as any);
+ const server=result.app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));const base=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+ const req=(url:string,key:string,body?:unknown,headers={})=>fetch(base+url,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
+ const waiting=async()=>{for(let i=0;i<50;i++){const item=(await(await req('/devices',admin)).json()).find((d:any)=>d.status==='pending');if(item)return item;await new Promise(r=>setTimeout(r,20));}throw Error('No pending device');};
+ try{
+  const first=req('/devices/pair',registry.pairingToken,{name:'Synthetic remote phone',platform:'android',version:'1'},{'CF-Connecting-IP':'192.0.2.10'});
+  const pending=await waiting();assert.equal(pending.via,'internet');assert.equal((await req('/devices/'+pending.id+'/approve',admin,{},{'X-Forwarded-For':'192.0.2.1'})).status,401);
+  assert.equal((await req('/devices/'+pending.id+'/approve',admin,{})).status,200);const allowed=await first;assert.equal(allowed.status,200);assert.ok((await allowed.json()).deviceId);
+  const second=req('/devices/pair',registry.pairingToken,{name:'Synthetic stranger',platform:'android',version:'1'},{'CF-Connecting-IP':'192.0.2.11'});
+  assert.equal((await req('/devices/'+(await waiting()).id+'/reject',admin,{})).status,200);const declined=await second;assert.equal(declined.status,403);assert.equal((await declined.json()).code,'pairing_rejected');
+  assert.deepEqual((await(await req('/devices',admin)).json()).map((d:any)=>d.name),['Synthetic remote phone']);
+ }finally{result.jobs.close();result.terminals.close();await result.queue?.close();await result.codexQueue?.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(root,{recursive:true,force:true});}
 });

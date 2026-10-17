@@ -24,15 +24,23 @@ test('home stays focused; categorized Settings restores focus and Back preserves
   await page.keyboard.press('Escape');await expect(page.locator('[data-settings-category="workspace"]')).toBeFocused();await page.keyboard.press('Escape');await expect(page.getByLabel('Message Codex')).toHaveValue('Keep my draft');
   await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'About',exact:true}).click();await expect(page.locator('.settings-about')).toContainText('Pocket Code');await expect(page.locator('.settings-about')).toContainText('BETA');
 });
-for(const profile of [{width:320,height:640},{width:844,height:390}])test(`Disconnect stays at the end of the settings index only at ${profile.width}x${profile.height}`,async({page})=>{
-  await page.setViewportSize(profile);await setup(page);await (profile.width<=760?page.locator('.mobile-nav'):page.locator('.desktop-tabs')).getByRole('button',{name:'Settings',exact:true}).click();
+for(const profile of [{width:320,height:640},{width:844,height:390}])test(`Disconnect is confirmed from the connection card, not the settings index, at ${profile.width}x${profile.height}`,async({page})=>{
+  await page.setViewportSize(profile);await setup(page);
+  const menu=page.getByRole('button',{name:'Navigation menu'}).filter({visible:true});if(await menu.count())await menu.click();
+  await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().getByRole('button',{name:'Settings',exact:true}).click();
+  await expect(page.locator('.settings-index .settings-category').first()).toHaveAttribute('data-settings-category','connection');
+  await expect(page.locator('[data-settings-category="connection"]')).toContainText('Settings test computer · Connected');
   for(const category of ['appearance','workspace','usage','jira','miro','updates','connection','notifications','about']){
     await page.locator(`[data-settings-category="${category}"]`).click();
-    await expect(page.locator('.settings-exit')).toHaveCount(0);
+    await expect(page.locator('.settings-exit,.settings-disconnect')).toHaveCount(0);
     await page.getByRole('button',{name:'All settings',exact:true}).click();
   }
-  await page.locator('.settings-content').evaluate(element=>{element.scrollTop=element.scrollHeight;});
-  const metrics=await page.locator('.settings-panel').evaluate(panel=>{const content=panel.querySelector('.settings-content')!.getBoundingClientRect(),index=panel.querySelector('.settings-index')!.getBoundingClientRect(),footer=panel.querySelector('.settings-exit')!.getBoundingClientRect(),button=panel.querySelector('.settings-disconnect')!.getBoundingClientRect();return{contentBottom:content.bottom,indexBottom:index.bottom,footerTop:footer.top,footerBottom:footer.bottom,buttonHeight:button.height,spill:document.documentElement.scrollWidth-innerWidth};});
-  expect(metrics.indexBottom).toBeLessThanOrEqual(metrics.footerTop);expect(metrics.footerBottom).toBeLessThanOrEqual(metrics.contentBottom+1);expect(metrics.buttonHeight).toBeGreaterThanOrEqual(48);expect(metrics.spill).toBeLessThanOrEqual(1);
-  await page.screenshot({path:`artifacts/screenshots/settings-categories-${profile.width}.png`,fullPage:true});await page.getByRole('button',{name:'Disconnect and forget',exact:true}).click();await openConnectionSettings(page);await expect(page.getByRole('button',{name:'Scan QR code',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({path:`artifacts/screenshots/settings-categories-${profile.width}.png`,fullPage:true});
+  await page.locator('[data-settings-category="connection"]').click();await expect(page.locator('.connect-status')).toContainText('Settings test computer');
+  await page.getByRole('button',{name:'Disconnect…',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Disconnect this phone from Settings test computer?'});
+  await expect(dialog).toBeVisible();await expect(dialog.getByRole('button',{name:'Cancel',exact:true})).toBeFocused();await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(dialog).toHaveCount(0);await expect(page.locator('.connect-status')).toBeVisible();
+  await page.getByRole('button',{name:'Disconnect…',exact:true}).click();await dialog.getByRole('button',{name:'Disconnect and forget',exact:true}).click();
+  await openConnectionSettings(page);await expect(page.getByRole('button',{name:'Choose a QR image',exact:true})).toBeVisible();await expect(page.locator('.connect-status')).toHaveCount(0);
 });
