@@ -139,6 +139,8 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
     // Windows: n / p move between files, v marks the current file viewed, Ctrl+B switches the layout.
     const key=(event:KeyboardEvent)=>{
       if(event.defaultPrevented||options||sheet||(event.target as HTMLElement).closest?.('input,textarea,select,[contenteditable="true"]'))return;
+      // A Review left open in a hidden Windows chat (Board or Settings page) or under another dialog must not take these keys.
+      const own=panel.current;if(!own?.getClientRects().length||[...document.querySelectorAll('[aria-modal="true"],dialog[open]')].some(element=>element!==own&&!own.contains(element)&&element.getClientRects().length))return;
       poke.current();
       if((event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&event.code==='KeyB'){event.preventDefault();chooseLayout(effectiveLayout==='split'?'unified':splitPossible?'split':'unified');return;}
       if(event.ctrlKey||event.metaKey||event.altKey)return;
@@ -152,7 +154,7 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
   const count=!data&&error?'—':visibleFiles.length===total?plural(total,['{0} файл','{0} файла','{0} файлов']):t('{0} из {1}',visibleFiles.length,plural(total,['{0} файла','{0} файлов','{0} файлов']));
   const fileRow=(file:ReviewFile)=>{const status=fileStatus(file),slash=file.path.lastIndexOf('/');return <li key={file.path} className={currentName===file.path?'current':''}>
     <button type="button" onClick={()=>scrollToFile(file.path)} aria-current={currentName===file.path?'location':undefined}>{status&&<span className="review-file-status" data-status={status.key}>{status.label}</span>}<span className="review-nav-path"><span className="review-file-folder">{file.path.slice(0,slash+1)}</span>{file.path.slice(slash+1)}</span><FileStats file={file}/></button>
-    <input type="checkbox" aria-label={t('Просмотрено: {0}',file.path)} checked={isViewed(file)} onChange={event=>markViewed(file,event.target.checked)}/></li>;};
+    <label className="review-nav-viewed"><input type="checkbox" aria-label={t('Просмотрено: {0}',file.path)} checked={isViewed(file)} onChange={event=>markViewed(file,event.target.checked)}/></label></li>;};
   const fileList=<>
     <div className="review-nav-actions"><span>{t('Просмотрено {0} из {1}',viewedCount,visibleFiles.length)}</span><button type="button" className="icon-button" aria-label={t('Свернуть всё')} title={t('Свернуть всё')} onClick={()=>setAll(false)}><ChevronsDownUp size={18}/></button><button type="button" className="icon-button" aria-label={t('Развернуть всё')} title={t('Развернуть всё')} onClick={()=>setAll(true)}><ChevronsUpDown size={18}/></button></div>
     <ul className="review-nav-list">{visibleFiles.map(fileRow)}</ul>
@@ -186,7 +188,7 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
       <button className="icon-button" disabled={busy} aria-label={t('Обновить')} title={updated?t('Обновлено в {0}',new Date(updated).toLocaleTimeString(getLanguage()==='ru'?'ru-RU':'en-US')):t('Обновить')} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={18}/></button>
       {busy&&data&&<span className="review-progress" aria-hidden="true"/>}
     </div>
-    {(activeHidden.length>0||turnFiles)&&!reading&&<div className="review-filter-note">{turnFiles&&<span>{t('Только файлы последнего хода')}<button type="button" className="text-button" onClick={()=>setTurnOnly(false)}>{t('Показать все')}</button></span>}{activeHidden.length>0&&<span>{t('Скрыто типов: {0}',activeHidden.length)}<button type="button" className="text-button" onClick={()=>setHidden([])}>{t('Показать все типы')}</button></span>}</div>}
+    {(activeHidden.length>0||turnFiles)&&!reading&&<div className="review-filter-note">{turnFiles&&<span>{t('Только файлы этого хода')}<button type="button" className="text-button" onClick={()=>setTurnOnly(false)}>{t('Показать все')}</button></span>}{activeHidden.length>0&&<span>{t('Скрыто типов: {0}',activeHidden.length)}<button type="button" className="text-button" onClick={()=>setHidden([])}>{t('Показать все типы')}</button></span>}</div>}
     {reading&&<button type="button" className="review-reading-band" onClick={()=>{toggleReading(false);setNavOpen(true);}}><FileDiff size={14}/><span>{currentName||repoName}</span></button>}
     {reading&&<button ref={restore} className="icon-button review-restore" aria-label={t('Показать управление ревью')} title={t('Показать управление ревью')} onClick={()=>toggleReading(false)}><EyeOff size={20}/></button>}
     <p className="visually-hidden" role="status">{busy&&!data?t('Загружаем изменения…'):data&&!error?count:''}</p>
@@ -196,7 +198,7 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
       {tree&&treeOpen&&<nav className="review-tree" aria-label={t('Изменённые файлы')}>{fileList}</nav>}
       <section ref={diff} className="diff-content" aria-label={t('Изменённые файлы')} tabIndex={0}>
         {emptyChanges&&<div className="review-empty"><GitCompareArrows size={30}/><h3>{mode==='branch'&&comparisonBranch?t('Нет изменений относительно {0}',comparisonBranch):t('Нет незакоммиченных изменений в {0}',repoName)}</h3>{data?.current&&<p><GitBranch size={13}/>{data.current}</p>}<div>{!taskRunId&&mode!=='branch'&&<button type="button" className="secondary" onClick={()=>{setMode('branch');setData(null);}}>{t('Сравнить с основной веткой')}</button>}<button type="button" className="secondary" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={15}/>{t('Обновить')}</button></div></div>}
-        {!!files.length&&!visibleFiles.length&&<div className="review-empty"><p>{t('Все файлы скрыты фильтром.')}</p><button type="button" className="secondary" onClick={()=>{setHidden([]);setTurnOnly(false);}}>{t('Показать все типы')}</button></div>}
+        {!!files.length&&!visibleFiles.length&&<div className="review-empty"><p>{turnFiles&&!turnFiles.length?t('Файлы этого хода больше не отличаются в этом сравнении.'):t('Все файлы скрыты фильтром.')}</p><button type="button" className="secondary" onClick={()=>{setHidden([]);setTurnOnly(false);}}>{turnFiles&&!turnFiles.length?t('Показать все'):t('Показать все типы')}</button></div>}
         <div className="review-file-list">{visibleFiles.map(item=><ReviewFileDiff key={[cwd,mode,base,item.path].join('|')} file={item} taskRunId={taskRunId} connection={connection} cwd={cwd} mode={mode} base={base} layout={effectiveLayout} fontSize={fontSize} fitWidth={fitWidth} wrap={wrap} compact={width<COMPACT} width={width} whitespace={whitespace} viewport={diff} open={isOpen(item)} onToggle={toggle} viewed={isViewed(item)} changedSinceViewed={!!viewed[item.path]&&!isViewed(item)} onViewed={markViewed} selection={selection?.path===item.path?selection:null} onSelectLine={selectLine}/>)}</div>
       </section>
     </div>

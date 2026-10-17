@@ -174,9 +174,34 @@ test('the turn chip opens Review on the files of that turn, with all changes one
   await page.getByRole('button',{name:/Garden review/}).click();
   await page.locator('button.turn-changes').click();
   const review=panel(page);await expect(review.locator('.review-file')).toHaveCount(1);
-  await expect(review.locator('.review-filter-note')).toContainText('Only files from the last turn');
+  await expect(review.locator('.review-filter-note')).toContainText('Only files from this turn');
   await review.locator('.review-filter-note').getByRole('button',{name:'Show all',exact:true}).click();
   await expect(review.locator('.review-file')).toHaveCount(5);
   await file(page,'src/plants.ts').getByRole('button',{name:'20 more context lines'}).click();
   await expect.poll(()=>state.calls.some(url=>url.searchParams.get('file')==='src/plants.ts'&&url.searchParams.get('context')==='23')).toBe(true);
+});
+
+test('a turn whose files no longer differ says so and offers all changes',async({page})=>{
+  const state=await host(page);await page.setViewportSize({width:390,height:844});
+  state.messages=[{id:'ask',role:'user',blocks:[{type:'text',text:'Tidy up'}]},{id:'edit',role:'assistant',blocks:[{type:'tool_use',id:'e1',name:'Edit',input:{file_path:'C:/Workspace/garden-app/src/committed.ts',old_string:'a',new_string:'b'}}]},{id:'done',role:'assistant',blocks:[{type:'text',text:'Done.'}]}];
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
+  await page.getByRole('button',{name:/Garden review/}).click();await page.locator('button.turn-changes').click();
+  const review=panel(page);await expect(review.locator('.review-empty')).toContainText('The files of this turn no longer differ in this comparison.');
+  await review.locator('.review-empty').getByRole('button',{name:'Show all',exact:true}).click();
+  await expect(review.locator('.review-file')).toHaveCount(5);
+});
+
+test('Viewed checkboxes are 48 px targets and Review keys do nothing while Review is hidden',async({page})=>{
+  await host(page);await page.setViewportSize({width:390,height:844});await open(page);
+  const review=panel(page),plants=file(page,'src/plants.ts');
+  const box=await plants.locator('label.review-viewed').boundingBox();expect(box!.width).toBeGreaterThanOrEqual(48);expect(box!.height).toBeGreaterThanOrEqual(48);
+  await review.locator('.review-files-button').click();
+  const row=await page.getByRole('dialog',{name:'Changed files',exact:true}).locator('label.review-nav-viewed').first().boundingBox();expect(row!.width).toBeGreaterThanOrEqual(48);expect(row!.height).toBeGreaterThanOrEqual(48);
+  await page.keyboard.press('Escape');await review.locator('.diff-content').focus();
+  // A Windows chat keeps Review mounted while the Board or Settings page is shown.
+  const shell=page.locator('aside.review-panel');await shell.evaluate(element=>{element.style.display='none';});await page.keyboard.press('v');
+  await shell.evaluate(element=>{element.style.display='';});
+  await expect(review.locator('.review-file.viewed')).toHaveCount(0);
+  await page.keyboard.press('v');await expect(plants.getByRole('checkbox',{name:'Viewed'})).toBeChecked();
 });

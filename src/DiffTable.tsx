@@ -111,11 +111,13 @@ export const DiffTable=memo(function DiffTable({patch,path='',layout,fontSize,fi
     const side=cell.dataset.side as LineSide,item=lines[Number(row.dataset.index)];
     onSelectLine(side,Number(cell.dataset.line),event.shiftKey,(side==='old'?item?.left:item?.right??item?.left)||'');
   };
+  const press=useRef<{x:number;y:number;timer?:ReturnType<typeof setTimeout>}>({x:0,y:0});
   const longPress=(side:LineSide,line:number|undefined,text:string|undefined)=>{
     if(!onSelectLine||line===undefined)return {};
-    let timer:ReturnType<typeof setTimeout>|undefined;
-    const cancel=()=>clearTimeout(timer);
-    return {onPointerDown:(event:PointerEvent)=>{if(event.pointerType==='mouse')return;cancel();timer=setTimeout(()=>onSelectLine(side,line,!!selection&&selection.side===side,text||''),500);},onPointerUp:cancel,onPointerCancel:cancel,onPointerMove:cancel};
+    // The timer lives in a ref, so a re-render during the hold (polling, scrolling) cannot leave it running after the finger lifts;
+    // a finger always jitters a little, so only a real movement cancels the hold.
+    const cancel=()=>{clearTimeout(press.current.timer);press.current.timer=undefined;};
+    return {onPointerDown:(event:PointerEvent)=>{if(event.pointerType==='mouse')return;cancel();press.current={x:event.clientX,y:event.clientY,timer:setTimeout(()=>{press.current.timer=undefined;onSelectLine(side,line,!!selection&&selection.side===side,text||'');},500)};},onPointerUp:cancel,onPointerCancel:cancel,onPointerMove:(event:PointerEvent)=>{if(Math.hypot(event.clientX-press.current.x,event.clientY-press.current.y)>10)cancel();}};
   };
   const sr=(sign:string|undefined)=>sign==='+'?<span className="visually-hidden">{t('добавлено')}: </span>:sign==='-'?<span className="visually-hidden">{t('удалено')}: </span>:null;
   const stickyNumbers=!wraps;
