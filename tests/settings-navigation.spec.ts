@@ -29,7 +29,7 @@ for(const profile of [{width:320,height:640},{width:844,height:390}])test(`Disco
   await openSection(page,'Settings');
   await expect(page.locator('.settings-index .settings-category').first()).toHaveAttribute('data-settings-category','connection');
   await expect(page.locator('[data-settings-category="connection"]')).toContainText('Settings test computer · Connected');
-  for(const category of ['appearance','workspace','usage','jira','miro','updates','connection','notifications','about']){
+  for(const category of ['appearance','workspace','usage','miro','updates','connection','notifications','about']){
     await page.locator(`[data-settings-category="${category}"]`).click();
     await expect(page.locator('.settings-exit,.settings-disconnect')).toHaveCount(0);
     await page.getByRole('button',{name:'All settings',exact:true}).click();

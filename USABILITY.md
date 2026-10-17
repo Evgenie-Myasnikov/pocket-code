@@ -57,13 +57,13 @@ Panel resolution and diagonal do not determine an app's available logical width.
 
 - Final integration: all 128 browser scenarios passed, with 101 Node checks and a successful Android build. Project documents were additionally checked at 320 px/130% English and 360 px Russian; Results at 320 px/130% in both languages and landscape 844 px. These are browser working-area checks, not physical device certification.
 
-## Jobs context boundaries
+## Task context boundaries
 
-Jobs separates browsing, task detail and action confirmation. The list shows search, a category selector and compact task summaries; bulk selection is an explicit mode. The task screen shows its description, saved chat/PR links and only the next actions available for the chosen role. Folder/mode controls, required Jira fields and PR details appear in their relevant action forms. The queue is collapsed by default, while interrupted actions expose recovery in the task context. This applies progressive disclosure; whether it reduces users' cognitive load still needs participant testing.
+Jira tasks are hidden in this build because issues have no screen to appear in. When they return, they are planned as board cards (Start work → worktree → review) instead of a separate Jobs list, so browsing, task detail and action confirmation follow the board flow.
 
 Agent cards similarly separate a short activity indication from the child's full context. A drawer on wider windows becomes a full-width panel on phones. Its Back path is child → agent list → parent chat; drafts remain in the parent. Missing transcript/status information is explicit, and a nested image closes before leaving the agent context.
 
-Project keeps Rules, Changelog and Files together under one navigation item. The document reader has its own Back action and preserves list position. Results opens only on request: categories filter the loaded conversation, assistant outputs and user sources are separate, and recent items appear first. Media and file previews require selection; long agent names expand on demand.
+Rules, Changelog and Files are tabs of one document library with a shared project picker. The document reader has its own Back action and preserves list position. Results opens only on request: categories filter the loaded conversation, assistant outputs and user sources are separate, and recent items appear first. Media and file previews require selection; long agent names expand on demand.
 
 ## Suggested participant session
 

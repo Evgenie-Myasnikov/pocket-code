@@ -45,7 +45,9 @@ test('pairing page embeds local QR images, escapes labels and has no remote depe
 });
 
 test('PC Jira setup uses a separate local-only key in a fragment, not the phone connection token',async()=>{
- const html=await renderPairingPage([],token,4399,'pc-setup-test-key');
+ assert.equal((await renderPairingPage([],token,4399,'pc-setup-test-key')).includes('/setup/jira'),false,'Jira stays hidden by default');
+ process.env.POCKET_CODE_JIRA='1';
+ const html=await renderPairingPage([],token,4399,'pc-setup-test-key');delete process.env.POCKET_CODE_JIRA;
  assert.match(html,/http:\/\/127\.0\.0\.1:4399\/setup\/jira#pc-setup-test-key/);
  assert.equal(html.includes(token),false);
 });

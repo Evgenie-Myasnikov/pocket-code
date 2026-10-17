@@ -192,7 +192,7 @@ test('sidebar divider resizes the rail with mouse and keyboard, persists and res
 test('desktop has direct Rules and Changelog with internal Git project selection',async({page})=>{
  await desktop(page);const nav=page.getByRole('navigation');await expect(nav.getByRole('button',{name:'Project',exact:true})).toHaveCount(0);await nav.getByRole('button',{name:'Rules',exact:true}).click();
  await expect(page.getByLabel('Git project')).toHaveValue('C:\\Demo\\Atlas');await expect(page.locator('.project-docs-markdown')).toContainText('Use synthetic data.');await nav.getByRole('button',{name:'Changelog',exact:true}).click();await expect(page.locator('.project-docs-markdown')).toContainText('Synthetic entry');
- await expect(page.locator('.document-library').getByRole('button',{name:/^Refresh/})).toHaveCount(1);const before=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length);await page.getByRole('button',{name:'Refresh projects',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length)).toBeGreaterThan(before);await page.screenshot({path:'artifacts/screenshots/desktop-changelog.png'});
+ await expect(page.locator('.document-library').getByRole('button',{name:/^Refresh/})).toHaveCount(1);const before=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length);await page.getByRole('button',{name:'Refresh document',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length)).toBeGreaterThan(before);await page.screenshot({path:'artifacts/screenshots/desktop-changelog.png'});
 });
 
 
@@ -235,7 +235,7 @@ test('Russian Pocket Code roadmap keeps dependencies as data without visual conn
 });
 test('built-in board rule can be disabled and re-enabled from project Rules',async({page})=>{
  await desktop(page);await page.getByRole('navigation').getByRole('button',{name:'Rules',exact:true}).click();
- const toggle=page.getByRole('checkbox',{name:'Maintain the project board'});await expect(toggle).toBeChecked();await toggle.uncheck();await expect(toggle).not.toBeChecked();await toggle.check();await expect(toggle).toBeChecked();
+ await page.getByRole('button',{name:'All rules',exact:true}).click();const toggle=page.getByRole('switch',{name:'Board maintenance'});await expect(toggle).toHaveAttribute('aria-checked','true');await toggle.click();await expect(toggle).toHaveAttribute('aria-checked','false');await expect(page.getByText('Saved',{exact:true})).toBeVisible();await toggle.click();await expect(toggle).toHaveAttribute('aria-checked','true');
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.action==='write'&&c.endpoint==='/project-rules').length)).toBe(2);
 });
 for(const width of [390,1440])test('Miro board embeds, survives reopening and disconnects without deletion at '+width,async({page})=>{

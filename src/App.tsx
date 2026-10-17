@@ -60,7 +60,7 @@ import { useAppearance } from './Appearance';
 import {SettingsPanel,type SettingsPage} from './SettingsPanel';
 import { PartialMessage, MessageList, ApprovalCard } from './Messages';
 
-import { DocumentLibrary } from './DocumentLibrary';
+import { DocumentLibrary, type DocumentKind } from './DocumentLibrary';
 
 import { fileBase64, loadConnection, normalizeUrl, pairDevice, request, saveConnection, type Connection } from './api';
 import { demoMessages, demoSessions } from './demo';
@@ -83,7 +83,7 @@ type PendingSend = {jobId: string;key: string;text: string;attachments: Attachme
 const codexBusyMessage = 'This chat is open in Codex on the PC. Its history is available here, but Codex must release the chat before you can send a message. Finish the task and close Codex on the PC, then try again.';
 const uniqueMessages = (messages:ChatMessage[]) => [...new Map(messages.map(message=>[message.id,message])).values()];
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() || p;
-export type EmbeddedChat={activity?:ActivityFeed;inboxOpen?:boolean;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardChat?:BoardChat;onBoard?(target:BoardNoticeTarget):void;onCreated?(session:Session,job:JobView):void;onBack():void};
+export type EmbeddedChat={activity?:ActivityFeed;inboxOpen?:boolean;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onCreated?(session:Session,job:JobView):void;onBack():void};
 export function App({embedded}:{embedded?:EmbeddedChat}={}) {
   useBackNavigation();
   const [generation, setGeneration] = useState(0);
@@ -134,7 +134,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [cwd, setCwd] = useStateForWorkspace('');
   // Device navigation survives initial pairing/reconnection. Transcript state remains PC-scoped.
   // The phone starts on Chats, where chats that wait for the person are listed first; Back from there leaves the app.
-  const [tab,setTab]=useState<'chats' | 'files' | 'changelog' | 'settings' | 'connection' | 'workspace'>('chats');
+  const [tab,setTab]=useState<'chats' | 'files' | 'changelog' | 'settings' | 'connection' | 'workspace'>('chats'),[docView,setDocView]=useState<DocumentKind>('rules');
   const [mobileChat,setMobileChat]=useState(false);
   const [moreOpen,setMoreOpen]=useState(false),[inboxOpen,setInboxOpen]=useState(false);
   const [chatViewOpen,setChatViewOpen]=useStateForWorkspace(false);
@@ -451,7 +451,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const embeddedOpened=useRef(false);
   useEffect(()=>{if(!embedded||!health||!connection||embeddedOpened.current)return;embeddedOpened.current=true;
     if(embedded.session){void (async()=>{try{const active=embedded.jobId?await request<JobView>(connection,'/jobs/'+embedded.jobId):undefined;await openSession(embedded.session!,active);if(embedded.boardChat?.followUp)appendDraft(embedded.boardChat.prompt);}catch(e){setError((e as Error).message);}})();}
-    else {newChat(embedded.cwd);if(embedded.boardChat)setDraft(embedded.boardChat.prompt);}
+    else {newChat(embedded.cwd);if(embedded.boardChat)setDraft(embedded.boardChat.prompt);else if(embedded.draft)setDraft(embedded.draft);}
   },[health,connection,embedded]);
   // The desktop keeps this chat mounted when the board opens the same task chat again: a later follow-up still reaches the draft.
   const lastBoardChat=useRef(embedded?.boardChat);
@@ -764,7 +764,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const openInbox=()=>setInboxOpen(true);
   const bell=(variant:'icon'|'tab')=>!embedded&&!readingMode?<InboxButton notices={notices} activity={activity} open={inboxOpen} onOpen={openInbox} variant={variant}/>:null;
   const openNotice=(target:BoardNoticeTarget)=>{setNoticeTarget(target);setLocalBoards(!workspaceConnection);setWorkspaceScanner(false);setTab('workspace');setMobileChat(true);};
-  const showSection=(next:typeof tab,page?:SettingsPage)=>{if(next==='chats'){returnToChats();return;}if(page)setSettingsPage(page);else if(next==='settings')setSettingsPage('index');setTab(next);setMobileChat(true);};
+  const showSection=(next:typeof tab,page?:SettingsPage)=>{if(next==='files')setDocView('rules');else if(next==='changelog')setDocView('changelog');if(next==='chats'){returnToChats();return;}if(page)setSettingsPage(page);else if(next==='settings')setSettingsPage('index');setTab(next);setMobileChat(true);};
   // Before pairing, Chats shows the connection steps under a plain section header, not an empty conversation.
   const chatSurface=tab==='chats'&&!onboardingVisible;
   const inConversation=chatSurface&&mobileChat;
@@ -784,7 +784,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         {connection&&<button className="new-chat-button" disabled={busy||uploading} onClick={()=>newChat()}><Plus size={20}/>{t("Новый чат")}</button>}
         {bell('icon')}
       </div>
-      <nav className="desktop-tabs"><button className={tab === 'workspace' ? 'active' : ''} onClick={() => {setTab('workspace');setMobileChat(true);}}><ClipboardList size={17} />{t('Доска')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={17} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><BookOpen size={17} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} onClick={()=>{setTab('changelog');setMobileChat(true);}}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
+      <nav className="desktop-tabs"><button className={tab === 'workspace' ? 'active' : ''} onClick={() => {setTab('workspace');setMobileChat(true);}}><ClipboardList size={17} />{t('Доска')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={17} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => {setDocView('rules');setTab('files');}}><BookOpen size={17} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} onClick={()=>{setDocView('changelog');setTab('changelog');setMobileChat(true);}}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
       {providerChips}
       <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти чат")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
       <div className="session-list">
@@ -809,7 +809,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           reading={outputMessages.length>0||Boolean(job?.partial)?{disabled:loading||!history.length&&!job,open:()=>toggleReadingMode(true)}:undefined}
           top={selected&&!demo?{disabled:loading||busy,open:()=>void jumpHistory(true)}:undefined} detail={{value:detail,set:setDetailMode}}/>
       </>:tab==='workspace'?<header className="chat-header" data-section="board"><h1>{t("Доска")}</h1></header>:<header className="chat-header" data-section={tab}>
-        <div className="header-title"><h1>{tab==='connection'||tab==='chats'?t('Подключение к ПК'):tab==='settings'?t("Настройки"):tab==='files'?t("Правила"):t("История изменений")}</h1></div>
+        <div className="header-title"><h1>{tab==='connection'||tab==='chats'?t('Подключение к ПК'):tab==='settings'?t("Настройки"):docView==='files'?t('Файлы'):docView==='rules'?t("Правила"):t("История изменений")}</h1></div>
       </header>}
       {offline&&!connectionScreen&&<div className="network-banner" role="status">{locale().startsWith('ru')?'Офлайн · сохранённые данные, только просмотр':'Offline · saved data, read-only'}</div>}
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
@@ -819,7 +819,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       <Updates connection={connection} expanded={tab === 'settings'&&settingsPage === 'updates'} />
       {tab==='chats'&&taskRun&&!readingMode&&(history.length||job||selected)&&<button className="chat-task-entry" onClick={()=>setTaskPanel(true)}>{taskRun.title} · <span className={'task-stage-text task-stage-'+taskDisplayStage(taskRun)}>{taskRunStageLabel(taskRun)}</span></button>}
       </ChatOverlay>
-      {tab === 'connection' ? connectView() : onboardingVisible ? connectView(true) : tab === 'workspace' ? connection?<WorkBoards focusTarget={noticeTarget} compactContext local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={tab==='files'?'rules':'changelog'}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={connectView()} online={!!pcStatus?.online} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget}/> : <>
+      {tab === 'connection' ? connectView() : onboardingVisible ? connectView(true) : tab === 'workspace' ? connection?<WorkBoards focusTarget={noticeTarget} compactContext local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={docView} onKind={setDocView} onChat={connection?(root,prompt)=>{newChat(root);setDraft(prompt);}:undefined} onFolderChat={connection?path=>newChat(path):undefined}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={connectView()} online={!!pcStatus?.online} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget}/> : <>
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;markScrolling();rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}

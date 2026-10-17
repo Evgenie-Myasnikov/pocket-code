@@ -14,6 +14,7 @@ import {useState} from 'react';
 import {runAlertsEnabled,setRunAlerts} from './chat-notifications';
 import {EngineUpdates} from './EngineUpdates';
 import {JiraSettings} from './Jira';
+import {jiraEnabled} from './features';
 import type {Connection} from './api';
 import type {WorkspaceProvider,CodexAccess} from './preferences';
 import pkg from '../package.json';
@@ -36,21 +37,22 @@ type Props={connectionPanel?:ReactNode;workspaceSelector?:ReactNode;page:Setting
 export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,provider,connection,computerName,networkError,roots,cwd,onProject,appearance,codexAccess,onCodexAccess,budget,onBudget,online}:Props){
   const [subpage,setSubpage]=useState<'index'|'account'|'access'|'composer'|'project'>('index');
   useEffect(()=>setSubpage('index'),[page]);
-  const category=categories.find(item=>item.id===page);
+  const visible=categories.filter(item=>item.id!=='jira'||jiraEnabled());
+  const category=visible.find(item=>item.id===page);
   const content=useRef<HTMLDivElement|null>(null),previous=useRef(page),indexScroll=useRef(0);
   useEffect(()=>{
     if(previous.current===page)return;const prior=previous.current;previous.current=page;
     if(content.current){content.current.scrollTop=page==='index'?indexScroll.current:0;const target=page==='index'?content.current.querySelector<HTMLButtonElement>(`[data-settings-category="${prior}"]`):content.current.querySelector<HTMLButtonElement>('.settings-back');target?.focus({preventScroll:true});}
   },[page]);
   return <section className="settings-panel settings-categorized" data-settings-page={page}><div className="settings-content" ref={content} key={`${provider}:${page}`}>
-    {page==='index'?<nav className="settings-index" aria-label={t('Разделы настроек')}>{categories.map(({id,title,hint,Icon})=><button className="settings-category" key={id} data-settings-category={id} onClick={()=>{indexScroll.current=content.current?.scrollTop||0;onPage(id);}} aria-label={t(title)}><Icon size={21}/><span><strong>{t(title)}</strong><small>{id==='connection'?(connection&&!connection.workspaceOnly?<><span className={'connect-dot '+(online?'online':'offline')} aria-hidden="true"/>{computerName} · {online?t('Подключено'):t('Нет связи')}</>:t('Не подключено · отсканируйте QR')):t(hint)}</small></span><ChevronRight size={18}/></button>)}</nav>:<>
+    {page==='index'?<nav className="settings-index" aria-label={t('Разделы настроек')}>{visible.map(({id,title,hint,Icon})=><button className="settings-category" key={id} data-settings-category={id} onClick={()=>{indexScroll.current=content.current?.scrollTop||0;onPage(id);}} aria-label={t(title)}><Icon size={21}/><span><strong>{t(title)}</strong><small>{id==='connection'?(connection&&!connection.workspaceOnly?<><span className={'connect-dot '+(online?'online':'offline')} aria-hidden="true"/>{computerName} · {online?t('Подключено'):t('Нет связи')}</>:t('Не подключено · отсканируйте QR')):t(hint)}</small></span><ChevronRight size={18}/></button>)}</nav>:<>
       <button className="settings-back" onClick={()=>onPage('index')}><ArrowLeft size={18}/>{t('Все настройки')}</button>
       <h2 className="settings-page-title">{t(category?.title||'Настройки')}</h2>
       {page==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance}/></>}
       {page==='workspace'&&<>{workspaceSelector}{subpage==='index'?<nav className="settings-index">{(['account','access','composer','project'] as const).map(id=><button className="settings-category" key={id} onClick={()=>setSubpage(id)}><span><strong>{t(id==='account'?'Аккаунт AI':id==='access'?'Доступ агента':id==='composer'?'Сообщения и подтверждения':'Папка для новых чатов')}</strong></span><ChevronRight size={18}/></button>)}</nav>:<button className="settings-back" onClick={()=>setSubpage('index')}><ArrowLeft size={18}/>{t('Назад')}</button>}{subpage==='account'&&<ProviderConnections connection={connection} only={provider}/>}<p className="muted">{t('Настройки рабочего пространства {0}',provider==='copilot'?'Copilot':provider==='codex'?'Codex':'Claude')}</p>{subpage==='composer'&&<ComposerSettings desktop={false}/>}{subpage==='project'&&<label>{t('Папка для новых чатов')}<select value={roots.includes(cwd)?cwd:''} onChange={event=>onProject(event.target.value)}>{!roots.includes(cwd)&&<option value="">{cwd}</option>}{roots.map(root=><option key={root}>{root}</option>)}</select></label>}{subpage==='access'&&(provider==='copilot'?<></>:provider==='codex'?<CodexAccessSettings value={codexAccess} onChange={onCodexAccess}/>:<><ClaudeAccessSettings/><label>{t('Лимит стоимости одного запроса, $')}<input type="number" min="0.1" max="100" step="0.1" value={budget} onChange={event=>onBudget(Number(event.target.value))}/></label><p className="muted">{t('Оценка Agent SDK. Фактическая оплата зависит от способа входа в Claude. Лимит применяется к следующему сообщению.')}</p></>)}</>}
       {page==='usage'&&<>{workspaceSelector}<CodexUsage connection={connection} provider={provider}/></>}
       {page==='miro'&&<MiroSettings connection={connection} roots={roots}/>}
-      {page==='jira'&&<JiraSettings key={provider} connection={connection} provider={provider}/>}
+      {page==='jira'&&jiraEnabled()&&<JiraSettings key={provider} connection={connection} provider={provider}/>}
       {page==='updates'&&<><div id="settings-updates"/>{provider!=='copilot'&&<EngineUpdates connection={connection} provider={provider}/>}</>}
       {page==='notifications'&&<RunAlertsToggle/>}{page==='connection'&&connectionPanel}
       {page==='about'&&<div className="settings-about"><span className="logo"><Terminal size={24}/></span><h3>Pocket Code</h3><span className="version">BETA</span><p>{t('Версия {0}',pkg.version)}</p><p className="muted">{t('Claude Code и Codex с вашего ПК — на телефоне.')}</p></div>}

@@ -1,6 +1,8 @@
 import {connectByQr} from './qr-connect';
 import {chooseProvider,openSection} from './chat-navigation';
 import { test, expect } from '@playwright/test';
+// Jira is a hidden lab feature; these checks keep the kept connection code working.
+test.beforeEach(async({page})=>{await page.addInitScript(()=>localStorage.setItem('pocket-code-labs-jira','1'));});
 test('existing Claude connection reconnects without Android browser login', async ({ page }) => {
   let connected = true;
   await page.route('**/api/jira/**', route => {

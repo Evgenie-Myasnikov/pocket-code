@@ -22,18 +22,19 @@ type Status = {error?: string;source?: 'claude'|'codex'|'copilot';connected: boo
 export function JiraSettings({ connection,provider='claude' }: {connection: Connection | null;provider?:'claude'|'codex'|'copilot'}) {
   const request=providerRequest(provider);
 
-  const [status, setStatus] = useState<Status | null>(null),[busy, setBusy] = useState(false),[error, setError] = useState('');
+  const [status, setStatus] = useState<Status | null>(null),[busy, setBusy] = useState(false),[error, setError] = useState(''),[started,setStarted]=useState(false),[revision,setRevision]=useState(0);
+  const native=Capacitor.isNativePlatform();
   const attempt = useRef(0);
   useEffect(() => {
     let cancelled = false;
     if (connection) request<Status>(connection, '/jira/status').then((s) => {if (!cancelled) {setStatus(s);setError(s.error || "");}}).catch((e) => {if (!cancelled) setError(e.message);});
     return () => {cancelled = true;attempt.current++;void Login.cancel().catch(() => {});};
-  }, [connection,provider]);
+  }, [connection,provider,revision]);
   async function connect() {
     if (!connection || busy) return;
     if (Boolean(status?.source)) {setBusy(true);setError('');try {const next = await request<Status>(connection, '/jira/connect-existing', {});setStatus(next);setError(next.error || "");} catch(e) {setError((e as Error).message);} finally {setBusy(false);}return;}
     if (!Capacitor.isNativePlatform()) {setError(t("Вход Jira доступен в Android-приложении. Откройте на телефоне Настройки → Jira → Connect."));return;}
-    const current = ++attempt.current;setBusy(true);setError('');
+    const current = ++attempt.current;setBusy(true);setError('');setStarted(true);
     try {
       const { redirectUrl } = await Login.prepare();
       const login = await request<{authorizationUrl: string;state: string;}>(connection, '/jira/connect', { redirectUrl });
@@ -48,18 +49,20 @@ export function JiraSettings({ connection,provider='claude' }: {connection: Conn
   async function disconnect() {
     if (!connection) return;
     ++attempt.current;setBusy(true);setError('');
-    try {await Login.cancel().catch(() => {});await request(connection, '/jira/disconnect', {});setStatus({ connected: false, sites: [], source: status?.source });}
+    try {await Login.cancel().catch(() => {});await request(connection, '/jira/disconnect', {});setStatus({ connected: false, sites: [], source: status?.source });setStarted(false);}
     catch (e) {setError((e as Error).message);} finally
     {setBusy(false);}
   }
-  return <section className="jira-settings" aria-label={t("Подключение Jira")}><div className="eyebrow">{t("ИНТЕГРАЦИИ")}</div><h2>Jira</h2>
-    <p className="muted">{status?.source === 'codex' ? (getLanguage()==='ru'?'Jira использует прямой Atlassian MCP через Codex на ПК, без обращения к модели.':'Jira uses direct Atlassian MCP through Codex on your PC, without a model turn.') : status?.source === "claude" ? t("Jira подключена через существующий Atlassian MCP в Claude на ПК. Отдельный вход не нужен.") : t("Войдите в Atlassian на телефоне. В Jobs появятся все задачи, назначенные на вас, включая завершённые.")}</p>
+  return <section className="jira-settings" aria-label={t("Подключение Jira")}>
+    <p className="muted">{status?.source === 'codex' ? (getLanguage()==='ru'?'Jira использует прямой Atlassian MCP через Codex на ПК, без обращения к модели.':'Jira uses direct Atlassian MCP through Codex on your PC, without a model turn.') : status?.source === "claude" ? t("Jira подключена через существующий Atlassian MCP в Claude на ПК. Отдельный вход не нужен.") : t("Войдите в Atlassian на телефоне, чтобы Pocket Code мог читать назначенные на вас задачи.")}</p>
     <p className="muted">{getLanguage()==='ru'?'Общее подключение для Claude и Codex выбирается на ПК: окно с QR → Jira. AI для задачи выбирается отдельно.':'Choose the shared connection for Claude and Codex on your PC: QR window → Jira. The task AI is selected separately.'}</p>
     {status?.connected && <p className="jira-connected">{t("Подключено · ")}{status.sites.map((s) => s.name).join(', ') || t("Нет доступных сайтов Jira")}</p>}
     {busy && <p role="status">{status?.source === 'codex' ? (getLanguage()==='ru'?'Подключаем инструменты Jira в Codex…':'Connecting Jira tools in Codex…') : status?.source === "claude" ? t("Читаем Jira через Claude на ПК…") : t("Завершите вход в браузере и вернитесь в Pocket Code. Ожидаем до 5 минут.")}</p>}
     {error && <p className="error" role="alert">{t(error)}</p>}
-    {!status?.connected && !busy && <button className="primary" disabled={!connection||!status} onClick={() => void connect()}><Link2 size={16} />{status?.source === 'codex' ? (getLanguage()==='ru'?'Использовать подключение Codex':'Use Codex connection') : status?.source === "claude" ? t("Использовать подключение Claude") : "Connect"}</button>}
-    {(status?.connected || busy || error) && <button className="secondary" onClick={() => void disconnect()}>{busy ? t("Отменить вход") : status?.connected ? t("Отключить Jira") : t("Сбросить вход")}</button>}
+    {!status&&error&&connection&&<button className="secondary" onClick={()=>{setError('');setRevision(value=>value+1);}}><RefreshCw size={16}/>{t('Повторить')}</button>}
+    {status&&!status.source&&!status.connected&&!native&&<p className="jira-info-card">{t('Вход в Jira выполняется в Android-приложении Pocket Code или на ПК: окно с QR → Jira.')}</p>}
+    {!status?.connected && !busy && (native||status?.source) && <button className="primary" disabled={!connection||!status} onClick={() => void connect()}><Link2 size={16} />{status?.source === 'codex' ? (getLanguage()==='ru'?'Использовать подключение Codex':'Use Codex connection') : status?.source === "claude" ? t("Использовать подключение Claude") : t("Подключить")}</button>}
+    {(status?.connected || busy || started&&error) && <button className="secondary" onClick={() => void disconnect()}>{busy ? t("Отменить вход") : status?.connected ? t("Отключить Jira") : t("Сбросить вход")}</button>}
     <p className="muted">{status?.source === 'codex' ? (getLanguage()==='ru'?'Отключение здесь не удаляет коннектор из Codex. При отсутствии доступа автоматического переключения на Claude нет.':'Disconnecting here does not remove the Codex connector. Unavailable access never silently falls back to Claude.') : status?.source === "claude" ? t("Чтение задач использует Claude на ПК и его лимиты. Отключение здесь не отключает коннектор в Claude.") : t("Доступ хранится на ПК в защищённом хранилище Windows. Отключение удаляет его из Pocket Code; разрешение Atlassian можно отозвать в настройках аккаунта.")}</p>
   </section>;
 }

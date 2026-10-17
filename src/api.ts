@@ -69,6 +69,8 @@ export async function request<T>(connection: Connection, endpoint: string, data?
   } catch (error) {if(data===undefined&&cacheable(endpoint)){const cached=await readOffline(connection,endpoint);if(cached!==undefined){window.dispatchEvent(new CustomEvent('pocket-offline-read'));return cached as T;}}throw Object.assign(new Error(networkFailure(url, error)),{problem:networkProblem(error instanceof Error?error.message:String(error))});}
   if (status === 204) return null as T;
   if (typeof body === 'string') {try {body = JSON.parse(body);} catch {body = null;}}
+  // A JSON reason from the host survives; only a bare tunnel/proxy failure (HTML or empty body) gets the generic reconnect hint.
+  if (status >= 500 && typeof body?.error === 'string' && body.error) throw Object.assign(new Error(body.code&&serverMessages[body.code]?t(serverMessages[body.code]):t(body.error)),{status,...(body.code?{code:body.code}:{})});
   if (status >= 500) throw Object.assign(new Error(t("Сервер или интернет-туннель пока недоступен (HTTP {0}). Убедитесь, что окно сервера открыто; повторите подключение или отсканируйте новый QR после перезапуска.", status)),{status});
   // Only pairing endpoints prove revocation; integration 401s (Jira, Miro sign-in) must not unpair the phone.
   const pairingCheck=endpoint==='/health'||endpoint.startsWith('/devices/heartbeat');

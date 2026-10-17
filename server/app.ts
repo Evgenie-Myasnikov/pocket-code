@@ -383,7 +383,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     return [...projects].filter(visibleRoot);
   }
   app.get('/api/projects',async(_req,res)=>res.json(await projectFolders()));
-  app.get('/api/document-projects',async(req,res)=>res.json(await documentProjects(await projectFolders(),z.enum(['rules','changelog']).parse(req.query.kind))));
+  app.get('/api/document-projects',async(req,res)=>res.json(await documentProjects(await projectFolders(),z.enum(['rules','changelog','files']).parse(req.query.kind))));
   app.get('/api/sessions', async (req, res) => res.json(await sessions(providerSchema.parse(req.query.provider))));
   app.get('/api/sessions/:id/messages', async (req, res) => {
     const provider = providerSchema.parse(req.query.provider);
@@ -571,7 +571,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.get('/api/project-doc', async (req, res) => {
     const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);
-    res.json(await readProjectDocument(cwd,text.parse(req.query.path)));
+    res.json(await readProjectDocument(cwd,text.parse(req.query.path),typeof req.query.known==='string'?req.query.known.slice(0,64):undefined));
   });
   app.get('/api/files', async (req, res) => {
     const dir = await allowedPath(accessRoots(), text.parse(req.query.path), true);

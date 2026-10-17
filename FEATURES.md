@@ -33,11 +33,8 @@ The standard Windows launcher currently requires Claude or Codex detection. Copi
 | Review | Scrollable collapsible file diffs with status and line counts; working/index/branch comparison; persistent extension filters; Auto/unified/split; word highlights; wrap, 10-24 px and fit-to-width (60% minimum); ignore whitespace; file list, Viewed and Next; quote lines into the draft; more context / whole file |
 | Activity | Right-side draggable drawer, job states and unanswered requests, viewed completion tracking |
 | Android alerts | Native tracking of the last open chat and outcome/question notifications, subject to OS permissions/background limits |
-| Tasks | Shared Jira connection, assigned-issue search and native filters, full descriptions, role-aware actions and required fields |
 | Task batches | One normal chat with full descriptions and a sequential prompt; no separate queue UI |
-| PR workflow | Explicit branch/file preview, GitHub CLI publication and Jira transition; no automatic merge |
-| Task bell | Periodically detected issue changes; baseline and read state; not Jira's full inbox |
-| Project documents | Read-only Markdown rules/changelogs and file browsing |
+| Project documents | Rules, Changelog and Files tabs with one project picker; per-provider reader labels (Claude, Codex, Copilot) and an agent chain view; relative links, anchors, outline and collapsible changelog versions; read-only file preview |
 | Appearance | English/Russian, themes/palettes, chat size, interface scale, spacing and compact mode |
 | Updates | PC prepares verified APKs for phones; Android confirms installation; Windows desktop/host updates when idle with failed-start rollback |
 | Compatibility | Effective AI runtime version tracking and a separate source-project compatibility task |
@@ -50,7 +47,7 @@ The standard Windows launcher currently requires Claude or Codex detection. Copi
 - Results indexes recognized materials in available messages. It does not list every file on the disk or guarantee native rendering of Office/interactive artifacts.
 - Review includes all selected-project Git edits, including edits outside the conversation. It is not a per-turn snapshot or a PR approval; the turn chip only filters Review to the paths that turn edited.
 - Rules are displayed, not edited or injected into native instructions by the viewer.
-- Jira roles organize the UI; account permissions and live transitions still govern actions. Unsupported required fields need Jira itself.
+- Jira is hidden in this build: the connection code is kept, but issues have no place in the app until they become board cards.
 - Batch chat creation does not change statuses or publish PRs. AI completion does not imply review approval or QA success.
 - Android confirms APK installation. The original launcher/source is distinct from managed host packages; some launcher changes require updating that source and relaunching.
 - Separate terminal/live-chat navigation was removed. Legacy APIs remain for older clients.
