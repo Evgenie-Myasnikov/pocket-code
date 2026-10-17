@@ -46,6 +46,6 @@ test('a question waits as a banner while the person is typing and focus returns 
  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(answer).toBeFocused();
 });
 test('a request without a timeout stays answerable',async({page})=>{
- await setup(page);await page.evaluate(()=>(window as any).askSynthetic([{question:'Proceed?',options:[{label:'Yes'}]}],'claude',-Date.now()));
+ await setup(page);await page.evaluate(()=>(window as any).askSynthetic([{question:'Proceed?',options:[{label:'Yes'}]}],'claude',0));
  await page.getByRole('radio',{name:'Yes'}).check();await expect(page.getByRole('button',{name:'Send answers'})).toBeEnabled();
 });

@@ -50,7 +50,7 @@
 .prompt-composer .composer-models .model-picker{min-width:44px}.prompt-composer .composer-tools .effort-picker{min-width:44px}
 .prompt-composer .composer-tools select:disabled{opacity:.55;cursor:default}
 .prompt-composer .composer-tools select:disabled:hover{background:transparent;color:var(--muted)}
-.model-picker .model-catalog-hint{width:40px;min-width:40px;height:40px;padding:0;display:grid;place-items:center;border:0;background:transparent;color:var(--muted);border-radius:50%}
+.model-picker .model-catalog-hint{width:44px;min-width:44px;height:44px;padding:0;display:grid;place-items:center;border:0;background:transparent;color:var(--muted);border-radius:50%}
 .model-catalog-note{position:absolute;bottom:calc(100% + 6px);left:0;z-index:10;width:min(22em,80vw);margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);font-size:clamp(12px,calc(12px * var(--ui-scale,1)),15px);box-shadow:0 4px 16px #0003}
 .model-custom .primary{min-height:44px;padding:0 16px;border-radius:10px}.model-custom .secondary{min-height:44px;padding:0 14px;border-radius:10px}
 /* The chat's access mode is visible where the message is written; Full access carries the warning colour. */
@@ -68,13 +68,13 @@
 .access-menu span{display:grid;gap:2px;min-width:0}.access-menu strong{font-weight:500;font-size:clamp(13px,calc(13px * var(--ui-scale,1)),16px)}.access-menu small{color:var(--muted);font-size:clamp(12px,calc(12px * var(--ui-scale,1)),15px);line-height:1.4}
 /* Messages waiting to be sent sit above the composer with one set of actions. */
 .outbox-shelf{margin:0 0 8px;padding:6px 10px 8px;border:1px dashed var(--line);border-radius:14px;background:var(--panel)}
-.outbox-toggle{display:flex;align-items:center;gap:6px;min-height:40px;padding:0 4px;border:0;background:transparent;color:var(--muted);font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px)}
+.outbox-toggle{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 4px;border:0;background:transparent;color:var(--muted);font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px)}
 .outbox-shelf ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:30dvh;overflow:auto}
 .outbox-item{padding:6px 8px;border-radius:10px;background:var(--surface)}
 .outbox-text{margin:0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:clamp(12px,calc(13px * var(--ui-scale,1)),16px)}
 .outbox-meta{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:2px 0 0;color:var(--muted);font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px)}
 .outbox-actions{display:flex;flex-wrap:wrap;gap:4px 14px}
-.outbox-actions .text-button{min-height:40px;padding:0;border:0;background:transparent;color:var(--accent);font-size:clamp(12px,calc(13px * var(--ui-scale,1)),16px)}
+.outbox-actions .text-button{min-height:44px;padding:0;border:0;background:transparent;color:var(--accent);font-size:clamp(12px,calc(13px * var(--ui-scale,1)),16px)}
 /* The run status line lives above the composer, not in the transcript, so it never scrolls away. */
 .composer-area>.running-action{margin:0 8px 6px;font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px);flex-wrap:wrap;row-gap:0}
 .chat-overlay .composer-area>.running-action{align-self:stretch}

@@ -49,6 +49,10 @@ test('each file has its own card: a failed upload names the file and retries, a 
   await page.locator('input[type=file]').setInputFiles([{name:'notes.md',mimeType:'text/markdown',buffer:Buffer.from('# Notes')},{name:'flaky.md',mimeType:'text/markdown',buffer:Buffer.from('# Flaky')}]);
   const tray=page.locator('.attachment-tray'),flaky=tray.locator('.draft-attachment',{hasText:'flaky.md'});
   await expect(flaky).toContainText('Upload failed');await expect(flaky).toHaveAttribute('title',/flaky\.md: Synthetic upload failure/);
+  // The card text fits inside the card and Retry is a card-sized target, not a 32px line.
+  const card=(await flaky.boundingBox())!,name=(await flaky.locator('strong').boundingBox())!,retry=(await flaky.getByRole('button',{name:'Retry'}).boundingBox())!;
+  expect(name.y).toBeGreaterThanOrEqual(card.y+6);expect(retry.y+retry.height).toBeLessThanOrEqual(card.y+card.height-6);
+  for(const [x,y] of [[card.x+16,card.y+12],[card.x+card.width-60,card.y+card.height-10]])expect(await page.evaluate(([x,y])=>document.elementFromPoint(x,y)?.closest('button')?.textContent,[x,y])).toBe('Retry');
   const draft=page.getByRole('textbox',{name:'Message Claude'}),send=page.getByRole('button',{name:'Send message',exact:true});
   await draft.fill('Review these');await expect(send).toBeDisabled();
   await flaky.getByRole('button',{name:'Retry'}).click();await expect(flaky).not.toContainText('Upload failed');await expect(send).toBeEnabled();
