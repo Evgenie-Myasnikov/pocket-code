@@ -65,6 +65,7 @@ test('Back and Escape protect a typed note draft, then walk board to gallery and
  await page.getByRole('button',{name:'Create note',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Note details'});await expect(dialog.getByLabel('Title',{exact:true})).toBeFocused();await dialog.getByLabel('Title',{exact:true}).fill('Draft idea');
  await page.keyboard.press('Escape');const confirm=page.getByRole('alertdialog',{name:'Discard changes?'});await expect(confirm).toBeVisible();await expect(confirm.getByRole('button',{name:'Keep editing'})).toBeFocused();
  await confirm.getByRole('button',{name:'Keep editing'}).click();await expect(dialog.getByLabel('Title',{exact:true})).toHaveValue('Draft idea');
+ await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await expect(confirm).toBeVisible();await confirm.getByRole('button',{name:'Keep editing'}).click();await expect(dialog.getByLabel('Title',{exact:true})).toHaveValue('Draft idea');
  await dialog.getByRole('button',{name:'Close note',exact:true}).click();await confirm.getByRole('button',{name:'Discard changes',exact:true}).click();await expect(dialog).toHaveCount(0);expect(state.board.notes).toHaveLength(0);
  await page.getByRole('navigation',{name:'Main sections'}).getByRole('button',{name:'Chats',exact:true}).click();await page.getByRole('navigation',{name:'Main sections'}).getByRole('button',{name:'Board',exact:true}).click();
  await expect(page.locator('.board-header-navigation h2')).toHaveText('Version roadmap');
@@ -96,4 +97,10 @@ test('the AI task stage is visible on the card and opens the task result',async(
  await setup(page,{notes:[{id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',title:'Staged card',description:'Synthetic acceptance criteria',branch:'',status:'ready',priority:'normal',owner:'',dependencies:[],x:24,y:72}],runs:[run]});
  const chip=page.getByRole('button',{name:'AI task: Ready for review. Open result',exact:true});await expect(chip).toBeVisible();await chip.click();
  await expect(page.getByRole('dialog',{name:'Task result',exact:true}).getByRole('status')).toHaveText('Ready for review');
+});
+
+test('the gallery card shows the task stage when the host reports the project path with backslashes',async({page})=>{
+ const noteId='cccccccc-cccc-4ccc-8ccc-cccccccccccc',run={id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',boardId:'11111111-1111-4111-8111-111111111111',noteId,noteRevision:'initial',title:'Staged card',provider:'claude',projectPath:'C:\\Synthetic\\roadmap\\',stage:'questions',revision:3,createdAt:1700000000000,updatedAt:1700000000000,jobs:[{jobId:'job-1',status:'done',startedAt:1700000000000}]};
+ await setup(page,{notes:[{id:noteId,title:'Staged card',description:'',branch:'',status:'ready',priority:'normal',owner:'',dependencies:[],x:24,y:72}],runs:[run]});
+ await expect(page.locator('.board-header-navigation h2')).toHaveText('Version roadmap');await page.keyboard.press('Escape');await expect(page.locator('.project-board-row .project-board-tasks')).toHaveText('Need you: 1');
 });

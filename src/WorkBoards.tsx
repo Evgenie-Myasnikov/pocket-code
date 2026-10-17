@@ -133,7 +133,7 @@ export function WorkBoards({connection,roots,workspaces,onChat,local=false,compa
       :<BoardTaskRuns connection={connection} board={board} note={editing} unsaved={!board.notes.some(n=>n.id===editing.id&&JSON.stringify(n)===JSON.stringify(editing))} onNoteStatus={canEdit?suggestion=>applyStatus(editing.id,suggestion):undefined} onChat={target=>{setEditing(null);onChat(target);}}/>}
       {error&&<p role="alert">{error}</p>}
       </div>
-      <footer className="board-sheet-footer"><button type="button" onClick={()=>setEditing(null)}>{l('Cancel','Отмена')}</button><button className="primary" disabled={busy||!canEdit||!editing.title.trim()}>{l('Save','Сохранить')}</button></footer></form></div>}
+      <footer className="board-sheet-footer"><button type="button" onClick={closeNote}>{l('Cancel','Отмена')}</button><button className="primary" disabled={busy||!canEdit||!editing.title.trim()}>{l('Save','Сохранить')}</button></footer></form></div>}
     {discard&&editing&&<DiscardChanges onKeep={()=>setDiscard(false)} onDiscard={()=>{setDiscard(false);setEditing(null);}}/>}
     {taskDetail&&board&&<TaskRunPanel connection={connection} initial={taskDetail} noteStatus={detailNote?.status} onNoteStatus={canEdit&&detailNote?suggestion=>applyStatus(detailNote.id,suggestion):undefined} onClose={()=>{setTaskDetail(null);void loadRuns();}} onChat={(value,draft)=>{const note=board.notes.find(n=>n.id===value.noteId),chat=note&&taskRunChat(connection,board,note,value,ru,draft);setTaskDetail(null);if(chat)onChat(chat);}}/>}
   </section>;

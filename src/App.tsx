@@ -369,6 +369,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [reviewPaths,setReviewPaths]=useState<string[]|undefined>();
   const openTurnReview=useMemo(()=>reviewReady?(changes?:{files:string[]})=>{setReviewPaths(changes?.files.length?changes.files:undefined);setReviewOpen(true);}:undefined,[reviewReady,setReviewOpen]);
   const quoteToDraft=useCallback((text:string)=>setDraft(current=>current.trim()?current.replace(/\s+$/,'')+'\n\n'+text+'\n':text+'\n'),[setDraft]);
+  /** A task follow-up joins the unsent draft instead of replacing it; repeating the same step does not duplicate it. */
+  const appendDraft=(text:string)=>setDraft(current=>!current.trim()?text:current.includes(text.trim())?current:current.replace(/\s+$/,'')+'\n\n'+text);
   useEffect(()=>{
     setAgentPanel(null);setAgentList([]);setOutputsOpen(false);
     if(!connection||demo||tab!=='chats'||!parentChatId||parentChatId.startsWith('pending-'))return;
@@ -448,9 +450,12 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   useEffect(()=>{if(embedded&&!embedded.session&&job?.sessionId)embedded.onCreated?.({sessionId:job.sessionId,cwd:job.cwd,summary:job.messages.find(m=>m.role==='user')?.blocks.find(b=>b.type==='text')?.text||'New',lastModified:job.startedAt},job);},[job?.sessionId]);
   const embeddedOpened=useRef(false);
   useEffect(()=>{if(!embedded||!health||!connection||embeddedOpened.current)return;embeddedOpened.current=true;
-    if(embedded.session){void (async()=>{try{const active=embedded.jobId?await request<JobView>(connection,'/jobs/'+embedded.jobId):undefined;await openSession(embedded.session!,active);if(embedded.boardChat?.followUp)setDraft(embedded.boardChat.prompt);}catch(e){setError((e as Error).message);}})();}
+    if(embedded.session){void (async()=>{try{const active=embedded.jobId?await request<JobView>(connection,'/jobs/'+embedded.jobId):undefined;await openSession(embedded.session!,active);if(embedded.boardChat?.followUp)appendDraft(embedded.boardChat.prompt);}catch(e){setError((e as Error).message);}})();}
     else {newChat(embedded.cwd);if(embedded.boardChat)setDraft(embedded.boardChat.prompt);}
   },[health,connection,embedded]);
+  // The desktop keeps this chat mounted when the board opens the same task chat again: a later follow-up still reaches the draft.
+  const lastBoardChat=useRef(embedded?.boardChat);
+  useEffect(()=>{const next=embedded?.boardChat;if(!next||next===lastBoardChat.current)return;lastBoardChat.current=next;if(embeddedOpened.current&&next.followUp)appendDraft(next.prompt);},[embedded?.boardChat]);
   useEffect(() => {
     if (!connection || demo) return;
     let cancelled = false;
@@ -626,7 +631,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     } catch (e) {setError((e as Error).message);} finally
     {if (epoch === navigation.current) setLoading(false);}
   }
-  useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch;if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});if(target.followUp)setDraft(target.prompt);}else{newChat(target.root);setDraft(target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
+  useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch;if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});if(target.followUp)appendDraft(target.prompt);}else{newChat(target.root);setDraft(target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
   useEffect(()=>{if(!boardChat||boardChat.taskRun||!job?.sessionId||!connection)return;const target=boardChat;setBoardChat(null);void (async()=>{try{const b=await request<any>(connection,'/boards/'+target.boardId);await request(connection,'/boards/'+b.id,{revision:b.revision,versions:b.versions,notes:b.notes.map((n:any)=>n.id===target.note.id?{...n,chat:{provider,sessionId:job.sessionId}}:n)});}catch(e){setError((e as Error).message);}})();},[job?.sessionId,boardChat,connection]);
   async function openSession(s: Session, activeJob?: Pick<JobView,'id'|'sessionId'>) {
     if (busy || uploading) return;
@@ -791,7 +796,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       </div></aside>
     <main className={`workspace ${chatSurface?'chat-canvas':''}`}>
       {reviewOpen && connection && reviewCwd && <Review key={reviewContext} connection={connection} cwd={reviewCwd} taskRunId={taskRun?.id} initialMode={availableReview?.mode} onlyPaths={reviewPaths} onQuote={quoteToDraft} onClose={()=>{setReviewOpen(false);setReviewPaths(undefined);}}/>}
-      {taskPanel&&taskRun&&connection&&<TaskRunPanel key={taskRun.id} connection={connection} initial={taskRun} onClose={()=>setTaskPanel(false)} onChat={(_run,followUp)=>{setTaskPanel(false);if(followUp)setDraft(followUp);}} onBoard={target=>{if(embedded?.onBoard)embedded.onBoard(target);else{setNoticeTarget(target);setLocalBoards(true);setTab('workspace');}}}/>}
+      {taskPanel&&taskRun&&connection&&<TaskRunPanel key={taskRun.id} connection={connection} initial={taskRun} onClose={()=>setTaskPanel(false)} onChat={(_run,followUp)=>{setTaskPanel(false);if(followUp)appendDraft(followUp);}} onBoard={target=>{if(embedded?.onBoard)embedded.onBoard(target);else{setNoticeTarget(target);setLocalBoards(true);setTab('workspace');}}}/>}
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>

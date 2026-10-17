@@ -152,8 +152,20 @@ async function fullAppTask(page:Page,desktop:boolean){
   await page.locator('.note-content').click();const dialog=page.getByRole('dialog',{name:'Note details',exact:true});await dialog.getByRole('tab',{name:'Agent',exact:true}).click();
   await dialog.getByRole('combobox',{name:'Provider',exact:true}).selectOption('codex');
   await dialog.getByRole('button',{name:'Prepare task chat',exact:true}).click();
-  return {calls,getRun:()=>run};
+  return {calls,getRun:()=>run,setStage:(stage:TaskRun['stage'])=>{run={...run!,stage};}};
 }
+
+for(const desktop of [true,false])test(`${desktop?'desktop':'mobile'} next-step draft joins the unsent text of the open task chat`,async({page})=>{
+  const state=await fullAppTask(page,desktop);const input=page.locator('.composer textarea');
+  await expect(input).toHaveValue(/Implementation working copy/);await page.getByRole('button',{name:'Send message',exact:true}).click();
+  await expect(page.locator('.conversation')).toContainText('Synthetic task in progress');
+  await input.fill('Synthetic unsent remark');state.setStage('review');
+  // Desktop reopens the same mounted chat from the board card; the phone uses the task entry inside the chat.
+  if(desktop){await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.getByRole('button',{name:'AI task: Ready for review. Open result',exact:true}).click();}
+  else await page.locator('.chat-task-entry').click();
+  await page.getByRole('dialog',{name:'Task result',exact:true}).getByRole('button',{name:'Address my notes',exact:true}).click();
+  await expect(input).toBeVisible();await expect(input).toHaveValue(/^Synthetic unsent remark\n\nAddress my review notes on the task result:/);
+});
 
 for(const desktop of [true,false])test(`${desktop?'desktop':'mobile'} board task switches provider and sends in its isolated working copy`,async({page})=>{
   const state=await fullAppTask(page,desktop);const input=page.locator('.composer textarea');
