@@ -1,4 +1,3 @@
-.board-notifications-trigger b{border-radius:1em;background:var(--accent);color:var(--bg);padding:.1em .5em}
 .desktop-rail .board-notifications{justify-content:flex-start;padding:0;border:0}
 .board-notification-detail p{white-space:pre-wrap;overflow-wrap:anywhere}
 .board-notifications-inbox .task-inbox-item span{overflow-wrap:anywhere}
@@ -18,8 +17,6 @@
 .board-notifications-trigger:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .chat-header>.board-notifications,.chat-header-main>.board-notifications{margin-left:auto}
 .chat-header .board-notifications-trigger{width:48px;height:48px;padding:12px}
-.chat-header .board-notifications-trigger>span{display:none}
-.chat-header .board-notifications-trigger b{position:absolute;top:1px;right:0;font-size:10px;line-height:16px;min-width:16px;padding:0 3px;text-align:center}
 .desktop-rail nav .board-notifications{width:100%}
 .desktop-rail nav .board-notifications-trigger{width:100%;min-height:48px;justify-content:flex-start}
-.desktop-rail nav .board-notifications-trigger b{margin-left:auto;font-size:.8em}
+.desktop-rail nav .board-notifications-trigger[aria-current=page]{background:var(--surface);color:var(--text)}

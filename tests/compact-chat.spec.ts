@@ -6,7 +6,7 @@ for(const width of [320,1280])test(`compact attachments, focus and edge treatmen
   const image=new URL(route.request().url()).searchParams.get('path')?.endsWith('.png');
   return route.fulfill({json:image?{name:'diagram.png',mimeType:'image/png',data:imageData}:{name:'notes.md',mimeType:'text/markdown',text:'# Notes\n\nSynthetic attachment'}});
  });
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-menu-button:visible,.desktop-tabs:visible').first().waitFor();
+ await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {CompactChatHarness}=await import('/tests/fixtures/CompactChatHarness.tsx' as string);const root=document.createElement('div');document.body.replaceChildren(root);createRoot(root).render(React.createElement(CompactChatHarness));
@@ -19,7 +19,7 @@ for(const width of [320,1280])test(`compact attachments, focus and edge treatmen
  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Open diagram.png'})).toBeFocused();
  await page.getByRole('button',{name:'Open notes.md'}).click();await expect(page.getByRole('heading',{name:'Notes',exact:true})).toBeVisible();await page.keyboard.press('Escape');
  expect(await page.locator('.conversation').evaluate(el=>getComputedStyle(el).maskImage)).toContain('linear-gradient');
- if(width===320)expect(await page.locator('.mobile-menu-button').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+ if(width===320)expect(await page.locator('.mobile-back').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`.local/compact-chat-${width}.png`});
 });

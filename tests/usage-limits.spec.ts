@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openSection} from './chat-navigation';
 import { test, expect, type Page, type Route } from '@playwright/test';
 
 const connection = { url: 'http://127.0.0.1:4319', token: 'test-only-'.repeat(5) };
@@ -22,7 +22,7 @@ async function setup(page: Page, usage: (route: Route, provider: string) => Prom
     return route.fulfill({ status: 404, json: { error: 'Synthetic endpoint not configured' } });
   });
   await page.goto('http://127.0.0.1:5173');await openChatList(page);
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSection(page,'Settings');
   await page.getByRole('button', { name: 'Usage limits', exact: true }).click();
 }
 
@@ -37,7 +37,7 @@ test('usage shows remaining allowance, actual windows, reset time and English/Ru
   await expect(card.getByRole('progressbar').first()).toHaveAttribute('value', '73');
   await page.evaluate(() => localStorage.setItem('pocket-code-language-v1', 'ru'));
   await page.reload();
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Настройки', exact: true }).click();
+  await openSection(page,'Настройки');
   await page.getByRole('button', { name: 'Лимиты использования', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Лимиты Codex', exact: true }).getByText('Осталось 73%', { exact: true })).toBeVisible();
   const bounds = await page.locator('.codex-usage').evaluate(element => ({ width: element.clientWidth, scroll: element.scrollWidth }));
@@ -68,7 +68,7 @@ test('switching workspace rejects late usage replies and loads Claude limits', a
   await setup(page, async (route, provider) => { if (provider === 'codex') await pending; await route.fulfill({ json: snapshot(provider === 'codex' ? 'Old Codex bucket' : 'Claude', provider === 'codex' ? 2 : 81) }); });
   await expect(page.locator('.codex-usage').getByText('Loading limits…')).toBeVisible();
   await page.locator('.workspace-picker-settings select').selectOption('claude');
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSection(page,'Settings');
   await page.getByRole('button', { name: 'Usage limits', exact: true }).click();
   const card = page.getByRole('region', { name: 'Claude usage limits', exact: true });
   await expect(card.getByText('81% remaining')).toBeVisible();
@@ -85,7 +85,7 @@ test('usage is requested only while settings are mounted and empty data stays un
   const mountedReads = reads;
   await page.clock.fastForward(60_000);
   await expect.poll(() => reads).toBeGreaterThan(mountedReads);
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Chats', exact: true }).click();
+  await openSection(page,'Chats');
   const previous = reads;
   await page.clock.fastForward(120_000);
   expect(reads).toBe(previous);

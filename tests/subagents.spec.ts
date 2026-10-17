@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,chooseProvider} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 
 const reviewer={id:'child-review',name:'Review access checks and navigation',status:'running',prompt:'Check access boundaries and navigation. Report findings only.',provider:'codex'};
@@ -29,7 +29,7 @@ async function mockHost(page:Page,options:{failure?:boolean;slow?:ReturnType<typ
 async function openChat(page:Page,language='en',scale=100){
   await page.addInitScript(({language,scale,connection})=>{localStorage.setItem('pocket-code-language-v1',language);sessionStorage.setItem('connection',JSON.stringify(connection));localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',textSize:14,scale}));},{language,scale,connection});
   await page.goto('http://127.0.0.1:5173');await openChatList(page);
-  await page.locator('.workspace-picker-sidebar select').selectOption('codex');
+  await chooseProvider(page,'codex');
   await page.getByRole('button',{name:/Agent activity example/}).click();
   await expect(page.getByText('Parent conversation remains here.')).toBeVisible();
 }
@@ -81,7 +81,7 @@ test('late child responses cannot replace a different selected agent and polling
 for(const profile of [{width:320,height:640,language:'en',scale:130},{width:360,height:760,language:'ru',scale:100},{width:844,height:390,language:'en',scale:100},{width:1280,height:800,language:'en',scale:100}]){
   test(`agent panel fits ${profile.width}x${profile.height} ${profile.language} ${profile.scale}%`,async({page})=>{
     await page.setViewportSize(profile);await mockHost(page,{long:true});await openChat(page,profile.language,profile.scale);
-    await expect(page.locator('.chat-header-actions>button')).toHaveCount(4);
+    await expect(page.locator('.chat-header-actions>button')).toHaveCount(3);
     for(const button of await page.locator('.chat-header-actions>button').all()){
       const box=(await button.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(profile.width);expect(box.width).toBeGreaterThanOrEqual(48);
     }

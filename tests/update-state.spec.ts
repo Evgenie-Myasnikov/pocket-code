@@ -1,4 +1,5 @@
 import {connectByQr} from './qr-connect';
+import {openSection} from './chat-navigation';
 import { test, expect } from '@playwright/test';
 
 test('a newer release invalidates a previously downloaded APK and install is bound to its checksum', async ({ page }) => {
@@ -33,7 +34,7 @@ test('a newer release invalidates a previously downloaded APK and install is bou
   const checks:string[]=[];await page.route('**/api/updates/**',route=>{checks.push(route.request().url());return route.fulfill({json:{enabled:true,state:'ready',update:release}});});
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('http://127.0.0.1:5173');
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Settings', exact: true }).click();await page.getByRole('button',{name:'Updates',exact:true}).click();
+  await openSection(page,'Settings');await page.getByRole('button',{name:'Updates',exact:true}).click();
   await expect(page.getByRole('button', { name: 'Install update', exact: true })).toBeVisible();
   expect(checks.some(url=>url.endsWith('/latest')||url.endsWith('/check'))).toBe(false);
   expect(await page.evaluate(() => (window as any).nativeCalls.filter((call: any) => call.method === 'install').at(-1).options)).toEqual({ versionCode: 99001, sha256: 'a'.repeat(64) });

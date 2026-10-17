@@ -1,4 +1,5 @@
 import {connectByQr} from './qr-connect';
+import {chooseProvider,openSection} from './chat-navigation';
 import { test, expect } from '@playwright/test';
 test('existing Claude connection reconnects without Android browser login', async ({ page }) => {
   let connected = true;
@@ -12,7 +13,7 @@ test('existing Claude connection reconnects without Android browser login', asyn
   await page.setViewportSize({width:390,height:844});
   await page.goto('http://127.0.0.1:5173');
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
-  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Jira',exact:true}).click();
+  await openSection(page,'Settings');await page.getByRole('button',{name:'Jira',exact:true}).click();
   await expect(page.getByText(/Jira uses the existing Atlassian MCP/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Connect',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Disconnect Jira',exact:true}).click();
@@ -26,12 +27,12 @@ test('Jira settings use the selected workspace and never silently select Claude'
  await page.route('**/api/providers',route=>route.fulfill({json:[{id:'claude',available:true},{id:'codex',available:true,authenticated:true,models:[]}]}));
  const reconnects:string[]=[];
  await page.route('**/api/jira/**',route=>{const url=new URL(route.request().url()),provider=url.searchParams.get('provider');if(url.pathname.endsWith('connect-existing'))reconnects.push(route.request().postDataJSON().provider);return route.fulfill({json:{connected:false,source:provider,sites:[]}});});
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Jira',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await openSection(page,'Settings');await page.getByRole('button',{name:'Jira',exact:true}).click();
  await expect(page.getByText(/Jira uses direct Atlassian MCP through Codex.*without a model turn/)).toBeVisible();
  await page.getByRole('button',{name:'Use Codex connection',exact:true}).click();expect(reconnects).toEqual(['codex']);
- await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();
- await page.locator('.workspace-picker-sidebar select').selectOption('claude');
- await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Jira',exact:true}).click();
+ await openSection(page,'Chats');
+ await chooseProvider(page,'claude');
+ await openSection(page,'Settings');await page.getByRole('button',{name:'Jira',exact:true}).click();
  await expect(page.getByRole('button',{name:'Use Claude connection',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Use Claude connection',exact:true}).click();expect(reconnects).toEqual(['codex','claude']);
 });

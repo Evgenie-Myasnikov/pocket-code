@@ -2,7 +2,7 @@ import {test,expect,type Page} from '@playwright/test';
 async function setup(page:Page,width=390,scale=100){
  await page.setViewportSize({width,height:844});
  await page.addInitScript(scale=>{localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({theme:'dark',palette:'neutral',scale,textSize:16}));},scale);
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-menu-button:visible,.desktop-tabs:visible').first().waitFor();
+ await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {ComposerHarness}=await import('/tests/fixtures/ComposerHarness.tsx' as string);

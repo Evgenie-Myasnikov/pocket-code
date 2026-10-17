@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openSection} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect} from '@playwright/test';
 test('Review opens on the right and preserves the draft; smaller settings survive reload',async({page})=>{
@@ -11,9 +11,9 @@ test('Review opens on the right and preserves the draft; smaller settings surviv
   await page.screenshot({path:'artifacts/screenshots/review-mobile.png',fullPage:true});
   await page.getByRole('button',{name:'Back to chat',exact:true}).click();await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');
   await page.getByLabel('Claude model').selectOption('sonnet');
-  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Appearance & language',exact:true}).click();
+  await openSection(page,'Settings');await page.getByRole('button',{name:'Appearance & language',exact:true}).click();
   await page.getByLabel('Chat text size',{exact:true}).fill('8');await page.getByLabel('Interface scale',{exact:true}).fill('60');
-  await page.reload();await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Appearance & language',exact:true}).click();
+  await page.reload();await openSection(page,'Settings');await page.getByRole('button',{name:'Appearance & language',exact:true}).click();
   await expect(page.getByLabel('Chat text size',{exact:true})).toHaveValue('8');await expect(page.getByLabel('Interface scale',{exact:true})).toHaveValue('60');
-  await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await page.getByRole('button',{name:/Интеграционный тест/}).click();await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');
+  await openSection(page,'Chats');await page.getByRole('button',{name:/Интеграционный тест/}).click();await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');
 });

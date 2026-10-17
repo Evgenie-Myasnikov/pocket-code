@@ -58,7 +58,7 @@ for(const language of ['en','ru'])test('QR-only entry is usable on a narrow phon
   await expect(page.locator('.qr-connect button')).toHaveCount(1);await expect(page.getByRole('button',{name:/^(Choose a QR image|Выбрать изображение с QR)$/})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   if(language==='en')await page.screenshot({path:'artifacts/screenshots/connect-qr-only.png',fullPage:true});
-  await connectByQr(page);await expect(page.locator('.connect-status')).toContainText(/Connected|Подключено/);await expect(page.getByRole('button',{name:/^(Reconnect|Повторить подключение)$/,exact:true})).toHaveCount(0);await openChatList(page);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
+  await connectByQr(page);await expect(page.locator('.connect-status')).toContainText(/Connected|Подключено/);await expect(page.getByRole('button',{name:/^(Reconnect|Повторить подключение)$/,exact:true})).toHaveCount(0);await openChatList(page);await expect(page.getByRole('button',{name:/^(New chat|Новый чат)$/})).toBeVisible();
 });
 
 test('invalid QR image keeps scanning available, then a valid QR connects',async({page})=>{
@@ -67,7 +67,7 @@ test('invalid QR image keeps scanning available, then a valid QR connects',async
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'invalid.png',mimeType:'image/png',buffer:Buffer.from('not an image')});
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.getByRole('button',{name:'Choose a QR image',exact:true})).toBeEnabled();
-  await connectByQr(page);await expect(page.getByRole('button',{name:'Check connection',exact:true})).toBeVisible();await openChatList(page);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
+  await connectByQr(page);await expect(page.getByRole('button',{name:'Check connection',exact:true})).toBeVisible();await openChatList(page);await expect(page.getByRole('button',{name:/^(New chat|Новый чат)$/})).toBeVisible();
 });
 
 test('failed QR connection can retry without rescanning or entering credentials',async({page})=>{

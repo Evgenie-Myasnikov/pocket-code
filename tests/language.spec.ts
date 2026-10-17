@@ -1,5 +1,5 @@
 import {connectByQr,openConnectionSettings} from './qr-connect';
-import {openChatList} from './chat-navigation';
+import {openChatList,openSection} from './chat-navigation';
 import { test, expect } from '@playwright/test';
 
 test('English default and persistent Russian selection on the connection screen', async ({ page }) => {
@@ -18,12 +18,12 @@ test('English default and persistent Russian selection on the connection screen'
   await openChatList(page);
   await page.getByRole('button', {name:/Интеграционный тест/}).click();
   await page.getByLabel('Сообщение Claude').fill('My draft — мой текст');
-  await page.getByRole('button',{name:/^(Navigation menu|Меню разделов)$/}).filter({visible:true}).click();await page.locator('.mobile-nav').getByRole('button', {name:'Настройки', exact:true}).click();await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();
+  await openSection(page,'Настройки');await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();
   await page.getByLabel('Language / Язык').selectOption('en');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.locator('.language-picker')).toContainText('Interface language');
   await page.screenshot({path:'artifacts/screenshots/settings-english.png',fullPage:true});
-  await page.getByRole('button',{name:/^(Navigation menu|Меню разделов)$/}).filter({visible:true}).click();await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();
+  await openSection(page,'Chats');await page.getByRole('button', {name:/Интеграционный тест/}).click();
   await expect(page.getByLabel('Message Claude')).toHaveValue('My draft — мой текст');
 });
 

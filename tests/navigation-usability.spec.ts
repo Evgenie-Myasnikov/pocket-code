@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {newChat,openChatList} from './chat-navigation';
+import {newChat,openChatList,openSection} from './chat-navigation';
 test('chat drafts survive navigation and modal Back/Escape restores focus',async({page})=>{
   const roots=['C:\\Fixture\\first','C:\\Fixture\\second'];
   await page.setViewportSize({width:390,height:844});
@@ -19,7 +19,7 @@ test('chat drafts survive navigation and modal Back/Escape restores focus',async
   });
   await page.goto('http://127.0.0.1:5173');await openChatList(page);await page.getByRole('button',{name:/^First/}).click();
   const draft=page.getByLabel('Message Claude');await draft.fill('First unsent message');
-  for(const name of ['Board','Rules','Changelog','Settings']){await page.locator('.mobile-nav').getByRole('button',{name,exact:true}).click();await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await expect(draft).toHaveValue('First unsent message');await expect(page.locator('.chat-header')).toContainText('First');}
+  for(const name of ['Board','Rules','Changelog','Settings']){await openSection(page,name);await openSection(page,'Chats');await page.getByRole('button',{name:/^First/}).click();await expect(draft).toHaveValue('First unsent message');await expect(page.locator('.chat-header')).toContainText('First');}
   await page.locator('input[type=file]').setInputFiles({name:'draft.txt',mimeType:'text/plain',buffer:Buffer.from('note')});
   await expect(page.locator('.draft-attachment')).toContainText('draft.txt');
   await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));

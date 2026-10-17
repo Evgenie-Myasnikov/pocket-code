@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openSection,chooseProvider} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 
@@ -22,7 +22,7 @@ async function host(page:Page){
 async function connect(page:Page,provider='codex'){
   await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
-  await page.locator('.workspace-picker-sidebar select').selectOption(provider);
+  await chooseProvider(page,provider);
   await page.getByRole('button',{name:`Saved ${provider} chat`}).click();
   await expect(page.getByText('History message 1',{exact:true})).toHaveCount(1);
 }
@@ -65,13 +65,13 @@ test('busy recovery preserves a newer draft and remains isolated when switching 
   await page.locator('input[type=file]').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('note')});
   await expect(page.locator('.draft-attachment')).toContainText('notes.txt');await submit(page);
   await expect(page.getByLabel('Message Codex')).toHaveValue('');await page.getByLabel('Message Codex').fill('Newer Codex draft');
-  await page.locator('.workspace-picker-sidebar select').selectOption('claude');await page.getByLabel('Message Claude').fill('Private Claude draft');reject.resolve();
+  await chooseProvider(page,'claude');await page.getByLabel('Message Claude').fill('Private Claude draft');reject.resolve();
   await expect(page.getByLabel('Message Claude')).toHaveValue('Private Claude draft');await expect(page.locator('.draft-attachment')).toHaveCount(0);
-  await page.locator('.workspace-picker-sidebar select').selectOption('codex');
+  await chooseProvider(page,'codex');
   await expect(page.getByRole('alert')).toContainText('Your newer draft is unchanged');await expect(page.getByLabel('Message Codex')).toHaveValue('Newer Codex draft');
   await page.getByRole('button',{name:'Add unsent message to draft'}).click();
   await expect(page.getByLabel('Message Codex')).toHaveValue('Newer Codex draft\n\nUnsent Codex task');await expect(page.locator('.draft-attachment')).toContainText('notes.txt');
-  expect(sent).toHaveLength(1);await page.locator('.workspace-picker-sidebar select').selectOption('claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Private Claude draft');
+  expect(sent).toHaveLength(1);await chooseProvider(page,'claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Private Claude draft');
 });
 
 test('scrolling to history edges loads automatically once and preserves the visible message',async({page})=>{
@@ -127,7 +127,7 @@ test('reading mode hides controls and preserves the chat, draft and scroll on ex
   const anchor=page.getByText('History message 40',{exact:true});await anchor.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
   const offset=()=>anchor.evaluate(el=>el.getBoundingClientRect().top-document.querySelector('.conversation')!.getBoundingClientRect().top);
   const before=await offset();await page.getByRole('button',{name:'Reading mode',exact:true}).click();
-  await expect(page.locator('.app')).toHaveClass(/reading-mode/);await expect(page.locator('.chat-header')).toBeHidden();await expect(page.locator('.mobile-nav')).toBeHidden();await expect(page.locator('.composer-area')).toBeHidden();
+  await expect(page.locator('.app')).toHaveClass(/reading-mode/);await expect(page.locator('.chat-header')).toBeHidden();await expect(page.locator('.mobile-tabbar')).toBeHidden();await expect(page.locator('.composer-area')).toBeHidden();
   await expect(page.getByRole('button',{name:'Exit reading mode'})).toBeVisible();await expect.poll(offset).toBeCloseTo(before,0);
   await page.getByRole('button',{name:'Exit reading mode'}).click();await expect(page.getByLabel('Message Claude')).toHaveValue('Draft kept during reading');await expect.poll(offset).toBeCloseTo(before,0);
   await page.getByRole('button',{name:'Reading mode',exact:true}).click();await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
@@ -155,8 +155,8 @@ test('chat position and jump controls survive downward scrolling, tab changes an
  await scroller.evaluate(el=>{el.scrollTop=1900;el.dispatchEvent(new Event('scroll'));});
  await expect(page.getByRole('button',{name:'Go to beginning'})).toBeVisible();
  const before=await scroller.evaluate(el=>el.scrollTop);
- await page.getByRole('button',{name:'Navigation menu',exact:true}).filter({visible:true}).click();await page.locator('.mobile-nav').getByRole('button',{name:'Settings'}).click();
- await openChatList(page);
+ await openSection(page,'Settings');
+ await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
  await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
  await page.getByRole('button',{name:'Back to chats',exact:true}).click();
  await page.getByRole('button',{name:'Saved claude chat'}).click();
@@ -177,7 +177,7 @@ test('Codex byte-limited history advances by returned offsets in both directions
   });
   await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
-  await page.locator('.workspace-picker-sidebar select').selectOption('codex');await page.getByRole('button',{name:'Saved codex chat'}).click();
+  await chooseProvider(page,'codex');await page.getByRole('button',{name:'Saved codex chat'}).click();
   await expect(page.locator('.message')).toHaveCount(30);
   const scroller=page.locator('.conversation');await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
   await scroller.evaluate(el=>{el.scrollTo({top:0,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});

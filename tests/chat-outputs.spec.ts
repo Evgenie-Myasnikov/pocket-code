@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,chooseProvider} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 const connection={url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)};
 const cwd='C:\\Workspace\\example';
@@ -41,7 +41,7 @@ async function setup(page:Page,language='en',scale=100,options:{delay?:Promise<v
     return route.fulfill({status:404,json:{error:'Synthetic endpoint not configured'}});
   });
   await page.addInitScript(({connection,language,scale})=>{sessionStorage.setItem('connection',JSON.stringify(connection));localStorage.setItem('pocket-code-language-v1',language);localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',textSize:14,scale}));},{connection,language,scale});
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);await page.locator('.workspace-picker-sidebar select').selectOption('codex');await page.getByRole('button',{name:/Results example/}).click();
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);await chooseProvider(page,'codex');await page.getByRole('button',{name:/Results example/}).click();
   await expect(page.getByText('const result = 42;', {exact:true})).toBeVisible();
 }
 const panel=(page:Page)=>page.locator('.chat-outputs-panel');

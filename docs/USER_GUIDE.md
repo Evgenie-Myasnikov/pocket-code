@@ -6,10 +6,18 @@ Pocket Code is a Windows host and Android companion for local AI coding tools. W
 
 ## Mobile navigation
 
-Use the menu button at the left of the header to open Board, Chats, Rules,
-Changelog or Settings. There is no persistent bottom bar. Back/Escape or a tap
-outside closes the menu. Returning to Chats preserves the selected conversation
-and draft. A running answer follows its rendered height until you scroll upward.
+The phone starts on **Chats**. A bottom bar holds Chats, Board, Inbox and More
+(Rules, Changelog, Settings and the PC connection); it is hidden inside an open
+conversation, where the Back arrow returns to the list and its dot shows the state
+of your other chats. Back on the Chats list leaves the app; Back from another
+section returns to Chats. Returning to Chats preserves the selected conversation
+and draft. Chats that need you, from every provider, are listed first under
+**Needs you**; the rest are grouped by Today, Yesterday and Earlier with relative
+times. Provider chips above the list switch between Claude, Codex and Copilot.
+On Windows, Ctrl+N starts a chat, Ctrl+Tab/Ctrl+Shift+Tab switch chats, Ctrl+Alt+U
+opens the inbox and Ctrl+/ lists the shortcuts.
+
+A running answer follows its rendered height until you scroll upward.
 Already received text appears immediately on entry; new letters fade in with a
 short pause between words. Appearance controls the reveal speed; Instant and
 reduced motion bypass the effect.
@@ -92,7 +100,7 @@ Scroll the file list and collapse individual file diffs. Long lines can still re
 with their own chat, pinned diff, verification commands and human approval. Miro AI
 read/write access has a [separate setup](MIRO-AI.md).
 
-The bell combines active, waiting, failed and completed chats with board notifications, replacing the separate right-edge handle. Choose All, Processes or Notifications. Opening the inbox does not mark results read: reading a completed result acknowledges it; a question stays actionable until answered. The Chats tab has a status indicator. Provider reporting and connection state determine how fresh these indicators are; failed refreshes retain the last known states with an error and Retry.
+The inbox combines active, waiting, failed and completed chats with board notifications. Its number counts only what needs you: chats waiting for an answer, errors and unread board notices. Running work shows a spinning ring without a number, and unseen results a dot. Filters (All, Needs you, Running, Done, Board) show counts; the inbox always opens on All. Opening the inbox does not mark results read: reading a completed result acknowledges it, and **Clear finished** hides all finished results with Undo. An error stays under Needs you until the task is restarted, you write in that chat or choose **Hide**. A board question opens a reply sheet: the answer is added to the card, the card returns to Ready and the notice is marked read; **Hide** marks it read without answering. Provider reporting and connection state determine how fresh these indicators are; failed refreshes retain the last known states with an error, the time of the last update and Retry.
 
 Enable chat notifications in settings and grant Android's notification permission. The native background watcher can report completion, errors and questions while a host connection is available. Battery restrictions or a stopped app can delay delivery. This is not a hosted push service. Board assignments/questions from compatible host boards appear in the same bell; Miro's notification inbox is not imported.
 

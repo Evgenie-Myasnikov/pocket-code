@@ -1,5 +1,5 @@
 import {connectByQr} from './qr-connect';
-import {newChat,openChatList} from './chat-navigation';
+import {newChat,openChatList,openSection} from './chat-navigation';
 import { test, expect, type Page } from '@playwright/test';
 
 const roots = ['C:\\Workspace\\first', 'C:\\Workspace\\second'];
@@ -27,11 +27,11 @@ async function connect(page:Page) {
   await page.goto('http://127.0.0.1:5173');
   await connectByQr(page,connection.url,connection.token);
   await openChatList(page);
-  await expect(page.locator('.workspace-picker-sidebar select')).toBeVisible();
+  await expect(page.locator('.provider-chips:visible')).toBeVisible();
 }
 async function switchSidebar(page:Page,provider:string){
- const nav=page.locator('.mobile-nav:visible,.desktop-tabs:visible').first();await nav.getByRole('button',{name:'Settings',exact:true}).click();
- await page.locator('[data-settings-category="workspace"]').click();await page.locator('.workspace-picker-settings select').selectOption(provider);await nav.getByRole('button',{name:'Chats',exact:true}).click();
+ await openSection(page,'Settings');
+ await page.locator('[data-settings-category="workspace"]').click();await page.locator('.workspace-picker-settings select').selectOption(provider);await openSection(page,'Chats');
 }
 const switchHeader=switchSidebar;
 

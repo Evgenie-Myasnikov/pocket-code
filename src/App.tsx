@@ -1,4 +1,6 @@
-import {MobileNavigation,MobileMenuButton} from './MobileNavigation';
+import {MobileNavigation} from './MobileNavigation';
+import {ChatRunStatus,RunStatusDot,relativeTime,fullTime,dayGroup,dayGroupLabel,runStatusLabel,type RunStatus} from './run-status';
+import {providerName} from './ActivityList';
 import {useTranscriptFollow,transcriptFollowing} from './use-transcript-follow';
 import {useClaudeAccess} from './claude-access';
 import {RunningAction} from './RunningAction';
@@ -8,8 +10,7 @@ import {ChatOverlay} from './ChatOverlay';
 import {ModelPicker,useClaudeModels} from './ModelPicker';
 import {useChatReturn} from './use-chat-return';
 import {WorkspacePassword} from './WorkspacePassword';
-import {BoardNotifications,type BoardNoticeTarget} from './BoardNotifications';
-import {MobileWorkspaceHeader} from './MobileWorkspaceHeader';
+import {InboxButton,NotificationInbox,useBoardNotices,type BoardNoticeTarget} from './BoardNotifications';
 import {savedWorkspaces,rememberWorkspace,workspaceJoinId,type WorkspaceAccess} from './workspace-access';
 import {clearOffline} from './offline-data';
 import {WorkspaceIdentity} from './WorkspaceIdentity';
@@ -43,7 +44,7 @@ import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
 import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { BookOpen, FileText, ArrowUp, ArrowLeft, Plus, Search, MessageSquare, Folder, Settings, Terminal, Wifi, ChevronDown, X, GitBranch, RefreshCw, Laptop, LogOut, ShieldCheck, ClipboardList, Eye, EyeOff, PanelsTopLeft } from 'lucide-react';
+import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, Terminal, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop } from 'lucide-react';
 import { Connect, type ConnectedPc } from './Connect';
 import { connectionProblem as classifyProblem, type ConnectionProblem } from './connection-errors';
 import { useAppearance } from './Appearance';
@@ -121,8 +122,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const projectChosen = useRefForWorkspace(false);
   const [cwd, setCwd] = useStateForWorkspace('');
   // Device navigation survives initial pairing/reconnection. Transcript state remains PC-scoped.
-  const [tab,setTab]=useState<'chats' | 'files' | 'changelog' | 'settings' | 'connection' | 'workspace'>(embedded?'chats':'workspace');
-  const [mobileChat,setMobileChat]=useState(!embedded);
+  // The phone starts on Chats, where chats that wait for the person are listed first; Back from there leaves the app.
+  const [tab,setTab]=useState<'chats' | 'files' | 'changelog' | 'settings' | 'connection' | 'workspace'>('chats');
+  const [mobileChat,setMobileChat]=useState(false);
+  const [moreOpen,setMoreOpen]=useState(false),[inboxOpen,setInboxOpen]=useState(false);
   const [chatViewOpen,setChatViewOpen]=useStateForWorkspace(false);
   useEffect(()=>{if(tab==='chats')setChatViewOpen(mobileChat);},[tab,mobileChat]);
   const returnToChats=()=>{setTab('chats');setMobileChat(chatViewOpen);};
@@ -139,7 +142,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const claudeEffort=useCodexEffort(provider==='claude'?claudeCatalog.models:undefined,model,'claude');
   const localActivity=useActivity(demo||embedded?.activity?null:connection);
   const activity=embedded?.activity||localActivity;
-  const [activityOpen,setActivityOpen]=useState(false),[activityTarget,setActivityTarget]=useState<{item:ActivityItem;connection:Connection}|null>(null);
+  const notices=useBoardNotices(embedded?null:workspaceConnection||connection);
+  const activityOpen=inboxOpen,setActivityOpen=setInboxOpen,[activityTarget,setActivityTarget]=useState<{item:ActivityItem;connection:Connection}|null>(null);
   const [notificationTarget,setNotificationTarget]=useState<WatchedChat|null>(null);
   useRunNotifications(demo||connection?.workspaceId?null:connection,locale().startsWith('ru')?'ru':'en');
   useChatNotifications(connection,demo?null:tab==='chats'?(mobileChat&&(selected||job)?{provider,sessionId:job?.sessionId||selected?.sessionId,jobId:job?.id,cwd,title:selected?.customTitle||selected?.summary||engineName}:null):undefined,locale().startsWith('ru')?'ru':'en',chat=>{
@@ -200,7 +204,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       setProjectReady(true);
     } else if (!cwd) setCwd(preferredRoot(connection.url, health.roots, provider));
   },[connection,health,projects,projectReady,cwd,provider]);
-  useEffect(()=>{if(connection&&!demo)void request(connection,'/engine-updates/settings',{provider}).catch(()=>{});},[connection,provider,demo]);
   useEffect(()=>{if(connection&&projectReady&&projects?.includes(cwd))savePreferredRoot(connection.url,cwd,provider);},[connection,cwd,projects,projectReady,provider]);
   useEffect(()=>{if(tab!=='chats')setReadingMode(false);},[provider,tab]);
   const historyWindow = useRefForWorkspace(100);
@@ -208,7 +211,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const bottom = useRefForWorkspace<HTMLDivElement|null>(null),scroll = useRefForWorkspace<HTMLDivElement|null>(null);
   const navigation = useRefForWorkspace(0),sending = useRefForWorkspace(false),nearBottom = useRefForWorkspace(true);
   const retry = useRefForWorkspace<{signature: string;id: string;} | null>(null);
-  const [menuOpen,setMenuOpen]=useState(false);
   const retryClosedFollowup = useRefForWorkspace<{jobId:string;epoch:number;signature:string}|null>(null);
   const running = job?.status === 'running';
   useEffect(()=>{
@@ -224,7 +226,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if(!element||!element.getClientRects().length||element.closest('[inert]')||document.visibilityState==='hidden'||tab!=='chats'||loading||loadingOlder||error||historyError||activityOpen||embedded?.inboxOpen||activityTarget||reviewOpen||agentPanel||outputsOpen||pendingTakeover)return;
     if(element.scrollHeight-element.scrollTop-element.clientHeight>80)return;
     for(const item of activity.items){
-      if(item.provider!==provider||item.status==='running'||item.status==='needs_input')continue;
+      // An error stays until the task is restarted, the person writes in the chat or hides it explicitly.
+      if(item.provider!==provider||item.status==='running'||item.status==='needs_input'||item.status==='error')continue;
       const viewedJob=job?.id===item.id&&job.status===item.status;
       const viewedHistory=item.status==='done'&&item.sessionId===selected?.sessionId&&item.resultMessageId&&history.some(message=>message.id===item.resultMessageId);
       if(viewedJob||viewedHistory)activity.markViewed(item);
@@ -604,6 +607,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       drafts.current!.delete(currentDraftKey());
       setRejectedDrafts(old=>{const next={...old};delete next[currentDraftKey()];return next;});
       setJob(next);setTakeover(true);setDraft('');setAttachments([]);retry.current = null;nearBottom.current = true;
+      if(sessionId)for(const item of activity.items)if(item.status==='error'&&item.provider===provider&&item.sessionId===sessionId)activity.markViewed(item);
     } catch (e) {if (epoch === navigation.current) setError((e as Error).message);} finally {sending.current = false;setBusy(false);}
   }
   async function upload(files: FileList | File[] | null) {
@@ -635,41 +639,58 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const visible = sessions.filter((s) => `${s.customTitle || ""} ${s.summary} ${s.cwd}`.toLowerCase().includes(search.toLowerCase()));
   const workspacePicker = (location:'sidebar'|'header'|'settings') => <label className={`workspace-picker workspace-picker-${location}`}>{location==='settings'&&<span>{t("Провайдер")}</span>}<select aria-label={t("Провайдер")} value={provider} disabled={demo} onChange={event=>setProvider(event.target.value as WorkspaceProvider)}><option value="claude">Claude</option><option value="codex">Codex</option><option value="copilot">GitHub Copilot</option></select></label>;
   const chatStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>item.status===status));
-  const chatStatusLabel=chatStatus?t(({needs_input:'Waiting for input',error:'Error',running:'Running',done:'Completed'} as const)[chatStatus]):'';
-  const chatStatusDot=chatStatus?<span className={'chat-tab-status chat-tab-status-'+chatStatus} aria-hidden="true"/>:null;
-  const menuButton=!embedded&&!readingMode?<MobileMenuButton open={menuOpen} onOpen={()=>setMenuOpen(true)} status={chatStatusDot}/>:undefined;
-  return <div className={`app ${embedded?'embedded-chat':''} ${mobileChat ? 'show-chat' : ''} ${tab==='chats'&&(mobileChat||embedded)?'chat-edge-to-edge':''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
+  const chatStatusLabel=chatStatus?t('Чаты')+': '+runStatusLabel(chatStatus):'';
+  const chatStatusDot=chatStatus?<RunStatusDot status={chatStatus} className={'chat-tab-status chat-tab-status-'+chatStatus}/>:null;
+  // Status of chats other than the open one, shown on the conversation's Back arrow.
+  const otherStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>item.status===status&&!(item.provider===provider&&(item.id===job?.id||item.sessionId&&item.sessionId===(job?.sessionId||selected?.sessionId)))));
+  const openInbox=()=>setInboxOpen(true);
+  const bell=(variant:'icon'|'tab')=>!embedded&&!readingMode?<InboxButton notices={notices} activity={activity} open={inboxOpen} onOpen={openInbox} variant={variant}/>:null;
+  const openNotice=(target:BoardNoticeTarget)=>{setNoticeTarget(target);setLocalBoards(!workspaceConnection);setWorkspaceScanner(false);setTab('workspace');setMobileChat(true);};
+  const showSection=(next:typeof tab,page?:SettingsPage)=>{if(next==='chats'){returnToChats();return;}if(page)setSettingsPage(page);else if(next==='settings')setSettingsPage('index');setTab(next);setMobileChat(true);};
+  // Before pairing, Chats shows the connection steps under a plain section header, not an empty conversation.
+  const chatSurface=tab==='chats'&&!onboardingVisible;
+  const inConversation=chatSurface&&mobileChat;
+  const tabBar=!embedded&&!readingMode&&!inConversation;
+  // Chats that wait for the person come from every provider, so a waiting Codex chat is visible while Claude is selected.
+  const waiting=activity.items.filter(item=>item.status==='needs_input'||item.status==='error');
+  const sessionStatus=(sessionId:string):RunStatus|undefined=>{const active=jobs.find(j=>j.sessionId===sessionId&&j.status==='running');if(active)return active.approvals?.length?'needs_input':'running';return activity.items.find(item=>item.provider===provider&&item.sessionId===sessionId)?.status;};
+  const providerAttention=(id:WorkspaceProvider)=>waiting.filter(item=>item.provider===id).length;
+  const providerChips=<div className="provider-chips" role="group" aria-label={t('Провайдер')}>{(['claude','codex','copilot'] as const).map(id=>{const count=providerAttention(id);return <button key={id} aria-pressed={provider===id} disabled={demo||busy||uploading} onClick={()=>setProvider(id)}>{providerName(id)}{count>0&&<b aria-label={t('Ждут вас: {0}',count)}>{count}</b>}</button>;})}</div>;
+  const grouped=visible.reduce<{group:'today'|'yesterday'|'earlier';items:Session[]}[]>((list,session)=>{const group=dayGroup(session.lastModified),last=list.at(-1);if(last?.group===group)last.items.push(session);else list.push({group,items:[session]});return list;},[]);
+  const sessionRow=(s:Session)=>{const status=sessionStatus(s.sessionId);return <button className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} aria-current={selected?.sessionId===s.sessionId&&mobileChat?'true':undefined} disabled={busy || uploading} key={s.sessionId} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span aria-hidden="true">·</span>{status?<ChatRunStatus status={status}/>:<time dateTime={new Date(s.lastModified).toISOString()} title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}</small></div></button>;};
+  return <div className={`app ${embedded?'embedded-chat':''} ${mobileChat||onboardingVisible ? 'show-chat' : ''} ${tabBar?'has-tabbar':''} ${tab==='chats'&&(mobileChat||embedded)?'chat-edge-to-edge':''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
 
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={21}/></button>}
     <aside className="sidebar">
-      <div className="chat-list-actions">{menuButton}{workspacePicker('sidebar')}
-        {!embedded&&!readingMode&&<BoardNotifications activity={activity} busy={busy||uploading||Boolean(activityTarget)} onOpenActivity={openActivity} onOpenChange={setActivityOpen} connection={workspaceConnection||connection} onOpen={target=>{setNoticeTarget(target);setLocalBoards(!workspaceConnection);setWorkspaceScanner(false);setTab('workspace');setMobileChat(true);}}/>}
+      <div className="chat-list-actions"><h1>{t("Чаты")}</h1>
+        {connection&&<button className="new-chat-button" disabled={busy||uploading} onClick={()=>newChat()}><Plus size={20}/>{t("Новый чат")}</button>}
+        {bell('icon')}
       </div>
-      <nav className="desktop-tabs"><button className={tab === 'workspace' ? 'active' : ''} onClick={() => {setTab('workspace');setMobileChat(true);}}><ClipboardList size={17} />{(locale().startsWith('ru')?'Доска':'Board')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={17} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><BookOpen size={17} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} onClick={()=>{setTab('changelog');setMobileChat(true);}}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
-      <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти в чатах")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-      <div className="session-list"><div className="list-label">{t("ВАШИ ЧАТЫ ")}<span>{visible.length}</span></div>
-        {connection&&<button className={`session-row ${!selected&&!job?'selected':''}`} aria-label="New" disabled={busy||uploading} onClick={()=>newChat()}><MessageSquare size={16}/><div><strong>New</strong></div></button>}
-        {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><span className="pulse-dot" /><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}</small></div></button>)}
-        {visible.map((s) => <button className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} disabled={busy || uploading} key={s.sessionId} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span>·</span>{new Date(s.lastModified).toLocaleDateString(locale(), { day: 'numeric', month: 'short' })}</small></div>{jobs.some((j) => j.sessionId === s.sessionId && j.status === 'running') && <span className="pulse-dot" />}</button>)}
+      <nav className="desktop-tabs"><button className={tab === 'workspace' ? 'active' : ''} onClick={() => {setTab('workspace');setMobileChat(true);}}><ClipboardList size={17} />{t('Доска')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={17} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}><BookOpen size={17} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} onClick={()=>{setTab('changelog');setMobileChat(true);}}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
+      {providerChips}
+      <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти чат")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      <div className="session-list">
+        {waiting.length>0&&!search&&<section className="session-group session-group-waiting" aria-labelledby="waiting-chats"><h2 className="list-label" id="waiting-chats">{t('Ждут вас')}<span>{waiting.length}</span></h2>
+          {waiting.map(item=><button className="session-row" key={item.provider+':'+item.id} disabled={busy||uploading||Boolean(activityTarget)} onClick={()=>openActivity(item)}><MessageSquare size={16}/><div><strong>{item.title||t('Новый разговор')}</strong><small>{providerName(item.provider)} · {basename(item.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={item.status}/></small></div></button>)}</section>}
+        {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><MessageSquare size={16}/><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={j.approvals?.length?'needs_input':'running'}/></small></div></button>)}
+        {grouped.map(group=><section className="session-group" key={group.group} aria-label={dayGroupLabel(group.group)}><h2 className="list-label">{dayGroupLabel(group.group)}<span>{group.items.length}</span></h2>{group.items.map(sessionRow)}</section>)}
         {!visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : connection ? t("Здесь появятся чаты {0} из разрешённых папок.",engineName) : t('Подключите ПК, чтобы видеть чаты.')}</p>{!connection&&!search&&!demo&&<button className="primary" onClick={()=>setMobileChat(true)}>{t('Подключить компьютер')}</button>}</div>}
       </div></aside>
-    <main className={`workspace ${tab==='chats'?'chat-canvas':''}`}>
+    <main className={`workspace ${chatSurface?'chat-canvas':''}`}>
       {reviewOpen && connection && reviewCwd && <Review key={reviewContext} connection={connection} cwd={reviewCwd} taskRunId={taskRun?.id} initialMode={availableReview?.mode} onClose={()=>setReviewOpen(false)}/>}
       {taskPanel&&taskRun&&connection&&<TaskRunPanel key={taskRun.id} connection={connection} initial={taskRun} onClose={()=>setTaskPanel(false)} onBoard={target=>{if(embedded?.onBoard)embedded.onBoard(target);else{setNoticeTarget(target);setLocalBoards(true);setTab('workspace');}}}/>}
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
-      <ChatOverlay edge="top" enabled={tab==='chats'}>{tab==='chats'?<>
-        <ChatHeader notifications={!embedded&&!readingMode&&<BoardNotifications activity={activity} busy={busy||uploading||Boolean(activityTarget)} onOpenActivity={openActivity} onOpenChange={setActivityOpen} connection={workspaceConnection||connection} onOpen={target=>{setNoticeTarget(target);setLocalBoards(!workspaceConnection);setWorkspaceScanner(false);setTab('workspace');setMobileChat(true);}}/>} title={selected?.customTitle||selected?.summary||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
-          navigation={menuButton} onBack={()=>embedded?embedded.onBack():setMobileChat(false)}
+      <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
+        <ChatHeader notifications={bell('icon')} title={selected?.customTitle||selected?.summary||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
+          status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():setMobileChat(false)}
+          context={!selected&&!job&&!taskRun?<>{workspacePicker('header')}<span aria-hidden="true">·</span><label className="project-picker"><Folder size={13} aria-hidden="true"/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label></>:undefined}
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>setReviewOpen(true)}:undefined}
-          outputs={hasOutputs||Boolean(selected)?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
+          outputs={hasOutputs?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
           subagents={agentMap.size>0&&parentChatId?{count:agentMap.size,running:[...agentMap.values()].filter(agent=>agent.status==='running').length,disabled:!connection||demo,open:()=>setAgentPanel({})}:undefined}
           reading={outputMessages.length>0||Boolean(job?.partial)?{disabled:loading||!history.length&&!job,open:()=>toggleReadingMode(true)}:undefined}/>
-        {!selected&&!job&&!taskRun&&<div className="chat-start-context"><label className="project-picker"><Folder size={14}/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label>{workspacePicker('header')}</div>}
-      </>:tab==='workspace'?<header className="chat-header" data-section="board">{menuButton}<h1>{t("Доска")}</h1>{!embedded&&!readingMode&&<BoardNotifications activity={activity} busy={busy||uploading||Boolean(activityTarget)} onOpenActivity={openActivity} onOpenChange={setActivityOpen} connection={workspaceConnection||connection} onOpen={target=>{setNoticeTarget(target);setLocalBoards(!workspaceConnection);setWorkspaceScanner(false);setTab('workspace');setMobileChat(true);}}/>}</header>:<header className="chat-header" data-section={tab}>{menuButton}
-        <div className="header-title"><strong>{tab==='connection'?'Connection':tab==='settings'?t("Настройки"):tab==='files'?t("Правила"):t("История изменений")}</strong></div>
-
-        {!embedded&&!readingMode&&<BoardNotifications activity={activity} busy={busy||uploading||Boolean(activityTarget)} onOpenActivity={openActivity} onOpenChange={setActivityOpen} connection={workspaceConnection||connection} onOpen={target=>{setNoticeTarget(target);setLocalBoards(!workspaceConnection);setWorkspaceScanner(false);setTab('workspace');setMobileChat(true);}}/>}
+      </>:tab==='workspace'?<header className="chat-header" data-section="board"><h1>{t("Доска")}</h1></header>:<header className="chat-header" data-section={tab}>
+        <div className="header-title"><h1>{tab==='connection'||tab==='chats'?t('Подключение к ПК'):tab==='settings'?t("Настройки"):tab==='files'?t("Правила"):t("История изменений")}</h1></div>
       </header>}
       {offline&&!connectionScreen&&<div className="network-banner" role="status">{locale().startsWith('ru')?'Офлайн · сохранённые данные, только просмотр':'Offline · saved data, read-only'}</div>}
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
@@ -681,7 +702,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       </ChatOverlay>
       {tab === 'connection' ? connectView() : onboardingVisible ? connectView(true) : tab === 'workspace' ? connection?<WorkBoards focusTarget={noticeTarget} compactContext local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={tab==='files'?'rules':'changelog'}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={connectView()} online={!!pcStatus?.online} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget}/> : <>
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
-          <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}<div className="conversation-date"><span />{demo ? t("ПРИМЕР РАЗГОВОРА") : t("РАБОЧЕЕ ПРОСТРАНСТВО")}<span /></div>
+          <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}
             {!loading && !history.length && !job && !selected && <div className="welcome"><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={15} /></button>)}</div></div>}
             {!loading && selected && !history.length && !job && <p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>}
@@ -712,7 +733,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         </div></ChatOverlay>
       </>}
     </main>
-    {!embedded&&<MobileNavigation open={menuOpen} onClose={()=>setMenuOpen(false)}><nav className="mobile-nav" onClick={event=>{if((event.target as HTMLElement).closest('button'))setMenuOpen(false);}}><button className={tab==='workspace'?'active':''} onClick={()=>{setTab('workspace');setMobileChat(true);}}><Folder size={20}/>{t("Доска")}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={20} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => {setTab('files');setMobileChat(true);}}><BookOpen size={20} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} onClick={()=>{setTab('changelog');setMobileChat(true);}}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={20} />{t("Настройки")}</button></nav></MobileNavigation>}
+    {tabBar&&<nav className="mobile-tabbar" aria-label={t('Основные разделы')}><button className={tab==='chats'?'active':''} aria-current={tab==='chats'?'page':undefined} onClick={()=>showSection('chats')} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={22}/>{chatStatusDot}</span>{t("Чаты")}</button><button className={tab==='workspace'?'active':''} aria-current={tab==='workspace'?'page':undefined} onClick={()=>showSection('workspace')}><ClipboardList size={22}/>{t("Доска")}</button>{bell('tab')}<button className={['files','changelog','settings','connection'].includes(tab)?'active':''} aria-haspopup="dialog" aria-expanded={moreOpen} onClick={()=>setMoreOpen(true)}><MoreHorizontal size={22}/>{t("Ещё")}</button></nav>}
+    {!embedded&&<MobileNavigation open={moreOpen} onClose={()=>setMoreOpen(false)}><nav className="mobile-nav" onClick={event=>{if((event.target as HTMLElement).closest('button'))setMoreOpen(false);}}><button className={tab === 'files' ? 'active' : ''} aria-current={tab==='files'?'page':undefined} onClick={() => showSection('files')}><BookOpen size={20} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} aria-current={tab==='changelog'?'page':undefined} onClick={()=>showSection('changelog')}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings'&&settingsPage!=='connection' ? 'active' : ''} aria-current={tab==='settings'&&settingsPage!=='connection'?'page':undefined} onClick={() => showSection('settings')}><Settings size={20} />{t("Настройки")}</button><button className={tab==='settings'&&settingsPage==='connection'?'active':''} onClick={()=>showSection('settings','connection')}><Laptop size={20}/><span className="mobile-nav-label">{t("Подключение к ПК")}<small>{pcStatus?(pcStatus.online?pcStatus.name:t('Нет связи · {0}',pcStatus.name)):saved?.name&&!saved.workspaceOnly?t('Нет связи · {0}',saved.name):t('Не подключено')}</small></span></button></nav></MobileNavigation>}
+    {!embedded&&<NotificationInbox open={inboxOpen} onClose={()=>setInboxOpen(false)} notices={notices} activity={activity} busy={busy||uploading||Boolean(activityTarget)} onOpenActivity={openActivity} onOpenNotice={openNotice}/>}
     {pendingTakeover && <div className="modal-backdrop"><section ref={confirmation} className="confirm-modal" role="dialog" aria-modal="true" aria-label={t("Продолжить чат с телефона?")}><Terminal size={28} /><h2>{t("Продолжить чат с телефона?")}</h2><p>{t("Сначала дождитесь завершения ответа в {0} на ПК. Одновременная работа с одной историей может вызвать конфликт.",engineName)}</p><button className="primary" onClick={() => {setPendingTakeover(false);setTakeover(true);void send(true);}}>{t("На ПК завершено — продолжить")}</button><button className="text-button" onClick={() => setPendingTakeover(false)}>{t("Отмена")}</button></section></div>}
   </div>;
 }

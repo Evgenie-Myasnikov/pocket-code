@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openSection} from './chat-navigation';
 import {test,expect} from '@playwright/test';
 for(const provider of ['claude','codex'])test(`${provider} accepts clarification while running and preserves a rejected draft`,async({page})=>{
   await page.setViewportSize({width:320,height:740});
@@ -40,6 +40,5 @@ for(const provider of ['claude','codex'])test(`${provider} accepts clarification
     await expect(draft).toHaveValue('');
     await expect(page.locator('.conversation')).toContainText('Keep this clarification');
   }
-  await page.getByRole('button',{name:'Navigation menu',exact:true}).click();
-  await page.locator('.mobile-nav:visible').getByRole('button',{name:'Board',exact:true}).click();await expect(page.getByRole('heading',{name:'Board',exact:true})).toBeVisible();await expect(page.getByText('Assigned to me',{exact:true})).toHaveCount(0);
+  await openSection(page,'Board');await expect(page.getByRole('heading',{name:'Board',exact:true})).toBeVisible();await expect(page.getByText('Assigned to me',{exact:true})).toHaveCount(0);
 });

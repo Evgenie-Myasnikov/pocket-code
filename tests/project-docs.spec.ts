@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {openSection} from './chat-navigation';
 
 const first='C:\\Workspace\\demo-a',second='C:\\Workspace\\demo-b';
 const connection={url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)};
@@ -32,14 +33,14 @@ async function host(page:Page){
 }
 async function openRules(page:Page,language='en',scale=100){
  await page.addInitScript(({connection,language,scale})=>{sessionStorage.setItem('connection',JSON.stringify(connection));localStorage.setItem('pocket-code-language-v1',language);localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',theme:'dark',textSize:14,scale}));},{connection,language,scale});
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:language==='ru'?'Правила':'Rules',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await openSection(page,language==='ru'?'Правила':'Rules');
 }
 const panel=(page:Page)=>page.locator('.project-docs');
 test.beforeEach(async({page})=>{await page.setViewportSize({width:390,height:844});});
 test('Rules render safe Markdown, preserve list focus and Changelog opens directly',async({page})=>{
  const resources:string[]=[];await page.route('https://assets.example/**',route=>{resources.push(route.request().url());return route.abort();});await host(page);await openRules(page);
  await expect(panel(page).locator('.project-docs-item')).toHaveCount(2);await panel(page).getByRole('button',{name:/^AGENTS.md/}).click();await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();await expect(panel(page).locator('pre code')).toHaveText('const safe = true;\n');await expect(panel(page).getByRole('link',{name:'Reference'})).toHaveAttribute('href','https://example.com/rules');await expect(panel(page).locator('img')).toHaveCount(0);expect(resources).toEqual([]);
- await page.keyboard.press('Escape');await expect(panel(page).getByRole('button',{name:/^AGENTS.md/})).toBeFocused();await page.locator('.mobile-nav').getByRole('button',{name:'Changelog',exact:true}).click();await expect(panel(page).getByRole('heading',{name:'2026-09-30'})).toBeVisible();await expect(page.getByRole('button',{name:'Project overview',exact:true})).toHaveCount(0);
+ await page.keyboard.press('Escape');await expect(panel(page).getByRole('button',{name:/^AGENTS.md/})).toBeFocused();await openSection(page,'Changelog');await expect(panel(page).getByRole('heading',{name:'2026-09-30'})).toBeVisible();await expect(page.getByRole('button',{name:'Project overview',exact:true})).toHaveCount(0);
 });
 test('document refresh keeps the last copy on failure and recovers',async({page})=>{
  const state=await host(page);state.documents=[rule];await openRules(page);await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();state.contentFailure=true;await page.getByRole('button',{name:'Refresh projects',exact:true}).click();await expect(panel(page).getByRole('alert')).toContainText('last loaded copy');await expect(panel(page).getByRole('heading',{name:'Project conventions'})).toBeVisible();state.contentFailure=false;state.content='# Updated rules';await panel(page).getByRole('button',{name:'Try again'}).click();await expect(panel(page).getByRole('heading',{name:'Updated rules'})).toBeVisible();

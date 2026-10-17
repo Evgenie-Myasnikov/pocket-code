@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openSection} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 const root='C:\\Workspace\\access-demo';
 const connection={url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)};
@@ -30,9 +30,9 @@ async function setup(page:Page,options:{language?:string;scale?:number;stored?:s
     sessionStorage.setItem('connection',JSON.stringify(connection));
     if(!localStorage.getItem('access-test-seeded')){localStorage.setItem('access-test-seeded','true');localStorage.setItem('pocket-code-workspace','codex');localStorage.setItem('pocket-code-language-v1',language);localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({palette:'sage',textSize:14,scale}));if(stored)localStorage.setItem('pocket-code-chat-preferences-codex',stored);}
   },{connection,language:options.language||'en',scale:options.scale||100,stored:options.stored});
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);await expect(page.locator('.workspace-picker-sidebar select')).toHaveValue('codex');
+  await page.goto('http://127.0.0.1:5173');await openChatList(page);await expect(page.locator('.provider-chips:visible').first().getByRole('button',{name:/^Codex/})).toHaveAttribute('aria-pressed','true');
 }
-const settings=async(page:Page)=>{await page.locator('.mobile-nav').getByRole('button',{name:/^(Settings|Настройки)$/,exact:true}).click();if(await page.locator('[data-settings-category="workspace"]').isVisible())await page.locator('[data-settings-category="workspace"]').click();const access=page.getByRole('button',{name:/^(Agent access|Доступ агента)$/,exact:true});if(await access.isVisible())await access.click();};
+const settings=async(page:Page)=>{await openSection(page,/^(Settings|Настройки)$/);if(await page.locator('[data-settings-category="workspace"]').isVisible())await page.locator('[data-settings-category="workspace"]').click();const access=page.getByRole('button',{name:/^(Agent access|Доступ агента)$/,exact:true});if(await access.isVisible())await access.click();};
 test.beforeEach(async({page})=>{await page.setViewportSize({width:390,height:844});});
 
 test('Full access defaults on new and migrated Codex preferences and is sent on the next message',async({page})=>{

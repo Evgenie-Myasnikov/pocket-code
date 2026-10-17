@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openSection} from './chat-navigation';
 import { test, expect, type Page } from '@playwright/test';
 
 const root = 'C:\\Workspace\\typography';
@@ -53,7 +53,7 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
         if (elements.some(element => !element)) throw new Error(`Missing typography sample: ${selectors[elements.findIndex(element => !element)]}`);
         return {
           fonts: elements.map(element => parseFloat(getComputedStyle(element!).fontSize)),
-          navigationFont: parseFloat(getComputedStyle(document.querySelector('.mobile-nav button')!).fontSize),
+          navigationFont: parseFloat(getComputedStyle(document.querySelector('.mobile-tabbar button,.desktop-tabs button')!).fontSize),
           taps: [...message.querySelectorAll('summary,button')].map(element => element.getBoundingClientRect().height),
           width: message.getBoundingClientRect().width, scroll: message.scrollWidth,
           overflow:[...message.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>message.getBoundingClientRect().right+1).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width,scroll:e.scrollWidth})),
@@ -76,7 +76,7 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
       await page.screenshot({ path: 'artifacts/settings-typography-844.png', fullPage: true, animations: 'disabled' });
       await page.setViewportSize({ width: 320, height: 740 });
       await page.screenshot({ path: 'artifacts/settings-typography-320.png', fullPage: true, animations: 'disabled' });
-      await page.locator('.mobile-nav').getByRole('button', { name: 'Chats', exact: true }).click();
+      await openSection(page,'Chats');
       await expect(page.locator('[data-message-id="typography-message"]')).toBeVisible();
       await page.getByRole('button', { name: 'Back to chats', exact: true }).click();
       await expect(page.locator('.sidebar')).toBeVisible();

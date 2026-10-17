@@ -2,6 +2,10 @@
 
 This is an expert review supported by interface checks and published guidance. It is not a study with participants, an accessibility certification, or proof that every Android device behaves identically.
 
+## Phone shell and inbox — 2026-10-17
+
+The hidden section drawer is replaced by a bottom bar (Chats · Board · Inbox · More) on phones, with the app starting on Chats and Back from the Chats list leaving the app. The bar is not shown inside a conversation, so the transcript keeps its full height; the conversation header has only Back (with the state of other chats), the title and applicable, labelled actions. One app-level inbox serves every bell: its badge counts only items that need the person, polling is silent and the sheet always opens on All. Run states use one vocabulary (Needs you, Running, Done, Error, Stopped) and theme tokens with at least 4.5:1 contrast, always paired with an icon shape. Wider windows keep the existing sidebar instead of a separate navigation rail.
+
 ## Coordinated updates — 2026-10-01
 
 After an Android upgrade, PC update status stays in Settings → Updates instead of adding another persistent chat panel. The sequence distinguishes downloading, preparing installation, waiting for ongoing work, restarting, success and failure. Temporary network failures during a planned restart use reconnection feedback; stale responses from a different connection are ignored. Failure exposes an explicit retry. Android installation remains a system-confirmed action.

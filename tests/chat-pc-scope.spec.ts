@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {chooseProvider,openSection} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 test('board navigation and legacy workspace metadata preserve PC chats while credentials isolate identical session IDs',async({page})=>{
  await page.setViewportSize({width:390,height:844});
@@ -14,16 +15,16 @@ test('board navigation and legacy workspace metadata preserve PC chats while cre
   if(u.pathname==='/api/board-notifications')json={items:[]};
   return route.fulfill({json});
  });
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await openSection(page,'Chats');
  for(const provider of ['codex','copilot','claude']){
-  await page.locator('.workspace-picker-sidebar select').selectOption(provider);
-  await expect(page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true})).toHaveClass('active');
+  await chooseProvider(page,provider);
+  await expect(page.locator('.mobile-tabbar').getByRole('button',{name:'Chats',exact:true})).toHaveClass('active');
   await expect(page.getByRole('button',{name:/Conversation A/})).toBeVisible();
   await expect(page.locator('.mobile-workspace-header')).toHaveCount(0);
  }
  await page.getByRole('button',{name:/Conversation A/}).click();await expect(page.getByText('Private reply A')).toBeVisible();await page.getByLabel('Message Claude').fill('Draft on A');
- await page.locator('.mobile-nav').getByRole('button',{name:'Board',exact:true}).click();await expect(page.locator('.mobile-workspace-header')).toHaveCount(0);await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await expect(page.getByLabel('Message Claude')).toHaveValue('Draft on A');await expect(page.getByText('Private reply A')).toBeVisible();
- async function changePc(token:string){await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'PC connection',exact:true}).click();await connectByQr(page,url,token);await expect.poll(()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}').token)).toBe(token);await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();}
+ await openSection(page,'Board');await expect(page.locator('.mobile-workspace-header')).toHaveCount(0);await openSection(page,'Chats');await expect(page.getByLabel('Message Claude')).toHaveValue('Draft on A');await expect(page.getByText('Private reply A')).toBeVisible();
+ async function changePc(token:string){await openSection(page,'Settings');await page.getByRole('button',{name:'PC connection',exact:true}).click();await connectByQr(page,url,token);await expect.poll(()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}').token)).toBe(token);await openSection(page,'Chats');}
  await changePc(tokenB);await page.getByRole('button',{name:/Conversation B/}).click();await expect(page.getByText('Private reply B')).toBeVisible();await expect(page.getByText('Private reply A')).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('');await page.getByLabel('Message Claude').fill('Draft on B');
  await changePc(tokenA);await expect(page.getByLabel('Message Claude')).toHaveValue('Draft on A');await expect(page.getByText('Private reply A')).toBeVisible();
 });

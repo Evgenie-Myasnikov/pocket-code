@@ -1,7 +1,7 @@
 ﻿import {test,expect} from '@playwright/test';
 test('board contents form a decorative preview while card actions and names remain usable',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
- await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().waitFor();
+ await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {ProjectBoardCard}=await import('/src/ProjectBoardCard.tsx' as string);

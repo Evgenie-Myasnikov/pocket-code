@@ -1,16 +1,27 @@
 import {expect,type Page} from '@playwright/test';
-/** Current navigation: the app starts on Board; New is a conversation-list item. */
-export async function openChatList(page:Page){
-  await page.locator('.mobile-menu-button:visible,.desktop-tabs:visible').first().waitFor();
-  const menu=page.getByRole('button',{name:/^(Navigation menu|Меню разделов)$/}).filter({visible:true});
-  if(await menu.count())await menu.click();
-  const navigation=page.locator('.mobile-nav:visible,.desktop-tabs:visible').first();
-  await navigation.getByRole('button',{name:/^(Chats|Чаты)$/,exact:true}).click();
+/** Current navigation: the phone starts on Chats with a bottom bar (Chats, Board, Inbox, More); wide windows keep the sidebar tabs. */
+const tabs=(page:Page)=>page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first();
+export async function openSection(page:Page,name:string|RegExp){
+  const back=page.getByRole('button',{name:/^(Back to chats|К списку чатов)$/}).filter({visible:true});
+  await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible,.chat-header-conversation:visible').first().waitFor();
+  if(!await tabs(page).count()&&await back.count())await back.click();
+  const navigation=tabs(page),target=navigation.getByRole('button',{name,exact:true});
+  if(await target.count()){await target.click();return;}
+  await navigation.getByRole('button',{name:/^(More|Ещё)$/}).click();
+  await page.getByRole('dialog',{name:/^(More|Ещё)$/}).getByRole('button',{name,exact:true}).click();
 }
+export async function openChatList(page:Page){await openSection(page,/^(Chats|Чаты)$/);}
 export async function newChat(page:Page){
   await openChatList(page);
   const back=page.getByRole('button',{name:/^(Back to chats|К списку чатов|Назад к чатам)$/});
-  if(await back.isVisible())await back.click();
-  await page.getByRole('button',{name:'New',exact:true}).click();
+  if(await back.isVisible()&&!await page.locator('.new-chat-button:visible').count())await back.click();
+  await page.locator('.new-chat-button:visible').first().click();
   await expect(page.locator('.composer textarea')).toBeVisible();
+}
+/** Provider chips replace the select that used to be the chat list title. */
+export async function chooseProvider(page:Page,provider:string){
+  const name=({claude:'Claude',codex:'Codex',copilot:'Copilot'} as Record<string,string>)[provider];
+  const back=page.getByRole('button',{name:/^(Back to chats|К списку чатов)$/}).filter({visible:true});
+  if(!await page.locator('.provider-chips:visible').count()&&await back.count())await back.click();
+  await page.locator('.provider-chips:visible').first().getByRole('button',{name:new RegExp('^'+name)}).click();
 }

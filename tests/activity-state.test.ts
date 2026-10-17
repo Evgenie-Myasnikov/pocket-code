@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type {ActivityItem} from '../server/types';
-import {pruneSeen,rememberViewed,validActivity,visibleActivity} from '../src/activity-state';
+import {pruneSeen,rememberViewed,validActivity,visibleActivity,activityCounts} from '../src/activity-state';
 
 const item=(id:string,status:ActivityItem['status']='done',provider:ActivityItem['provider']='codex',version='v1'):ActivityItem=>({id,provider,cwd:'C:\\Workspace\\activity-demo',title:id,status,startedAt:1,version});
 test('viewing terminal work removes exactly that provider/id/version',()=>{
@@ -28,4 +28,9 @@ test('history is bounded and deduplicated without dropping active work',()=>{
 test('activity validation rejects malformed responses instead of showing fake work',()=>{
   assert.equal(validActivity([item('a')]),true);assert.equal(validActivity([]),true);
   for(const value of [{items:[]},null,[{...item('a'),status:'unknown'}],[{...item('a'),provider:'other'}],[{...item('a'),startedAt:NaN}]])assert.equal(validActivity(value),false);
+});
+test('the badge counts only work that needs the person',()=>{
+  const counts=activityCounts([item('a','needs_input'),item('b','error'),item('c','running'),item('d','running'),item('e','done'),item('f','stopped')]);
+  assert.deepEqual(counts,{attention:2,running:2,unseen:2});
+  assert.deepEqual(activityCounts([]),{attention:0,running:0,unseen:0});
 });

@@ -41,10 +41,10 @@ test('Connection is in Settings without retired workspace administration',async(
  await expect(page.locator('.desktop-rail').getByLabel('Project',{exact:true})).toHaveCount(0);
 });
 test('desktop keeps a draft across navigation and submits through the shared chat',async({page})=>{
- await desktop(page);await page.getByRole('button',{name:'New',exact:true}).click();
+ await desktop(page);await page.getByRole('button',{name:'New chat',exact:true}).click();
  await page.locator('textarea').fill('Synthetic planning request');
  await page.getByRole('button',{name:'Settings',exact:true}).first().click();
- await page.getByRole('button',{name:'New',exact:true}).click();
+ await page.getByRole('button',{name:'New chat',exact:true}).click();
  await expect(page.locator('textarea')).toHaveValue('Synthetic planning request');
  await page.getByRole('button',{name:'Send message',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='write'&&/^\/jobs(?:\?|$)/.test(c.endpoint)&&c.data.text==='Synthetic planning request'))).toBe(true);
@@ -52,12 +52,12 @@ test('desktop keeps a draft across navigation and submits through the shared cha
 });
 test('provider status distinguishes login from server and launches only explicit sign-in',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();
- await page.getByRole('button',{name:/^AI accounts/}).click();await page.getByRole('button',{name:'Claude',exact:true}).click();const panel=page.locator('.provider-connections');await expect(panel.getByText('Signed in',{exact:true})).toHaveCount(1);
+ await page.getByRole('button',{name:/^AI accounts/}).click();await page.getByRole('navigation',{name:'AI providers'}).getByRole('button',{name:'Claude',exact:true}).click();const panel=page.locator('.provider-connections');await expect(panel.getByText('Signed in',{exact:true})).toHaveCount(1);
  
  await expect(panel.getByText('Starts with a task',{exact:true})).toBeVisible();
  await page.screenshot({path:'artifacts/screenshots/provider-connections.png'});
  expect(await page.evaluate(()=>(window as any).desktopCalls.filter((v:any)=>v.action==='provider-login').length)).toBe(0);
- await page.getByRole('button',{name:'AI accounts',exact:true}).click();await page.getByRole('button',{name:'Codex',exact:true}).click();await panel.getByRole('button',{name:'Device code',exact:true}).click();
+ await page.getByRole('button',{name:'AI accounts',exact:true}).click();await page.getByRole('navigation',{name:'AI providers'}).getByRole('button',{name:'Codex',exact:true}).click();await panel.getByRole('button',{name:'Device code',exact:true}).click();
  expect(await page.evaluate(()=>(window as any).desktopCalls.find((v:any)=>v.action==='provider-login'))).toMatchObject({provider:'codex',method:'device'});
 });
 async function desktop(page:Page){
@@ -115,7 +115,7 @@ async function desktop(page:Page){
 }
 test('desktop shares editable chat, review and results with provider/project selection',async({page})=>{
  await page.setViewportSize({width:1366,height:900});await desktop(page);
- await page.getByLabel('Provider',{exact:true}).selectOption('codex');
+ await page.getByRole('group',{name:'Provider'}).getByRole('button',{name:/^Codex/}).click();
  await expect(page.getByRole('button',{name:/Documentation/})).toBeVisible();
  await page.getByRole('button',{name:/codex · Interface review/}).click();
  await expect(page.getByText('The responsive layout is ready.')).toBeVisible();await expect(page.locator('textarea')).toBeVisible();
@@ -144,7 +144,7 @@ for(const width of [900,1440,1920])test(`desktop layout fits ${width}px`,async({
 
 test('desktop exposes account sign-out confirmation and automatic updates',async({page})=>{
  await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();
- await page.getByRole('button',{name:/^AI accounts/}).click();await page.getByRole('button',{name:'Claude',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.getByText(/Signs out the CLI on this PC/)).toBeVisible();
+ await page.getByRole('button',{name:/^AI accounts/}).click();await page.getByRole('navigation',{name:'AI providers'}).getByRole('button',{name:'Claude',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.getByText(/Signs out the CLI on this PC/)).toBeVisible();
  await page.getByRole('button',{name:'Cancel',exact:true}).click();expect(await page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='provider-logout'))).toBeFalsy();
  await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.getByRole('button',{name:'Sign out now',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='provider-logout'&&c.provider==='claude'))).toBeTruthy();
@@ -155,16 +155,16 @@ test('desktop follows the newest run, streams partial text and shows question/er
  await desktop(page);
  await page.evaluate(()=>{const base={cwd:'C:\\Demo\\Atlas',sessionId:'alpha',provider:'claude',messages:[],approvals:[],baseMessageCount:0,revision:1};(window as any).testRuns=[{...base,id:'old',startedAt:1,status:'done',partial:'Stale answer'},{...base,id:'new',startedAt:2,status:'running',partial:'Live response'}];});
  const row=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});
- await expect(row).toContainText('Working');await row.click();
+ await expect(row).toContainText('Running');await row.click();
  await expect(page.getByText('Live response',{exact:true})).toBeVisible();
  await expect(page.getByText('Stale answer',{exact:true})).toHaveCount(0);
  await page.evaluate(()=>{const run=(window as any).testRuns[1];run.partial='Live response continues';run.approvals=[{id:'question',tool:'Write',input:{file_path:'synthetic.txt'},createdAt:Date.now()}];run.revision++;});
- await expect(page.getByText('Live response continues',{exact:true})).toBeVisible();await expect(row).toContainText('Needs your answer');
+ await expect(page.getByText('Live response continues',{exact:true})).toBeVisible();await expect(row).toContainText('Needs you');
  await expect(page.getByRole('button',{name:'Allow',exact:true})).toBeVisible();
  await page.evaluate(()=>{const run=(window as any).testRuns[1];run.status='error';run.error='Synthetic run failure';run.approvals=[];run.revision++;});
  await expect(row).toContainText('Error');await expect(page.getByText('Synthetic run failure')).toBeVisible();
  await page.evaluate(()=>{const run=(window as any).testRuns[1];run.status='done';delete run.error;run.revision++;});
- await expect(row).toContainText('Completed');
+ await expect(row).toContainText('Done');
  const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.filter((c:any)=>c.endpoint?.includes('/messages?')).some((c:any)=>c.endpoint.includes('/sessions/alpha/messages?'))).toBeTruthy();
 });
 test('PC shows device presence and confirms individual revocation',async({page})=>{
@@ -203,9 +203,9 @@ test('personal chats stay visible independently of the shared board workspace',a
  await page.getByRole('button',{name:/claude \u00b7 Interface review/}).click();await expect(page.locator('.embedded-chat')).toBeVisible();
 });
 
-test('desktop board inbox shows a targeted question and marks it read after opening',async({page})=>{
+test('desktop board inbox opens a question as a reply sheet and keeps it unread until answered or hidden',async({page})=>{
  await page.addInitScript(()=>{const boardId='22222222-2222-4222-8222-222222222222',noteId='33333333-3333-4333-8333-333333333333';(window as any).testBoards=[{id:boardId,name:'Example',root:'C:\\Demo\\Atlas',revision:0,versions:[],versionSource:'planned',notes:[{id:noteId,title:'Example feature',description:'Acceptance criteria',branch:'',status:'idea',owner:'',dependencies:[],x:1200,y:900}]}];(window as any).testBoardNotices=[{id:'notice',boardId,noteId,recipientId:'host',kind:'question',title:'Example feature',message:'Which format should be supported?',at:1}];});
- await desktop(page);await page.getByRole('button',{name:'Notifications and activity',exact:true}).click();await page.screenshot({path:'.local/notifications-0255.png'});await page.getByRole('button',{name:/Clarification requested.*Example feature/}).click();await expect(page.getByRole('dialog',{name:'Note details'})).toBeVisible();await expect(page.getByLabel('Title',{exact:true})).toHaveValue('Example feature');await expect(page.getByRole('dialog',{name:'Note details'})).toContainText('Which format should be supported?');await expect(page.getByRole('heading',{name:'Example',exact:true})).toBeVisible();await expect.poll(()=>page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeTruthy();await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('.board-note-highlight')).toBeInViewport();await page.screenshot({path:'.local/notification-board-0256.png'});
+ await desktop(page);await page.getByRole('button',{name:'Inbox',exact:true}).click();await page.screenshot({path:'.local/notifications-0255.png'});await page.getByRole('button',{name:/Example feature.*Clarification requested/}).click();await expect(page.getByRole('heading',{name:'Answer the question'})).toBeVisible();await expect(page.locator('.board-notification-reply blockquote')).toHaveText('Which format should be supported?');await page.getByRole('button',{name:'Open card',exact:true}).click();await expect(page.getByRole('dialog',{name:'Note details'})).toBeVisible();await expect(page.getByLabel('Title',{exact:true})).toHaveValue('Example feature');await expect(page.getByRole('dialog',{name:'Note details'})).toContainText('Which format should be supported?');await expect(page.getByRole('heading',{name:'Example',exact:true})).toBeVisible();expect(await page.evaluate(()=>(window as any).testBoardNotices[0].readAt)).toBeFalsy();await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('.board-note-highlight')).toBeInViewport();await page.screenshot({path:'.local/notification-board-0256.png'});
 });
 
 test('desktop pastes an image attachment using the native clipboard event',async({page,context})=>{
@@ -254,7 +254,7 @@ test('Miro connection is in settings and WorkSpace is absent from navigation',as
  await page.getByRole('button',{name:'Disconnect link'}).click();await expect(page.getByRole('button',{name:'Disconnect link'})).toHaveCount(0);
 });
 test('composer pointer focus uses a soft background without a textarea outline',async({page})=>{
- await desktop(page);await page.getByRole('button',{name:'New',exact:true}).click();const field=page.locator('textarea');await field.click();
+ await desktop(page);await page.getByRole('button',{name:'New chat',exact:true}).click();const field=page.locator('textarea');await field.click();
  await expect(field).toBeFocused();expect(await field.evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('none');
  expect(await page.locator('.composer').evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('none');
  await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(field).toBeFocused();expect(await page.locator('.composer').evaluate(e=>getComputedStyle(e).outlineStyle)).toBe('solid');
@@ -304,16 +304,16 @@ test('right-click note deletion confirms, preserves other cards and removes dang
 
  test('returning after an active chat finishes while hidden follows latest messages; idle return preserves position',async({page})=>{
  await desktop(page);await page.evaluate(()=>{(window as any).testRuns=[{id:'latest-run',cwd:'C:\\Demo\\Atlas',sessionId:'alpha',provider:'claude',messages:[],approvals:[],baseMessageCount:0,revision:1,startedAt:2,status:'running',partial:Array.from({length:70},(_,i)=>'Progress paragraph '+i).join('\n\n')+'\n\nLatest response'}];});
- const row=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});await expect(row).toContainText('Working');await row.click();await expect(page.getByText('Latest response',{exact:true})).toBeVisible();
+ const row=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});await expect(row).toContainText('Running');await row.click();await expect(page.getByText('Latest response',{exact:true})).toBeVisible();
  const scroll=page.locator('.desktop-chat-host .conversation');await scroll.evaluate(el=>{el.scrollTop=120;el.dispatchEvent(new Event('scroll'));});
- await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await page.evaluate(()=>{(window as any).testRuns[0].status='done';(window as any).testRuns[0].revision++;});await expect(row).toContainText('Completed');await row.click();
+ await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await page.evaluate(()=>{(window as any).testRuns[0].status='done';(window as any).testRuns[0].revision++;});await expect(row).toContainText('Done');await row.click();
  await expect.poll(()=>scroll.evaluate(el=>Math.round(el.scrollHeight-el.clientHeight-el.scrollTop))).toBeLessThan(8);
  await scroll.evaluate(el=>{el.scrollTop=120;el.dispatchEvent(new Event('scroll'));});await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await row.click();await expect.poll(()=>scroll.evaluate(el=>Math.round(el.scrollTop))).toBe(120);
  });
 
 test('desktop notifications sit with navigation and retain a full-size touch target',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await desktop(page);
- const bell=page.locator('.desktop-rail nav').getByRole('button',{name:'Notifications and activity'});await expect(bell).toBeVisible();expect((await bell.boundingBox())!.height).toBeGreaterThanOrEqual(48);await expect(page.locator('.desktop-rail > .board-notifications')).toHaveCount(0);await bell.click();await expect(page.getByRole('dialog',{name:'Notifications and activity'})).toBeVisible();
+ const bell=page.locator('.desktop-rail nav').getByRole('button',{name:'Inbox'});await expect(bell).toBeVisible();expect((await bell.boundingBox())!.height).toBeGreaterThanOrEqual(48);await expect(page.locator('.desktop-rail > .board-notifications')).toHaveCount(0);await bell.click();await expect(page.getByRole('dialog',{name:'Inbox'})).toBeVisible();
 });
 
 
@@ -324,17 +324,17 @@ test('desktop bell shares process state with chats and is available outside chat
   (window as any).testRuns=[{...run,messages:[{id:'finished-result',role:'assistant',blocks:[{type:'text',text:'Synthetic completed result'}]}],partial:'',approvals:[],revision:2}];
  });
  await desktop(page);
- const bell=page.getByRole('button',{name:'Notifications and activity',exact:true});
- await expect(bell.locator('b')).toHaveText('2');await bell.click();
- const inbox=page.getByRole('dialog',{name:'Notifications and activity'});
- await expect(inbox.getByRole('button',{name:'Synthetic process',exact:true})).toBeVisible();
- await page.keyboard.press('Escape');await expect(bell.locator('b')).toHaveText('2');
+ const bell=page.getByRole('button',{name:'Inbox',exact:true});
+ await expect(bell.locator('b')).toHaveText('1');await bell.click();await expect(bell).toHaveAttribute('aria-current','page');
+ const inbox=page.getByRole('dialog',{name:'Inbox'});
+ await expect(inbox.getByRole('button',{name:/^Synthetic process,/})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(bell.locator('b')).toHaveText('1');
  await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await bell.click();
- await inbox.getByRole('button',{name:'Synthetic process',exact:true}).click();
+ await inbox.getByRole('button',{name:/^Synthetic process,/}).click();
  await expect(page.getByText('Synthetic completed result',{exact:true})).toBeVisible();
  await expect(bell.locator('b')).toHaveText('1');await bell.click();
- await expect(inbox.getByRole('button',{name:'Synthetic question',exact:true})).toBeVisible();
- await expect(inbox.getByRole('button',{name:'Synthetic process',exact:true})).toHaveCount(0);
+ await expect(inbox.getByRole('button',{name:/^Synthetic question,/})).toBeVisible();
+ await expect(inbox.getByRole('button',{name:/^Synthetic process,/})).toHaveCount(0);
  await expect(page.locator('.activity-entry,.activity-drawer')).toHaveCount(0);
 });
 
@@ -344,6 +344,6 @@ test('desktop edge fade preference persists and applies to shared chat',async({p
  const slider=page.getByRole('slider',{name:'Chat edge fade',exact:true});await expect(slider).toHaveValue('100');await slider.fill('0');
  await expect(page.locator('html')).toHaveAttribute('data-chat-edge-fade','off');
  await page.reload();await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:/Appearance and language/}).click();await expect(slider).toHaveValue('0');
- await page.locator('.desktop-sessions').getByRole('button',{name:'New',exact:true}).click();
+ await page.locator('.desktop-sessions').getByRole('button',{name:'New chat',exact:true}).click();
  await expect(page.locator('.conversation')).toBeVisible();expect(await page.locator('.conversation').evaluate(el=>getComputedStyle(el).maskImage)).toBe('none');
 });

@@ -1,12 +1,10 @@
 import type {Page} from '@playwright/test';
 import QRCode from 'qrcode';
+import {openSection} from './chat-navigation';
 
 export async function openConnectionSettings(page:Page){
   if(await page.locator('input[type="file"][accept="image/*"]').count())return;
-  await page.locator('.mobile-menu-button:visible,.desktop-tabs:visible').first().waitFor();
-  const menu=page.getByRole('button',{name:/^(Navigation menu|Меню разделов)$/}).filter({visible:true});
-  if(await menu.count())await menu.click();
-  await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().getByRole('button',{name:/^(Settings|Настройки)$/,exact:true}).click();
+  await openSection(page,/^(Settings|Настройки)$/);
   await page.locator('[data-settings-category="connection"]').click();
 }
 /** Exercise actual QR decoding with synthetic credentials, never private pairing data. */

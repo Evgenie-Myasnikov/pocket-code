@@ -1,4 +1,5 @@
 import {connectByQr} from './qr-connect';
+import {openSection} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 
 const version='99.1.0',sha256='c'.repeat(64);
@@ -55,7 +56,7 @@ test('a reachable PC stays the update source and GitHub is not contacted',async(
   await page.route('**/api/updates/**',route=>route.fulfill({json:{enabled:true,state:'idle'}}));
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
-  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Updates',exact:true}).click();
+  await openSection(page,'Settings');await page.getByRole('button',{name:'Updates',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Updates from PC'})).toBeVisible();
   const before=github.length;await page.waitForTimeout(6000);
   expect(github.length).toBe(before);
@@ -67,7 +68,7 @@ test('a paired PC that does not answer leaves the phone updating itself',async({
   await page.route('**/api/updates/**',route=>route.fulfill({status:503,json:{error:'Synthetic outage'}}));
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
-  await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Updates',exact:true}).click();
+  await openSection(page,'Settings');await page.getByRole('button',{name:'Updates',exact:true}).click();
   await expect(page.getByRole('region',{name:'Updates',exact:true}).getByRole('heading',{name:'Updates',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Check for updates',exact:true})).toBeVisible();
   await expect.poll(()=>calls(page,'downloadRelease').then(list=>list.length)).toBeGreaterThan(0);

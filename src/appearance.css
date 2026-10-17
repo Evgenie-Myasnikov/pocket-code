@@ -3,7 +3,7 @@
 :root[data-theme] :is(.sidebar,.workspace,.mobile-nav,.chat-header,.connect-page){background:var(--bg);color:var(--text)}
 :root[data-theme] :is(.host-card,.search,.composer,.message.user,.approval-card,.confirm-modal,.secret-input,.appearance-preview,label>select,label>input,.markdown pre,.secondary,.branch,.suggestions button,.attachment-chip){background:var(--panel);color:var(--text);border-color:var(--line)}
 :root[data-theme] :is(.session-row.selected,.session-row:hover,.icon-button:hover,.secondary:hover,.host-icon){background:var(--surface);border-color:var(--line)}
-:root[data-theme] :is(label,.message,.markdown strong,.tool-card,.session-row,.search input,.thinking,.composer textarea,.header-title strong,.settings-panel h2){color:var(--text)}
+:root[data-theme] :is(label,.message,.markdown strong,.tool-card,.session-row,.search input,.thinking,.composer textarea,.header-title strong,.header-title h1,.settings-panel h2){color:var(--text)}
 :root[data-theme] .session-row strong{color:var(--text)}
 :root[data-theme] :is(.muted,.icon-button,.text-button,.message-label,.session-row small,.header-title>span,.composer-caption,.branch,.host-card span,.eyebrow,.conversation-date,.mobile-nav button,.connect-intro p,.setup-help,.security-note,.thinking p){color:var(--muted)}
 :root[data-theme] :is(.message.assistant .message-label,.desktop-tabs button.active,.mobile-nav button.active,.connect-intro h1 span,.inline-link){color:var(--accent)}

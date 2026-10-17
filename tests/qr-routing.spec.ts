@@ -1,11 +1,12 @@
 import {test,expect} from '@playwright/test';
+import {openSection} from './chat-navigation';
 import QRCode from 'qrcode';
 test('PC connection rejects workspace QR while legacy join API preserves password, approval and revocation',async({page,request})=>{
  const url='http://127.0.0.1:4319',headers={Authorization:'Bearer '+'test-only-'.repeat(5)};
  const health=await (await request.get(url+'/api/health',{headers})).json();
  const ws=await (await request.post(url+'/api/workspaces',{headers,data:{name:'QR routing '+Date.now(),password:'synthetic-password',roots:[health.roots[0]]}})).json();
  const invitation=await request.post(url+'/api/workspaces/'+ws.id+'/invitation',{headers,data:{role:'viewer'}});expect(invitation.ok()).toBeTruthy();const {token}=await invitation.json();
- await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'PC connection',exact:true}).click();
+ await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openSection(page,'Settings');await page.getByRole('button',{name:'PC connection',exact:true}).click();
  const buffer=await QRCode.toBuffer(JSON.stringify({type:'pocket-workspace',version:1,url,token,workspaceId:ws.id}),{width:640,margin:4});await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer});
  await expect(page.getByRole('alert')).toContainText(/workspace|WorkSpace/i);await expect(page.getByLabel('Workspace password',{exact:true})).toHaveCount(0);expect(await page.evaluate(()=>sessionStorage.getItem('connection'))).toBeNull();
  const invitationHeaders={Authorization:'Bearer '+token};expect((await request.post(url+'/api/workspace-join',{headers:invitationHeaders,data:{password:'wrong-password'}})).status()).toBe(401);

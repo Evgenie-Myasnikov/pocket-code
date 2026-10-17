@@ -1,5 +1,5 @@
 import {connectByQr,openConnectionSettings} from './qr-connect';
-import {openChatList} from './chat-navigation';
+import {openChatList,openSection} from './chat-navigation';
 import {randomUUID} from 'node:crypto';
 
 import { test, expect } from '@playwright/test';
@@ -30,7 +30,7 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await expect(page.getByText('History message 0.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: /К новым сообщениям/ }).click();
   await expect(page.getByText('History message 149.', { exact: false })).toBeVisible();
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Настройки', exact: true }).click();
+  await openSection(page,'Настройки');
   await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await page.getByLabel('Тема', { exact: true }).selectOption('light');
   await page.getByRole('button', { name: 'Мята', exact: false }).click();
   await page.getByLabel('Размер текста чата', { exact: true }).focus(); await page.keyboard.press('End');
@@ -40,7 +40,7 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await page.locator('.settings-content').evaluate(el => { el.scrollTop = 0; });
   await page.screenshot({ path: 'artifacts/screenshots/appearance-mobile.png', fullPage: true });
   await page.reload();
-  await page.locator('.mobile-nav').getByRole('button', { name: 'Настройки', exact: true }).click();
+  await openSection(page,'Настройки');
   await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('light');
   await expect(page.getByRole('button', { name: /Мята/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByLabel('Размер текста чата', { exact: true })).toHaveValue('22');
@@ -78,7 +78,7 @@ test('generated PC QR connects phone UI from an image without typing credentials
   await openConnectionSettings(page);await expect(page.getByRole('button', { name: 'Сканировать QR-код', exact: true })).toBeVisible();
   await page.getByLabel('Изображение QR-кода').setInputFiles({ name: 'connection.png', mimeType: 'image/png', buffer: Buffer.from(encoded, 'base64') });
   await openChatList(page);await expect(page.getByRole('button', { name: /Интеграционный тест/ })).toBeVisible();
-  await page.locator('.mobile-nav').getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('button',{name:'Подключение к ПК',exact:true}).click();await expect(page.getByRole('button',{name:'Повторить подключение',exact:true})).toBeVisible();expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}').url)).toBe('http://127.0.0.1:4319');
+  await openSection(page,'Настройки');await page.getByRole('button',{name:'Подключение к ПК',exact:true}).click();await expect(page.getByRole('button',{name:'Повторить подключение',exact:true})).toBeVisible();expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('connection')||'{}').url)).toBe('http://127.0.0.1:4319');
 });
 
 test('mobile connects, uploads, restores approval after reload and controls a real PTY', async ({ page, request }) => {

@@ -21,14 +21,14 @@ async function setup(page:Page,fallback=false){
  });
  await page.goto('http://127.0.0.1:5173');
  await openChatList(page);
- await page.getByRole('button',{name:'New',exact:true}).click();
+ await page.getByRole('button',{name:'New chat',exact:true}).click();
  await expect(page.getByLabel('Message Claude')).toBeVisible();return sent;
 }
 test('Claude versions are selectable, persisted and sent; an explicit version can be entered',async({page})=>{
  const sent=await setup(page);const models=page.getByLabel('Claude model',{exact:true});
  await expect(models.locator('option[value="claude-sonnet-fixture"]')).toHaveCount(1);
  await models.selectOption('claude-sonnet-fixture');await page.reload();
- await openChatList(page);await page.getByRole('button',{name:'New',exact:true}).click();
+ await openChatList(page);await page.getByRole('button',{name:'New chat',exact:true}).click();
  await expect(models).toHaveValue('claude-sonnet-fixture');
  await page.getByLabel('Message Claude').fill('Synthetic pinned model request');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent[0]?.model).toBe('claude-sonnet-fixture');
  await models.selectOption('__custom__');await page.getByLabel('Claude model ID').fill('claude-custom-fixture[1m]');await page.getByRole('button',{name:'Apply',exact:true}).click();await expect(models).toHaveValue('claude-custom-fixture[1m]');

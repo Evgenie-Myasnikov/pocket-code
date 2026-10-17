@@ -166,8 +166,7 @@
 .app>.sidebar,.app>.workspace{min-height:0}
 
 .chat-tab-icon{position:relative;display:inline-flex}
-.chat-tab-status{position:absolute;right:-5px;top:-3px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px var(--bg);background:#68b5eb}
-.chat-tab-status-done{background:#70c78a}.chat-tab-status-error{background:#f07575}.chat-tab-status-needs_input{background:#efc35b}
+.chat-tab-status{position:absolute;right:-5px;top:-3px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px var(--bg);background:var(--run-status)}
 @media(prefers-reduced-motion:no-preference){.chat-tab-status-running{animation:chat-status-pulse 1.3s ease-in-out infinite}@keyframes chat-status-pulse{50%{opacity:.3}}}
 
 .tasks-header-role{color:var(--muted);font-size:clamp(11px,calc(13px * var(--ui-scale,1)),17px);max-width:55%;overflow-wrap:anywhere;text-align:right}

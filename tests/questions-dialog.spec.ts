@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 async function setup(page:Page,width=390){
- await page.setViewportSize({width,height:844});await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().waitFor();
+ await page.setViewportSize({width,height:844});await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{QuestionsHarness}=await import('/tests/fixtures/QuestionsHarness.tsx' as string);const root=document.createElement('div');document.body.replaceChildren(root);createRoot(root).render(React.createElement(QuestionsHarness));});
  await expect(page.getByRole('button',{name:'Background control'})).toBeVisible();
 }

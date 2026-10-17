@@ -1,17 +1,42 @@
-.notification-center .inbox-processes section{margin:12px 0 20px}
+.notification-center .inbox-processes section,.notification-center .inbox-board{margin:12px 0 20px}
 .notification-center h3{display:flex;align-items:center;gap:8px;font-size:var(--category-detail-size);font-weight:500;color:var(--muted);margin:12px 0}
 .notification-center h3 span{font-size:.9em;opacity:.7}
-.inbox-process-row{display:flex;align-items:flex-start;gap:12px;width:100%;padding:14px 12px;border:0;border-radius:14px;background:transparent;color:var(--text);font:inherit;text-align:left}
+.notification-center h3 .text-button{margin-left:auto;min-height:44px;padding:8px;font-size:inherit;color:var(--accent)}
+.inbox-process-item{display:flex;align-items:center;gap:4px}
+.inbox-process-row{display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0;width:100%;padding:12px;border:0;border-radius:14px;background:transparent;color:var(--text);font:inherit;text-align:left}
 .inbox-process-row:hover,.inbox-process-row:focus-visible{background:var(--panel)}
-.inbox-process-row>svg{flex-shrink:0;margin-top:3px;color:var(--muted)}
-.inbox-process-row>span{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}
+.inbox-process-row>svg{flex-shrink:0;margin-top:3px}
+.inbox-process-row>span:not(.inbox-pill){display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;overflow-wrap:anywhere}
 .inbox-process-row strong{font-size:var(--category-title-size);font-weight:500;line-height:1.4}
 .inbox-process-row small{font-size:var(--category-detail-size);color:var(--muted)}
-.inbox-process-row.state-needs_input>svg{color:var(--accent)}
-.inbox-process-row.state-error>svg{color:var(--danger,#e57373)}
-.inbox-process-row.state-done>svg{color:var(--success,#71b894)}
-.inbox-process-row.state-running>svg{animation:inbox-running 2s linear infinite;color:var(--accent)}
-.inbox-sync-error{padding:12px;background:var(--panel);border-radius:12px;font-size:var(--category-detail-size)}
-.notification-center .task-inbox-tools{border:0}
+.inbox-pill{flex:none;align-self:center;padding:2px 8px;border-radius:999px;border:1px solid var(--run-status);color:var(--run-status);font-size:var(--category-detail-size);line-height:1.5;white-space:nowrap}
+.inbox-dismiss{flex:none;min-height:44px;min-width:44px;padding:8px;color:var(--muted)}
+.inbox-sync-error{display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--panel);border-radius:12px;font-size:var(--category-detail-size);margin:8px 0}
+.inbox-sync-error>svg{flex:none;color:var(--status-error);margin-top:2px}.inbox-sync-error>div{flex:1;min-width:0}.inbox-sync-error p{margin:0 0 4px}.inbox-sync-error .secondary{flex:none;min-height:44px;padding:8px 12px}
+.inbox-error{color:var(--status-error);font-size:var(--category-detail-size)}
+.notification-center .task-inbox-tools{border:0;flex-wrap:wrap;gap:6px}
+.notification-center .task-inbox-tools button{flex:none;border:1px solid var(--line);border-radius:999px;min-height:44px;padding:4px 12px}
+.notification-center .task-inbox-tools button[aria-pressed=true]{border-color:var(--accent);border-radius:999px}
+.inbox-chip-count{font-variant-numeric:tabular-nums;opacity:.75}
+.board-notifications-inbox .task-inbox-item.inbox-notice-row{border:0;border-radius:14px;margin:0;padding:12px;background:transparent;align-items:center}
+.board-notifications-inbox .task-inbox-item.inbox-notice-row:hover,.board-notifications-inbox .task-inbox-item.inbox-notice-row:focus-visible{background:var(--panel)}
+.board-notifications-inbox .board-notice-body small{font-size:var(--category-detail-size);color:var(--muted)}
+.board-notifications-inbox .inbox-notice-row .board-notice-icon{flex:0 0 20px;height:20px;margin-top:2px;background:transparent;align-self:flex-start}
+.inbox-unread-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none}
+.inbox-spin{animation:inbox-running 1.2s linear infinite}
+.inbox-refreshing svg{animation:inbox-running 1s linear infinite}
+.board-notification-reply{display:grid;gap:12px;padding:8px 0}.board-notification-reply h3{margin:0;color:var(--text);font-size:1.05em}.board-notification-reply p{margin:0}
+.board-notification-reply blockquote{margin:0;padding:10px 14px;border-left:3px solid var(--status-attention);background:var(--panel);border-radius:0 10px 10px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.board-notification-reply label{display:grid;gap:6px;font-size:var(--category-detail-size);color:var(--muted)}.board-notification-reply textarea{width:100%;box-sizing:border-box;min-height:96px;font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.board-reply-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.board-reply-actions>button{min-height:44px}
+.inbox-snackbar{display:flex;align-items:center;gap:12px;margin:8px 12px calc(8px + env(safe-area-inset-bottom));padding:6px 6px 6px 14px;border-radius:12px;background:var(--text);color:var(--bg);font-size:var(--category-detail-size)}
+.inbox-snackbar span{flex:1}.inbox-snackbar .text-button{color:var(--bg);font-weight:600;min-height:44px}
+/* The bell: number for what needs you, a ring while work runs, a dot for unseen results. */
+.inbox-bell{position:relative;display:inline-grid;place-items:center;border-radius:50%}
+.inbox-bell>b{position:absolute;top:-6px;right:-9px;min-width:16px;padding:0 4px;border-radius:1em;background:var(--accent);color:var(--bg);font-size:10px;line-height:16px;text-align:center;font-weight:700}
+.inbox-bell>b.inbox-badge-danger{background:var(--status-error);color:var(--bg)}
+.inbox-unseen-dot{position:absolute;top:-2px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--status-done);box-shadow:0 0 0 2px var(--bg)}
+.inbox-running .inbox-bell::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid transparent;border-top-color:var(--status-running);border-right-color:var(--status-running);animation:inbox-running 1.4s linear infinite}
+.chat-header .board-notifications-trigger>.inbox-label,.chat-list-actions .board-notifications-trigger>.inbox-label{display:none}
 @keyframes inbox-running{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.inbox-process-row.state-running>svg{animation:none}}
+@media(prefers-reduced-motion:reduce){.inbox-spin,.inbox-refreshing svg,.inbox-running .inbox-bell::after{animation:none}}

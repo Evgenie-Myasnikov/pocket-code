@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,chooseProvider,openSection} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 const snapshot=(name:string,value:number)=>({checkedAt:Date.now(),ordinaryUsageAllowed:null,buckets:[{id:'quota',name,windows:[{id:'primary',remainingPercent:value,usedPercent:100-value,windowDurationMins:300,resetsAt:null},{id:'secondary',remainingPercent:90,usedPercent:10,windowDurationMins:10080,resetsAt:null}]}]});
@@ -18,7 +18,7 @@ test('right-side ring shows remaining allowance and opens details without losing
   const send=page.locator('.send-button');expect((await send.boundingBox())!.width).toBeGreaterThanOrEqual(48);
   expect(await send.evaluate(element=>Number.parseFloat(getComputedStyle(element,'::before').width))).toBeLessThanOrEqual(36);
   await page.getByLabel('Message Claude').fill('Keep this draft');await page.screenshot({path:'artifacts/screenshots/chat-usage-ring.png'});await indicator.click();
-  await expect(page.locator('.codex-usage')).toContainText('42% remaining');await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');
+  await expect(page.locator('.codex-usage')).toContainText('42% remaining');await openSection(page,'Chats');await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');
 });
 test('background polling pauses and a failed refresh becomes unknown rather than a stale current percentage',async({page})=>{
   await page.setViewportSize({width:390,height:844});let fail=false,reads=0;
@@ -33,5 +33,5 @@ test('switching providers discards late quota responses',async({page})=>{
   await page.setViewportSize({width:390,height:844});let started=0,release!:()=>void;const hold=new Promise<void>(resolve=>release=resolve);
   await page.route('**/api/claude/usage',async route=>{started++;await hold;await route.fulfill({json:snapshot('Claude',2)});});
   await page.route('**/api/codex/usage',route=>route.fulfill({json:snapshot('Codex',67)}));
-  await open(page);await expect.poll(()=>started).toBeGreaterThan(0);await page.getByRole('button',{name:'Back to chats',exact:true}).click();await page.locator('.workspace-picker-sidebar select').selectOption('codex');await page.getByRole('button',{name:'Quota example',exact:false}).click();await expect(page.locator('.usage-indicator')).toHaveText('67%');release();await expect(page.locator('.usage-indicator')).toHaveAccessibleName('Codex: 67% allowance remaining');
+  await open(page);await expect.poll(()=>started).toBeGreaterThan(0);await page.getByRole('button',{name:'Back to chats',exact:true}).click();await chooseProvider(page,'codex');await page.getByRole('button',{name:'Quota example',exact:false}).click();await expect(page.locator('.usage-indicator')).toHaveText('67%');release();await expect(page.locator('.usage-indicator')).toHaveAccessibleName('Codex: 67% allowance remaining');
 });

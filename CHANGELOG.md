@@ -9,6 +9,15 @@
 - connection: "Disconnect and forget" now asks for confirmation, names the PC and lists what is removed; it is hidden when nothing is connected.
 - security: a pairing QR stops working after one use and rotates; the PC can rotate it manually. Pairing through the internet tunnel waits for approval on the PC, and the desktop tray announces new or waiting devices.
 - desktop: optional keep-awake while agents run or a phone is online on mains power; open the logs folder from the app.
+- shell: the phone starts on Chats and uses a bottom bar (Chats, Board, Inbox, More) instead of the hidden section drawer; the bar is hidden inside a conversation, Back from Chats leaves the app and More holds Rules, Changelog, Settings and the PC connection with its state.
+- shell: one conversation header with Back (showing the state of other chats), the title as a heading, a subtitle that picks provider and project in a new chat, and only applicable labelled actions; the separate project row and the "Workspace" divider are gone.
+- inbox: a single app-level inbox and poll serve every bell; the badge counts only chats waiting for an answer, errors and unread board notices, while running work shows a ring and unseen results a dot.
+- inbox: filters by action with counts (All, Needs you, Running, Done, Board) that always open on All, two-line rows with provider, project and relative time, status pills only for Needs you and Error, "Clear finished" with Undo and "Mark all read" for board notices.
+- inbox: an error stays under Needs you until the task is restarted, the person writes in that chat or chooses Hide; a board question opens a reply sheet that adds the answer to the card, returns it to Ready and only then marks the notice read.
+- chats: chats that need you from every provider are listed first, the rest are grouped by Today, Yesterday and Earlier with relative times and a status (Needs you, Running, Done, Error, Stopped); provider chips replace the select used as a title and "New chat" is a labelled action.
+- status: one run-status vocabulary and theme tokens with at least 4.5:1 contrast in light and dark themes, always paired with an icon shape, shared by the phone list, the PC window, the inbox and the tab dots.
+- accessibility: inbox rows are named by title, status, provider and project; filters and provider chips are labelled groups with pressed state; status dots carry hidden text; every section has an h1.
+- desktop: Ctrl+N starts a chat in the current project, Ctrl+Tab/Ctrl+Shift+Tab switch chats, Ctrl+Alt+U opens the inbox and Ctrl+/ lists the shortcuts; the inbox is marked current while open and the chat list stops highlighting a chat when another section is shown.
 
 ### Bug Fixes
 - i18n: restore the Russian follow-up recovery message and the external-image button label that were saved as question marks in 0.26.9.
@@ -20,10 +29,16 @@
 - chat: show tool output as preformatted monospace text instead of Markdown, keeping line breaks and "> command" lines intact.
 - chat: place the conversation header on an opaque band so titles and controls no longer print over messages, including with edge fade off.
 - chat: stop showing "update the PC server to enable Codex" while offline or in Claude/Copilot chats when provider status is simply not loaded yet.
+- chat: the conversation header band is opaque by default (translucent with blur only on desktop with edge fade on), gains a hairline once the transcript scrolls under it, and the edge fade now holds its floor across the measured header height.
+- inbox: background polls no longer flash "Loading processes…", re-render the app or announce through a status region; Refresh spins while loading and Retry is a regular button with the time of the last update.
+- inbox: tapping a board notice shows progress immediately and ignores repeated taps.
+- engine updates: browsing another provider's chats no longer changes which engine the PC checks for compatibility; only changing the setting in Settings → Updates sends it.
+- cleanup: removed the unused mobile workspace header.
 
 ### Validation
 - TypeScript check passed; no remaining question-mark placeholders in src. Browser scenarios passed: device pairing (including a Miro 401 that keeps the pairing), follow-up composer and task pipeline (12), edge/compact chat layout (7). Transcript specs tool-activity/activity-groups/rich-updates/chat-surfaces show the same 5 failures with and without these changes (height and navigation assertions). Device checks not run.
 - Connection area: TypeScript check and unit tests passed (332/333; the board-evidence test failure predates this work). 48 of 52 browser scenarios passed across connect-usability, device-pairing, qr-routing, workspace-recovery, settings-navigation, language and desktop-ui; qr-routing, settings-navigation and workspace-recovery fail identically on the previous commit, and the desktop note-deletion scenario passed on rerun. The C# shell was not compiled; no physical Android or Windows checks.
+- Shell and inbox area: TypeScript check passed; unit tests 333/334 (the board-evidence failure predates this work; new badge-count test added). Browser: mobile-menu, notification-placement, section-header, notification-center (incl. new badge, reply-sheet and Undo scenarios), edge-chat, compact-chat, desktop-ui, language, connect-usability, settings-navigation, followup-composer, workspace-recovery, responsive-layout (now 72/72) and 25 other updated specs pass. Still failing and also failing on the previous commit: chat-recovery reading mode, chat-surfaces (3), navigation-usability, chat-pc-scope, attachment-tray (2), codex-access selection, copilot-provider, workspaces histories, ui QR image, usage-limits failed refresh. workspaces preference reload failed 1 of 10 repeated runs (intermittent).
 
 ## [0.26.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.8...v0.26.9) (2026-10-14)
 

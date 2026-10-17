@@ -28,3 +28,5 @@ export function rememberViewed(seen:ActivitySeen[],item:ActivityItem,now=Date.no
 export function validActivity(value:unknown):value is ActivityItem[]{
   return Array.isArray(value)&&value.every(item=>item&&typeof item==='object'&&typeof item.id==='string'&&(item.provider==='copilot'||item.provider==='codex'||item.provider==='claude')&&typeof item.cwd==='string'&&(item.sessionId===undefined||typeof item.sessionId==='string')&&typeof item.title==='string'&&['running','needs_input','done','error','stopped'].includes(item.status)&&typeof item.startedAt==='number'&&Number.isFinite(item.startedAt)&&typeof item.version==='string');
 }
+/** Badge counts only what needs the person; running work and unseen results are shown as a ring and a dot instead. */
+export function activityCounts(items:Pick<ActivityItem,'status'>[]){let attention=0,running=0,unseen=0;for(const item of items){if(item.status==='needs_input'||item.status==='error')attention++;else if(item.status==='running')running++;else unseen++;}return{attention,running,unseen};}

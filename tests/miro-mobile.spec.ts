@@ -1,4 +1,5 @@
 ﻿import {test,expect} from '@playwright/test';
+import {openSection} from './chat-navigation';
 for(const width of [360,430])test('mobile Miro settings, embedded board and Back at '+width,async({page})=>{
  let miro:null|{root:string;url:string}=null;const root='C:\\Demo\\Atlas';await page.setViewportSize({width,height:850});
  await page.addInitScript(()=>{sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'synthetic-token'.repeat(4)}));localStorage.setItem('pocket-code-language-v1','en');});
@@ -14,9 +15,9 @@ for(const width of [360,430])test('mobile Miro settings, embedded board and Back
   if(p==='/api/board-notifications'||p==='/api/task-notifications')return r.fulfill({json:{items:[],unread:0}});
   return r.fulfill({json:[]});
  });
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Miro',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await openSection(page,'Settings');await page.getByRole('button',{name:'Miro',exact:true}).click();
  await page.getByLabel('Miro board link').fill('https://miro.com/app/board/synthetic_123=/');await page.getByRole('button',{name:'Connect Miro board'}).click();await expect(page.getByRole('status')).toContainText('Miro board connected');
- await page.locator('.mobile-nav').getByRole('button',{name:'Board',exact:true}).click();await expect(page.locator('.mobile-workspace-header')).toHaveCount(0);await page.locator('.project-board-row').getByRole('button').click();await expect(page.locator('iframe[title="Miro live board"]')).toBeVisible();
+ await openSection(page,'Board');await expect(page.locator('.mobile-workspace-header')).toHaveCount(0);await page.locator('.project-board-row').getByRole('button').click();await expect(page.locator('iframe[title="Miro live board"]')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'.local/miro-mobile-'+width+'.png'});
  await page.getByRole('button',{name:'Back to boards',exact:true}).click();await expect(page.locator('iframe')).toHaveCount(0);
 });

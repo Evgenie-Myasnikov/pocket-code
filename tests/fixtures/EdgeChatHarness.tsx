@@ -3,7 +3,6 @@ import {ChatOverlay} from '../../src/ChatOverlay';
 import {ChatHeader} from '../../src/ChatHeader';
 import {ChatComposer} from '../../src/ChatComposer';
 import {MessageList} from '../../src/Messages';
-import {MobileMenuButton} from '../../src/MobileNavigation';
 import {useTranscriptFollow,transcriptFollowing} from '../../src/use-transcript-follow';
 
 export function EdgeChatHarness(){
@@ -13,7 +12,7 @@ export function EdgeChatHarness(){
  useTranscriptFollow(scroll,following,true,'edge');
  Object.assign(window,{edgeAppend:()=>setExtra(value=>value+'\n\nA new paragraph with implementation details and the next verification step.'),edgeReading:setReading});
  return <div className={`app show-chat chat-edge-to-edge ${reading?'reading-mode':''}`}><main className="workspace chat-canvas">
-  <ChatOverlay edge="top"><ChatHeader title="Interface review" project="Example" provider="Claude" onBack={()=>{}} navigation={<MobileMenuButton open={false} onOpen={()=>{}}/>} outputs={{disabled:false,open:()=>{}}} reading={{disabled:false,open:()=>setReading(true)}}/></ChatOverlay>
+  <ChatOverlay edge="top"><ChatHeader title="Interface review" project="Example" provider="Claude" onBack={()=>{}} outputs={{disabled:false,open:()=>{}}} reading={{disabled:false,open:()=>setReading(true)}}/></ChatOverlay>
   <div ref={scroll} className="conversation" style={{overflowAnchor:'none'}} onScroll={event=>{const el=event.currentTarget;following.current=transcriptFollowing(el,last.current,following.current);last.current=el.scrollTop;setJump(!following.current);}}><div className="conversation-inner"><MessageList messages={[
    {id:'first',role:'user',blocks:[{type:'text',text:'How should the interface behave while reading a long conversation?'}]},
    {id:'answer',role:'assistant',blocks:[{type:'text',text:'## A clear reading surface\n\n'+('The conversation continues beneath the controls. You can scroll naturally and keep your place while new information arrives.\n\n').repeat(14)+extra}]},

@@ -12,7 +12,7 @@ async function setup(page:Page,baseURL:string,canManage:boolean){
   if(pathname==='/api/miro/items')return route.fulfill({json:{items:[{id:'synthetic-note'}]}});
   return route.fulfill({json:[]});
  });
- await page.goto(baseURL);await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().waitFor();
+ await page.goto(baseURL);await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{MiroHarness}=await import('/tests/fixtures/MiroHarness.tsx' as string);const root=document.createElement('div');document.body.replaceChildren(root);createRoot(root).render(React.createElement(MiroHarness));});
  await expect(page.getByRole('heading',{name:'AI access'})).toBeVisible();return writes;
 }

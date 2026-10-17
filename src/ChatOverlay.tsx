@@ -11,7 +11,10 @@ export function ChatOverlay({edge,enabled=true,children}:{edge:'top'|'bottom';en
     const measure=()=>workspace.style.setProperty(property,`${element.offsetHeight}px`);
     measure();
     const observer=new ResizeObserver(measure);observer.observe(element);
-    return()=>{observer.disconnect();workspace.style.removeProperty(property);};
+    // The top band shows a hairline only once the transcript scrolls beneath it.
+    const scrolled=(target:EventTarget|null)=>{if(edge==='top'&&target instanceof HTMLElement&&target.classList.contains('conversation'))element.dataset.scrolled=String(target.scrollTop>4);};
+    const onScroll=(event:Event)=>scrolled(event.target);scrolled(workspace.querySelector('.conversation'));workspace.addEventListener('scroll',onScroll,true);
+    return()=>{observer.disconnect();workspace.removeEventListener('scroll',onScroll,true);workspace.style.removeProperty(property);};
   },[edge,enabled]);
   return enabled?<div ref={ref} className={`chat-overlay chat-overlay-${edge}`}>{children}</div>:<>{children}</>;
 }

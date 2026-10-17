@@ -1,6 +1,8 @@
 import {useActivity} from './useActivity';
 import {useDesktopRunNotifications,type WatchedChat} from './chat-notifications';
-import {BoardNotifications,type BoardNoticeTarget} from './BoardNotifications';
+import {InboxButton,NotificationInbox,useBoardNotices,type BoardNoticeTarget} from './BoardNotifications';
+import {ChatRunStatus,RunStatusDot,relativeTime,fullTime} from './run-status';
+import {providerName} from './ActivityList';
 import {useChatShortcuts} from './use-chat-shortcuts';
 import {readChatCache,writeChatCache} from './chat-cache';
 import {DesktopSettings} from './DesktopSettings';
@@ -16,10 +18,10 @@ import {DocumentLibrary} from './DocumentLibrary';
 import {watchWindowTheme} from './window-theme';
 import {DesktopUpdates} from './DesktopUpdates';
 import {ProviderConnections,HostStatus} from './ProviderConnections';
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import QRCode from 'qrcode';
 import {releaseRepository} from './release-update';
-import {ArrowDown,BookOpen,FileText,Check,ChevronRight,Folder,GitCompareArrows,MessageSquare,Monitor,RefreshCw,Search,Settings,Smartphone,Wifi,X} from 'lucide-react';
+import {ArrowDown,BookOpen,FileText,Check,ChevronRight,Folder,GitCompareArrows,Keyboard,MessageSquare,Monitor,Plus,RefreshCw,Search,Settings,Smartphone,Wifi,X} from 'lucide-react';
 import {request,type Connection} from './api';
 import {desktopCall,watchDesktop,type DesktopState} from './desktop-bridge';
 import {useAppearance,AppearanceSettings} from './Appearance';
@@ -31,11 +33,10 @@ import {ChatOutputs} from './ChatOutputs';
 import {Subagents} from './Subagents';
 import {shareSnapshot} from './chat-snapshot';
 import {startVisiblePoll} from './visible-poll';
-import {useBackNavigation} from './navigation';
+import {useBackNavigation,useModal} from './navigation';
 import type {JobView} from '../server/types';
 import type {Session} from './session';
 type Provider='claude'|'codex'|'copilot';
-function runLabel(status:string,ru:boolean){const labels:Record<string,[string,string]>={running:['Working…','Работает…'],needs_input:['Needs your answer','Нужен ваш ответ'],done:['Completed','Завершено'],error:['Error','Ошибка'],stopped:['Stopped','Остановлено']};return labels[status]?.[ru?1:0]||'';}
 const connection:Connection={url:'http://127.0.0.1:4318',token:'',desktop:true};
 const initial:DesktopState={online:false,busy:false,status:'',startup:false,autoReconnect:true,internet:true,addresses:[],jira:false};
 const name=(path:string)=>path.split(/[\\/]/).filter(Boolean).at(-1)||path;
@@ -101,7 +102,9 @@ export function DesktopApp(){
   const [boardChat,setBoardChat]=useState<BoardChat|undefined>();
   const [creating,setCreating]=useState(false);
   const activity=useActivity(state.online?connection:null);
-  const [inboxOpen,setInboxOpen]=useState(false);
+  const notices=useBoardNotices(state.online?connection:null);
+  const [inboxOpen,setInboxOpen]=useState(false),[shortcutsOpen,setShortcutsOpen]=useState(false);
+  const shortcutsSheet=useRef<HTMLElement|null>(null);useModal(shortcutsSheet,shortcutsOpen,()=>setShortcutsOpen(false));
   const [notificationChat,setNotificationChat]=useState<WatchedChat|null>(null);
   const [selected,setSelected]=useState<Session|null>(null),[loading,setLoading]=useState(false),[revision,setRevision]=useState(0),[address,setAddress]=useState(0);
   useEffect(()=>{const unwatch=watchDesktop(setState);let active=true;void desktopCall<DesktopState>('state').then(value=>{if(active)setState(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;unwatch();};},[]);
@@ -131,20 +134,37 @@ export function DesktopApp(){
   const projectRoot=project||selected?.cwd||folders[0]||'';
   const visible=chatSessions.filter(item=>`${item.customTitle||item.summary} ${item.cwd}`.toLowerCase().includes(search.toLowerCase()));
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
+  function startChat(){if(!state.online||!projectRoot)return;setNotificationChat(null);setBoardChat(undefined);setCreating(true);setSelected(null);setPage('chats');}
+  function openChat(session:Session){setNotificationChat(null);setBoardChat(undefined);setSelected(session);setPage('chats');}
+  // Keyboard: Ctrl+N new chat, Ctrl+Tab / Ctrl+Shift+Tab next or previous chat, Ctrl+Alt+U inbox, Ctrl+/ the list of shortcuts.
+  const shortcutActions=useRef({startChat,cycle:(_step:number)=>{}});
+  shortcutActions.current={startChat,cycle:step=>{if(!visible.length)return;const index=visible.findIndex(item=>item.sessionId===selected?.sessionId);openChat(visible[index<0?(step>0?0:visible.length-1):(index+step+visible.length)%visible.length]);}};
+  useEffect(()=>{const key=(event:KeyboardEvent)=>{
+    if(!(event.ctrlKey||event.metaKey))return;
+    if(event.code==='Slash'&&!event.altKey){event.preventDefault();setShortcutsOpen(open=>!open);return;}
+    if(document.querySelector('[aria-modal="true"]'))return;
+    if(event.code==='KeyN'&&!event.altKey&&!event.shiftKey){event.preventDefault();shortcutActions.current.startChat();}
+    else if(event.key==='Tab'&&!event.altKey){event.preventDefault();shortcutActions.current.cycle(event.shiftKey?-1:1);}
+    else if(event.code==='KeyU'&&event.altKey&&!event.shiftKey){event.preventDefault();setInboxOpen(true);}
+  };document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[]);
+  const shortcuts:[string,string][]=[['Ctrl+N',label('New chat in the current project','Новый чат в текущем проекте')],['Ctrl+Tab',label('Next chat','Следующий чат')],['Ctrl+Shift+Tab',label('Previous chat','Предыдущий чат')],['Ctrl+Alt+U',label('Open the inbox','Открыть входящие')],['Ctrl+/',label('Show keyboard shortcuts','Показать сочетания клавиш')],['Ctrl+A',label('Select the conversation','Выделить переписку')],['Ctrl+V',label('Paste into the message','Вставить в сообщение')],['Esc',label('Close a panel or dialog','Закрыть панель или диалог')]];
   const connectionPanel=<DesktopConnection state={state} action={action} onState={setState} label={label}/>;
   return <div className="desktop-app" style={railWidth===null?undefined:{['--desktop-rail-width' as string]:railWidth+'px'}}>
     {page==='workspace'&&<WorkspaceIdentity connection={state.online?connection:null} value={projectSpaces}/>}
     <aside className="desktop-rail"><RailResizer width={railWidth} onChange={setRailWidth}/>
-      <nav aria-label={label('Navigation','Навигация')}>{([['work',Folder,label('Board','\u0414\u043e\u0441\u043a\u0430')],['rules',BookOpen,label('Rules','Правила')],['changelog',FileText,label('Changelog','История изменений')],['settings',Settings,label('Settings','Настройки')]] as const).map(([id,Icon,title])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={19}/>{title}</button>)}<BoardNotifications activity={activity} onOpenChange={setInboxOpen} onOpenActivity={item=>openNotificationChat({provider:item.provider,jobId:item.id,sessionId:item.sessionId,cwd:item.cwd,title:item.title})} connection={state.online?connection:null} onOpen={target=>{setNoticeTarget(target);setPage('work');}}/></nav>
-      <div className="desktop-library"><label>{label('Provider','Провайдер')}<select aria-label={label('Provider','Провайдер')} value={provider} onChange={event=>setProvider(event.target.value as Provider)}><option value="claude">Claude</option><option value="codex">Codex</option><option value="copilot">GitHub Copilot</option></select></label>
+      <nav aria-label={label('Navigation','Навигация')}>{([['work',Folder,label('Board','\u0414\u043e\u0441\u043a\u0430')],['rules',BookOpen,label('Rules','Правила')],['changelog',FileText,label('Changelog','История изменений')],['settings',Settings,label('Settings','Настройки')]] as const).map(([id,Icon,title])=>{const active=!inboxOpen&&(page===id||id==='settings'&&page==='connection');return <button key={id} className={active?'active':''} aria-current={active?'page':undefined} onClick={()=>setPage(id)}><Icon size={19}/>{title}</button>;})}<InboxButton notices={notices} activity={activity} open={inboxOpen} onOpen={()=>setInboxOpen(true)} variant="rail"/></nav>
+      <NotificationInbox open={inboxOpen} onClose={()=>setInboxOpen(false)} notices={notices} activity={activity} onOpenActivity={item=>openNotificationChat({provider:item.provider,jobId:item.id,sessionId:item.sessionId,cwd:item.cwd,title:item.title})} onOpenNotice={target=>{setNoticeTarget(target);setPage('work');}}/>
+      <div className="desktop-library"><div className="provider-chips" role="group" aria-label={label('Provider','Провайдер')}>{(['claude','codex','copilot'] as const).map(id=>{const waiting=activity.items.filter(item=>item.provider===id&&(item.status==='needs_input'||item.status==='error')).length;return <button key={id} aria-pressed={provider===id} onClick={()=>setProvider(id)}>{providerName(id)}{waiting>0&&<b aria-label={label(`Needs you: ${waiting}`,`Ждут вас: ${waiting}`)}>{waiting}</b>}</button>;})}</div>
       <div className="desktop-search"><Search size={16}/><input aria-label={label('Find a chat','Найти чат')} placeholder={label('Find a chat','Найти чат')} value={search} onChange={event=>setSearch(event.target.value)}/></div>
-      <div className="desktop-list-caption"><span>{label('Conversations','Переписки')} · {visible.length}</span><button className="icon-button" aria-label={label('Refresh','Обновить')} onClick={()=>setRevision(value=>value+1)}><RefreshCw size={15}/></button></div>
-      <div className="desktop-sessions"><button aria-label="New" aria-pressed={creating&&!selected&&page==='chats'} disabled={!state.online||!projectRoot} onClick={()=>{setNotificationChat(null);setBoardChat(undefined);setCreating(true);setSelected(null);setPage('chats');}}><MessageSquare size={16}/><span><strong>New</strong></span><ChevronRight size={14}/></button>{loading&&!sessions.length?<p role="status">{label('Loading chats…','Загружаем чаты…')}</p>:visible.map(session=>{const job=latestJobs.get(session.sessionId);const status=job?.status==='running'&&job.approvals?.length?'needs_input':job?.status;return <button key={session.sessionId} aria-pressed={selected?.sessionId===session.sessionId} onClick={()=>{setNotificationChat(null);setBoardChat(undefined);setSelected(session);setPage('chats');}}><span className={'desktop-chat-dot '+(status==='error'?'failed':status||'idle')}/><span><strong>{session.customTitle||session.summary||label('Untitled chat','Без названия')}</strong><small>{session.cwd?name(session.cwd):label('No project','Без проекта')}</small>{status&&<small className={'desktop-run-label '+(status==='error'?'failed':status)}>{runLabel(status,language==='ru')}</small>}</span><ChevronRight size={14}/></button>;})}{!loading&&!visible.length&&<p className="muted">{state.online?label('No matching chats','Нет подходящих чатов'):label('Connect the PC host to load chats.','Подключите сервер ПК, чтобы загрузить чаты.')}</p>}</div></div>
+      <div className="desktop-list-caption"><span>{label('Chats','Чаты')} · {visible.length}</span><button className="icon-button" aria-label={label('Refresh','Обновить')} onClick={()=>setRevision(value=>value+1)}><RefreshCw size={15}/></button></div>
+      <div className="desktop-sessions"><button className="desktop-new-chat" aria-pressed={creating&&!selected&&page==='chats'} aria-keyshortcuts="Control+N" title={label('New chat (Ctrl+N)','Новый чат (Ctrl+N)')} disabled={!state.online||!projectRoot} onClick={startChat}><Plus size={16}/><span><strong>{label('New chat','Новый чат')}</strong></span></button>{loading&&!sessions.length?<p role="status">{label('Loading chats…','Загружаем чаты…')}</p>:visible.map(session=>{const job=latestJobs.get(session.sessionId);const status=job?.status==='running'&&job.approvals?.length?'needs_input':job?.status;return <button key={session.sessionId} aria-pressed={page==='chats'&&selected?.sessionId===session.sessionId} onClick={()=>openChat(session)}>{status?<RunStatusDot status={status} className="desktop-chat-dot"/>:<span className="desktop-chat-dot idle"/>}<span><strong>{session.customTitle||session.summary||label('Untitled chat','Без названия')}</strong><small>{session.cwd?name(session.cwd):label('No project','Без проекта')}{!status&&<> · <time title={fullTime(session.lastModified)}>{relativeTime(session.lastModified)}</time></>}</small>{status&&<small className="desktop-run-label"><ChatRunStatus status={status}/></small>}</span><ChevronRight size={14}/></button>;})}{!loading&&!visible.length&&<p className="muted">{state.online?label('No matching chats','Нет подходящих чатов'):label('Connect the PC host to load chats.','Подключите сервер ПК, чтобы загрузить чаты.')}</p>}</div></div>
+      <button className="desktop-shortcuts-button" aria-keyshortcuts="Control+/" onClick={()=>setShortcutsOpen(true)}><Keyboard size={16}/>{label('Keyboard shortcuts','Сочетания клавиш')}<kbd>Ctrl+/</kbd></button>
       <button className="desktop-connection-status" onClick={()=>setPage('connection')}><span className={'desktop-chat-dot '+(state.online?'done':'idle')}/>{state.online?label('PC connected','ПК подключён'):label('Not connected','Нет подключения')}<ChevronRight size={15}/></button>
     </aside>
     <main className="desktop-main">{error&&<div className="desktop-error" role="alert">{error}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setError('')}><X size={16}/></button></div>}
     {(selected||creating)&&<div className="desktop-chat-host" hidden={page!=='chats'}><SharedChat key={provider+(selected?.sessionId||'new:'+projectRoot)+(boardChat?':'+boardChat.boardId+':'+boardChat.note.id:'')} embedded={{activity,inboxOpen,visible:page==='chats',connection,provider,session:selected||undefined,cwd:selected?.cwd||projectRoot,boardChat,jobId:selected?(notificationChat?.provider===provider&&selected.sessionId===(notificationChat.sessionId||`pending-${notificationChat.jobId}`)?notificationChat.jobId:latestJobs.get(selected.sessionId)?.id):undefined,onBoard:target=>{setNoticeTarget(target);setPage('work');},onCreated:(session,run)=>{setJobs(old=>[run,...old.filter(j=>j.id!==run.id)]);setSelected(session);setCreating(false);},onBack:()=>{setSelected(null);setCreating(false);}}}/></div>}
     {page==='workspace'?<DesktopWorkspaces connection={connection} value={projectSpaces} roots={allFolders} addresses={state.addresses} onBoard={()=>{setLocalBoards(false);setPage('work');}}/>:page==='work'?<div className="desktop-board-section"><WorkBoards focusTarget={noticeTarget} local connection={connection} roots={allFolders} workspaces={projectSpaces} onChat={target=>{setNotificationChat(null);setBoardChat(target);setProject(target.root);if(target.taskRun)setProvider(target.taskRun.provider);if(target.note.chat){setProvider(target.note.chat.provider);setSelected({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});setCreating(false);}else{setSelected(null);setCreating(true);}setPage('chats');}}/></div>:page==='chats'?(selected||creating?null:<div className="desktop-empty"><MessageSquare size={36}/><h1>{label('Your workspace, at a glance','Ваше рабочее пространство')}</h1><p>{label('Choose a conversation to read replies, review changes and explore AI results.','Выберите чат, чтобы читать ответы, смотреть изменения и результаты AI.')}</p><span>{label('Chat here or continue from your phone','Пишите здесь или на телефоне')}</span>{!state.online&&(bridgeAvailable()?<button className="primary" onClick={()=>setPage('connection')}>{label('Set up connection','Настроить подключение')}</button>:<p className="muted">{label('Open Pocket Code for Windows to set up the connection.','Откройте Pocket Code для Windows, чтобы настроить подключение.')}</p>)}</div>):(page==='rules'||page==='changelog')?<div className="desktop-project"><header className="document-section-heading"><h1>{page==='rules'?label('Rules','Правила'):label('Changelog','История изменений')}</h1></header><DocumentLibrary connection={connection} kind={page}/></div>:<DesktopSettings roots={allFolders} key={page} initialPage={page==='connection'?'connection':'index'} connectionPanel={connectionPanel} state={state} connection={connection} appearance={appearance} action={action}/>}
     </main>
+    {shortcutsOpen&&<div className="modal-backdrop" onClick={event=>{if(event.target===event.currentTarget)setShortcutsOpen(false);}}><section ref={shortcutsSheet} className="confirm-modal desktop-shortcuts" role="dialog" aria-modal="true" aria-label={label('Keyboard shortcuts','Сочетания клавиш')}><Keyboard size={26}/><h2>{label('Keyboard shortcuts','Сочетания клавиш')}</h2><dl>{shortcuts.map(([keys,text])=><div key={keys}><dt><kbd>{keys}</kbd></dt><dd>{text}</dd></div>)}</dl><button className="secondary" onClick={()=>setShortcutsOpen(false)}>{label('Close','Закрыть')}</button></section></div>}
   </div>;
 }

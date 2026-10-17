@@ -6,13 +6,21 @@
 @media(max-width:760px){
   .app>.sidebar{padding:0 20px}
   .sidebar>.chat-list-actions{box-sizing:border-box;display:flex;height:var(--section-header-height);min-height:var(--section-header-height);margin:0 -20px 14px;padding:0 var(--section-header-inset);border-bottom:1px solid var(--line)}
-  .sidebar>.chat-list-actions .workspace-picker-sidebar{flex:1;min-width:0;font-size:var(--section-header-font)}
-  .sidebar>.chat-list-actions .workspace-picker-sidebar select{width:100%;height:48px;padding:0 24px 0 0;font-size:inherit;font-weight:600;line-height:1.3}
   .app:has(.prompt-composer)>.mobile-nav{border-top:0}
   .workspace>header.chat-header.chat-header-conversation{padding:0 var(--section-header-inset)}
   header.chat-header-conversation .chat-header-main{min-height:calc(var(--section-header-height) - 1px);width:100%}
 }
 .chat-list-actions .board-notifications{margin-left:auto}
 .chat-list-actions .board-notifications-trigger{width:48px;height:48px;padding:12px}
-.chat-list-actions .board-notifications-trigger>span{display:none}
-.chat-list-actions .board-notifications-trigger b{position:absolute;top:1px;right:0;font-size:10px;line-height:16px;padding:0 3px}
+/* Chats list: an h1, a labelled New chat action and provider chips instead of a select used as a title. */
+.sidebar>.chat-list-actions{display:flex;align-items:center;gap:8px}
+.sidebar>.chat-list-actions>h1{flex:1;min-width:0;margin:0;font-size:var(--section-header-font);font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.new-chat-button{display:inline-flex;align-items:center;gap:6px;min-height:48px;padding:0 14px;border:1px solid var(--line);border-radius:24px;background:var(--panel);color:var(--text);font:inherit;font-size:var(--category-detail-size);font-weight:600;white-space:nowrap;flex:none}
+.new-chat-button:hover:not(:disabled){border-color:var(--accent)}.new-chat-button svg{color:var(--accent)}
+.provider-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px}
+.provider-chips>button{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:var(--category-detail-size)}
+.provider-chips>button[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.provider-chips>button>b{min-width:18px;padding:0 5px;border-radius:9px;background:var(--status-attention);color:var(--bg);font-size:11px;line-height:18px;text-align:center}
+.session-group{margin-bottom:12px}.session-list h2.list-label{margin:8px 0 0;font-weight:600}
+.session-row small .run-status{font-size:inherit}.session-row small time{white-space:nowrap}
+@media(min-width:761px){.sidebar>.chat-list-actions{margin-bottom:12px}.sidebar>.chat-list-actions>h1{font-size:1.1rem}.new-chat-button{min-height:40px;padding:0 10px}}

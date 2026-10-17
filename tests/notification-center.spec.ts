@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openSection,chooseProvider} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 import type {ActivityItem,ChatMessage} from '../server/types';
 
@@ -32,8 +32,8 @@ async function host(page:Page){
   });
   return state;
 }
-async function navigate(page:Page,name:string){await page.getByRole('button',{name:'Navigation menu',exact:true}).filter({visible:true}).click();await page.locator('.mobile-nav:visible').getByRole('button',{name,exact:true}).click();}
-const drawer=(page:Page)=>page.getByRole('dialog',{name:'Notifications and activity',exact:true});
+async function navigate(page:Page,name:string){await openSection(page,name);}
+const drawer=(page:Page)=>page.getByRole('dialog',{name:'Inbox',exact:true});
 const openDrawer=async(page:Page)=>{await page.locator('.board-notifications-trigger:visible').first().click();await expect(drawer(page)).toBeVisible();await drawer(page).evaluate(async element=>{await Promise.all(element.getAnimations().map(animation=>animation.finished));});};
 async function open(page:Page,scale=100){
   await page.addInitScript(({scale})=>{
@@ -45,34 +45,34 @@ async function open(page:Page,scale=100){
 
 test('activity groups work across providers and closes without losing a draft',async({page})=>{
   await host(page);await page.setViewportSize({width:390,height:844});await open(page);await page.getByLabel('Message Claude').fill('Keep this draft');await openDrawer(page);
-  await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toBeVisible();await expect(drawer(page).getByRole('button',{name:'claude question',exact:true})).toBeVisible();await expect(drawer(page).getByRole('button',{name:'codex working',exact:true})).toBeVisible();
+  await expect(drawer(page).getByRole('button',{name:/^codex result,/})).toBeVisible();await expect(drawer(page).getByRole('button',{name:/^claude question,/})).toBeVisible();await expect(drawer(page).getByRole('button',{name:/^codex working,/})).toBeVisible();
   await expect(drawer(page).locator('.inbox-processes section')).toHaveCount(3);await page.keyboard.press('Escape');await expect(drawer(page)).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');await expect(page.locator('.board-notifications-trigger:visible')).toBeFocused();
-  await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'All chats',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');await page.getByRole('button',{name:'Back to chats',exact:true}).click();await expect(drawer(page)).toHaveCount(0);await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
+  await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'All chats',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');await page.getByRole('button',{name:'Back to chats',exact:true}).click();await expect(drawer(page)).toHaveCount(0);await expect(page.getByRole('button',{name:'New chat',exact:true})).toBeVisible();
 });
 
 test('a completed result is acknowledged only after loading and stays viewed after reload',async({page})=>{
   const state=await host(page);state.jobDelay=gate();await page.setViewportSize({width:390,height:844});await open(page);await page.getByLabel('Message Claude').fill('Unsent Claude draft');await openDrawer(page);
   try{
-    await drawer(page).getByRole('button',{name:'codex result',exact:true}).click();
+    await drawer(page).getByRole('button',{name:/^codex result,/}).click();
     expect(await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('pocket-code-activity-seen-v1:')).flatMap(key=>JSON.parse(localStorage.getItem(key)||'[]')))).toEqual([]);
     state.jobDelay.resolve();await expect(page.getByText('Visible result for result',{exact:true})).toBeVisible();await openDrawer(page);
-    await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toHaveCount(0);await expect(drawer(page).getByRole('button',{name:'claude question',exact:true})).toBeVisible();await drawer(page).getByRole('button',{name:'Close',exact:true}).click();
-    await page.getByRole('button',{name:'Back to chats',exact:true}).click();await page.locator('.workspace-picker-sidebar select').selectOption('claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Unsent Claude draft');
+    await expect(drawer(page).getByRole('button',{name:/^codex result,/})).toHaveCount(0);await expect(drawer(page).getByRole('button',{name:/^claude question,/})).toBeVisible();await drawer(page).getByRole('button',{name:'Close',exact:true}).click();
+    await page.getByRole('button',{name:'Back to chats',exact:true}).click();await chooseProvider(page,'claude');await expect(page.getByLabel('Message Claude')).toHaveValue('Unsent Claude draft');
     const stored=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('pocket-code-activity-seen-v1:')).map(key=>localStorage.getItem(key)).join(''));
     expect(stored).not.toContain('test-only');expect(stored).not.toContain(root);expect(stored).toContain('result');
-    await page.reload();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toHaveCount(0);await expect(drawer(page).getByRole('button',{name:'codex working',exact:true})).toBeVisible();
+    await page.reload();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:/^codex result,/})).toHaveCount(0);await expect(drawer(page).getByRole('button',{name:/^codex working,/})).toBeVisible();
   }finally{state.jobDelay.resolve();}
 });
 
 test('an unanswered task remains in activity after its chat is opened',async({page})=>{
-  await host(page);await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);await drawer(page).getByRole('button',{name:'claude question',exact:true}).click();
-  await expect(page.getByText('Visible result for question',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'claude question',exact:true})).toBeVisible();
+  await host(page);await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);await drawer(page).getByRole('button',{name:/^claude question,/}).click();
+  await expect(page.getByText('Visible result for question',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:/^claude question,/})).toBeVisible();
 });
 
 test('completion received while reading older messages stays unread until the bottom is reached',async({page})=>{
   await page.emulateMedia({reducedMotion: 'reduce'});await page.clock.install();const state=await host(page);state.items=[item('working','codex','running')];
   state.history=Array.from({length:35},(_,index)=>({id:`older-${index}`,role:'assistant',blocks:[{type:'text',text:`Older saved message ${index}.\n\nThis conversation has enough history to read well above its final result.`}]}));
-  await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);await drawer(page).getByRole('button',{name:'codex working',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);await drawer(page).getByRole('button',{name:/^codex working,/}).click();
   await expect(page.getByText('Visible result for working',{exact:true})).toBeVisible();const conversation=page.locator('.conversation');
   await conversation.evaluate(element=>{element.scrollTop=200;});await expect.poll(()=>conversation.evaluate(element=>element.scrollHeight-element.scrollTop-element.clientHeight)).toBeGreaterThan(500);
   state.items=[{...state.items[0],status:'done',version:'done-2'}];await page.clock.fastForward(3100);await openDrawer(page);await expect(drawer(page).locator('.inbox-process-row.state-done')).toHaveCount(1);
@@ -80,7 +80,7 @@ test('completion received while reading older messages stays unread until the bo
   expect(await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('pocket-code-activity-seen-v1:')).flatMap(key=>JSON.parse(localStorage.getItem(key)||'[]')))).toEqual([]);
   await conversation.evaluate(element=>{element.scrollTop=element.scrollHeight;});
   await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('pocket-code-activity-seen-v1:')).flatMap(key=>JSON.parse(localStorage.getItem(key)||'[]')).map(item=>item.id))).toContain('working');
-  await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'codex working',exact:true})).toHaveCount(0);
+  await openDrawer(page);await expect(drawer(page).getByRole('button',{name:/^codex working,/})).toHaveCount(0);
 });
 
 test('opening session history acknowledges completion only once its exact final result is loaded',async({page})=>{
@@ -88,19 +88,19 @@ test('opening session history acknowledges completion only once its exact final 
   state.sessions=[{sessionId:'session-result',provider:'claude',cwd:root,summary:'Saved completed chat',lastModified:1}];
   state.history=[{id:'stale-reply',role:'assistant',blocks:[{type:'text',text:'An earlier response before the task completed.'}]}];
   await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'All chats',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');await page.getByRole('button',{name:'Back to chats',exact:true}).click();await page.getByRole('button',{name:/Saved completed chat/}).click();
-  await expect(page.getByText('An earlier response before the task completed.',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'claude result',exact:true})).toBeVisible();
+  await expect(page.getByText('An earlier response before the task completed.',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:/^claude result,/})).toBeVisible();
   await drawer(page).getByRole('button',{name:'Close',exact:true}).click();state.history=[...state.history,{id:'final-answer',role:'assistant',blocks:[{type:'text',text:'The actual completed result is now in history.'}]}];await page.clock.fastForward(3100);
-  await expect(page.getByText('The actual completed result is now in history.',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'claude result',exact:true})).toHaveCount(0);expect(state.jobCalls).toBe(0);
+  await expect(page.getByText('The actual completed result is now in history.',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:/^claude result,/})).toHaveCount(0);expect(state.jobCalls).toBe(0);
 });
 
 test('failure to open a completed chat leaves its result unread',async({page})=>{
-  const state=await host(page);state.failedJob='result';await open(page);await openDrawer(page);await drawer(page).getByRole('button',{name:'codex result',exact:true}).click();
-  await expect(page.getByRole('alert')).toContainText('Synthetic job unavailable');await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'codex result',exact:true})).toBeVisible();
+  const state=await host(page);state.failedJob='result';await open(page);await openDrawer(page);await drawer(page).getByRole('button',{name:/^codex result,/}).click();
+  await expect(page.getByRole('alert')).toContainText('Synthetic job unavailable');await openDrawer(page);await expect(drawer(page).getByRole('button',{name:/^codex result,/})).toBeVisible();
 });
 
 test('activity refresh retains old entries offline and moves finished work to completed',async({page})=>{
   const state=await host(page);await open(page);await openDrawer(page);await expect(drawer(page).locator('.inbox-process-row.state-running')).toHaveCount(1);
-  state.error=503;await drawer(page).getByRole('button',{name:'Refresh',exact:true}).click();await expect(drawer(page).locator('.inbox-sync-error')).toBeVisible();await expect(drawer(page).getByRole('button',{name:'codex working',exact:true})).toBeVisible();
+  state.error=503;await drawer(page).getByRole('button',{name:'Refresh',exact:true}).click();await expect(drawer(page).locator('.inbox-sync-error')).toBeVisible();await expect(drawer(page).getByRole('button',{name:/^codex working,/})).toBeVisible();
   state.error=0;state.items=state.items.map(value=>value.id==='working'?{...value,status:'done',version:'done-2'}:value);await drawer(page).getByRole('button',{name:'Retry',exact:true}).click();
   await expect(drawer(page).locator('.inbox-sync-error')).toHaveCount(0);await expect(drawer(page).locator('.inbox-process-row.state-running')).toHaveCount(0);await expect(drawer(page).locator('.inbox-process-row.state-done')).toHaveCount(2);
 });
@@ -136,30 +136,48 @@ test('unified bell remains available in every main section',async({page})=>{
  }
 });
 
-test('Chats tab preserves the open conversation until explicit Back and shows activity priority',async({page})=>{
+test('Chats tab and the conversation Back arrow show the state of other chats; waiting chats are listed first',async({page})=>{
  const state=await host(page);await page.setViewportSize({width:390,height:844});await open(page);
- const nav=page.locator('.mobile-nav'),chats=nav.getByRole('button',{name:'Chats',exact:true});
- await page.getByLabel('Message Claude').fill('Remember my open chat');
- for(const name of ['Board','Rules','Changelog','Settings']){await navigate(page,name);await navigate(page,'Chats');await expect(page.getByLabel('Message Claude')).toHaveValue('Remember my open chat');}
- await page.getByRole('button',{name:'Navigation menu',exact:true}).click();await expect(chats.locator('.chat-tab-status-needs_input')).toBeVisible();
+ const back=page.getByRole('button',{name:'Back to chats',exact:true});
+ await expect(back.locator('.chat-tab-status-needs_input')).toBeAttached();await expect(back).toHaveAttribute('aria-description','Other chats: Needs you');
+ await back.click();const chats=page.locator('.mobile-tabbar').getByRole('button',{name:'Chats',exact:true});
+ await expect(chats.locator('.chat-tab-status-needs_input')).toBeVisible();await expect(chats).toHaveAttribute('aria-description','Chats: Needs you');
+ await expect(page.locator('.session-group-waiting')).toContainText('claude question');await expect(page.locator('.session-group-waiting')).toContainText('Needs you');
  for(const status of ['error','running','done'] as const){state.items=[item('badge','codex',status)];await expect(chats.locator('.chat-tab-status-'+status)).toBeVisible({timeout:6000});}
- await page.keyboard.press('Escape');await page.getByRole('button',{name:'Back to chats',exact:true}).click();await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
- await navigate(page,'Settings');await navigate(page,'Chats');await expect(page.getByRole('button',{name:'New',exact:true})).toBeVisible();
+ await expect(page.locator('.session-group-waiting')).toHaveCount(0);
 });
 
-
-
-test('bell combines unread notices and processes with independent filters',async({page})=>{
- await host(page);let reads=0;
- await page.route('**/api/board-notifications',route=>route.fulfill({json:{items:[{id:'notice',boardId:'missing',noteId:'note',kind:'question',title:'Synthetic board question',message:'Choose the format',at:1}]}}));
+test('badge counts what needs the person; board filter and question reply sheet',async({page})=>{
+ await host(page);let reads=0,saved:any=null;
+ const board={id:'board-1',root,title:'Synthetic board',revision:3,versions:[],notes:[{id:'note',title:'Synthetic board question',description:'Choose the format',status:'questions',owner:'',x:0,y:0,dependencies:[],images:[],branch:''}]};
+ await page.route('**/api/board-notifications',route=>route.fulfill({json:{items:[{id:'notice',boardId:'board-1',noteId:'note',kind:'question',title:'Synthetic board question',message:'Choose the format',at:Date.now()-120000}]}}));
  await page.route('**/api/board-notifications/read',route=>{reads++;return route.fulfill({json:{ok:true}});});
- await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);
- await expect(page.locator('.board-notifications-trigger:visible b')).toHaveText('4');
+ await page.route('**/api/boards/board-1',route=>{if(route.request().method()==='POST'){saved=route.request().postDataJSON();return route.fulfill({json:{...board,revision:4}});}return route.fulfill({json:board});});
+ await page.setViewportSize({width:390,height:844});await open(page);
+ // 1 question waiting + 1 unread board notice; the running and the finished process do not add to the number.
+ const trigger=page.locator('.board-notifications-trigger:visible');await expect(trigger.locator('b')).toHaveText('2');await expect(trigger).toHaveClass(/inbox-running/);
+ await openDrawer(page);
  await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(3);await expect(drawer(page).getByText('Synthetic board question')).toBeVisible();
- await drawer(page).getByRole('button',{name:'Notifications',exact:true}).click();await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(0);
- await drawer(page).getByText('Synthetic board question').click();await expect(drawer(page).getByRole('alert')).toBeVisible();expect(reads).toBe(0);
- await drawer(page).getByRole('button',{name:'Processes',exact:true}).click();await expect(drawer(page).getByText('Synthetic board question')).toHaveCount(0);await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(3);
+ const filters=drawer(page).getByRole('group',{name:'Inbox filter'});await expect(filters.getByRole('button',{name:/^All/})).toHaveAttribute('aria-pressed','true');
+ await filters.getByRole('button',{name:/^Board/}).click();await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(0);
+ await filters.getByRole('button',{name:/^Running/}).click();await expect(drawer(page).getByText('Synthetic board question')).toHaveCount(0);await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(1);
+ await page.keyboard.press('Escape');await openDrawer(page);await expect(filters.getByRole('button',{name:/^All/})).toHaveAttribute('aria-pressed','true');
+ await drawer(page).locator('.inbox-notice-row').click();await expect(drawer(page).getByRole('heading',{name:'Answer the question'})).toBeVisible();expect(reads).toBe(0);
+ await expect(drawer(page).locator('blockquote')).toHaveText('Choose the format');await drawer(page).getByLabel('Your answer').fill('Use Markdown tables');
+ await drawer(page).getByRole('button',{name:'Send answer',exact:true}).click();await expect(drawer(page).getByRole('heading',{name:'Inbox'})).toBeVisible();
+ expect(reads).toBe(1);expect(saved.revision).toBe(3);expect(saved.notes[0].status).toBe('ready');expect(saved.notes[0].description).toBe('Choose the format\n\nAnswer: Use Markdown tables');
  await expect(page.locator('.activity-entry,.activity-drawer')).toHaveCount(0);await page.screenshot({path:'.local/unified-processes.png'});
+});
+
+test('an error stays until hidden, finished results clear with Undo and background polls never flash loading',async({page})=>{
+ await page.clock.install();const state=await host(page);state.items=[item('broken','codex','error'),item('result','codex','done'),item('other','claude','stopped')];
+ await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);
+ const error=drawer(page).getByRole('button',{name:/^codex broken,/});await expect(error).toBeVisible();await expect(drawer(page).locator('.inbox-pill.run-status-error')).toHaveText('Error');
+ await page.clock.fastForward(9100);await expect(drawer(page).getByText('Loading processes…')).toHaveCount(0);await expect(drawer(page).locator('[role=status]')).toHaveCount(0);
+ await drawer(page).getByRole('button',{name:'Clear finished',exact:true}).click();await expect(drawer(page).locator('.inbox-process-row.state-done,.inbox-process-row.state-stopped')).toHaveCount(0);
+ await drawer(page).getByRole('button',{name:'Undo',exact:true}).click();await expect(drawer(page).locator('.inbox-process-row.state-done,.inbox-process-row.state-stopped')).toHaveCount(2);
+ await drawer(page).getByRole('button',{name:'Hide error: codex broken',exact:true}).click();await expect(error).toHaveCount(0);
+ await page.keyboard.press('Escape');await expect(page.locator('.board-notifications-trigger:visible b')).toHaveCount(0);await expect(page.locator('.board-notifications-trigger:visible .inbox-unseen-dot')).toHaveCount(1);
 });
 
 test('mobile appearance controls edge opacity without changing transcript geometry',async({page})=>{
@@ -168,7 +186,7 @@ test('mobile appearance controls edge opacity without changing transcript geomet
  await navigate(page,'Settings');await page.getByRole('button',{name:/Appearance.*language/}).click();
  const slider=page.getByRole('slider',{name:'Chat edge fade',exact:true});await expect(slider).toHaveValue('100');await slider.fill('50');
  await expect.poll(()=>page.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--chat-edge-floor'))).toBe('0.5');
- await navigate(page,'Chats');expect(await chat.boundingBox()).toEqual(geometry);expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toContain('0.5');
- await navigate(page,'Settings');await page.getByRole('button',{name:/Appearance.*language/}).click();await slider.fill('0');await navigate(page,'Chats');expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toBe('none');expect(await chat.boundingBox()).toEqual(geometry);
+ await navigate(page,'Chats');await newChat(page);expect(await chat.boundingBox()).toEqual(geometry);expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toContain('0.5');
+ await navigate(page,'Settings');await page.getByRole('button',{name:/Appearance.*language/}).click();await slider.fill('0');await navigate(page,'Chats');await newChat(page);expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toBe('none');expect(await chat.boundingBox()).toEqual(geometry);
  await page.reload();await navigate(page,'Settings');await page.getByRole('button',{name:/Appearance.*language/}).click();await expect(slider).toHaveValue('0');
 });

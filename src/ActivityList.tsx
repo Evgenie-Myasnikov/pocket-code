@@ -1,18 +1,26 @@
-import {Check,LoaderCircle,MessageCircle,Square,TriangleAlert} from 'lucide-react';
-import {useLanguage} from './i18n';
+import {t,useLanguage} from './i18n';
 import type {ActivityItem} from '../server/types';
 import type {useActivity} from './useActivity';
+import {RunStatusIcon,runStatusLabel,relativeTime,fullTime} from './run-status';
 export type ActivityFeed=ReturnType<typeof useActivity>;
-export function ActivityList({feed,busy,onOpen}:{feed:ActivityFeed;busy?:boolean;onOpen(item:ActivityItem):void}){
- const ru=useLanguage()==='ru',l=(en:string,other:string)=>ru?other:en;
- const states={needs_input:{Icon:MessageCircle,label:l('Needs your answer','Нужен ваш ответ')},error:{Icon:TriangleAlert,label:l('Error','Ошибка')},running:{Icon:LoaderCircle,label:l('Running','Работает')},done:{Icon:Check,label:l('Completed','Завершено')},stopped:{Icon:Square,label:l('Stopped','Остановлен')}};
+export type ActivityFilter='attention'|'running'|'done';
+export const providerName=(provider:ActivityItem['provider'])=>provider==='codex'?'Codex':provider==='claude'?'Claude':'Copilot';
+const project=(cwd:string)=>cwd.split(/[\\/]/).filter(Boolean).at(-1)||cwd;
+const groups:{id:ActivityFilter;name:string;statuses:ActivityItem['status'][]}[]=[{id:'attention',name:'Ждут вас',statuses:['needs_input','error']},{id:'running',name:'Работают',statuses:['running']},{id:'done',name:'Готово',statuses:['done','stopped']}];
+/** One two-line row per process: title, then provider · project · time; a pill only when the person must act. */
+export function ActivityList({feed,busy,onOpen,filter,onClearFinished}:{feed:ActivityFeed;busy?:boolean;onOpen(item:ActivityItem):void;filter?:ActivityFilter;onClearFinished?():void}){
+ useLanguage();
+ const shown=groups.filter(group=>!filter||group.id===filter);
+ const empty=!feed.items.some(item=>shown.some(group=>group.statuses.includes(item.status)));
  return <div className="inbox-processes">
-  {feed.error&&<div role="status" className="inbox-sync-error"><p>{l('Processes could not be refreshed.','Не удалось обновить процессы.')}</p>{feed.items.length>0&&<p>{l('Showing the last received states.','Показаны последние полученные состояния.')}</p>}<button onClick={feed.refresh} disabled={feed.loading}>{l('Retry','Повторить')}</button></div>}
-  {feed.loading&&!feed.items.length&&<p role="status">{l('Loading processes…','Загружаем процессы…')}</p>}
-  {!feed.loading&&!feed.error&&!feed.items.length&&<p className="muted">{l('No active processes or unseen results.','Нет активных процессов и непросмотренных результатов.')}</p>}
-  {[{name:l('Needs attention','Требует внимания'),statuses:['needs_input','error']},{name:l('In progress','В работе'),statuses:['running']},{name:l('Finished','Завершено'),statuses:['done','stopped']}].map(group=>{
+  {feed.loading&&!feed.items.length&&<p className="muted">{t('Загружаем процессы…')}</p>}
+  {!feed.loading&&!feed.error&&empty&&<p className="muted">{filter==='attention'?t('Никто не ждёт вашего ответа.'):filter==='running'?t('Сейчас ничего не работает.'):filter==='done'?t('Нет непросмотренных результатов.'):t('Нет активных процессов и непросмотренных результатов.')}</p>}
+  {shown.map(group=>{
    const items=feed.items.filter(item=>group.statuses.includes(item.status));if(!items.length)return null;
-   return <section key={group.name}><h3>{group.name}<span>{items.length}</span></h3><ul>{items.map(item=>{const {Icon,label}=states[item.status];return <li key={item.provider+':'+item.id}><button className={'inbox-process-row state-'+item.status} disabled={busy} onClick={()=>onOpen(item)} aria-label={item.title||l('New conversation','Новый разговор')}><Icon size={20}/><span><strong>{item.title||l('New conversation','Новый разговор')}</strong><small>{item.provider==='codex'?'Codex':item.provider==='claude'?'Claude':'Copilot'} · {item.cwd.split(/[\\/]/).filter(Boolean).at(-1)}</small><small className="process-status">{label}</small></span></button></li>;})}</ul></section>;
+   return <section key={group.id} data-group={group.id}><h3>{t(group.name)}<span>{items.length}</span>{group.id==='done'&&onClearFinished&&<button className="text-button" disabled={busy} onClick={onClearFinished}>{t('Очистить готовые')}</button>}</h3><ul>{items.map(item=>{
+    const title=item.title||t('Новый разговор'),label=runStatusLabel(item.status),meta=[providerName(item.provider),project(item.cwd)].join(' · ');
+    return <li key={item.provider+':'+item.id} className="inbox-process-item"><button className={'inbox-process-row state-'+item.status} disabled={busy} onClick={()=>onOpen(item)} aria-label={`${title}, ${label}, ${meta}`}><RunStatusIcon status={item.status} size={20}/><span><strong>{title}</strong><small>{meta} · <time dateTime={new Date(item.startedAt).toISOString()} title={fullTime(item.startedAt)}>{relativeTime(item.startedAt)}</time></small></span>{(item.status==='needs_input'||item.status==='error')&&<span className={'inbox-pill run-status-'+item.status} aria-hidden="true">{label}</span>}</button>
+     {item.status==='error'&&<button className="text-button inbox-dismiss" disabled={busy} onClick={()=>feed.markViewed(item)} aria-label={t('Скрыть ошибку: {0}',title)}>{t('Скрыть')}</button>}</li>;})}</ul></section>;
   })}
  </div>;
 }

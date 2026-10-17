@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openSection} from './chat-navigation';
 ﻿import {test,expect} from '@playwright/test';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
 for(const scale of [60,130])test(`attachment thumbnails and file cards at ${scale}%`,async({page})=>{
@@ -22,7 +22,7 @@ for(const scale of [60,130])test(`attachment thumbnails and file cards at ${scal
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  expect(await tray.locator('button').first().evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(48);
  await page.screenshot({path:`artifacts/screenshots/attachment-tray-${scale}.png`});
- await page.locator('.mobile-nav').getByRole('button',{name:'Settings',exact:true}).click();await page.locator('.mobile-nav').getByRole('button',{name:'Chats',exact:true}).click();await expect(photo).toBeVisible();
+ await openSection(page,'Settings');await openSection(page,'Chats');await expect(photo).toBeVisible();
  const src=await photo.getAttribute('src');await tray.locator('.draft-attachment-image button').click();await expect(photo).toHaveCount(0);
  await expect.poll(()=>page.evaluate(src=>(window as any).revoked.includes(src),src)).toBe(true);await expect(tray.locator('.draft-attachment')).toHaveCount(1);
  await tray.locator('button').click();await expect(tray).toHaveCount(0);

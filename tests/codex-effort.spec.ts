@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,chooseProvider} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 
 const root='C:\\Workspace\\effort-demo';
@@ -50,8 +50,8 @@ test('Codex effort is remembered per model across reload and remains absent from
   await effort(page).selectOption('high');await page.getByLabel('Codex model').selectOption(standard.id);await expect(effort(page)).toHaveValue('ultra');
   await page.reload();await newChat(page);await expect(effort(page)).toHaveValue('ultra');
   await page.getByLabel('Codex model').selectOption(small.id);await expect(effort(page)).toHaveValue('high');
-  await page.locator('.workspace-picker-sidebar select').selectOption('claude');await expect(effort(page)).toHaveCount(0);
-  await page.locator('.workspace-picker-sidebar select').selectOption('codex');await expect(effort(page)).toHaveValue('high');
+  await chooseProvider(page,'claude');await expect(effort(page)).toHaveCount(0);
+  await chooseProvider(page,'codex');await expect(effort(page)).toHaveValue('high');
 });
 
 test('an effort removed by a model update falls back to its advertised default',async({page})=>{

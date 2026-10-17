@@ -1,5 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
-import {openChatList} from './chat-navigation';
+import {openChatList,openSection} from './chat-navigation';
 
 // CSS working areas, not a claim that every phone uses a fixed browser density.
 // Native system bars are excluded by the app's SystemBars/adjustResize setup.
@@ -73,9 +73,9 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-list.png`});
   await page.getByRole('button',{name:new RegExp(title)}).click();
   await expect(page.locator('.message').last()).toBeVisible();
-  await withinViewport(page,'.chat-header button,.chat-header select,.chat-header strong,.composer-tools button,.composer-tools select,.mobile-nav',profile.width,profile.height);
-  await targets(page,'.chat-header button,.chat-header select,.composer-tools button,.composer-tools select,.mobile-nav button');
-  const titleBox=await page.locator('.header-title strong').boundingBox(),projectBox=await page.locator('.chat-context').boundingBox();
+  await withinViewport(page,'.chat-header button,.chat-header select,.chat-header h1,.composer-tools button,.composer-tools select,.mobile-tabbar',profile.width,profile.height);
+  await targets(page,'.chat-header button,.chat-header select,.composer-tools button,.composer-tools select,.mobile-tabbar button');
+  const titleBox=await page.locator('.header-title h1').boundingBox(),projectBox=await page.locator('.chat-context').boundingBox();
   if(profile.width<=760&&profile.height>540)expect(titleBox!.y+titleBox!.height).toBeLessThanOrEqual(projectBox!.y+1);
   else if(profile.width<=760)await expect(page.locator('.chat-context')).toBeHidden();
   expect((await page.locator('.conversation').boundingBox())!.height).toBeGreaterThan(65);
@@ -94,7 +94,7 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-review.png`});
   await page.locator('.review-panel').getByRole('button',{name:language==='en'?'Back to chat':'Вернуться в чат',exact:true}).click();
   const settings=language==='en'?'Settings':'Настройки';
-  await (profile.width<=760?page.locator('.mobile-nav').getByRole('button',{name:settings,exact:true}):page.locator('.desktop-tabs').getByRole('button',{name:settings,exact:true})).click();
+  await openSection(page,settings);
   await expect(page.locator('.settings-index .settings-category')).toHaveCount(9);
   await expect(page.locator('.chat-header .review-button')).toHaveCount(0);
   await expect(page.locator('.chat-header .project-picker')).toHaveCount(0);

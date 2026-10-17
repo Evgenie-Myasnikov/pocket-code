@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 test('sliders and native frame follow palette and theme',async({page})=>{
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.goto('http://127.0.0.1:5173');
- await page.locator('.mobile-nav:visible,.desktop-tabs:visible').first().waitFor();
+ await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {AppearanceSettings,useAppearance}=await import('/src/Appearance.tsx' as string);

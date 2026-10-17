@@ -4,7 +4,7 @@ header.chat-header.chat-header-conversation{display:flex;align-items:center;just
 .chat-header-conversation .chat-header-main{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
 .chat-header-conversation .mobile-back{display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;min-height:48px;margin:0;padding:0;border:0;background:transparent}
 header.chat-header.chat-header-conversation .header-title{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;margin:0;padding:0;grid-area:auto}
-header.chat-header.chat-header-conversation .header-title>strong{display:block;margin:0;font-size:clamp(14px,calc(16px * var(--ui-scale,1)),20px);font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header.chat-header.chat-header-conversation .header-title>h1{display:block;margin:0;font-size:clamp(14px,calc(16px * var(--ui-scale,1)),20px);font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chat-header-conversation .chat-context{display:flex;align-items:center;gap:6px;min-width:0;font-size:clamp(10px,calc(11px * var(--ui-scale,1)),14px);line-height:1.3;color:var(--muted)}
 .chat-context-provider{flex-shrink:0}.chat-context-project{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-context-branch{display:flex;align-items:center;gap:4px;min-width:0;max-width:38%}.chat-context-branch svg{flex-shrink:0}.chat-context-branch>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-header-conversation .chat-header-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
@@ -33,6 +33,10 @@ header.chat-header.chat-header-conversation .header-title>strong{display:block;m
   .chat-header-conversation .chat-header-actions>button>span{display:none}
   .chat-header-actions .header-agent-count{display:inline}
 }
-
-/* Chrome over the transcript sits on an opaque band so titles and controls never print over messages. */
-header.chat-header-conversation{background:var(--bg);position:relative;z-index:2}
+/* A new chat picks provider and project from the subtitle itself; the selects read as subtitle text with a chevron. */
+.chat-context-picker{gap:4px;flex-wrap:nowrap}.chat-context-picker :is(.workspace-picker,.project-picker){display:inline-flex;align-items:center;gap:4px;min-width:0;margin:0}.chat-context-picker .workspace-picker{flex:none}.chat-context-picker .project-picker{flex:1 1 auto}
+.chat-context-picker select{min-width:0;max-width:100%;min-height:32px;margin:0;padding:2px 18px 2px 0;border:0;background:transparent;color:var(--muted);font:inherit;text-overflow:ellipsis;cursor:pointer}
+:root[data-theme] .chat-context-picker label>select{background:transparent;border:0;color:var(--muted)}
+header.chat-header .chat-context-picker select{min-height:36px;padding-block:0}
+.chat-context-picker select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px}
+.mobile-back .chat-tab-status{right:-6px;top:-4px}

@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 for(const width of [390,1280])for(const fade of [0,100])test(`image viewer covers chat at ${width}px with fade ${fade}`,async({page})=>{
  await page.setViewportSize({width,height:844});
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-menu-button:visible,.desktop-tabs:visible').first().waitFor();
+ await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async({fade})=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {RichBlock}=await import('/src/RichBlocks.tsx' as string);
