@@ -21,6 +21,7 @@ import {WorkspacePassword} from './WorkspacePassword';
 import {InboxButton,NotificationInbox,useBoardNotices,type BoardNoticeTarget} from './BoardNotifications';
 import {savedWorkspaces,rememberWorkspace,workspaceJoinId,type WorkspaceAccess} from './workspace-access';
 import {clearOffline} from './offline-data';
+import {clearReviewViewed} from './review-viewed';
 import {WorkspaceIdentity} from './WorkspaceIdentity';
 import {TaskRunPanel} from './TaskRunPanel';
 import {useTaskRun,taskStageLabel} from './task-run-ui';
@@ -101,7 +102,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const useStateForWorkspace = <T,>(initial:T | ((provider:WorkspaceProvider)=>T)) => useWorkspaceState(provider, initial, cacheScope);
   const useRefForWorkspace = <T,>(initial:T) => useWorkspaceRef(provider, initial, cacheScope);
   const [reviewOpen,setReviewOpen] = useStateForWorkspace(false);
-  const [reviewAvailability,setReviewAvailability]=useStateForWorkspace<{key:string;mode:'working'|'branch'}|null>(null);
+  const [reviewAvailability,setReviewAvailability]=useStateForWorkspace<{key:string;mode:'working'|'branch';added?:number;removed?:number;files?:number}|null>(null);
   const [outputsOpen,setOutputsOpen] = useStateForWorkspace(false);
   const [agentPanel,setAgentPanel] = useStateForWorkspace<{initial?:SubagentView}|null>(null);
   const [agentList,setAgentList] = useStateForWorkspace<SubagentView[]>([]);
@@ -279,13 +280,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const recallLast=()=>{for(const message of [...outputMessages].reverse()){if(message.role!=='user')continue;const text=message.blocks.filter(block=>block.type==='text').map(block=>block.text||'').join('\n').trim();if(text&&!text.startsWith('<task-notification'))return text;}return undefined;};
   const keyActions=useRef({stop:()=>{}});keyActions.current={stop:()=>void stopRun()};
   useEffect(()=>{
-    // Windows: Esc stops the run; Ctrl+Shift+M, I and E open the access, model and effort pickers of this chat.
+    // Windows: Esc stops the run; Ctrl+Shift+M, I and E open the access, model and effort pickers of this chat; Ctrl+Shift+D opens Review.
     if(!embedded)return;
     const key=(event:KeyboardEvent)=>{
       const root=scroll.current?.closest<HTMLElement>('.app');if(!root||!root.getClientRects().length||event.defaultPrevented)return;
       if(document.querySelector('[aria-modal="true"],dialog[open],.access-menu,.chat-menu'))return;
       if(event.key==='Escape'&&running&&!reviewOpen&&!agentPanel&&!outputsOpen&&!taskPanel){event.preventDefault();keyActions.current.stop();return;}
       if(!(event.ctrlKey||event.metaKey)||!event.shiftKey||event.altKey)return;
+      if(event.code==='KeyD'){const button=root.querySelector<HTMLButtonElement>('.review-button:not(:disabled)');if(button){event.preventDefault();button.click();}return;}
       const target=event.code==='KeyM'?root.querySelector<HTMLElement>('.access-chip'):event.code==='KeyI'?root.querySelector<HTMLElement>('.composer-models .model-picker select'):event.code==='KeyE'?root.querySelector<HTMLElement>('.composer-models .effort-picker'):null;
       if(!target)return;event.preventDefault();target.focus();
       if(target instanceof HTMLSelectElement)try{target.showPicker();}catch{/* Focus is enough where the picker cannot open. */}else target.click();
@@ -344,8 +346,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     let cancelled=false,timer:ReturnType<typeof setTimeout>|undefined;
     const poll=async()=>{
       if(document.visibilityState!=='hidden'&&document.querySelector('.workspace')?.getClientRects().length)try{
-        const value=await request<{available:boolean;mode:'working'|'branch'}>(connection,`/review/availability?cwd=${encodeURIComponent(reviewCwd)}`);
-        if(!cancelled)setReviewAvailability(value.available&&(value.mode==='working'||value.mode==='branch')?{key:reviewContext,mode:value.mode}:null);
+        const value=await request<{available:boolean;mode:'working'|'branch';added?:number;removed?:number;files?:number}>(connection,`/review/availability?cwd=${encodeURIComponent(reviewCwd)}`);
+        if(!cancelled)setReviewAvailability(old=>value.available&&(value.mode==='working'||value.mode==='branch')?(old&&old.key===reviewContext&&old.mode===value.mode&&old.added===value.added&&old.removed===value.removed&&old.files===value.files?old:{key:reviewContext,mode:value.mode,added:value.added,removed:value.removed,files:value.files}):null);
       }catch{if(!cancelled)setReviewAvailability(null);}
       if(!cancelled)timer=setTimeout(poll,15000);
     };
@@ -363,7 +365,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   },[history,job?.messages,agentList,running]);
   const openSubagent=useCallback((agent:SubagentView)=>setAgentPanel({initial:agent}),[setAgentPanel]);
   const reviewReady=Boolean((availableReview||taskRun)&&connection&&!demo&&!selected?.readOnly);
-  const openTurnReview=useMemo(()=>reviewReady?()=>setReviewOpen(true):undefined,[reviewReady,setReviewOpen]);
+  // A turn's chip opens Review on that turn's files first ("last turn"), with all changes one tap away.
+  const [reviewPaths,setReviewPaths]=useState<string[]|undefined>();
+  const openTurnReview=useMemo(()=>reviewReady?(changes?:{files:string[]})=>{setReviewPaths(changes?.files.length?changes.files:undefined);setReviewOpen(true);}:undefined,[reviewReady,setReviewOpen]);
+  const quoteToDraft=useCallback((text:string)=>setDraft(current=>current.trim()?current.replace(/\s+$/,'')+'\n\n'+text+'\n':text+'\n'),[setDraft]);
   useEffect(()=>{
     setAgentPanel(null);setAgentList([]);setOutputsOpen(false);
     if(!connection||demo||tab!=='chats'||!parentChatId||parentChatId.startsWith('pending-'))return;
@@ -733,7 +738,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   function startDemo() {setDemo(true);setTab('chats');setMobileChat(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.10.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
   // Leaving on the phone also removes it from the PC's device list; an unreachable or older PC is not a blocker.
   // A revoked key is not sent again: the PC already removed it, and a second 401 would restart this flow.
-  async function disconnect(reason:'user'|'revoked'='user') {if(disconnecting.current)return;disconnecting.current=true;++connectEpoch.current;try {if(workspaceConnection&&!workspaceConnection.deviceId)await request(workspaceConnection,'/workspace-logout',{}).catch(()=>{});if(reason==='user'&&connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);clearOffline();try{localStorage.removeItem("pocket-own-profile");}catch{}clearChatCache();persistPosition.current=()=>{};clearPositions();setRevoked(reason==='revoked'?pcName.current:null);onDisconnect();}catch(e){disconnecting.current=false;setError((e as Error).message);}}
+  async function disconnect(reason:'user'|'revoked'='user') {if(disconnecting.current)return;disconnecting.current=true;++connectEpoch.current;try {if(workspaceConnection&&!workspaceConnection.deviceId)await request(workspaceConnection,'/workspace-logout',{}).catch(()=>{});if(reason==='user'&&connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);clearOffline();clearReviewViewed();try{localStorage.removeItem("pocket-own-profile");}catch{}clearChatCache();persistPosition.current=()=>{};clearPositions();setRevoked(reason==='revoked'?pcName.current:null);onDisconnect();}catch(e){disconnecting.current=false;setError((e as Error).message);}}
   if(workspacePasswordRequest)return <WorkspacePassword busy={busy} error={error} onCancel={()=>{setWorkspacePasswordRequest(null);setError('');}} onSubmit={password=>void joinWorkspace(workspacePasswordRequest,password)}/>;
   // Without a reachable PC the phone still checks, downloads and offers the latest release itself.
   if(!health&&embedded)return <div className="desktop-empty" role="status">{error||t("Loading...")}{error&&<button className="secondary" onClick={()=>void connect(embedded.connection)}>{t("Retry")}</button>}</div>;
@@ -785,7 +790,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         {!visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : connection ? t("Здесь появятся чаты {0} из разрешённых папок.",engineName) : t('Подключите ПК, чтобы видеть чаты.')}</p>{!connection&&!search&&!demo&&<button className="primary" onClick={()=>setMobileChat(true)}>{t('Подключить компьютер')}</button>}</div>}
       </div></aside>
     <main className={`workspace ${chatSurface?'chat-canvas':''}`}>
-      {reviewOpen && connection && reviewCwd && <Review key={reviewContext} connection={connection} cwd={reviewCwd} taskRunId={taskRun?.id} initialMode={availableReview?.mode} onClose={()=>setReviewOpen(false)}/>}
+      {reviewOpen && connection && reviewCwd && <Review key={reviewContext} connection={connection} cwd={reviewCwd} taskRunId={taskRun?.id} initialMode={availableReview?.mode} onlyPaths={reviewPaths} onQuote={quoteToDraft} onClose={()=>{setReviewOpen(false);setReviewPaths(undefined);}}/>}
       {taskPanel&&taskRun&&connection&&<TaskRunPanel key={taskRun.id} connection={connection} initial={taskRun} onClose={()=>setTaskPanel(false)} onBoard={target=>{if(embedded?.onBoard)embedded.onBoard(target);else{setNoticeTarget(target);setLocalBoards(true);setTab('workspace');}}}/>}
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
@@ -793,7 +798,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <ChatHeader notifications={bell('icon')} title={selected?.customTitle||selected?.summary||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():setMobileChat(false)}
           context={!selected&&!job&&!taskRun?<>{workspacePicker('header')}<span aria-hidden="true">·</span><label className="project-picker"><Folder size={13} aria-hidden="true"/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label></>:undefined}
-          review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>setReviewOpen(true)}:undefined}
+          review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>{setReviewPaths(undefined);setReviewOpen(true);},stats:availableReview&&availableReview.files!==undefined?{added:availableReview.added||0,removed:availableReview.removed||0,files:availableReview.files}:undefined}:undefined}
           outputs={hasOutputs?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
           subagents={agentMap.size>0&&parentChatId?{count:agentMap.size,running:[...agentMap.values()].filter(agent=>agent.status==='running').length,disabled:!connection||demo,open:()=>setAgentPanel({})}:undefined}
           reading={outputMessages.length>0||Boolean(job?.partial)?{disabled:loading||!history.length&&!job,open:()=>toggleReadingMode(true)}:undefined}

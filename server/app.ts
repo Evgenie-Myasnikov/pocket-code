@@ -339,7 +339,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const messages = provider==='copilot'?[]:provider === 'codex' ? await codex().subagentMessages(parent.sessionId, agent) : await claudeSubagentMessages(parent.sessionId, agent, cwd);
     res.json({ messages });
   });
-  app.get('/api/review', async (req, res) => { const query = z.object({cwd:text,mode:z.enum(['working','staged','branch']).default('working'),base:z.string().max(300).optional(),file:z.string().max(4096).optional()}).parse(req.query); res.json(await review(roots,query.cwd,query.mode,query.base,query.file)); });
+  app.get('/api/review', async (req, res) => { const query = z.object({cwd:text,mode:z.enum(['working','staged','branch']).default('working'),base:z.string().max(300).optional(),file:z.string().max(4096).optional(),whitespace:z.enum(['0','1']).optional(),context:z.coerce.number().int().min(0).max(100000).optional()}).parse(req.query); res.json(await review(roots,query.cwd,query.mode,query.base,query.file,{whitespace:query.whitespace==='1',context:query.context})); });
   app.get('/api/review/availability', async (req, res) => { const { cwd } = z.object({ cwd: text }).parse(req.query); res.json(await reviewAvailability(roots, cwd)); });
   app.get('/api/codex/usage', async (_req, res) => res.json(await codex().usage()));
   app.get('/api/copilot/usage', async (_req, res) => res.json(await copilot().usage()));

@@ -78,13 +78,15 @@ Open **Review** from a chat when repository changes are available. Its heading i
 | All changes | Uncommitted changes, including eligible new files |
 | Staged changes | Changes already in the Git index |
 | Branch changes | Committed differences against the selected base |
+| Auto | Split on a wide panel (about 900 px), Unified on a narrow one |
 | Unified | Added/removed lines in one sequence |
-| Split | Old and new sides; a newly added file can have an empty old side |
+| Split | Two equal halves with wrapped lines; unavailable when a side would be under about 40 columns |
 | Inline highlights (automatic) | Emphasize changed spans within lines when available |
 | File types | Hide selected extensions such as .png |
-| Code size / fit width | Adjust code independently of UI scale or fit long lines to the viewport |
+| Wrap lines / fit width / ignore whitespace | Wrap long lines (default on phones), shrink unwrapped code to at least 60%, or hide indentation-only changes |
+| Code size | 10–24 px, independent of UI scale |
 
-Scroll the file list and collapse individual file diffs. Long lines can still require horizontal scrolling when fit is disabled. Very long lines become small when fit is enabled. Refresh re-reads Git; a network error can leave a retained, stale comparison. Review does not stage, commit, approve, merge or publish.
+Each file shows a status (New, Deleted, Not in Git, Binary, Generated) and its line counts; generated files such as lock files start collapsed. Open the file list from the toolbar (on Windows it stays beside the diff), mark files **Viewed**, collapse or expand all, and use **Next** to go to the next unviewed file. A viewed file that the agent edits again is marked **Changed since viewed**. Tap a line number (Shift+click for a range, or long-press the code) and choose **Ask the agent** to add `path:Lnn` with the quoted lines to your message draft; you still send it yourself. **More context lines** and **Whole file** expand unchanged lines. The **Changed N files** chip under a turn opens Review on that turn's files first. On Windows: Ctrl+Shift+D opens Review, N/P move between files, V marks the current file viewed and Ctrl+B switches columns. Refresh re-reads Git; a network error can leave a retained, stale comparison. Review does not stage, commit, approve, merge or publish.
 
 ## Boards, rules and changelogs
 

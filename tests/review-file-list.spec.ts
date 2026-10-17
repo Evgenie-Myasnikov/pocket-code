@@ -18,9 +18,9 @@ test('review scrolls through collapsible files and filters detected extensions',
  await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:/Review fixture/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
  const panel=page.getByRole('dialog',{name:'Review',exact:true});await expect(panel.locator('.review-file')).toHaveCount(3);await expect(panel).toContainText('src/second.ts updated');
  await expect(panel.locator('.review-filebar select')).toHaveCount(0);
- const first=panel.locator('.review-file').first();await first.getByRole('button').click();await expect(first.getByRole('button')).toHaveAttribute('aria-expanded','false');await expect(first.locator('.diff-table')).toHaveCount(0);
+ const first=panel.locator('.review-file').first(),firstToggle=first.locator('.review-file-toggle');await firstToggle.click();await expect(firstToggle).toHaveAttribute('aria-expanded','false');await expect(first.locator('.diff-table')).toHaveCount(0);
  await panel.getByRole('button',{name:'Review options',exact:true}).click();await panel.getByLabel('.png',{exact:true}).uncheck();await page.keyboard.press('Escape');await expect(panel.locator('.review-file')).toHaveCount(2);await expect(panel).not.toContainText('images/logo.png');
- await first.getByRole('button').click();await expect(first).toContainText('src/first.ts updated');
+ await firstToggle.click();await expect(first).toContainText('src/first.ts updated');
  await page.screenshot({path:'artifacts/screenshots/review-file-list.png',fullPage:true});
  expect(calls).toContain('src/second.ts');
 });
@@ -32,7 +32,8 @@ test('split gutters remain fixed across unequal files and layout modes are visib
  await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
  const panel=page.getByRole('dialog',{name:'Review',exact:true});await panel.getByRole('button',{name:'Split',exact:true}).click();await expect(panel.locator('.diff-table.split')).toHaveCount(2);
  await expect(panel).toContainText('a longer synthetic example');
- const positions=await panel.locator('.diff-table.split').evaluateAll(tables=>tables.map(table=>{const cells=table.querySelector('tr:not(.hunk):not(.diff-spacer)')!.children;return {gutter:cells[0].getBoundingClientRect().width,right:cells[2].getBoundingClientRect().left,left:cells[1].getBoundingClientRect().width,other:cells[3].getBoundingClientRect().width};}));
+ // Columns: old number, sign, old code | new number, sign, new code. Both halves are equal whatever the line lengths.
+ const positions=await panel.locator('.diff-table.split').evaluateAll(tables=>tables.map(table=>{const cells=table.querySelector('tr:not(.hunk):not(.diff-spacer)')!.children;return {gutter:cells[0].getBoundingClientRect().width,right:cells[3].getBoundingClientRect().left,left:cells[2].getBoundingClientRect().width,other:cells[5].getBoundingClientRect().width};}));
  expect(positions[0].right).toBeCloseTo(positions[1].right,0);for(const p of positions){expect(p.gutter).toBeLessThan(90);expect(p.left).toBeCloseTo(p.other,0);}
  await panel.getByRole('button',{name:'Unified',exact:true}).click();await expect(panel.locator('.diff-table.unified')).toHaveCount(2);
  expect(await page.evaluate(()=>localStorage.getItem('pocket-code-diff-layout'))).toBe('unified');
@@ -48,7 +49,8 @@ test('new files fill the width in split mode; modified files support inline repl
  await expect(added.locator('.diff-table.single-file')).toBeVisible();await expect(changed.locator('.diff-table.split')).toBeVisible();
  const offset=await added.locator('pre').first().evaluate(el=>el.getBoundingClientRect().left-el.closest('table')!.getBoundingClientRect().left);expect(offset).toBeLessThan(100);
  await panel.getByRole('button',{name:'Unified',exact:true}).click();await expect(changed.locator('.diff-table.unified')).toBeVisible();
- expect(await changed.locator('pre').allTextContents()).toEqual([' context','-old one','-old two','+new one','+new two']);
+ expect(await changed.locator('pre').allTextContents()).toEqual(['context','old one','old two','new one','new two']);
+ expect(await changed.locator('td.sign').allTextContents()).toEqual(['','−','−','+','+']);
  await panel.getByRole('button',{name:'Split',exact:true}).click();await expect(added.locator('.diff-table.single-file')).toBeVisible();
  await page.screenshot({path:'artifacts/screenshots/diff-new-file-width.png'});
 });

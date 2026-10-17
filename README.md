@@ -19,7 +19,7 @@ QR codes are private connection credentials. Provider sign-in is separate. The P
 | Area | Features |
 | --- | --- |
 | Chats | Claude, Codex and Copilot; text/files/images; provider model choices; Codex effort; follow-ups during work; history, search and saved reading position |
-| Review | Scrollable file diffs, unified/split views with inline highlights, file-type filters, folding, code size and fit-to-width |
+| Review | Scrollable file diffs, Auto/unified/split views with word highlights, file statuses, Viewed marks, file list, line quotes into the chat draft, file-type filters, wrap and fit-to-width |
 | Results | Images, documents and links from available chat history; image zoom and local file previews |
 | Activity | Running, completed, failed and waiting-for-answer chats; child agent context where the provider exposes it |
 | Board | Optional repository boards with version columns, notes, images, status and priority; Miro Live Embed |

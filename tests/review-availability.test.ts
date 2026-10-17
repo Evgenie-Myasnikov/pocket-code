@@ -19,11 +19,11 @@ test('Review is available only for actual scoped working or branch changes', asy
   await writeFile(path.join(root, 'outside.txt'), 'outside change\n');
   assert.equal((await reviewAvailability([root], folder)).available, false, 'unrelated changes must not show Review');
   await writeFile(path.join(folder, 'new.txt'), 'new\n');
-  assert.deepEqual(await reviewAvailability([root], folder), { available: true, mode: 'working' });
+  assert.deepEqual(await reviewAvailability([root], folder), { available: true, mode: 'working', added: 0, removed: 0, files: 1 }, 'the Review button counts the new file');
   git('checkout', '-b', 'feature'); git('add', '.');
   assert.equal((await reviewAvailability([root], folder)).available, true, 'staged files are reviewable');
   git('commit', '-m', 'Change');
-  assert.deepEqual(await reviewAvailability([root], folder), { available: true, mode: 'branch' });
+  assert.deepEqual(await reviewAvailability([root], folder), { available: true, mode: 'branch', files: 1, added: 1, removed: 0 }, 'branch size excludes the change outside the project');
   await assert.rejects(reviewAvailability([folder], root), /вне разрешённых/);
 });
 
@@ -42,7 +42,7 @@ test('availability handles unborn repositories and never invokes content filters
   await writeFile(path.join(root, '.gitattributes'), 'code.txt filter=probe\n');
   git('config', 'filter.probe.clean', 'node filter.cjs'); git('config', 'filter.probe.process', 'node filter.cjs'); git('config', 'filter.probe.required', 'true');
   await writeFile(path.join(root, 'code.txt'), 'modified\n');
-  assert.deepEqual(await reviewAvailability([root], root), { available: true, mode: 'working' });
+  assert.deepEqual(await reviewAvailability([root], root), { available: true, mode: 'working', added: 1, removed: 1, files: 3 }, 'the size read also runs without content filters');
   await assert.rejects(access(path.join(root, 'side-effect.txt')));
 });
 

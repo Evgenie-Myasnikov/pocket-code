@@ -71,7 +71,7 @@ test('Review reading mode preserves the diff position and draft, and Back restor
   await expect(panel.getByLabel('Changed files',{exact:true})).toBeVisible();await expect(panel.getByRole('button',{name:'Review options',exact:true})).toBeHidden();
   expect(Math.abs(await content.evaluate(element=>element.scrollTop)-before)).toBeLessThanOrEqual(1);
   await page.keyboard.press('Tab');await expect(content).toBeFocused();
-  await page.keyboard.press('Tab');await expect(panel.locator('.review-file-heading').first()).toBeFocused();
+  await page.keyboard.press('Tab');await expect(panel.locator('.review-file-toggle').first()).toBeFocused();
   const afterKeyboard=await content.evaluate(element=>element.scrollTop);
   await page.keyboard.press('Escape');await expect(panel).toBeVisible();await expect(panel.getByRole('button',{name:'Reading mode',exact:true})).toBeFocused();
   expect(Math.abs(await content.evaluate(element=>element.scrollTop)-afterKeyboard)).toBeLessThanOrEqual(1);
@@ -86,9 +86,9 @@ test('late file responses stay inside their own file and cannot reopen a collaps
   const state=await host(page);state.delayed=gate();await connect(page);
   const panel=review(page),first=panel.locator('.review-file').nth(0),second=panel.locator('.review-file').nth(1),third=panel.locator('.review-file').nth(2);
   try{
-    await first.getByRole('button').click();
+    await first.locator('.review-file-toggle').click();
     await expect.poll(()=>state.calls.some(url=>url.searchParams.get('file')===paths[1])).toBe(true);
-    await second.getByRole('button').click();await expect(third).toContainText('src/third.ts new 0');
+    await second.locator('.review-file-toggle').click();await expect(third).toContainText('src/third.ts new 0');
     state.delayed.resolve();await expect.poll(()=>state.delayedFinished).toBe(true);
     await expect(second.locator('.diff-table')).toHaveCount(0);await expect(third).not.toContainText('src/second.ts new 0');
   }finally{state.delayed.resolve();}

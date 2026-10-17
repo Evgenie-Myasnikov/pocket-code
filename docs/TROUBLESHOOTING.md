@@ -41,7 +41,7 @@ For Copilot, start sign-in from **Settings → AI accounts → AI account**, com
 
 If Review has fewer changes than expected, check **All changes / Staged / Branch**, selected base branch, the chat's project folder, collapsed files and hidden extensions. Branch comparison excludes uncommitted changes. Ignored files are absent, and binary/large files may lack a text diff. Refresh after restoring connection; cached content is not evidence of current disk state.
 
-If code extends beyond the screen, enable **Fit diff to width**. If it becomes too small, disable fit and choose a fixed code size. This is separate from interface scale and chat text size.
+If code extends beyond the screen, enable **Wrap long lines** (the phone default) or **Fit diff to width**, which never shrinks code below 60%. This is separate from interface scale and chat text size.
 
 If Results seems incomplete, wait for history indexing and check category/source filters. Reopening restarts scanning; a failure retains partial results for retry. A deleted local file cannot be recreated by its old path. External images require explicit loading. A current-file preview is not necessarily a historical snapshot.
 

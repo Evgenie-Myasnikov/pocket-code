@@ -22,11 +22,11 @@ export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'ani
   return text?<Message {...shared} animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
 }
 /** The end of a turn that edited files says how much changed and leads to Review. */
-function TurnChangesChip({changes,onReview}:{changes:TurnChanges;onReview?:()=>void}){
+function TurnChangesChip({changes,onReview}:{changes:TurnChanges;onReview?:(changes:TurnChanges)=>void}){
   const label=t('Изменено')+' '+plural(changes.files.length,['{0} файл','{0} файла','{0} файлов'])+` · +${changes.added} −${changes.removed}`;
-  return onReview?<button className="turn-changes" title={changes.files.join(', ')} onClick={onReview}><GitCompareArrows size={15} aria-hidden="true"/>{label}</button>:<p className="turn-changes" title={changes.files.join(', ')}><GitCompareArrows size={15} aria-hidden="true"/>{label}</p>;
+  return onReview?<button className="turn-changes" title={changes.files.join(', ')} onClick={()=>onReview(changes)}><GitCompareArrows size={15} aria-hidden="true"/>{label}</button>:<p className="turn-changes" title={changes.files.join(', ')}><GitCompareArrows size={15} aria-hidden="true"/>{label}</p>;
 }
-export const MessageList=memo(function MessageList({messages,runningMessages,turnChanges,onReview,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;onReview?:()=>void}){
+export const MessageList=memo(function MessageList({messages,runningMessages,turnChanges,onReview,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;onReview?:(changes:TurnChanges)=>void}){
   // Messages already present when this transcript mounts are a snapshot, even
   // if their run is still active. Only newly arriving messages start from empty.
   const initialIds=useRef(new Set(messages.map(message=>message.id)));

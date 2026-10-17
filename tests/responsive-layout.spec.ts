@@ -88,7 +88,8 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   await page.locator('.reading-exit').click();
   await page.getByRole('button',{name:'Review',exact:true}).click();
   await expect(page.locator('.diff-table pre').filter({hasText:/^\+?new value$/})).toBeVisible();
-  await expect(page.locator('.diff-table')).toHaveClass(profile.width<600?'diff-table unified':'diff-table split');
+  // Auto layout: Split only from a 900 px panel; phones also wrap long lines by default.
+  await expect(page.locator('.diff-table')).toHaveClass(profile.width<600?'diff-table unified wrap':'diff-table unified');
   await withinViewport(page,'.review-panel button,.review-panel select,.review-panel h2',profile.width,profile.height);
   expect((await page.locator('.diff-content').boundingBox())!.height).toBeGreaterThan(70);
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-review.png`});

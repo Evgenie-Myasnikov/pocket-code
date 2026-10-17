@@ -30,7 +30,7 @@ The standard Windows launcher currently requires Claude or Codex detection. Copi
 | Projects | Phone folder selection, incremental local Git/worktree discovery, explicit allowed-root restriction |
 | Chat | Compact tool rows, attachments with removal controls, automatic history pagination, saved reading position, reading mode |
 | Results | Progressive history indexing, content/source categories, image thumbnails and zoom, supported file previews |
-| Review | Scrollable collapsible file diffs; working/index/branch comparison; extension filters; unified/split; 4-24 px and fit-to-width |
+| Review | Scrollable collapsible file diffs with status and line counts; working/index/branch comparison; persistent extension filters; Auto/unified/split; word highlights; wrap, 10-24 px and fit-to-width (60% minimum); ignore whitespace; file list, Viewed and Next; quote lines into the draft; more context / whole file |
 | Activity | Right-side draggable drawer, job states and unanswered requests, viewed completion tracking |
 | Android alerts | Native tracking of the last open chat and outcome/question notifications, subject to OS permissions/background limits |
 | Tasks | Shared Jira connection, assigned-issue search and native filters, full descriptions, role-aware actions and required fields |
@@ -48,7 +48,7 @@ The standard Windows launcher currently requires Claude or Codex detection. Copi
 - The host blocks overlapping project writers across its agents. Up to three jobs per provider can run in separate folders; automatic worktree creation is not implemented.
 - Codex Desktop can retain a writer lock even while idle. Pocket Code does not remove locks or terminate Desktop to take a chat.
 - Results indexes recognized materials in available messages. It does not list every file on the disk or guarantee native rendering of Office/interactive artifacts.
-- Review includes all selected-project Git edits, including edits outside the conversation. It is not a per-turn snapshot or a PR approval.
+- Review includes all selected-project Git edits, including edits outside the conversation. It is not a per-turn snapshot or a PR approval; the turn chip only filters Review to the paths that turn edited.
 - Rules are displayed, not edited or injected into native instructions by the viewer.
 - Jira roles organize the UI; account permissions and live transitions still govern actions. Unsupported required fields need Jira itself.
 - Batch chat creation does not change statuses or publish PRs. AI completion does not imply review approval or QA success.

@@ -1,3 +1,4 @@
+import {plural} from './plural';
 import {ArrowLeft,Eye,GitCompareArrows,PanelsTopLeft,GitBranch,Users,Ellipsis,ArrowUpToLine,Check} from 'lucide-react';
 import {t} from './i18n';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
@@ -5,7 +6,7 @@ import type {DetailMode} from './activity-groups';
 import {RunStatusDot,type RunStatus} from './run-status';
 import './chat-header.css';
 
-type Props={title:string;project:string;provider:string;branch?:string;notifications?:ReactNode;status?:{value:RunStatus;label:string};context?:ReactNode;onBack():void;review?:{disabled:boolean;open():void};outputs?:{disabled:boolean;open():void};subagents?:{count:number;running:number;disabled:boolean;open():void};reading?:{disabled:boolean;open():void};top?:{disabled:boolean;open():void};detail?:{value:DetailMode;set(value:DetailMode):void}};
+type Props={title:string;project:string;provider:string;branch?:string;notifications?:ReactNode;status?:{value:RunStatus;label:string};context?:ReactNode;onBack():void;review?:{disabled:boolean;open():void;stats?:{added:number;removed:number;files:number}};outputs?:{disabled:boolean;open():void};subagents?:{count:number;running:number;disabled:boolean;open():void};reading?:{disabled:boolean;open():void};top?:{disabled:boolean;open():void};detail?:{value:DetailMode;set(value:DetailMode):void}};
 /** One conversation header: Back (with the state of other chats), the title as h1, a subtitle that picks provider and project in a new chat, and only applicable, labelled actions. */
 /** Rare conversation actions: jump to the beginning and brief or detailed activity. Fixed position, so the header band never clips it. */
 function ChatMenu({top,detail}:{top?:Props['top'];detail?:Props['detail']}){
@@ -33,7 +34,7 @@ export function ChatHeader({title,project,provider,branch,notifications,status,c
       {notifications}
     </div>
     {(review||outputs||subagents?.count||reading||top||detail)&&<div className="chat-header-actions" role="group" aria-label={t('Действия чата')}>
-      {review&&<button className="review-button" aria-label="Review" title="Review" disabled={review.disabled} onClick={review.open}><GitCompareArrows size={19}/><span>Review</span></button>}
+      {review&&<button className="review-button" aria-label="Review" aria-description={review.stats?t('Изменено')+' '+plural(review.stats.files,['{0} файл','{0} файла','{0} файлов'])+` · +${review.stats.added} −${review.stats.removed}`:undefined} aria-keyshortcuts="Control+Shift+D" title={review.stats?`Review · ${plural(review.stats.files,['{0} файл','{0} файла','{0} файлов'])} · +${review.stats.added} −${review.stats.removed}`:'Review'} disabled={review.disabled} onClick={review.open}><GitCompareArrows size={19}/><span>Review</span>{review.stats&&(review.stats.added||review.stats.removed)?<span className="review-button-stats" aria-hidden="true"><b>+{review.stats.added}</b> <i>−{review.stats.removed}</i></span>:review.stats?.files?<span className="review-button-stats" aria-hidden="true">{review.stats.files}</span>:null}</button>}
       {outputs&&<button className="outputs-entry" aria-label={t('Результаты')} title={t('Результаты')} disabled={outputs.disabled} onClick={outputs.open}><PanelsTopLeft size={19}/><span>{t('Результаты')}</span></button>}
       {!!subagents?.count&&<button className="subagents-entry" aria-label={agentsLabel} title={agentsLabel} disabled={subagents.disabled} onClick={subagents.open}><Users size={19}/><span>{t('Субагенты · {0}',subagents.count)}</span><small className="header-agent-count" aria-hidden="true">{subagents.count}</small></button>}
       {reading&&<button className="reading-entry" aria-label={t('Режим чтения')} title={t('Режим чтения')} disabled={reading.disabled} onClick={reading.open}><Eye size={19}/><span>{t('Чтение')}</span></button>}

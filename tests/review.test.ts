@@ -51,7 +51,8 @@ test('review treats project and selected file names as literal paths',async t=>{
   git('add','.');git('commit','-m','Fixture');
   await writeFile(path.join(folder,'code[1].txt'),'selected change\n');await writeFile(path.join(folder,'code1.txt'),'other file change\n');await writeFile(path.join(other,'code[1].txt'),'other folder change\n');
   const scoped=await review([root],folder,'working',undefined,'project[1]/code[1].txt');
-  assert.equal(scoped.scope,'project[1]');assert.deepEqual(scoped.files.map(file=>file.path).sort(),['project[1]/code1.txt','project[1]/code[1].txt'].sort());
+  assert.equal(scoped.scope,'project[1]');assert.deepEqual(scoped.files.map(file=>file.path),['project[1]/code[1].txt'],'a file request reads only that literal path, not a glob match');
+  assert.deepEqual((await review([root],folder,'working')).files.map(file=>file.path).sort(),['project[1]/code1.txt','project[1]/code[1].txt'].sort());
   assert.match(scoped.patch,/\+selected change/);assert.doesNotMatch(scoped.patch,/other file change|other folder change/);
 });
 
