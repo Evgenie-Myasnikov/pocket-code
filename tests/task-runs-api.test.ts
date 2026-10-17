@@ -69,9 +69,9 @@ test('manual checks return a running response promptly, report evidence and requ
   const started=await f.request(`/task-runs/${run.id}/check`,{revision:run.revision,checks});assert.equal(started.status,202);run=await started.json();assert.equal(run.verification?.status,'running');assert.equal(f.app.taskRuntime!.hasWork(),true);
   assert.equal((await f.request(`/task-runs/${run.id}/approve`,{revision:run.revision})).status,409);
   await writeFile(gate,'continue');
-  const result=await eventually(()=>f.request(`/task-runs/${run.id}/result`).then(value=>value.json()),value=>value.run.stage==='review');assert.equal(result.verificationCurrent,true);assert.equal(result.approvalCurrent,false);assert.equal(result.run.verification.evidence[0].exitCode,0);
+  const result=await eventually(()=>f.request(`/task-runs/${run.id}/result`).then(value=>value.json()),value=>value.run.stage==='review');assert.equal(result.verificationCurrent,true);assert.equal(result.snapshotCurrent,true);assert.equal(result.approvalCurrent,false);assert.equal(result.run.verification.evidence[0].exitCode,0);
   const approval=await f.request(`/task-runs/${run.id}/approve`,{revision:result.run.revision});assert.equal(approval.status,200);assert.equal((await approval.json()).stage,'approved');
-  await writeFile(path.join(run.worktree!.cwd,'code.txt'),'post-review edit\n');const stale=await(await f.request(`/task-runs/${run.id}/result`)).json();assert.equal(stale.verificationCurrent,false);assert.equal(stale.approvalCurrent,false);
+  await writeFile(path.join(run.worktree!.cwd,'code.txt'),'post-review edit\n');const stale=await(await f.request(`/task-runs/${run.id}/result`)).json();assert.equal(stale.verificationCurrent,false);assert.equal(stale.snapshotCurrent,false);assert.equal(stale.approvalCurrent,false);
 });
 
 test('automatic failed checks run once and removed projects are excluded from private run lists',async t=>{

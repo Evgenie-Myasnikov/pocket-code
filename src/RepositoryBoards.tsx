@@ -1,24 +1,31 @@
 ﻿import type {BoardPreviewData} from './BoardPreview';
-import {ProjectBoardCard} from './ProjectBoardCard';
+import {ProjectBoardCard,type BoardTaskSummary} from './ProjectBoardCard';
+import {CardActionMenu} from './CardActionMenu';
+import {latestRuns,taskDisplayStage,type TaskDisplayStage,type TaskRun} from './task-run-ui';
 import {DeleteProjectBoard} from './DeleteProjectBoard';
 import {MiroBoard} from './MiroBoard';
 import {miroLink} from './miro-link';
 ﻿import {useEffect,useRef,useState} from 'react';
-import {RefreshCw,Plus,Search} from 'lucide-react';
+import {RefreshCw,Plus,Search,PanelTop,Trash2} from 'lucide-react';
 import {request,type Connection} from './api';
-import {useLanguage} from './i18n';
+import {useLanguage,t} from './i18n';
 import type {BoardView} from './WorkBoards';
+const urgency:TaskDisplayStage[]=['questions','failed','review','checks','working','prepared','approved'];
+/** One request for every task run: the gallery shows what waits for the person per project, without per-board polling. */
+function summarize(runs:TaskRun[]){const result:Record<string,BoardTaskSummary>={};for(const run of latestRuns(runs).values()){const key=run.projectPath.toLowerCase(),stage=taskDisplayStage(run),known=result[key];if(stage==='approved'&&!known)continue;result[key]={stage:known&&urgency.indexOf(known.stage)<urgency.indexOf(stage)?known.stage:stage,waiting:(known?.waiting||0)+(stage==='questions'?1:0)};}return result;}
 export function RepositoryBoards({connection,roots,onOpen}:{connection:Connection;roots:string[];onOpen(board:BoardView):void}){
  const ru=useLanguage()==='ru',l=(en:string,other:string)=>ru?other:en;
  const [miro,setMiro]=useState<{root:string;url:string}|null>(null),[boardNames,setBoardNames]=useState<Record<string,string>>({}),[kind,setKind]=useState<'repository'|'miro'>('repository'),[miroUrl,setMiroUrl]=useState('');
  const [existing,setExisting]=useState<string[]>([]),[missing,setMissing]=useState<string[]>([]),[failed,setFailed]=useState<string[]>([]);
  const [query,setQuery]=useState('');
  const [adding,setAdding]=useState(false),[selected,setSelected]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(''),[loading,setLoading]=useState(true),[revision,setRevision]=useState(0);
+ const [menu,setMenu]=useState<{root:string;point:{x:number;y:number}}|null>(null),[tasks,setTasks]=useState<Record<string,BoardTaskSummary>>({});
  const [deleting,setDeleting]=useState<string|null>(null),[records,setRecords]=useState<Record<string,{miro:boolean;revision?:string;canEdit:boolean;preview?:BoardPreviewData}>>({});
  const epoch=useRef(0),lock=useRef(false);
- useEffect(()=>{const generation=++epoch.current;setMiro(null);setDeleting(null);setRecords({});setBoardNames({});setExisting([]);setMissing([]);setFailed([]);setAdding(false);setSelected('');setError('');setLoading(true);
+ const name=(root:string)=>root.split(/[\\/]/).filter(Boolean).at(-1)||root;
+ useEffect(()=>{const generation=++epoch.current;setMiro(null);setDeleting(null);setMenu(null);setRecords({});setBoardNames({});setExisting([]);setMissing([]);setFailed([]);setAdding(false);setSelected('');setError('');setLoading(true);
   const queue=[...new Set(roots)],found:string[]=[],titles:Record<string,string>={},metadata:Record<string,{miro:boolean;revision?:string;canEdit:boolean;preview?:BoardPreviewData}>={},absent:string[]=[],unavailable:string[]=[];let cursor=0;
-  void Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{while(cursor<queue.length&&generation===epoch.current){const root=queue[cursor++];try{const result=await request<{board:BoardView|null;miro?:{root:string;url:string};canEdit?:boolean}>(connection,'/project-board?root='+encodeURIComponent(root));(result.board||result.miro?found:absent).push(root);if(result.board||result.miro){titles[root]=result.miro?'Miro':result.board!.name;metadata[root]={preview:result.board?{versions:result.board.versions,notes:result.board.notes.map(({x,y,branch,status,title})=>({x,y,branch,status,title}))}:undefined,miro:!!result.miro,revision:result.board?.repositoryRevision,canEdit:result.canEdit!==false};}}catch{unavailable.push(root);}}})).then(()=>{if(generation!==epoch.current)return;setBoardNames(titles);setRecords(metadata);setExisting(queue.filter(r=>found.includes(r)));setMissing(queue.filter(r=>absent.includes(r)));setFailed(unavailable);setLoading(false);});
+  void Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{while(cursor<queue.length&&generation===epoch.current){const root=queue[cursor++];try{const result=await request<{board:BoardView|null;miro?:{root:string;url:string};canEdit?:boolean}>(connection,'/project-board?root='+encodeURIComponent(root));(result.board||result.miro?found:absent).push(root);if(result.board||result.miro){titles[root]=result.miro?name(root):result.board!.name;metadata[root]={preview:result.board?{versions:result.board.versions,notes:result.board.notes.map(({x,y,branch,status,title})=>({x,y,branch,status,title}))}:undefined,miro:!!result.miro,revision:result.board?.repositoryRevision,canEdit:result.canEdit!==false};}}catch{unavailable.push(root);}}})).then(()=>{if(generation!==epoch.current)return;void request<{runs:TaskRun[]}>(connection,'/task-runs').then(data=>{if(generation===epoch.current&&Array.isArray(data?.runs))setTasks(summarize(data.runs));}).catch(()=>{/* Older hosts and shared workspaces have no task runs. */});setBoardNames(titles);setRecords(metadata);setExisting(queue.filter(r=>found.includes(r)));setMissing(queue.filter(r=>absent.includes(r)));setFailed(unavailable);setLoading(false);});
   return()=>{epoch.current++;};
  },[connection.url,connection.token,roots.join('|'),revision]);
  async function open(root:string,create=false){if(lock.current)return;lock.current=true;setBusy(root);setError('');const generation=epoch.current;
@@ -28,7 +35,6 @@ export function RepositoryBoards({connection,roots,onOpen}:{connection:Connectio
    if(generation!==epoch.current)return;if(board)onOpen(board);else{setExisting(old=>old.filter(r=>r!==root));setMissing(old=>[...new Set([...old,root])]);}
   }catch(e){if(generation===epoch.current)setError((e as Error).message);}finally{lock.current=false;setBusy('');}
  }
- const name=(root:string)=>root.split(/[\\/]/).filter(Boolean).at(-1)||root;
  if(miro)return <MiroBoard url={miro.url} name={name(miro.root)} onBack={()=>{setMiro(null);setRevision(v=>v+1);}} onDisconnect={async()=>{await request(connection,'/project-board/miro',{root:miro.root,url:null});setMiro(null);setRevision(v=>v+1);}}/>;
  return <div className="board-index project-board-index">
   <div className="board-index-actions"><label className="board-gallery-search"><Search size={18}/><input aria-label={l('Find board','Найти доску')} placeholder={l('Find board','Найти доску')} value={query} onChange={e=>setQuery(e.target.value)}/></label><button className="secondary" disabled={loading||!!busy||!missing.length} onClick={()=>{setAdding(v=>!v);setSelected(missing[0]||'');}}><Plus size={18}/>{l('Add project board','Добавить доску проекта')}</button><button className="icon-button" aria-label={l('Refresh boards','Обновить доски')} disabled={loading||!!busy} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={18}/></button></div>
@@ -36,7 +42,8 @@ export function RepositoryBoards({connection,roots,onOpen}:{connection:Connectio
   {error&&<p role="alert">{error}</p>}{loading&&<p role="status">{l('Loading boards…','Загружаем доски…')}</p>}
   {!!failed.length&&<p role="alert">{l('Some projects could not be checked. Refresh to retry.','Некоторые проекты не удалось проверить. Обновите список, чтобы повторить.')}</p>}
   {!loading&&!existing.length&&<p>{l('No project boards yet. Add one when you need it.','Досок проектов пока нет. Добавьте доску, когда она понадобится.')}</p>}
-  <div className="project-board-grid">{existing.filter(root=>!query.trim()||(boardNames[root]+' '+name(root)).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map(root=><div key={root} className="project-board-row"><ProjectBoardCard name={boardNames[root]} project={name(root)} preview={records[root]?.preview} disabled={!!busy} busy={busy===root} onOpen={()=>void open(root)} onDelete={records[root]?.canEdit?()=>setDeleting(root):undefined}/></div>)}</div>
+  <div className="project-board-grid">{[...existing].sort((a,b)=>(boardNames[a]||name(a)).localeCompare(boardNames[b]||name(b),undefined,{sensitivity:'base'})||name(a).localeCompare(name(b))).filter(root=>!query.trim()||(boardNames[root]+' '+name(root)).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map(root=><div key={root} className="project-board-row"><ProjectBoardCard name={boardNames[root]} project={name(root)} preview={records[root]?.preview} miro={records[root]?.miro} tasks={tasks[root.toLowerCase()]} disabled={!!busy} busy={busy===root} onOpen={()=>void open(root)} onDelete={records[root]?.canEdit?()=>setDeleting(root):undefined} onMenu={point=>setMenu({root,point})}/></div>)}</div>
+  {menu&&<CardActionMenu label={t('Действия с доской «{0}»',boardNames[menu.root]||name(menu.root))} point={menu.point} onClose={()=>setMenu(null)} items={[{label:t('Открыть'),Icon:PanelTop,onSelect:()=>void open(menu.root)},...(records[menu.root]?.canEdit?[{label:t('Удалить…'),Icon:Trash2,danger:true,onSelect:()=>setDeleting(menu.root)}]:[])]}/>}
   {deleting&&<DeleteProjectBoard connection={connection} root={deleting} name={boardNames[deleting]} miro={records[deleting].miro} repositoryRevision={records[deleting].revision} onClose={()=>setDeleting(null)} onDeleted={()=>{setDeleting(null);setRevision(v=>v+1);}}/>}
  </div>;
 }

@@ -2,7 +2,8 @@ import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {request,fileBase64,type Connection} from './api';
 import {ImageViewer} from './ImageViewer';
-import {useLanguage} from './i18n';
+import {useLanguage,t} from './i18n';
+import {Paperclip,X} from 'lucide-react';
 import type {BoardNote} from '../server/boards';
 import './board-images.css';
 
@@ -15,7 +16,7 @@ function Thumbnail({connection,root,image,onOpen}:{connection:Connection;root:st
  return <button ref={element} type="button" className="board-image-thumb" disabled={!src} title={error||image.caption} aria-label={(ru?'Открыть изображение: ':'Open image: ')+image.caption} onClick={()=>onOpen(src)}>{src?<img src={src} alt={image.caption}/>:<span>{error?(ru?'Не удалось загрузить':'Could not load'):(ru?'Загрузка…':'Loading…')}</span>}<small>{image.caption}</small></button>;
 }
 export function BoardImages({connection,root,images=[],editable=false,onChange,onBusy}:{connection:Connection;root:string;images?:Image[];editable?:boolean;onChange?(images:Image[]):void;onBusy?(busy:boolean):void}){
- const ru=useLanguage()==='ru',[view,setView]=useState<{src:string;title:string}|null>(null),[error,setError]=useState(''),[uploading,setUploading]=useState(false),alive=useRef(true);
+ const ru=useLanguage()==='ru',[view,setView]=useState<{src:string;title:string}|null>(null),[error,setError]=useState(''),[uploading,setUploading]=useState(false),[dropping,setDropping]=useState(false),alive=useRef(true),picker=useRef<HTMLInputElement>(null);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;onBusy?.(false);};},[]);
  async function upload(files:FileList|null){
   if(!files?.length||!onChange||uploading)return;
@@ -28,5 +29,6 @@ export function BoardImages({connection,root,images=[],editable=false,onChange,o
    if(!next.some(i=>i.path===added.path))next.push(added);
   }}catch(e){if(alive.current)setError((e as Error).message);}finally{if(alive.current){onChange(next);setUploading(false);onBusy?.(false);}}
  }
- return <>{(images.length>0||editable)&&<div className="board-images" aria-label={ru?'Изображения идеи':'Idea images'}>{images.map((image,index)=><div className="board-image-item" key={image.path}><Thumbnail connection={connection} root={root} image={image} onOpen={src=>setView({src,title:image.caption})}/>{editable&&<button type="button" className="board-image-remove" aria-label={(ru?'Убрать изображение: ':'Remove image: ')+image.caption} onClick={()=>onChange?.(images.filter((_,i)=>i!==index))}>×</button>}</div>)}{editable&&<label className="board-image-upload">{ru?'Прикрепить изображения':'Attach images'}<input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={uploading||images.length>=12} onChange={e=>{void upload(e.target.files);e.target.value='';}}/><small>PNG, JPEG, WebP · 10 MB · {images.length}/12</small></label>}{uploading&&<p role="status">{ru?'Загрузка изображений…':'Uploading images…'}</p>}{error&&<p role="alert">{error}</p>}</div>}{view&&createPortal(<ImageViewer src={view.src} title={view.title} onClose={()=>setView(null)}/>,document.body)}</>;
+ const full=uploading||images.length>=12;
+ return <>{(images.length>0||editable)&&<div className={'board-images'+(dropping?' board-images-drop':'')} aria-label={ru?'Изображения идеи':'Idea images'} onDragOver={editable&&!full?e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();setDropping(true);}}:undefined} onDragLeave={()=>setDropping(false)} onDrop={editable&&!full?e=>{e.preventDefault();setDropping(false);void upload(e.dataTransfer.files);}:undefined}>{images.map((image,index)=><div className="board-image-item" key={image.path}><Thumbnail connection={connection} root={root} image={image} onOpen={src=>setView({src,title:image.caption})}/>{editable&&<button type="button" className="board-image-remove" aria-label={(ru?'Убрать изображение: ':'Remove image: ')+image.caption} onClick={()=>onChange?.(images.filter((_,i)=>i!==index))}><span aria-hidden="true"><X size={16}/></span></button>}</div>)}{editable&&<div className="board-image-upload"><input ref={picker} type="file" hidden tabIndex={-1} aria-hidden="true" accept="image/png,image/jpeg,image/webp" multiple disabled={full} onChange={e=>{void upload(e.target.files);e.target.value='';}}/><button type="button" disabled={full} onClick={()=>picker.current?.click()}><Paperclip size={16} aria-hidden="true"/>{ru?'Прикрепить изображения':'Attach images'}</button><small>{t('PNG, JPEG, WebP · до 10 МБ · {0}/12',images.length)}{!full&&<span className="board-image-drop-hint"> · {t('можно перетащить сюда')}</span>}</small></div>}{uploading&&<p role="status">{ru?'Загрузка изображений…':'Uploading images…'}</p>}{error&&<p role="alert">{error}</p>}</div>}{view&&createPortal(<ImageViewer src={view.src} title={view.title} onClose={()=>setView(null)}/>,document.body)}</>;
 }

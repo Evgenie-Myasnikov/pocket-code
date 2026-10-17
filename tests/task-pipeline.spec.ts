@@ -3,10 +3,10 @@ import type {TaskRun} from '../server/task-runs';
 const runId='33333333-3333-4333-8333-333333333333';
 const acceptedTask={title:'Accepted scope: accessible note search',description:'Accepted criteria:\n1. Keyboard focus remains visible.\n2. Escape restores focus to the search button.',branch:'Next',priority:'high' as const};
 function syntheticRun():TaskRun{return {id:runId,boardId:'11111111-1111-4111-8111-111111111111',noteId:'22222222-2222-4222-8222-222222222222',noteRevision:'fixture-revision',title:acceptedTask.title,noteSnapshot:{...acceptedTask},provider:'codex',projectPath:'/fixture/project',stage:'questions',revision:1,createdAt:1700000000000,updatedAt:1700000000000,jobs:[],worktree:{runId,projectPath:'/fixture/project',repositoryRoot:'/fixture/project',cwd:'/fixture/tasks/task-one',branch:'pocket/task-one',baseCommit:'a'.repeat(40)}};}
-async function setup(page:Page,existing=true,width=390,options:{delayResult?:boolean;delayCreate?:boolean}={}){
+async function setup(page:Page,existing=true,width=390,options:{delayResult?:boolean;delayCreate?:boolean;initial?:Partial<TaskRun>;snapshotCurrent?:boolean}={}){
   await page.setViewportSize({width,height:844});
   await page.addInitScript(()=>{localStorage.setItem('pocket-code-language-v1','en');localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({theme:'dark',palette:'neutral',scale:100,textSize:16}));});
-  let run=syntheticRun(),available=existing,verificationCurrent=false,approvalCurrent=false,rejectSave=false;
+  let run={...syntheticRun(),...options.initial} as TaskRun,available=existing,verificationCurrent=false,approvalCurrent=false,rejectSave=false;
   let releaseResult=()=>{},releaseCreate=()=>{},firstResult=true;
   const resultGate=new Promise<void>(resolve=>releaseResult=resolve),createGate=new Promise<void>(resolve=>releaseCreate=resolve);
   const calls:{method:string;path:string;query:URLSearchParams;body:any}[]=[];
@@ -16,7 +16,7 @@ async function setup(page:Page,existing=true,width=390,options:{delayResult?:boo
     calls.push({method:req.method(),path,query:url.searchParams,body});
     if(path==='/api/task-runs'&&req.method()==='GET')return route.fulfill({json:{runs:available?[run]:[]}});
     if(path==='/api/task-runs'&&req.method()==='POST'){run={...run,id:body.id,provider:body.provider,worktree:{...run.worktree!,runId:body.id}};available=true;if(options.delayCreate)await createGate;return route.fulfill({json:run});}
-    if(path.endsWith('/result')){const snapshot={run:structuredClone(run),verificationCurrent,approvalCurrent};if(firstResult&&options.delayResult){firstResult=false;await resultGate;}return route.fulfill({json:snapshot});}
+    if(path.endsWith('/result')){const snapshot={run:structuredClone(run),verificationCurrent,approvalCurrent,...(options.snapshotCurrent===undefined?{}:{snapshotCurrent:options.snapshotCurrent})};if(firstResult&&options.delayResult){firstResult=false;await resultGate;}return route.fulfill({json:snapshot});}
     if(path.endsWith('/checks')&&req.method()==='GET')return route.fulfill({json:{checks}});
     if(path.endsWith('/checks')&&req.method()==='POST'){
       if(rejectSave){rejectSave=false;run={...run,revision:run.revision+1};return route.fulfill({status:409,json:{error:'The task run changed. Refresh before continuing.'}});}
@@ -50,7 +50,7 @@ test('saved repository note prepares an isolated draft with selected provider an
 });
 
 for(const width of [390,1440])test(`task checks and approval remain tied to a current snapshot at ${width}px`,async({page})=>{
-  const state=await setup(page,true,width);await page.getByRole('button',{name:/codex · Needs an answer/}).click();
+  const state=await setup(page,true,width);await page.getByRole('button',{name:/Codex · Needs you/}).click();
   const dialog=page.getByRole('dialog',{name:'Task result',exact:true});await expect(dialog).toBeVisible();
   const criteria=dialog.locator('details').filter({has:page.locator('summary').getByText('Accepted task and criteria',{exact:true})});
   await criteria.locator('summary').click();await expect(criteria.locator('p')).toHaveText(acceptedTask.description);await expect(dialog.getByRole('heading',{name:acceptedTask.title,exact:true})).toBeVisible();
@@ -68,14 +68,14 @@ for(const width of [390,1440])test(`task checks and approval remain tied to a cu
 });
 
 test('revision conflict preserves drafted checks and reports the failed save',async({page})=>{
-  const state=await setup(page);await page.getByRole('button',{name:/codex · Needs an answer/}).click();
+  const state=await setup(page);await page.getByRole('button',{name:/Codex · Needs you/}).click();
   const dialog=page.getByRole('dialog',{name:'Task result',exact:true});await dialog.getByRole('button',{name:'Use project scripts'}).click();state.conflict();
   await dialog.getByRole('button',{name:'Save automatic checks'}).click();await expect(dialog.getByRole('alert')).toHaveText('The task run changed. Refresh before continuing.');
   await expect(dialog.locator('.task-check-plan')).toContainText('npm test');await expect(dialog.getByRole('button',{name:'Save automatic checks'})).toBeEnabled();
 });
 
 test('task diff and each file use the isolated task review endpoint',async({page})=>{
-  const state=await setup(page);await page.getByRole('button',{name:/codex · Needs an answer/}).click();
+  const state=await setup(page);await page.getByRole('button',{name:/Codex · Needs you/}).click();
   await page.getByRole('button',{name:'Review task changes'}).click();const review=page.getByRole('dialog',{name:'Review',exact:true});await expect(review).toBeVisible();
   await expect(review.locator('.review-file')).toHaveCount(2);await expect(review).toContainText('src/search.ts updated');
   await review.locator('.review-file').nth(1).scrollIntoViewIfNeeded();await expect(review).toContainText('src/search.test.ts updated');
@@ -84,7 +84,7 @@ test('task diff and each file use the isolated task review endpoint',async({page
 });
 
 test('late initial task status cannot erase a saved verification plan',async({page})=>{
-  const state=await setup(page,true,390,{delayResult:true});await page.getByRole('button',{name:/codex · Needs an answer/}).click();
+  const state=await setup(page,true,390,{delayResult:true});await page.getByRole('button',{name:/Codex · Needs you/}).click();
   const dialog=page.getByRole('dialog',{name:'Task result',exact:true});await dialog.getByRole('button',{name:'Use project scripts'}).click();
   await dialog.getByRole('button',{name:'Save automatic checks'}).click();await expect(dialog.getByRole('button',{name:'Save automatic checks'})).toBeDisabled();
   const response=page.waitForResponse(response=>response.url().endsWith('/result'));state.releaseResult();await response;
@@ -147,9 +147,9 @@ async function fullAppTask(page:Page,desktop:boolean){
   await page.exposeFunction('taskFixtureRequest',respond);
   await page.route('https://fixture.invalid/api/**',async route=>route.fulfill({json:respond(route.request().url(),route.request().method()==='POST'?route.request().postDataJSON():undefined)}));
   await page.goto((test.info().project.use.baseURL||'http://127.0.0.1:5173')+(desktop?'/?desktop=1':'/'));
-  if(desktop)await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+  if(desktop)await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();else await page.getByRole('navigation',{name:'Main sections'}).getByRole('button',{name:'Board',exact:true}).click();
   const card=page.locator('.project-board-row').filter({hasText:'Synthetic roadmap'});await card.getByRole('button').click();
-  await page.locator('.note-content').click();const dialog=page.getByRole('dialog',{name:'Note details',exact:true});
+  await page.locator('.note-content').click();const dialog=page.getByRole('dialog',{name:'Note details',exact:true});await dialog.getByRole('tab',{name:'Agent',exact:true}).click();
   await dialog.getByRole('combobox',{name:'Provider',exact:true}).selectOption('codex');
   await dialog.getByRole('button',{name:'Prepare task chat',exact:true}).click();
   return {calls,getRun:()=>run};
@@ -167,7 +167,37 @@ for(const desktop of [true,false])test(`${desktop?'desktop':'mobile'} board task
   expect(state.calls.find(call=>call.path==='/jobs'&&call.method==='POST')!.body.text).toBe(prompt);
   await expect(page.locator('.conversation')).toContainText('Synthetic task in progress');
   if(desktop){
-    await page.locator('.desktop-rail').getByRole('combobox',{name:'Provider',exact:true}).selectOption('claude');
+    await page.locator('.desktop-rail').getByRole('group',{name:'Provider'}).getByRole('button',{name:/^Claude/}).click();
     await expect(page.locator('.desktop-chat-host')).toHaveCount(0);
   }
+});
+
+test('task result keeps polling under StrictMode and Refresh always reaches the host',async({page})=>{
+  const state=await setup(page);await page.getByRole('button',{name:/Codex · Needs you/}).click();
+  const dialog=page.getByRole('dialog',{name:'Task result',exact:true});await expect(dialog).toBeVisible();
+  const results=()=>state.calls.filter(call=>call.path.endsWith('/result')).length;const opened=results();
+  await page.waitForTimeout(5000);expect(results()-opened).toBeGreaterThanOrEqual(2);
+  const before=results();await dialog.getByRole('button',{name:'Refresh task',exact:true}).click();await expect.poll(results).toBeGreaterThan(before);
+  await expect(dialog.locator('.task-run-freshness')).toContainText(/Updated \d+ s ago/);
+  await expect(dialog.getByRole('list',{name:'Task stages'}).locator('[aria-current=step]')).toHaveText(/Working/);
+});
+
+test('a failed check on unchanged files reports the failing command once and offers a visible fix draft',async({page})=>{
+  const failure='One or more verification commands failed.';
+  const state=await setup(page,true,390,{snapshotCurrent:true,initial:{stage:'failed',error:failure,verificationPlan:[{label:'Tests',executable:'npm',args:['test'],timeoutMs:120000}],verification:{status:'failed',error:failure,snapshot:{baseCommit:'a'.repeat(40),headCommit:'a'.repeat(40),branch:'pocket/task-one',fingerprint:'b'.repeat(64)},startedAt:1700000001000,finishedAt:1700000002000,evidence:[{label:'Tests',executable:'npm',args:['test'],startedAt:1700000001000,finishedAt:1700000002000,exitCode:1,passed:false,timedOut:false,output:'Synthetic assertion failed at search.test.ts',truncated:false}]}}});
+  await page.getByRole('button',{name:/Codex · Error/}).click();const dialog=page.getByRole('dialog',{name:'Task result',exact:true});
+  await expect(dialog.getByRole('alert')).toHaveCount(1);await expect(dialog.getByRole('alert')).toHaveText('Check failed: Tests (exit 1)');
+  await expect(dialog).not.toContainText('working copy changed');await expect(dialog).not.toContainText(failure);await expect(dialog.locator('.task-check-status')).toHaveText('Failed');
+  await expect(dialog.locator('.task-check-evidence[open]')).toContainText('Synthetic assertion failed at search.test.ts');
+  await expect(dialog.locator('.task-check-setup')).not.toHaveAttribute('open','');
+  await dialog.getByRole('button',{name:'Fix failed checks',exact:true}).click();
+  const target=JSON.parse((await page.getByTestId('chat-target').textContent())!);expect(target.followUp).toBe(true);expect(target.prompt).toContain('The automatic checks failed');expect(target.prompt).toContain('Synthetic assertion failed at search.test.ts');expect(target.prompt).not.toContain('Implement the following task');
+  expect(state.calls.some(call=>call.path==='/api/jobs')).toBe(false);
+});
+
+test('a single command line becomes argv without a shell',async({page})=>{
+  await setup(page);await page.getByRole('button',{name:/Codex · Needs you/}).click();const dialog=page.getByRole('dialog',{name:'Task result',exact:true});
+  await dialog.getByRole('button',{name:'Add command',exact:true}).click();await dialog.getByLabel('Command (no shell)').fill('node --test "tests/a b.test.mjs"');await dialog.getByRole('button',{name:'Add',exact:true}).click();
+  await expect(dialog.locator('.task-check-plan code')).toHaveText('node --test tests/a b.test.mjs');
+  await dialog.getByRole('button',{name:'Add command',exact:true}).click();await dialog.getByLabel('Command (no shell)').fill('"unterminated');await dialog.getByRole('button',{name:'Add',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('No shell is used');
 });

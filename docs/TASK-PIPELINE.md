@@ -27,14 +27,15 @@ or an operating-system sandbox. An agent's existing access/approval settings sti
 
 ## Checks and approval
 
-The task records **Work → Checks → Review → Approved**, with **Needs an answer** and
-**Failed** states. Structured approval/questions and interrupted jobs remain visible.
+The task records **Working → Checks → Ready for review → Approved**, with **Prepared**
+(worktree ready, nothing sent yet), **Needs you** and **Failed** states. The same stage
+appears on the board card, the gallery and the chat chip. Structured approval/questions and interrupted jobs remain visible.
 Natural-language questions that a provider does not identify as a question cannot be
 reliably classified automatically.
 
-In **Task result → Verification commands**, use project scripts or supply an executable
-and a JSON array of arguments. For example, program `node` and arguments
-`["--test", "tests/example.test.mjs"]`. Commands execute directly, without shell
+In **Task result → Check setup**, use project scripts or add a command line such as
+`node --test "tests/a b.test.mjs"`: quotes group words and nothing is expanded. A JSON
+array such as `["node", "--test", "tests/example.test.mjs"]` sets exact arguments. Commands execute directly, without shell
 interpolation, in the task's working copy. Windows `.cmd`/`.bat` commands are rejected;
 detected npm scripts run through Node's npm CLI. Saved commands run automatically after
 the linked AI attempt finishes. An empty saved plan disables automatic checks.
@@ -89,3 +90,11 @@ snapshots; `task-checks.ts` runs bounded verification commands. `BoardTaskRuns`,
 `TaskRunPanel` and `useTaskRun` share the Windows/Android UI. The native bridge must
 allowlist every supported route. Tests use temporary Git repositories and synthetic
 providers; physical-device behavior still needs a real device.
+
+## Next steps
+
+After checks finish, **Task result** offers **Fix failed checks** (with the failing output
+tail), **Address my notes** and, after approval, **Prepare merge into …**. Each opens the
+task chat with the message as a draft; you send it yourself. It can also suggest moving the
+card to Working, Review or Done (with an evidence line); the card changes only when you tap
+it, through the normal revision-checked save.

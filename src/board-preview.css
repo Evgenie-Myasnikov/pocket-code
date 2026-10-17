@@ -10,3 +10,8 @@
 @media(hover:hover){.project-board-grid .board-index-item.has-preview:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 6px 22px #00000018}}
 .project-board-grid .board-index-item.has-preview:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){.project-board-grid .board-index-item.has-preview{transition:none}}
+/* An empty board draws dashed columns instead of a blank frame that looks like a failed image. */
+.board-preview-empty{display:grid;grid-template-rows:1fr auto;gap:8px}.board-preview-empty-columns{display:flex;gap:10px;min-height:0}.board-preview-empty-columns span{flex:1;border:1.5px dashed color-mix(in srgb,var(--muted) 55%,transparent);border-radius:10px}.board-preview-empty small{text-align:center;color:var(--muted);font-size:.8em}
+/* Miro boards share the card surface, with a mark and a kind badge. */
+.board-preview-miro{display:grid;place-items:center;background:color-mix(in srgb,#ffd02f 14%,var(--bg))}.board-miro-mark{display:grid;place-items:center;width:56px;height:56px;border-radius:14px;background:#ffd02f;color:#050038;font-weight:800;font-size:28px;font-family:Manrope,sans-serif}
+.board-kind-badge{display:inline-block;padding:1px 8px;border-radius:999px;border:1px solid var(--line);font-size:.9em}

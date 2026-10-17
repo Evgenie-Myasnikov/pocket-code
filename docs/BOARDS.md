@@ -10,13 +10,13 @@ Existing curated files retain their IDs. The canonical filename takes precedence
 
 ## Edit a note
 
-Long-press empty canvas or right-click it on Windows, then choose **Create note**. Fill a title, description/acceptance criteria, status and priority. Images support PNG/JPEG/WebP, up to twelve per note and 10 MB each. Open a thumbnail for zoom.
+Use **+ Note** in the board header, the **+** beside a column heading (the note starts at the bottom of that column), or long-press empty canvas (right-click on Windows) and choose **Create note**. An empty board shows **Create note** in the middle. The note opens as a sheet with a fixed header and **Cancel / Save** footer; **Note** holds the fields and **Agent** holds task runs. Back, Escape or the close button ask before discarding unsaved changes. Fill a title, description/acceptance criteria, status and priority. Images support PNG/JPEG/WebP, up to twelve per note and 10 MB each. Open a thumbnail for zoom.
 
-Drag the handle to move a note. The target version column highlights; its placement determines the version label. Set grid spacing to 8, 12, 16, 24, 32 or 64 under Appearance. The visual grid and placement use the same step; existing positions are preserved until moved. Pinch or use Ctrl+wheel to zoom; pan on empty space. Keyboard arrows on the drag handle also move the note.
+Drag the handle to move a note, or move it without dragging: pick a **Version** in the note, or choose **Move to version…** from the card menu; the note goes to the bottom of that column. The target version column highlights while dragging; its placement determines the version label. Set grid spacing to 8, 12, 16, 24, 32 or 64 under Appearance. The visual grid and placement use the same step; existing positions are preserved until moved. Pinch, use Ctrl+wheel or the floating **− / % / + / Fit board** controls to zoom (the percentage resets to 100%); pan on empty space. The board re-reads its file when the app returns to the foreground; **Refresh board** stays available on phones. Keyboard arrows on the drag handle also move the note.
 
 Use the plus after the final column to add a planned version. Hold its name to rename it. A version heading explicitly says which real Git branch is linked, or that none is linked. A planned version name alone is not a branch. Connections between notes are retained in dependency IDs for AI planning and are not drawn as arrows.
 
-Right-click a note for deletion with confirmation. References to the deleted note are removed from remaining dependencies; unrelated notes and shared image files remain. Right-click a board card to remove the board or disconnect Miro. The repository, Git history and unrelated files are preserved.
+Long-press or right-click a note for its menu: **Open**, **Move to version…**, **Prepare task** and, last, **Delete…** with confirmation. References to the deleted note are removed from remaining dependencies; unrelated notes and shared image files remain. Long-press or right-click a board card for **Open** and **Delete…** (removes the board or disconnects Miro); the Delete key still opens the confirmation directly. The repository, Git history and unrelated files are preserved.
 
 ## Saving and Git
 

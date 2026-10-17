@@ -22,7 +22,7 @@ async function setup(page:Page){
   if(p.startsWith('/api/updates'))return route.fulfill({json:{enabled:false}});
   return route.fulfill({json:[]});
  });
- await page.goto('http://127.0.0.1:5173');await page.locator('.project-board-row .board-index-item').click();await expect(page.locator('.board-note')).toBeVisible();return state;
+ await page.goto('http://127.0.0.1:5173');await page.locator('button:visible',{hasText:/^Board$/}).first().click();await page.locator('.project-board-row .board-index-item').click();await expect(page.locator('.board-note')).toBeVisible();return state;
 }
 async function drag(page:Page){const handle=page.locator('.note-drag'),box=(await handle.boundingBox())!;await page.mouse.move(box.x+20,box.y+14);await page.mouse.down();await page.mouse.move(box.x+44,box.y+54,{steps:4});await page.mouse.up();}
 test('obsolete People preference opens the canvas without people categories',async({page})=>{

@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {boardColumnWidth,boardPlacement} from '../src/board-placement';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {boardColumnWidth,boardPlacement,columnSlot} from '../src/board-placement';
 test('notes stay inside their destination branch, including outside-canvas drops',()=>{
  const versions=['','release/1','release/2'];for(const x of [-100,0,200,339,340,630,679,680,900,2500]){const result=boardPlacement(x,30,versions);assert.equal(result.branch,versions[result.column]);assert.ok(result.x>=result.column*340+12);assert.ok(result.x+280<=(result.column+1)*340-12);assert.equal(result.y,64);assert.equal(result.x%8,0);assert.equal(result.y%8,0);}
  assert.equal(boardPlacement(350,120,versions).branch,'release/1');
@@ -16,4 +16,10 @@ test('all selectable grid steps fit cards inside every version column',()=>{
   assert.ok(result.x>=result.column*width+12);assert.ok(result.x+280<=(result.column+1)*width-12);
   assert.equal(result.branch,versions[result.column]);
  }
+});
+test('a column slot moves a note to the bottom of another version without dragging',()=>{
+ const versions=['','0.4','0.5'],notes=[{x:24,y:72,branch:''},{x:352,y:72,branch:'0.4'},{x:352,y:400,branch:'0.4'}];
+ assert.deepEqual(columnSlot(notes,versions,'0.4'),{column:1,x:352,y:704,branch:'0.4'});
+ assert.deepEqual(columnSlot(notes,versions,'0.5'),{column:2,x:696,y:72,branch:'0.5'});
+ assert.equal(columnSlot(notes,versions,'missing').branch,'');
 });

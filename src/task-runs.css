@@ -21,3 +21,37 @@
 .task-check-evidence{border-bottom:1px solid var(--line);padding:.7rem 0}.task-check-evidence summary{cursor:pointer;overflow-wrap:anywhere}.task-check-evidence pre{font-size:.82em;overflow:auto;max-height:18rem;white-space:pre-wrap;overflow-wrap:anywhere}
 .chat-task-entry{margin:0 .8rem .4rem;border:0;background:transparent;color:var(--muted);font-size:.85em;text-align:left;min-height:2.3rem;padding:.35rem .6rem}.chat-task-entry:hover{background:var(--panel)}
 @media(max-width:600px){.task-run-backdrop{padding:0;align-items:end}.task-run-panel{border-radius:1rem 1rem 0 0;max-height:94dvh}.task-run-body{padding:1rem}}
+
+/* One stage vocabulary and colour per stage on the card, gallery, chat chip and task result. Tokens fall back when the shared status sheet is not loaded. */
+:root{--task-stage-attention:var(--status-attention,#e8c06a);--task-stage-running:var(--status-running,#86bdf0);--task-stage-error:var(--status-error,#f09a90);--task-stage-done:var(--status-done,#8bcf9f);--task-stage-review:#c3a0e0}
+:root[data-theme=light]{--task-stage-attention:var(--status-attention,#7f5300);--task-stage-running:var(--status-running,#1b5a96);--task-stage-error:var(--status-error,#a33728);--task-stage-done:var(--status-done,#28663a);--task-stage-review:#6a3fa0}
+.task-stage-prepared{--task-stage:var(--muted)}.task-stage-questions,.task-stage-checks{--task-stage:var(--task-stage-attention)}.task-stage-working{--task-stage:var(--task-stage-running)}.task-stage-review{--task-stage:var(--task-stage-review)}.task-stage-approved{--task-stage:var(--task-stage-done)}.task-stage-failed{--task-stage:var(--task-stage-error)}
+.task-stage-text,.note-task-stage,.task-run-stage.task-stage{color:var(--task-stage)}
+.task-stage-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--task-stage);flex:none}
+.task-stage-working.task-stage-dot,.note-task-stage.task-stage-working>span::after{animation:task-stage-pulse 1.6s ease-in-out infinite}
+.note-task-stage.task-stage-working>span::after{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+@keyframes task-stage-pulse{50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.task-stage-working.task-stage-dot,.note-task-stage.task-stage-working>span::after{animation:none}}
+
+/* Task result: stage pill and stepper first, then actions, results and approval; check setup is folded below. */
+.task-run-summary{display:grid;gap:.7rem}
+.task-run-panel .task-run-stage.task-stage{justify-self:start;display:inline-flex;align-items:center;gap:.4rem;margin:0;padding:.25rem .8rem;border:1px solid currentColor;border-radius:999px;background:color-mix(in srgb,var(--task-stage) 12%,transparent)}
+.task-stepper{display:flex;flex-wrap:wrap;gap:.35rem .9rem;list-style:none;margin:0;padding:0;font-size:.85em;color:var(--muted)}
+.task-stepper li{display:inline-flex;align-items:center;gap:.35rem}.task-stepper li>span{display:inline-grid;place-items:center;width:1.3rem;height:1.3rem;border:1px solid currentColor;border-radius:50%;font-size:.8em}
+.task-stepper li.done{color:var(--task-stage-done)}.task-stepper li.current{color:var(--text);font-weight:650}.task-stepper li.current.failed{color:var(--task-stage-error)}.task-stepper li.current.waiting{color:var(--task-stage-attention)}
+.task-run-freshness{font-size:.95em}.task-run-freshness.stale{color:var(--task-stage-attention)}
+.task-run-panel summary,.board-task-runs summary{display:flex;align-items:center;gap:.5rem}
+.task-run-panel summary::before{content:'';flex:none;width:.45rem;height:.45rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;margin-right:.2rem;opacity:.7}
+.task-run-panel details[open]>summary::before{transform:rotate(45deg)}
+@media(prefers-reduced-motion:reduce){.task-run-panel summary::before{transition:none}}
+.task-check-setup{border-top:1px solid var(--line);padding-top:.6rem}.task-check-setup>summary{min-height:44px;font-weight:600}
+.task-check-status{font-weight:600}.task-check-failed,.task-check-interrupted{color:var(--task-stage-error)}.task-check-passed{color:var(--task-stage-done)}
+.task-check-failures{margin:.3rem 0;padding-left:1.2rem;color:var(--task-stage-error)}
+.task-next-steps,.task-status-suggestion{border:1px solid var(--line);border-radius:.8rem;padding:.8rem 1rem;background:color-mix(in srgb,var(--panel) 60%,transparent)}
+.task-next-steps h3{margin-bottom:.2rem}.task-status-suggestion{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}.task-status-suggestion p{flex:1;min-width:12rem;margin:0}
+.task-check-custom small{color:var(--muted)}
+.task-run-row-main{display:grid;gap:.15rem;min-width:0;flex:1}.task-run-row-main small{color:var(--muted);font-size:.82em}
+.project-board-tasks{display:inline-flex;align-items:center;gap:.4rem;font-size:.8em;color:var(--muted)}
+/* Prepared task chat: the task itself replaces the generic welcome and starters. */
+.task-chat-card{display:grid;gap:.6rem;max-width:36rem;margin:2.5rem auto 1rem;padding:1.2rem 1.3rem;border:1px solid var(--line);border-radius:1rem;background:var(--panel);color:var(--text)}.task-chat-card h2{margin:0;font-size:1.15em;overflow-wrap:anywhere}.task-chat-card p{margin:0;line-height:1.55}.task-chat-branch code{overflow-wrap:anywhere;font-size:.85em}.task-chat-criteria{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);font-size:.92em}
+.task-chat-card .task-chat-stage{justify-self:start;min-height:36px;padding:.2rem .8rem;border:1px solid currentColor;border-radius:999px;background:transparent;font:inherit;font-size:.85em;font-weight:600;cursor:pointer}

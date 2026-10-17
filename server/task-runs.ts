@@ -167,7 +167,9 @@ export class TaskRuns{
   async result(id:string){
     const run=await this.get(id);if(!run.worktree)throw new HttpError(409,'This task has no usable worktree.');
     const snapshot=await this.worktrees.snapshot(run.worktree);
-    return {run,snapshot,verificationCurrent:run.verification?.status==='passed'&&run.verification.snapshot.fingerprint===snapshot.fingerprint,approvalCurrent:run.stage==='approved'&&run.approval?.fingerprint===snapshot.fingerprint};
+    // snapshotCurrent compares the checked files for any outcome, so a failed run never claims the working copy changed.
+    const snapshotCurrent=run.verification?run.verification.snapshot.fingerprint===snapshot.fingerprint:undefined;
+    return {run,snapshot,snapshotCurrent,verificationCurrent:run.verification?.status==='passed'&&snapshotCurrent===true,approvalCurrent:run.stage==='approved'&&run.approval?.fingerprint===snapshot.fingerprint};
   }
   async startVerification(id:string,revision:number,input:TaskCheck[]){
     const checks=validateChecks(input);

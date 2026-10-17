@@ -14,4 +14,5 @@ function Harness(){
   const [unsaved,setUnsaved]=useState(false),[show,setShow]=useState(true),[chat,setChat]=useState<BoardChat|null>(null);
   return <main style={{width:'min(48rem,100%)',padding:'1rem',margin:'auto'}}><h1>Task pipeline fixture</h1><label><input type="checkbox" checked={unsaved} onChange={e=>setUnsaved(e.target.checked)}/>Unsaved note</label><label><input type="checkbox" checked={show} onChange={e=>setShow(e.target.checked)}/>Show task controls</label>{show&&<BoardTaskRuns connection={connection} board={board} note={note} unsaved={unsaved} onChat={setChat}/>}<output hidden data-testid="chat-target">{JSON.stringify(chat)}</output></main>;
 }
-createRoot(document.getElementById('root')!).render(<Harness/>);
+// StrictMode re-runs effects, as the dev server does: polling must survive it.
+createRoot(document.getElementById('root')!).render(<React.StrictMode><Harness/></React.StrictMode>);

@@ -90,7 +90,7 @@ Each file shows a status (New, Deleted, Not in Git, Binary, Generated) and its l
 
 ## Boards, rules and changelogs
 
-**Board** lists repositories that already have a board or a connected Miro board. **Add project board** explicitly creates a board for a repository; projects without one stay out of the list. Long-press empty canvas, or right-click on PC, to create a note. Move notes between version columns; the target column is highlighted. Right-click a note or board card to delete with confirmation. [Full board guide](BOARDS.md)
+**Board** lists repositories that already have a board or a connected Miro board. **Add project board** explicitly creates a board for a repository; projects without one stay out of the list. Create a note with **+ Note**, a column **+**, or a long-press on empty canvas (right-click on PC). Move notes between version columns by dragging, the note **Version** field or **Move to version…**. Long-press or right-click a note or board card for its action menu; **Delete…** is the last item and asks for confirmation. A card shows the stage of its latest AI task; tap it for the task result. [Full board guide](BOARDS.md)
 
 **Rules** and **Changelog** are separate sections. Select a Git project and open its Markdown document. The document view is separate from the index. Rules includes the built-in board-maintenance switch; disabling it does not disable project-native rules or authorize unrelated actions. A board is optional.
 

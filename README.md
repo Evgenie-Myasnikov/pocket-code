@@ -40,7 +40,7 @@ Codex advertises models and reasoning effort through its runtime. Copilot advert
 
 ## Boards and Miro
 
-Create a board only when a repository needs one. Notes are stored in `project-boards/board-*.json`; saving does not commit or push Git. Dependencies are AI planning metadata and are not drawn as arrows. Set an 8/12/16/24/32/64 grid in Appearance; right-click a card for deletion with confirmation.
+Create a board only when a repository needs one. Notes are stored in `project-boards/board-*.json`; saving does not commit or push Git. Dependencies are AI planning metadata and are not drawn as arrows. Set an 8/12/16/24/32/64 grid in Appearance; long-press or right-click a card for its actions, with **Delete…** last and confirmed.
 
 For Miro, open **Settings → Miro**, select a project and paste its board URL. Miro supplies its interface and permissions. If embedded login is unavailable, use **Open in browser**. Optional, separately authorized [AI API access](docs/MIRO-AI.md) is unreleased; it reads linked boards and updates existing items without importing them into Git. [Board guide](docs/BOARDS.md)
 

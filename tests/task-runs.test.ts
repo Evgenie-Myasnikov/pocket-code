@@ -38,6 +38,7 @@ test('finished AI work requires real passing commands and revision-bound human a
 test('failed executable checks can be corrected and rerun without a new task',async t=>{
   const {runs,input}=await taskFixture(t);let run=await finishJob(runs,await runs.create(input));
   run=await runs.verify(run.id,run.revision,[{...pass,args:['-e','process.exit(7)']}]);assert.equal(run.stage,'failed');assert.equal(run.verification?.evidence[0].exitCode,7);
+  const failedResult=await runs.result(run.id);assert.equal(failedResult.snapshotCurrent,true,'a failed check on unchanged files must not report a changed working copy');assert.equal(failedResult.verificationCurrent,false);
   await assert.rejects(runs.approve(run.id,run.revision),/Passing executable/);
   run=await runs.configureChecks(run.id,run.revision,[pass]);run=await runs.verify(run.id,run.revision,run.verificationPlan!);assert.equal(run.stage,'review');
 });

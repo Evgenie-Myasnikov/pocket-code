@@ -1,8 +1,8 @@
 import {test,expect,type Page} from '@playwright/test';
 
-async function setup(page:Page){
+async function setup(page:Page,initial:{versions?:string[];notes?:any[];runs?:any[]}={}){
  const root='C:/Synthetic/roadmap';
- const state={hold:false,release:()=>{},board:{id:'11111111-1111-4111-8111-111111111111',name:'Version roadmap',root,revision:0,repositoryFile:'board-example.json',repositoryRevision:'initial',versionSource:'planned',versions:[] as string[],branches:[],notes:[] as any[]}};
+ const state={hold:false,release:()=>{},board:{id:'11111111-1111-4111-8111-111111111111',name:'Version roadmap',root,revision:0,repositoryFile:'board-example.json',repositoryRevision:'initial',versionSource:'planned',versions:(initial.versions||[]) as string[],branches:[],notes:(initial.notes||[]) as any[]},reads:0,runs:initial.runs||[]};
  await page.setViewportSize({width:412,height:915});
  await page.addInitScript(()=>{sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'synthetic-pc-key-'.repeat(4)}));localStorage.setItem('pocket-code-language-v1','en');localStorage.setItem('pocket-board-grid-step','8');});
  await page.route('**/api/**',async route=>{
@@ -18,13 +18,14 @@ async function setup(page:Page){
     state.board={...state.board,notes:body.notes,versions:body.versions,revision:state.board.revision+1,repositoryRevision:String(state.board.revision+1)};
     return route.fulfill({json:state.board});
    }
-   return route.fulfill({json:{board:state.board,canEdit:true}});
+   state.reads++;return route.fulfill({json:{board:state.board,canEdit:true}});
   }
-  if(p==='/api/task-runs')return route.fulfill({json:{runs:[]}});
+  if(p==='/api/task-runs')return route.fulfill({json:{runs:state.runs}});
+  if(p.startsWith('/api/task-runs/')&&p.endsWith('/result'))return route.fulfill({json:{run:state.runs[0],verificationCurrent:false,approvalCurrent:false,snapshotCurrent:true}});
   if(p.endsWith('notifications'))return route.fulfill({json:{items:[],unread:0}});
   return route.fulfill({json:[]});
  });
- await page.goto('http://127.0.0.1:5173');await page.locator('.project-board-row .board-index-item').click();return state;
+ await page.goto('http://127.0.0.1:5173');await page.getByRole('navigation',{name:'Main sections'}).getByRole('button',{name:'Board',exact:true}).click();await page.locator('.project-board-row .board-index-item').click();return state;
 }
 async function createNote(page:Page,title:string,y:number){
  await page.locator('.board-viewport').click({button:'right',position:{x:20,y}});await page.getByRole('menuitem',{name:'Create note'}).click();
@@ -45,16 +46,54 @@ test('repository notes preserve grid drag, priority, versions and edits across r
  await page.getByRole('button',{name:'Create version',exact:true}).click();let dialog=page.getByRole('dialog',{name:'Create version'});await dialog.getByLabel('Version name').fill('1.0');await dialog.getByRole('button',{name:'Create',exact:true}).click();
  const heading=page.getByRole('button',{name:'1.0',exact:true});await heading.scrollIntoViewIfNeeded();const headingBox=(await heading.boundingBox())!;await page.mouse.move(headingBox.x+20,headingBox.y+20);await page.mouse.down();dialog=page.getByRole('dialog',{name:'Rename version'});await expect(dialog).toBeVisible();await page.mouse.up();await dialog.getByLabel('Version name').fill('1.1');await dialog.getByRole('button',{name:'Rename',exact:true}).click();await expect(page.getByRole('button',{name:'1.1',exact:true})).toBeVisible();
  await page.setViewportSize({width:1200,height:915});await card.scrollIntoViewIfNeeded();const dragBox=(await handle.boundingBox())!;await page.mouse.move(dragBox.x+20,dragBox.y+15);await page.mouse.down();await page.mouse.move(dragBox.x+360,dragBox.y+15,{steps:8});await expect(page.locator('.board-drop-active')).toHaveCount(1);await page.mouse.up();await expect(page.locator('.board-drop-active')).toHaveCount(0);await expect.poll(()=>state.board.notes.find(n=>n.title==='First idea')?.branch).toBe('1.1');
- await page.reload();await page.locator('.project-board-row .board-index-item').click();await expect(page.locator('.board-note')).toHaveCount(2);await expect(page.locator('.board-note').filter({hasText:'Second idea'})).toContainText('Working');
- await page.locator('.board-note').filter({hasText:'Second idea'}).click({button:'right'});await page.getByRole('dialog',{name:'Delete note',exact:true}).getByRole('button',{name:'Delete note',exact:true}).click();await expect(page.locator('.board-note')).toHaveCount(1);expect(state.board.notes[0].title).toBe('First idea');
+ await page.reload();await page.locator('button:visible',{hasText:/^Board$/}).first().click();await page.locator('.project-board-row .board-index-item').click();await expect(page.locator('.board-note')).toHaveCount(2);await expect(page.locator('.board-note').filter({hasText:'Second idea'})).toContainText('Working');
+ await page.locator('.board-note').filter({hasText:'Second idea'}).click({button:'right'});const actions=page.getByRole('menu',{name:'Actions for note Second idea'});await expect(actions.getByRole('menuitem')).toHaveText(['Open','Move to version…','Prepare task','Delete…']);await actions.getByRole('menuitem',{name:'Delete…'}).click();await page.getByRole('dialog',{name:'Delete note',exact:true}).getByRole('button',{name:'Delete note',exact:true}).click();await expect(page.locator('.board-note')).toHaveCount(1);expect(state.board.notes[0].title).toBe('First idea');
 });
 
 test('repository canvas pans and zooms, and a stationary touch hold creates a note',async({page})=>{
- await setup(page);const viewport=page.locator('.board-viewport'),canvas=page.locator('.board-canvas');await expect(page.getByRole('button',{name:/Zoom out|Zoom in/})).toHaveCount(0);
+ await setup(page);const viewport=page.locator('.board-viewport'),canvas=page.locator('.board-canvas');
  const panBox=(await viewport.boundingBox())!;await page.mouse.move(panBox.x+350,panBox.y+300);await page.mouse.down();await page.mouse.move(panBox.x+230,panBox.y+300,{steps:6});await page.mouse.up();await expect.poll(()=>viewport.evaluate(el=>el.scrollLeft)).toBeGreaterThan(50);await viewport.evaluate(el=>{el.scrollLeft=0;el.scrollTop=0;});
  await viewport.hover();await page.keyboard.down('Control');await page.mouse.wheel(0,240);await page.keyboard.up('Control');await expect.poll(()=>canvas.evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a)).toBeLessThan(.9);
  const before=await canvas.evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a),box=(await viewport.boundingBox())!,cx=box.x+box.width/2,cy=box.y+180,cdp=await page.context().newCDPSession(page);
  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:cx-40,y:cy,id:1},{x:cx+40,y:cy,id:2}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:cx-65,y:cy,id:1},{x:cx+65,y:cy,id:2}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expect.poll(()=>canvas.evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a)).toBeGreaterThan(before);
  const holdX=box.x+box.width-18,holdY=box.y+450;await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:holdX,y:holdY,id:3}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:holdX-30,y:holdY,id:3}]});await page.waitForTimeout(650);await expect(page.getByRole('menu')).toHaveCount(0);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:holdX,y:holdY,id:4}]});await expect(page.getByRole('menuitem',{name:'Create note'})).toBeVisible();await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.getByRole('menuitem',{name:'Create note'}).click();await expect(page.getByRole('dialog',{name:'Note details'})).toBeVisible();await page.getByRole('button',{name:'Cancel',exact:true}).click();
+});
+
+test('Back and Escape protect a typed note draft, then walk board to gallery and keep the open board across tabs',async({page})=>{
+ const state=await setup(page);await expect(page.getByText('No notes yet',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Create note',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Note details'});await expect(dialog.getByLabel('Title',{exact:true})).toBeFocused();await dialog.getByLabel('Title',{exact:true}).fill('Draft idea');
+ await page.keyboard.press('Escape');const confirm=page.getByRole('alertdialog',{name:'Discard changes?'});await expect(confirm).toBeVisible();await expect(confirm.getByRole('button',{name:'Keep editing'})).toBeFocused();
+ await confirm.getByRole('button',{name:'Keep editing'}).click();await expect(dialog.getByLabel('Title',{exact:true})).toHaveValue('Draft idea');
+ await dialog.getByRole('button',{name:'Close note',exact:true}).click();await confirm.getByRole('button',{name:'Discard changes',exact:true}).click();await expect(dialog).toHaveCount(0);expect(state.board.notes).toHaveLength(0);
+ await page.getByRole('navigation',{name:'Main sections'}).getByRole('button',{name:'Chats',exact:true}).click();await page.getByRole('navigation',{name:'Main sections'}).getByRole('button',{name:'Board',exact:true}).click();
+ await expect(page.locator('.board-header-navigation h2')).toHaveText('Version roadmap');
+ await page.keyboard.press('Escape');await expect(page.locator('.board-header-navigation')).toHaveCount(0);await expect(page.locator('.project-board-row')).toHaveCount(1);
+});
+
+test('column plus, the Version field and Move to version replace dragging between versions',async({page})=>{
+ const state=await setup(page,{versions:['1.0'],notes:[{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',title:'Idea card',description:'Synthetic acceptance criteria',branch:'',status:'ready',priority:'normal',owner:'',dependencies:[],x:24,y:72}]});
+ await page.getByRole('button',{name:'New note in 1.0',exact:true}).click();let dialog=page.getByRole('dialog',{name:'Note details'});await dialog.getByLabel('Title',{exact:true}).fill('Release card');await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toHaveCount(0);
+ expect(state.board.notes.find((n:any)=>n.title==='Release card')).toMatchObject({branch:'1.0',x:352});
+ await page.locator('.board-note').filter({hasText:'Idea card'}).locator('.note-content').click();dialog=page.getByRole('dialog',{name:'Note details'});await dialog.getByRole('combobox',{name:'Version',exact:true}).selectOption('1.0');await dialog.getByRole('button',{name:'Save',exact:true}).click();await expect(dialog).toHaveCount(0);
+ const moved=state.board.notes.find((n:any)=>n.title==='Idea card');expect(moved.branch).toBe('1.0');expect(moved.y).toBeGreaterThan(state.board.notes.find((n:any)=>n.title==='Release card').y);
+ await page.locator('.board-note').filter({hasText:'Idea card'}).click({button:'right'});await page.getByRole('menuitem',{name:'Move to version…'}).click();await expect(page.getByRole('menuitem',{name:'1.0',exact:true})).toBeDisabled();await page.getByRole('menuitem',{name:'Ideas',exact:true}).click();
+ await expect.poll(()=>state.board.notes.find((n:any)=>n.title==='Idea card')?.branch).toBe('');
+});
+
+test('zoom controls, fit, refresh on a phone and refresh on return to the app',async({page})=>{
+ const state=await setup(page,{notes:[{id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',title:'Zoom card',description:'Synthetic acceptance criteria',branch:'',status:'ready',priority:'normal',owner:'',dependencies:[],x:24,y:72}]});const canvas=page.locator('.board-canvas'),scale=()=>canvas.evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a);
+ await page.getByRole('button',{name:'Zoom out',exact:true}).click();await expect.poll(scale).toBeCloseTo(.75);
+ await page.getByRole('button',{name:'Zoom 75%. Reset to 100%',exact:true}).click();await expect.poll(scale).toBeCloseTo(1);
+ await page.getByRole('button',{name:'Fit board',exact:true}).click();await expect.poll(scale).toBeLessThan(1);
+ await page.setViewportSize({width:390,height:844});await expect(page.getByRole('button',{name:'Refresh board',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'New note',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ const reads=state.reads;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await expect.poll(()=>state.reads).toBeGreaterThan(reads);
+});
+
+test('the AI task stage is visible on the card and opens the task result',async({page})=>{
+ const noteId='cccccccc-cccc-4ccc-8ccc-cccccccccccc',run={id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',boardId:'11111111-1111-4111-8111-111111111111',noteId,noteRevision:'initial',title:'Staged card',provider:'claude',projectPath:'C:/Synthetic/roadmap',stage:'review',revision:3,createdAt:1700000000000,updatedAt:1700000000000,jobs:[{jobId:'job-1',status:'done',startedAt:1700000000000}],worktree:{runId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',projectPath:'C:/Synthetic/roadmap',repositoryRoot:'C:/Synthetic/roadmap',cwd:'C:/Synthetic/tasks/one',branch:'pocket/one',baseCommit:'a'.repeat(40)}};
+ await setup(page,{notes:[{id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',title:'Staged card',description:'Synthetic acceptance criteria',branch:'',status:'ready',priority:'normal',owner:'',dependencies:[],x:24,y:72}],runs:[run]});
+ const chip=page.getByRole('button',{name:'AI task: Ready for review. Open result',exact:true});await expect(chip).toBeVisible();await chip.click();
+ await expect(page.getByRole('dialog',{name:'Task result',exact:true}).getByRole('status')).toHaveText('Ready for review');
 });
