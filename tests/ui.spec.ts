@@ -93,11 +93,11 @@ test('mobile connects, uploads, restores approval after reload and controls a re
   await page.getByLabel('Сообщение Claude').fill('Проверь вложенный файл');
   await page.getByRole('button', { name: 'Отправить сообщение', exact: true }).click();
   await page.getByRole('button', { name: 'На ПК завершено — продолжить' }).click();
-  await expect(page.getByRole('heading', { name: 'Разрешить Write?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Создать файл example.txt?' })).toBeVisible();
   await page.reload();
   await openChatList(page);
   await page.getByRole('button', { name: /Интеграционный тест/ }).click();
-  await expect(page.getByRole('heading', { name: 'Разрешить Write?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Создать файл example.txt?' })).toBeVisible();
   await page.getByRole('button', { name: 'Разрешить', exact: true }).click();
   await expect(page.getByText('Тестовое действие подтверждено.')).toBeVisible();
   // The terminal screen is retired; retain its real PTY lifecycle check through the supported host API.

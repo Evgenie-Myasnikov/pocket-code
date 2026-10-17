@@ -8,8 +8,8 @@ import {plural} from './plural';
 import {ActivityGroup} from './ActivityGroup';
 import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode} from './activity-groups';
 import { t, useLanguage } from "./i18n";import { Fragment, memo, useRef, useState } from 'react';
-import { Copy, Check, ShieldCheck, X, GitCompareArrows } from 'lucide-react';
-import type { ChatMessage, Approval, SubagentView, Block } from '../server/types';
+import { Copy, Check, GitCompareArrows } from 'lucide-react';
+import type { ChatMessage, SubagentView, Block } from '../server/types';
 import './messages.css';
 import {QuestionDialog} from './QuestionDialog';
 function CopyButton({ text }: {text: string;}) {
@@ -73,14 +73,5 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
     return !id||before.toolResults?.get(id)===after.toolResults?.get(id);
   });
 });
-export function ApprovalCard({ approval, decide, provider = 'claude', autoOpenQuestions=true }: {approval: Approval;provider?: 'claude' | 'codex' | 'copilot';autoOpenQuestions?:boolean;decide: (allow: boolean, answers?: Record<string, string>) => Promise<void>;}) {
-  const [busy, setBusy] = useState(false),[error, setError] = useState('');
-  const questions = approval.tool === 'AskUserQuestion' && Array.isArray(approval.input.questions) ? approval.input.questions as Array<{question: string;options?: {label: string;description?: string;}[];}> : [];
-  async function submit(allow: boolean) {setBusy(true);setError('');try {await decide(allow);} catch (e) {setError((e as Error).message);} finally {setBusy(false);}}
-  if(questions.length)return <QuestionDialog approval={approval} provider={provider==='copilot'?'Copilot':provider==='codex'?'Codex':'Claude'} decide={decide} autoOpen={autoOpenQuestions}/>;
-  return <section className="approval-card"><div className="eyebrow"><ShieldCheck size={15} />{t(" НУЖНО ВАШЕ РЕШЕНИЕ")}</div><h3>{t("Разрешить {0}?", approval.tool)}</h3>
-    <pre>{JSON.stringify(approval.input, null, 2)}</pre>
-    <p>{t("Разрешение только на это действие · ожидание до 10 минут")}</p>{error && <div className="error">{t(error)}</div>}
-    <div className="approval-actions"><button className="secondary" disabled={busy} onClick={() => submit(false)}><X size={16} />{t("Отклонить")}</button><button className="primary" disabled={busy} onClick={() => submit(true)}><Check size={16} />{t("Разрешить")}</button></div>
-  </section>;
-}
+/** Kept here so existing imports keep working; the card lives in ApprovalCard.tsx. */
+export {ApprovalCard} from './ApprovalCard';

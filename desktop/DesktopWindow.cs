@@ -173,6 +173,8 @@ public sealed class PocketDesktop:Form {
         string ui=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ui");if(!File.Exists(Path.Combine(ui,"index.html")))throw new FileNotFoundException("Desktop interface is missing.");
         string profile=preview?Path.Combine(Path.GetTempPath(),"PocketCodeDesktopPreview"):Path.Combine(storage,"desktop-webview");
         var environment=await CoreWebView2Environment.CreateAsync(null,profile);await web.EnsureCoreWebView2Async(environment);
+        // Files dragged from Explorer reach the composer's drop zone; navigation by drop stays cancelled below.
+        web.AllowExternalDrop=true;
         var core=web.CoreWebView2;core.SetVirtualHostNameToFolderMapping("pocket-code.internal",ui,CoreWebView2HostResourceAccessKind.DenyCors);
         core.Settings.AreHostObjectsAllowed=false;core.Settings.AreDevToolsEnabled=false;core.Settings.AreDefaultContextMenusEnabled=false;core.Settings.IsStatusBarEnabled=false;core.Settings.IsPasswordAutosaveEnabled=false;core.Settings.IsGeneralAutofillEnabled=false;
         core.NavigationStarting+=(_,e)=>{Uri uri;if(!Uri.TryCreate(e.Uri,UriKind.Absolute,out uri)||uri.GetLeftPart(UriPartial.Authority)!=Origin||uri.AbsolutePath!="/index.html")e.Cancel=true;};

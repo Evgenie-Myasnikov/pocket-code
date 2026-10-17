@@ -44,10 +44,11 @@ function label(value:string){
   const names:Record<string,string>={none:'Без рассуждений',minimal:'Минимальная',low:'Низкая',medium:'Средняя',high:'Высокая',xhigh:'Очень высокая',max:'Максимальная',ultra:'Ультра'};
   return Object.hasOwn(names,value)?t(names[value]):value;
 }
-export function EffortPicker({value,options,defaultValue,onChange,disabled=false,provider='Codex'}:ReturnType<typeof useCodexEffort>&{disabled?:boolean;provider?:string}){
+export function EffortPicker({value,options,defaultValue,onChange,disabled=false,provider='Codex',disabledHint}:ReturnType<typeof useCodexEffort>&{disabled?:boolean;provider?:string;disabledHint?:string}){
   if(!options.length)return null;
-  return <select className="effort-picker" aria-label={provider==='Codex'?t('Глубина рассуждений Codex'):`${provider} effort`} title={provider==='Codex'?t('Глубина рассуждений Codex'):`${provider} effort`} value={value||defaultValue||''} disabled={disabled} onChange={event=>onChange(event.target.value)}>
-    {!defaultValue&&<option value="">—</option>}
+  const name=t('Глубина рассуждений {0}',provider);
+  return <select className="effort-picker" aria-label={name} title={disabled&&disabledHint?disabledHint:name} value={value||defaultValue||''} disabled={disabled} onChange={event=>onChange(event.target.value)}>
+    {!defaultValue&&<option value="">{t('По умолчанию')}</option>}
     {options.map(option=><option key={option} value={option}>{label(option)}</option>)}
   </select>;
 }

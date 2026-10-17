@@ -35,3 +35,17 @@ test('expired requests cannot submit and a new request clears old answers',async
  await setup(page);await page.evaluate(()=>(window as any).askSynthetic([{question:'Short request'}],'claude',200));await expect(page.getByRole('status')).toContainText('expired');await expect(page.getByRole('button',{name:'Send answers'})).toBeDisabled();
  await page.evaluate(()=>(window as any).askSynthetic([{question:'New request'}]));await expect(page.getByRole('textbox')).toHaveValue('');await page.getByRole('button',{name:'Decline',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);expect(await page.evaluate(()=>(window as any).questionAnswers)).toEqual([{allow:false}]);
 });
+test('a question waits as a banner while the person is typing and focus returns to it after closing',async({page})=>{
+ await setup(page);await page.evaluate(()=>(window as any).showDraft());const draft=page.getByRole('textbox',{name:'Synthetic draft'});await draft.click();await page.keyboard.type('Half a thought');
+ await page.evaluate(()=>(window as any).askSynthetic([{question:'Which file?'},{question:'Which branch?'}]));
+ await expect(page.getByText('Claude asked 2 questions')).toBeVisible();await expect(page.getByRole('dialog')).toHaveCount(0);
+ await page.keyboard.type(' continues');await expect(draft).toHaveValue('Half a thought continues');
+ const answer=page.getByRole('button',{name:/Answer questions/});await answer.click();await expect(page.getByRole('dialog')).toBeVisible();
+ // A request without a timeout never shows as expired.
+ await expect(page.getByRole('dialog').getByText('expired')).toHaveCount(0);
+ await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(answer).toBeFocused();
+});
+test('a request without a timeout stays answerable',async({page})=>{
+ await setup(page);await page.evaluate(()=>(window as any).askSynthetic([{question:'Proceed?',options:[{label:'Yes'}]}],'claude',-Date.now()));
+ await page.getByRole('radio',{name:'Yes'}).check();await expect(page.getByRole('button',{name:'Send answers'})).toBeEnabled();
+});

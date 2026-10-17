@@ -98,7 +98,7 @@ function ToolState({view}:{view:ToolView}){
 export function PlanChecklist({items}:{items:PlanItem[]}){
   return <ol className="plan-checklist">{items.map((item,index)=>{const Icon=item.status==='completed'?CircleCheck:item.status==='in_progress'?CircleDot:Circle;return <li key={index} data-status={item.status}><Icon size={16} aria-hidden="true"/><span>{item.status==='in_progress'&&item.active?item.active:item.text}</span><span className="visually-hidden">{t(item.status==='completed'?'выполнено':item.status==='in_progress'?'в работе':'ожидает')}</span></li>;})}</ol>;
 }
-function DiffBody({input,name}:{input:Record<string,unknown>;name:string}){
+export function DiffBody({input,name}:{input:Record<string,unknown>;name:string}){
   const str=(value:unknown)=>typeof value==='string'?value:'';
   const rows:string[]=[];
   const pair=(before:string,after:string)=>{if(before)rows.push(...before.replace(/\r\n/g,'\n').split('\n').map(line=>'-'+line));if(after)rows.push(...after.replace(/\r\n/g,'\n').split('\n').map(line=>'+'+line));};
@@ -110,7 +110,7 @@ function DiffBody({input,name}:{input:Record<string,unknown>;name:string}){
   const shown=rows.slice(0,2000);
   return <pre className="tool-diff">{shown.map((row,index)=><span key={index} data-line={row.startsWith('@@')||row.startsWith('***')?'meta':row.startsWith('+')&&!row.startsWith('+++')?'add':row.startsWith('-')&&!row.startsWith('---')?'del':undefined}>{row+'\n'}</span>)}{rows.length>shown.length&&<span data-line="meta">{t('… ещё {0} строк',rows.length-shown.length)}</span>}</pre>;
 }
-function ToolFields({input}:{input:unknown}){
+export function ToolFields({input}:{input:unknown}){
   if(!input||typeof input!=='object'||Array.isArray(input))return <pre>{JSON.stringify(input,null,2)}</pre>;
   const entries=Object.entries(input as Record<string,unknown>).filter(([,value])=>value!==undefined&&value!==null&&value!=='');
   if(!entries.length)return null;

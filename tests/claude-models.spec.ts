@@ -35,8 +35,8 @@ test('Claude versions are selectable, persisted and sent; an explicit version ca
  await page.screenshot({path:'.local/claude-model-picker-mobile.png'});
 });
 test('an older host still offers aliases and a custom ID without blocking the composer',async({page})=>{
- await setup(page,true);await expect(page.getByLabel('Model catalog unavailable')).toBeVisible();
+ await setup(page,true);await expect(page.getByRole('button',{name:'Why the model catalog is unavailable'})).toBeVisible();await page.getByRole('button',{name:'Why the model catalog is unavailable'}).click();await expect(page.getByRole('status').filter({hasText:'Claude catalog is unavailable'})).toBeVisible();
  await page.getByLabel('Claude model',{exact:true}).selectOption('opus');await expect(page.getByLabel('Message Claude')).toBeEnabled();
 });
 
-test('Claude effort follows model capabilities and reaches the request',async({page})=>{const sent=await setup(page);const effort=page.getByLabel('Claude effort',{exact:true});await expect(effort).toBeVisible();await effort.selectOption('high');await page.getByLabel('Message Claude').fill('Synthetic effort');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent[0]?.claudeEffort).toBe('high');await page.getByLabel('Claude model',{exact:true}).selectOption('claude-opus-fixture');await expect(effort).toHaveCount(0);});
+test('Claude effort follows model capabilities and reaches the request',async({page})=>{const sent=await setup(page);const effort=page.getByLabel('Claude reasoning effort',{exact:true});await expect(effort).toBeVisible();await effort.selectOption('high');await page.getByLabel('Message Claude').fill('Synthetic effort');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent[0]?.claudeEffort).toBe('high');await page.getByLabel('Claude model',{exact:true}).selectOption('claude-opus-fixture');await expect(effort).toHaveCount(0);});

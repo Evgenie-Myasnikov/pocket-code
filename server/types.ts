@@ -1,7 +1,12 @@
 export type SubagentView = { id: string; name: string; status: 'running' | 'completed' | 'error' | 'stopped' | 'unknown'; prompt?: string; result?: string; sessionId?: string; provider: 'claude' | 'codex' | 'copilot' };
 export type Block = { type: string; attachmentPath?: string; agent?: SubagentView; text?: string; name?: string; input?: unknown; content?: unknown; id?: string; tool_use_id?: string; thinking?: string; is_error?: boolean; title?: string; source?: { type?: string; media_type?: string; data?: string; url?: string; text?: string }; data?: string; mimeType?: string };
 export type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; blocks: Block[] };
-export type Approval = { id: string; tool: string; input: Record<string, unknown>; expiresAt: number };
+/** expiresAt 0 means the request waits until the person answers or the run stops. suggestions are the provider's own "allow such actions" rules. */
+export type Approval = { id: string; tool: string; input: Record<string, unknown>; expiresAt: number; suggestions?: unknown[] };
+/** How the person decided: a denial carries an optional comment for the agent; remember applies the provider's suggested rules; mode sets how an approved plan runs. */
+export type ApprovalDecision = { allow: boolean; answers?: Record<string, string>; message?: string; remember?: boolean; mode?: 'default' | 'acceptEdits' };
+/** A follow-up the agent has not received yet: shown in the composer queue, never in the transcript. */
+export type QueuedInput = { id: string; text: string; attachments: number };
 export type ActivityItem = {
   id: string; provider: 'claude' | 'codex' | 'copilot'; cwd: string; sessionId?: string; title: string;
   status: 'running' | 'needs_input' | 'done' | 'error' | 'stopped'; startedAt: number; version: string;
@@ -11,6 +16,11 @@ export type ActivityItem = {
 };
 export type JobView = {
   pendingInputIds?:string[];
+  queued?:QueuedInput[];
+  /** Requests that timed out; the agent received a denial for each. */
+  expiredApprovals?:{tool:string;at:number}[];
+  /** Claude's current permission mode; a running turn can change it. */
+  permissionMode?:'default'|'acceptEdits'|'bypassPermissions'|'plan';
   provider?: 'claude' | 'codex' | 'copilot';
   id: string; cwd: string; sessionId?: string; status: 'running' | 'done' | 'error' | 'stopped';
   messages: ChatMessage[]; partial: string; approvals: Approval[]; error?: string;

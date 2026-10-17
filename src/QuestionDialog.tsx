@@ -3,18 +3,23 @@ import {createPortal} from 'react-dom';
 import {MessageCircle,X} from 'lucide-react';
 import type {Approval} from '../server/types';
 import {useLanguage} from './i18n';
+import {plural} from './plural';
 import {useModal} from './navigation';
 import './question-dialog.css';
 
+/** A question never takes the keyboard from someone who is typing; it waits as a banner instead. */
+function composerInUse(){const field=document.querySelector<HTMLTextAreaElement>('.prompt-composer textarea');return Boolean(field&&(document.activeElement===field||field.value.trim()));}
 type Question={id?:string;question:string;header?:string;multiSelect?:boolean;allowFreeform?:boolean;options?:{label:string;description?:string}[]};
 export function QuestionDialog({approval,provider,decide,autoOpen=true}:{approval:Approval;provider:string;autoOpen?:boolean;decide:(allow:boolean,answers?:Record<string,string>)=>Promise<void>}){
  const ru=useLanguage()==='ru',l=(en:string,ruText:string)=>ru?ruText:en;
  const questions=(approval.input.questions as Question[]).filter(q=>q&&typeof q.question==='string');
- const [open,setOpen]=useState(autoOpen),[selected,setSelected]=useState<Record<number,string[]>>({}),[custom,setCustom]=useState<Record<number,string>>({});
- const [busy,setBusy]=useState(false),[resolved,setResolved]=useState(false),[error,setError]=useState(''),[expired,setExpired]=useState(Date.now()>=approval.expiresAt);
- const sending=useRef(false),dialog=useRef<HTMLDivElement>(null),title=useId();
- useModal(dialog,open&&!resolved,()=>setOpen(false));
- useEffect(()=>{const timer=setTimeout(()=>setExpired(true),Math.max(0,approval.expiresAt-Date.now()));return()=>clearTimeout(timer);},[approval.expiresAt]);
+ const [open,setOpen]=useState(()=>autoOpen&&!composerInUse()),[selected,setSelected]=useState<Record<number,string[]>>({}),[custom,setCustom]=useState<Record<number,string>>({});
+ const [busy,setBusy]=useState(false),[resolved,setResolved]=useState(false),[error,setError]=useState(''),[expired,setExpired]=useState(approval.expiresAt>0&&Date.now()>=approval.expiresAt);
+ const sending=useRef(false),dialog=useRef<HTMLDivElement>(null),answerButton=useRef<HTMLButtonElement>(null),title=useId();
+ // Closing returns focus to "Answer" on the card, never to the page body.
+ const close=()=>{setOpen(false);requestAnimationFrame(()=>answerButton.current?.focus({preventScroll:true}));};
+ useModal(dialog,open&&!resolved,close);
+ useEffect(()=>{if(!approval.expiresAt)return;const timer=setTimeout(()=>setExpired(true),Math.max(0,approval.expiresAt-Date.now()));return()=>clearTimeout(timer);},[approval.expiresAt]);
  const answer=(index:number)=>[...(selected[index]||[]),...(custom[index]?.trim()?[custom[index].trim()]:[])].join(', ');
  const complete=questions.length>0&&questions.every((_,i)=>answer(i));
  async function submit(allow:boolean){
@@ -25,9 +30,9 @@ export function QuestionDialog({approval,provider,decide,autoOpen=true}:{approva
   finally{sending.current=false;setBusy(false);}
  }
  if(resolved)return null;
- return <><section className="question-request"><MessageCircle size={18}/><div><strong>{l('Waiting for your response','Ждёт вашего ответа')}</strong><p>{questions[0]?.question}</p><button type="button" onClick={()=>setOpen(true)}>{l('Answer questions','Ответить на вопросы')}{questions.length>1?` · ${questions.length}`:''}</button></div></section>
- {open&&createPortal(<div className="question-overlay" onClick={e=>{if(e.target===e.currentTarget)setOpen(false);}}><div ref={dialog} className="question-dialog" role="dialog" aria-modal="true" aria-labelledby={title}>
-  <header><div><small>{provider}</small><h2 id={title}>{l('Questions for you','Вопросы к вам')}</h2></div><button type="button" className="icon-button" aria-label={l('Close questions','Закрыть вопросы')} onClick={()=>setOpen(false)}><X size={20}/></button></header>
+ return <><section className="question-request" aria-live="polite"><MessageCircle size={18} aria-hidden="true"/><div><strong>{ru?`${provider} ${plural(questions.length,['задал {0} вопрос','задал {0} вопроса','задал {0} вопросов'])}`:`${provider} asked ${questions.length} question${questions.length===1?'':'s'}`}</strong><p>{questions[0]?.question}</p><button ref={answerButton} type="button" onClick={()=>setOpen(true)}>{l('Answer questions','Ответить на вопросы')}{questions.length>1?` · ${questions.length}`:''}</button></div></section>
+ {open&&createPortal(<div className="question-overlay" onClick={e=>{if(e.target===e.currentTarget)close();}}><div ref={dialog} className="question-dialog" role="dialog" aria-modal="true" aria-labelledby={title}>
+  <header><div><small>{provider}</small><h2 id={title}>{l('Questions for you','Вопросы к вам')}</h2></div><button type="button" className="icon-button" aria-label={l('Close questions','Закрыть вопросы')} onClick={close}><X size={20}/></button></header>
   <form onSubmit={e=>{e.preventDefault();void submit(true);}}>
    <div className="question-body">{questions.map((q,index)=><fieldset key={q.id||index} disabled={busy||expired}>
     <legend>{q.header&&<small>{q.header} · </small>}{q.question}</legend>

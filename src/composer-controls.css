@@ -31,3 +31,58 @@
 @media(max-width:760px){.composer-area:has(.prompt-composer){padding:8px 10px 10px}:root[data-theme] .prompt-composer{border-radius:20px;padding:12px 9px 5px}.prompt-composer .composer-tools{gap:2px}.prompt-composer .composer-models{gap:0 3px}}
 @media(max-height:540px){.composer-area:has(.prompt-composer){padding-block:4px}:root[data-theme] .prompt-composer{padding-top:6px}:root[data-theme] .prompt-composer textarea{min-height:38px;max-height:24dvh;padding-block:2px 6px}.prompt-composer .attachment-tray{max-height:85px}}
 @media(prefers-reduced-motion:reduce){.composer-uploading{animation:none}.prompt-composer,.prompt-composer *{transition:none!important}}
+/* A disabled Send stays visible: an accent outline and an arrow with at least 3:1 contrast. */
+.prompt-composer .send-button:disabled::before{background:transparent;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 45%,transparent)}
+:root[data-theme] .prompt-composer .composer-tools .send-button:disabled{color:var(--muted)}
+/* With an empty draft during a run the Send slot holds one filled Stop; with text, Send and a smaller Stop sit side by side. */
+.prompt-composer .stop-button.stop-primary::before{background:var(--text);box-shadow:none}
+:root[data-theme] .prompt-composer .composer-tools .stop-button.stop-primary{color:var(--bg)}
+.prompt-composer .stop-button:not(.stop-primary)::before{inset:9px}
+.prompt-composer .stop-button:disabled{opacity:1;cursor:progress}
+.prompt-composer .composer-hint{margin:-4px 6px 4px;color:var(--muted);font-size:clamp(11px,calc(11px * var(--ui-scale,1)),14px)}
+/* Files dragged from Explorer drop onto the composer. */
+.prompt-composer{position:relative}
+.prompt-composer.composer-drop{border-color:var(--accent);border-style:dashed}
+.composer-drop-zone{position:absolute;inset:0;z-index:2;display:grid;place-items:center;border-radius:inherit;background:color-mix(in srgb,var(--panel) 88%,transparent);color:var(--text);font-weight:500;pointer-events:none}
+/* Model and effort sit at their content width, so the chevron stays next to the name; while a turn runs they look inactive. */
+.prompt-composer .composer-models .model-picker{flex:0 1 auto;max-width:min(16em,48%)}
+.prompt-composer .composer-models .model-picker>select{width:auto;max-width:100%;min-width:44px}
+.prompt-composer .composer-models .model-picker{min-width:44px}.prompt-composer .composer-tools .effort-picker{min-width:44px}
+.prompt-composer .composer-tools select:disabled{opacity:.55;cursor:default}
+.prompt-composer .composer-tools select:disabled:hover{background:transparent;color:var(--muted)}
+.model-picker .model-catalog-hint{width:40px;min-width:40px;height:40px;padding:0;display:grid;place-items:center;border:0;background:transparent;color:var(--muted);border-radius:50%}
+.model-catalog-note{position:absolute;bottom:calc(100% + 6px);left:0;z-index:10;width:min(22em,80vw);margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);font-size:clamp(12px,calc(12px * var(--ui-scale,1)),15px);box-shadow:0 4px 16px #0003}
+.model-custom .primary{min-height:44px;padding:0 16px;border-radius:10px}.model-custom .secondary{min-height:44px;padding:0 14px;border-radius:10px}
+/* The chat's access mode is visible where the message is written; Full access carries the warning colour. */
+.access-mode{position:relative;flex:none}
+.access-chip{display:inline-flex;align-items:center;gap:5px;min-height:48px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:clamp(11px,calc(11px * var(--ui-scale,1)),15px);white-space:nowrap}
+.access-chip:hover:not(:disabled){background:var(--surface);color:var(--text)}
+.access-chip[data-danger]{color:var(--status-attention)}
+@media(max-width:420px){.access-chip{justify-content:center;padding:0;min-width:48px}.access-chip>span,.access-chip>svg:last-child{display:none}.prompt-composer[data-running] .composer-tools .effort-picker{display:none}}
+.access-menu{position:fixed;z-index:1050;display:grid;gap:2px;width:min(300px,calc(100vw - 32px));padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 8px 28px #0004}
+.access-menu button{display:flex;align-items:flex-start;gap:10px;min-height:52px;padding:8px 10px;border:0;border-radius:10px;background:transparent;color:var(--text);text-align:left;font:inherit}
+.access-menu button:hover,.access-menu button:focus-visible{background:var(--surface)}
+.access-menu button[aria-checked=true]{box-shadow:inset 0 0 0 1px var(--accent)}
+.access-menu button[data-danger]>svg{color:var(--status-attention)}
+.access-menu button>svg{margin-top:2px;flex-shrink:0}
+.access-menu span{display:grid;gap:2px;min-width:0}.access-menu strong{font-weight:500;font-size:clamp(13px,calc(13px * var(--ui-scale,1)),16px)}.access-menu small{color:var(--muted);font-size:clamp(12px,calc(12px * var(--ui-scale,1)),15px);line-height:1.4}
+/* Messages waiting to be sent sit above the composer with one set of actions. */
+.outbox-shelf{margin:0 0 8px;padding:6px 10px 8px;border:1px dashed var(--line);border-radius:14px;background:var(--panel)}
+.outbox-toggle{display:flex;align-items:center;gap:6px;min-height:40px;padding:0 4px;border:0;background:transparent;color:var(--muted);font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px)}
+.outbox-shelf ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:30dvh;overflow:auto}
+.outbox-item{padding:6px 8px;border-radius:10px;background:var(--surface)}
+.outbox-text{margin:0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:clamp(12px,calc(13px * var(--ui-scale,1)),16px)}
+.outbox-meta{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:2px 0 0;color:var(--muted);font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px)}
+.outbox-actions{display:flex;flex-wrap:wrap;gap:4px 14px}
+.outbox-actions .text-button{min-height:40px;padding:0;border:0;background:transparent;color:var(--accent);font-size:clamp(12px,calc(13px * var(--ui-scale,1)),16px)}
+/* The run status line lives above the composer, not in the transcript, so it never scrolls away. */
+.composer-area>.running-action{margin:0 8px 6px;font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px);flex-wrap:wrap;row-gap:0}
+.chat-overlay .composer-area>.running-action{align-self:stretch}
+.running-action-quiet{color:var(--status-attention)}
+.running-action-hint{margin-left:auto;font:inherit;color:var(--muted);opacity:.85}
+/* A new chat's welcome folds once something is being written, and hides on short screens (keyboard open). */
+.welcome.welcome-collapsed .welcome-symbol,.welcome.welcome-collapsed p,.welcome.welcome-collapsed .suggestions{display:none}
+.welcome.welcome-collapsed{padding:24px 0 8px}
+@media(max-height:540px){.welcome{display:none}.prompt-composer .composer-tools{position:sticky;bottom:0;background:inherit}}
+@media(min-width:761px){.chat-context-picker .project-picker{flex:0 1 auto;max-width:320px}}
+.composer-settings{margin:12px 0}.composer-settings .desktop-toggle{display:flex;align-items:center;gap:12px;min-height:48px;margin:0;color:var(--text);font-size:clamp(13px,calc(14px * var(--ui-scale,1)),18px)}.composer-settings .desktop-toggle input{width:20px;height:20px;margin:0;accent-color:var(--accent)}.composer-settings select{width:100%;min-height:48px}

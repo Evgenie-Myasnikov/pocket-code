@@ -1,0 +1,5 @@
+root = true
+
+# Interface strings are Russian and English; files must stay UTF-8 so Cyrillic never turns into "????".
+[*]
+charset = utf-8

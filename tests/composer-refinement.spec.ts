@@ -15,7 +15,7 @@ for(const [width,scale] of [[320,60],[320,130],[390,100],[1440,100]])test(`compo
  await input.fill(Array.from({length:24},(_,i)=>`Prompt line ${i}`).join('\n'));
  expect((await input.boundingBox())!.height).toBeGreaterThan(initial);expect((await input.boundingBox())!.height).toBeLessThanOrEqual(260);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- for(const control of await page.locator('.composer-tools button,.composer-tools select').all()){const box=(await control.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);}
+ for(const control of await page.locator('.composer-tools button:visible,.composer-tools select:visible').all()){const box=(await control.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);}
  await input.press('Control+Enter');await expect(page.getByLabel('Sent')).toHaveText('1');await expect(input).toHaveValue('');
  await page.getByLabel('Stop synthetic').click();await expect(page.getByLabel('Stop synthetic')).toHaveCount(0);
  await input.fill('Explain the architecture and suggest the next step.');

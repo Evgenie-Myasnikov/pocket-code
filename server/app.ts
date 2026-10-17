@@ -458,7 +458,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       attachments: z.array(uuid).max(10).default([]), model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
       claudeEffort:z.enum(['low','medium','high','xhigh','max']).optional(),claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
-      taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
+      approvalTimeoutMinutes: z.union([z.literal(0), z.literal(10), z.literal(60)]).default(0), taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
     const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const engine = engineFor(body.provider);
     if (body.provider !== 'codex' && body.reasoningEffort) throw new HttpError(400, 'Reasoning effort is available for Codex chats only.');
@@ -493,7 +493,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if (raced) { await replyToRetry(raced);return; }
     guardProject(cwd, body.id);
     const bound=await taskRuntime!.bindJob({...body,cwd});
-    try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text }));}
+    try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text, approvalTimeoutMs: body.approvalTimeoutMinutes * 60000 }));}
     catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
   });
   app.post('/api/jobs/:id/messages',async(req,res)=>{
@@ -506,8 +506,19 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.post('/api/jobs/:id/stop', (req, res) => { const id = uuid.parse(req.params.id); engineForJob(id).stop(id); res.json({ ok: true }); });
   app.post('/api/jobs/:id/approvals/:approval', (req, res) => {
-    const body = z.object({ allow: z.boolean(), answers: z.record(z.string(), z.string()).optional() }).parse(req.body);
-    const id = uuid.parse(req.params.id); engineForJob(id).approve(id, uuid.parse(req.params.approval), body.allow, body.answers); res.json({ ok: true });
+    const body = z.object({ allow: z.boolean(), answers: z.record(z.string(), z.string()).optional(), message: z.string().max(4000).optional(), remember: z.boolean().optional(), mode: z.enum(['default', 'acceptEdits']).optional() }).parse(req.body);
+    const id = uuid.parse(req.params.id); engineForJob(id).approve(id, uuid.parse(req.params.approval), body.allow, body.answers, { message: body.message, remember: body.remember, mode: body.mode }); res.json({ ok: true });
+  });
+  // A queued follow-up can be withdrawn until the agent takes it; providers that steer or enqueue at once cannot.
+  app.post('/api/jobs/:id/messages/:message/cancel', (req, res) => {
+    const id = uuid.parse(req.params.id), engine = engineForJob(id);
+    if (!('cancelFollowup' in engine)) throw new HttpError(409, 'This provider already received the message.');
+    res.json(engine.cancelFollowup(id, uuid.parse(req.params.message)));
+  });
+  app.post('/api/jobs/:id/mode', async (req, res) => {
+    const id = uuid.parse(req.params.id), engine = engineForJob(id), body = z.object({ mode: z.enum(['default', 'acceptEdits', 'plan']) }).parse(req.body);
+    if (!('setMode' in engine)) throw new HttpError(409, 'This provider applies the mode to the next message.');
+    res.json(await engine.setMode(id, body.mode));
   });
   app.get('/api/terminals', (_req, res) => res.json(terminals.list()));
   app.post('/api/terminals', async (req, res) => {

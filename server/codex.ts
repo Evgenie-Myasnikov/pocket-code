@@ -14,9 +14,9 @@ import { normalizeCodexUsage } from './codex-usage.js';
 import { codexModels } from './codex-models.js';
 import { coalesceReads } from './read-coalescer.js';
 
-type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; reasoningEffort?: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
-type Pending = { finish: (allow: boolean, answers?: Record<string, string>) => void };
-type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void>; followups?:Followups };
+type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; reasoningEffort?: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; approvalTimeoutMs?: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
+type Pending = { finish: (allow: boolean, answers?: Record<string, string>, remember?: boolean) => void };
+type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void>; followups?:Followups; approvalTimeoutMs?: number };
 export type CodexSession = { sessionId: string; summary: string; cwd: string; lastModified: number; gitBranch?: string; source: 'codex'; provider: 'codex'; readOnly?: boolean };
 export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexRpc>; approvalTimeoutMs?: number; attachmentRoots?: string[]; allProjectHistory?:boolean };
 
@@ -237,7 +237,7 @@ export class CodexService {
     return this.messages(child);
   }
   view(job: CodexJob): JobView {
-    const { pending, turnId, acceptingEvents, cancelled, eventQueue, followups, ...view } = job; return view;
+    const { pending, turnId, acceptingEvents, cancelled, eventQueue, followups, approvalTimeoutMs, ...view } = job; return view;
   }
   async followup(id:string,input:FollowupInput){
     const job=this.get(id);job.followups??=new Followups();
@@ -271,7 +271,7 @@ export class CodexService {
     const job: CodexJob = { id: input.id, cwd: input.cwd, sessionId: input.sessionId, provider: 'codex', status: 'running',
       messages: [{ id: randomUUID(), role: 'user', blocks: userInputBlocks(input) }],
       partial: '', approvals: [], startedAt: Date.now(), revision: 0, baseMessageCount: input.baseMessageCount || 0, jira: input.jira,
-      pending: new Map(), acceptingEvents: false, cancelled: false, eventQueue: Promise.resolve() };
+      pending: new Map(), acceptingEvents: false, cancelled: false, eventQueue: Promise.resolve(), approvalTimeoutMs: input.approvalTimeoutMs };
     this.jobs.set(job.id, job); void this.execute(job, input); return this.view(job);
   }
   private async execute(job: CodexJob, input: StartInput) {
@@ -366,9 +366,12 @@ export class CodexService {
         command: p.command, cwd: p.cwd, reason: p.reason, grantRoot: p.grantRoot,
         changes: (job.messages.find(m => m.id === p.itemId)?.blocks.find(b => b.type === 'tool_use')?.input as any)?.changes,
         permissions: p.additionalPermissions, network: p.networkApprovalContext, availableDecisions: p.availableDecisions },
-      expiresAt: Date.now() + (this.options.approvalTimeoutMs ?? 600000) };
+      expiresAt: 0, ...(!questionRequest && Array.isArray(p.availableDecisions) && p.availableDecisions.includes('acceptForSession') ? { suggestions: [{ type: 'codexSession', destination: 'session' }] } : {}) };
+    // The person's setting wins; without one a request waits until it is answered or the run stops.
+    const timeout = job.approvalTimeoutMs ?? this.options.approvalTimeoutMs ?? 0;
+    if (timeout > 0) approval.expiresAt = Date.now() + timeout;
     let settled = false;
-    const finish = (allow: boolean, answers?: Record<string, string>) => {
+    const finish = (allow: boolean, answers?: Record<string, string>, remember = false) => {
       if (settled) return; settled = true; clearTimeout(timer);
       job.pending.delete(approval.id); job.approvals = job.approvals.filter(a => a.id !== approval.id); job.revision++;
       if (questionRequest) {
@@ -376,16 +379,17 @@ export class CodexService {
         if (allow) for (const q of questions) { const answer = (answers?.[q.id]??answers?.[q.question])?.trim(); if (answer) mapped[q.id] = { answers: [answer] }; }
         rpc.respond(id, { answers: mapped });
       } else {
-        // Only one action is approved: no session-wide or persistent permission amendment.
+        // One action is approved unless the person chose "allow such" and Codex offered a session-wide decision.
         const permitted = !Array.isArray(p.availableDecisions) || p.availableDecisions.includes('accept');
-        rpc.respond(id, { decision: allow && permitted ? 'accept' : 'decline' });
+        const session = remember && Array.isArray(p.availableDecisions) && p.availableDecisions.includes('acceptForSession');
+        rpc.respond(id, { decision: allow && session ? 'acceptForSession' : allow && permitted ? 'accept' : 'decline' });
       }
     };
-    const timer = setTimeout(() => finish(false), this.options.approvalTimeoutMs ?? 600000); timer.unref();
+    const timer = timeout > 0 ? setTimeout(() => { (job.expiredApprovals ??= []).push({ tool: approval.tool, at: Date.now() }); finish(false); }, timeout) : undefined; timer?.unref();
     job.pending.set(approval.id, { finish }); job.approvals.push(approval); job.revision++;
   }
-  approve(jobId: string, id: string, allow: boolean, answers?: Record<string, string>) {
-    const pending = this.get(jobId).pending.get(id); if (!pending) throw new HttpError(409, 'This approval request has already closed.'); pending.finish(allow, answers);
+  approve(jobId: string, id: string, allow: boolean, answers?: Record<string, string>, decision: { remember?: boolean } = {}) {
+    const pending = this.get(jobId).pending.get(id); if (!pending) throw new HttpError(409, 'This approval request has already closed.'); pending.finish(allow, answers, decision.remember);
   }
   private async interrupt(job: CodexJob, rpc?: CodexRpc) {
     if (!rpc || !job.sessionId || !job.turnId) return;

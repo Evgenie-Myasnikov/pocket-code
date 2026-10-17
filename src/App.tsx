@@ -9,6 +9,11 @@ import {turnChanges as computeTurnChanges} from './turn-changes';
 import {PlanBar,latestPlan} from './PlanBar';
 import './section-header.css';
 import {ChatComposer} from './ChatComposer';
+import {OutboxShelf,type OutboxItem} from './OutboxShelf';
+import {AccessModeChip,type AccessMode} from './AccessModeChip';
+import {useComposerPreferences,enterSends as enterSendsPreference,approvalTimeout} from './composer-preferences';
+import type {ClaudeAccess} from './claude-access';
+import type {CodexAccess} from './preferences';
 import {ChatOverlay} from './ChatOverlay';
 import {ModelPicker,useClaudeModels} from './ModelPicker';
 import {useChatReturn} from './use-chat-return';
@@ -31,7 +36,7 @@ import {startVisiblePoll} from './visible-poll';
 import {chatCacheScope,readChatCache,writeChatCache,clearChatCache} from './chat-cache';
 
 
-import type {DraftAttachment} from './AttachmentTray';
+import {attachmentReady,type DraftAttachment} from './AttachmentTray';
 import { Review } from './Review';
 import type {ActivityFeed} from './ActivityList';
 import {useActivity} from './useActivity';
@@ -72,6 +77,8 @@ type ProviderInfo = {id: WorkspaceProvider;name: string;available: boolean;authe
 type Attachment = DraftAttachment;
 type Draft = {text: string;attachments: Attachment[];};
 type RejectedDraft = Draft & {restored: boolean;};
+/** A message the host refused because the turn was ending; it is sent as it was written, never the current draft. */
+type PendingSend = {jobId: string;key: string;text: string;attachments: Attachment[];};
 const codexBusyMessage = 'This chat is open in Codex on the PC. Its history is available here, but Codex must release the chat before you can send a message. Finish the task and close Codex on the PC, then try again.';
 const uniqueMessages = (messages:ChatMessage[]) => [...new Map(messages.map(message=>[message.id,message])).values()];
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() || p;
@@ -140,7 +147,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [error, setError] = useStateForWorkspace(''),[networkError, setNetworkError] = useStateForWorkspace(''),[busy, setBusy] = useStateForWorkspace(false),[loading, setLoading] = useStateForWorkspace(false);
   const [hostRestarting,setHostRestarting] = useState(false);
   useEffect(()=>{const handle=(event:Event)=>setHostRestarting(!!(event as CustomEvent).detail?.active);window.addEventListener('pocket-code-host-update-restarting',handle);return()=>window.removeEventListener('pocket-code-host-update-restarting',handle);},[]);
-  const [demo, setDemo] = useState(false),[attachments, setAttachments] = useStateForWorkspace<Attachment[]>([]),[uploading, setUploading] = useStateForWorkspace(false);
+  const [demo, setDemo] = useState(false),[attachments, setAttachments] = useStateForWorkspace<Attachment[]>([]);
+  // Each file has its own card; navigation and sending wait while any of them is still uploading.
+  const uploading=attachments.some(item=>item.status==='uploading');
+  const composerPreferences=useComposerPreferences();
   const claudeCatalog=useClaudeModels(demo?null:connection,provider,cwd);
   const claudeEffort=useCodexEffort(provider==='claude'?claudeCatalog.models:undefined,model,'claude');
   const localActivity=useActivity(demo||embedded?.activity?null:connection);
@@ -214,16 +224,80 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const bottom = useRefForWorkspace<HTMLDivElement|null>(null),scroll = useRefForWorkspace<HTMLDivElement|null>(null);
   const navigation = useRefForWorkspace(0),sending = useRefForWorkspace(false),nearBottom = useRefForWorkspace(true);
   const retry = useRefForWorkspace<{signature: string;id: string;} | null>(null);
-  const retryClosedFollowup = useRefForWorkspace<{jobId:string;epoch:number;signature:string}|null>(null);
+  const [pendingSend,setPendingSend] = useStateForWorkspace<PendingSend|null>(null);
+  const sentFollowups = useRefForWorkspace<Map<string,Attachment[]>|null>(null);
+  if(!sentFollowups.current)sentFollowups.current=new Map();
+  const [stopping,setStopping] = useStateForWorkspace(false);
+  const [accessChoices,setAccessChoices] = useStateForWorkspace<Record<string,AccessMode>>({});
   const running = job?.status === 'running';
+  useEffect(()=>{if(!running)setStopping(false);},[running,job?.id]);
+  /** Put a message back into a chat's draft, after anything already typed there. */
+  function mergeDraft(key:string,text:string,files:Attachment[],stored=false){
+    const merge=(current:Draft):Draft=>{const combined=[...current.attachments,...files.filter(item=>!current.attachments.some(old=>old.id===item.id))];if(combined.length>10)setError(t("Можно прикрепить до 10 файлов"));return {text:current.text.trim()?(text.trim()?current.text.replace(/\s+$/,'')+'\n\n'+text:current.text):text,attachments:combined.slice(0,10)};};
+    if(!stored&&key===currentDraftKey()){const next=merge({text:draft,attachments});setDraft(next.text);setAttachments(next.attachments);}
+    else drafts.current!.set(key,merge(drafts.current!.get(key)||{text:'',attachments:[]}));
+  }
+  /** "Edit", Stop and leaving the chat return a waiting message to the draft instead of sending it later. */
+  /** stored: the chat is being left, so the message goes into its saved draft rather than the visible field. */
+  function releasePending(stored=false){const pending=pendingSend;if(!pending)return;setPendingSend(null);mergeDraft(pending.key,pending.text,pending.attachments,stored);}
+  // Settings hold the device default; the composer chip overrides it for this chat only.
+  const defaultAccess:AccessMode=provider==='claude'?claudeAccess:provider==='codex'?codexAccess:'default';
+  const chatAccess:AccessMode=accessChoices[currentDraftKey()]??defaultAccess;
+  async function changeAccess(value:AccessMode){
+    const key=currentDraftKey();setAccessChoices(old=>({...old,[key]:value}));
+    // Claude applies Ask, Edits and Plan inside the running turn; Full and other providers start with the next message.
+    if(provider==='claude'&&running&&job&&value!=='bypassPermissions'&&(value==='default'||value==='acceptEdits'||value==='plan'))try{setJob(await api<JobView>(`/jobs/${job.id}/mode`,{mode:value}));}catch(e){setError((e as Error).message);}
+  }
   useEffect(()=>{
-    const pending=retryClosedFollowup.current;
-    if(!pending||pending.jobId!==job?.id||pending.epoch!==navigation.current||busy||running||!job)return;
-    retryClosedFollowup.current=null;
-    // Resend only the message the user submitted; an edited draft stays unsent.
-    if(JSON.stringify({text:draft,attachments:attachments.map(item=>item.id)})!==pending.signature){setError('');return;}
-    void send(true);
-  },[busy,running,job?.id,job?.status]);
+    // A new chat keeps the mode chosen before its first message.
+    if(!job?.sessionId)return;const from=`new:${job.cwd}`;
+    setAccessChoices(old=>old[from]&&!old[job.sessionId!]?(({[from]:moved,...rest})=>({...rest,[job.sessionId!]:moved}))(old):old);
+  },[job?.sessionId]);
+  useEffect(()=>{
+    // An approved plan switches the chat to the mode chosen on the plan card.
+    if(provider!=='claude'||!job?.permissionMode||job.status!=='running')return;const key=job.sessionId||`new:${job.cwd}`,mode=job.permissionMode;
+    setAccessChoices(old=>old[key]===mode||!old[key]&&mode===defaultAccess?old:{...old,[key]:mode});
+  },[job?.permissionMode]);
+  async function stopRun(){
+    if(!job||stopping)return;
+    setStopping(true);releasePending();
+    try{await api(`/jobs/${job.id}/stop`,{});}catch(e){setStopping(false);setError((e as Error).message);}
+  }
+  /** A queued follow-up is withdrawn from the host before it is edited, removed or sent another way. */
+  async function withdrawQueued(id:string){
+    if(!job)return null;
+    try{const next=await api<JobView>(`/jobs/${job.id}/messages/${id}/cancel`,{});setJob(next);return next;}catch(e){setError((e as Error).message);return null;}
+  }
+  const outbox:OutboxItem[]=[
+    ...(pendingSend&&pendingSend.key===currentDraftKey()?[{id:'pending',text:pendingSend.text,attachments:pendingSend.attachments.length,caption:t('Отправится, когда {0} закончит ход',engineName),onEdit:()=>releasePending(),onRemove:()=>setPendingSend(null),removeLabel:t('Не отправлять')}]:[]),
+    ...(job?.queued||[]).map(item=>({id:item.id,text:item.text,attachments:item.attachments,caption:running?t('После завершения ответа'):t('Не доставлено'),
+      onEdit:async()=>{if(await withdrawQueued(item.id))mergeDraft(currentDraftKey(),item.text,sentFollowups.current!.get(item.id)||[]);},
+      onRemove:()=>void withdrawQueued(item.id),
+      // "Send now" stops the turn and sends this message first, as it was written.
+      onSendNow:async()=>{const current=job;if(!current||!await withdrawQueued(item.id))return;setPendingSend({jobId:current.id,key:currentDraftKey(),text:item.text,attachments:sentFollowups.current!.get(item.id)||[]});if(current.status==='running'){setStopping(true);try{await api(`/jobs/${current.id}/stop`,{});}catch(e){setStopping(false);setError((e as Error).message);}}}}))];
+  /** Up in an empty field brings back the last message the person wrote. */
+  const recallLast=()=>{for(const message of [...outputMessages].reverse()){if(message.role!=='user')continue;const text=message.blocks.filter(block=>block.type==='text').map(block=>block.text||'').join('\n').trim();if(text&&!text.startsWith('<task-notification'))return text;}return undefined;};
+  const keyActions=useRef({stop:()=>{}});keyActions.current={stop:()=>void stopRun()};
+  useEffect(()=>{
+    // Windows: Esc stops the run; Ctrl+Shift+M, I and E open the access, model and effort pickers of this chat.
+    if(!embedded)return;
+    const key=(event:KeyboardEvent)=>{
+      const root=scroll.current?.closest<HTMLElement>('.app');if(!root||!root.getClientRects().length||event.defaultPrevented)return;
+      if(document.querySelector('[aria-modal="true"],dialog[open],.access-menu,.chat-menu'))return;
+      if(event.key==='Escape'&&running&&!reviewOpen&&!agentPanel&&!outputsOpen&&!taskPanel){event.preventDefault();keyActions.current.stop();return;}
+      if(!(event.ctrlKey||event.metaKey)||!event.shiftKey||event.altKey)return;
+      const target=event.code==='KeyM'?root.querySelector<HTMLElement>('.access-chip'):event.code==='KeyI'?root.querySelector<HTMLElement>('.composer-models .model-picker select'):event.code==='KeyE'?root.querySelector<HTMLElement>('.composer-models .effort-picker'):null;
+      if(!target)return;event.preventDefault();target.focus();
+      if(target instanceof HTMLSelectElement)try{target.showPicker();}catch{/* Focus is enough where the picker cannot open. */}else target.click();
+    };
+    document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);
+  },[embedded,running,reviewOpen,agentPanel,outputsOpen,taskPanel]);
+  useEffect(()=>{
+    const pending=pendingSend;
+    if(!pending||!canRun||busy||running||uploading||loading||pending.key!==currentDraftKey()||job&&job.id!==pending.jobId)return;
+    setPendingSend(null);
+    void send(true,{text:pending.text,attachments:pending.attachments});
+  },[canRun,busy,running,uploading,loading,job?.id,job?.status,pendingSend]);
   function acknowledgeVisibleActivity(){
     const element=scroll.current;
     if(!element||!element.getClientRects().length||element.closest('[inert]')||document.visibilityState==='hidden'||tab!=='chats'||loading||loadingOlder||error||historyError||activityOpen||embedded?.inboxOpen||activityTarget||reviewOpen||agentPanel||outputsOpen||pendingTakeover)return;
@@ -551,8 +625,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   useEffect(()=>{if(!boardChat||boardChat.taskRun||!job?.sessionId||!connection)return;const target=boardChat;setBoardChat(null);void (async()=>{try{const b=await request<any>(connection,'/boards/'+target.boardId);await request(connection,'/boards/'+b.id,{revision:b.revision,versions:b.versions,notes:b.notes.map((n:any)=>n.id===target.note.id?{...n,chat:{provider,sessionId:job.sessionId}}:n)});}catch(e){setError((e as Error).message);}})();},[job?.sessionId,boardChat,connection]);
   async function openSession(s: Session, activeJob?: Pick<JobView,'id'|'sessionId'>) {
     if (busy || uploading) return;
-    retryClosedFollowup.current=null;
-    rememberPosition();rememberDraft();setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
+    rememberPosition();rememberDraft();releasePending(true);setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
     const savedPosition=positionOnOpen(positionKey(cacheScope,provider,s.sessionId));pendingPosition.current=savedPosition;
     historyWindow.current = savedPosition?.window||100;setHistoryError('');setFromStart(savedPosition?.fromStart||false);setShowScrollActions(savedPosition?!savedPosition.bottom:false);lastScrollTop.current = savedPosition?.top||0;
@@ -574,32 +647,34 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   }
   function newChat(project = cwd) {
     if (busy || uploading) return;
-    retryClosedFollowup.current=null;
     rememberPosition();
-    rememberDraft();setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;navigation.current++;setSelected(null);setHistory([]);setJob(null);restoreDraft(`new:${project}`);setError('');setHasMore(null);
+    rememberDraft();releasePending(true);setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;navigation.current++;setSelected(null);setHistory([]);setJob(null);restoreDraft(`new:${project}`);setError('');setHasMore(null);
     historyWindow.current = 100;setHistoryError('');setFromStart(false);setShowScrollActions(false);lastScrollTop.current = 0;
     pendingPosition.current=null;projectChosen.current=true;setCwd(project);setMobileChat(true);setTab('chats');setTakeover(true);setLoading(false);
   }
-  async function send(confirmed = takeover) {
-    if (sending.current || loading || uploading || demo || !canRun || selected?.readOnly || !draft.trim() && !attachments.length) return;
+  /** Sends the draft, or a waiting message exactly as it was written. Typing during the request is kept. */
+  async function send(confirmed = takeover, payload?: {text:string;attachments:Attachment[]}) {
+    const text=payload?payload.text:draft,files=payload?payload.attachments:attachments,ids=files.map(item=>item.id);
+    if (sending.current || loading || uploading || demo || !canRun || selected?.readOnly || !text.trim() && !files.length || !files.every(attachmentReady)) return;
+    const key=currentDraftKey();
+    const consume=()=>{if(payload)return;setDraft(current=>current===text?'':current.startsWith(text)?current.slice(text.length).trimStart():current);setAttachments(old=>old.filter(item=>!ids.includes(item.id)));drafts.current!.delete(key);};
     if(running&&job){
       sending.current=true;setBusy(true);setError('');
-      const epoch=navigation.current,data={text:draft,attachments:attachments.map(item=>item.id)},signature=JSON.stringify({jobId:job.id,...data});
+      const epoch=navigation.current,data={text,attachments:ids},signature=JSON.stringify({jobId:job.id,...data});
       const id=retry.current?.signature===signature?retry.current.id:crypto.randomUUID();retry.current={signature,id};
       try{
         const next=await api<JobView>(`/jobs/${job.id}/messages`,{...data,id});
         if(epoch!==navigation.current)return;
-        retryClosedFollowup.current=null;setJob(next);setDraft('');setAttachments([]);drafts.current!.delete(currentDraftKey());retry.current=null;nearBottom.current=true;
+        setJob(next);consume();sentFollowups.current!.set(id,files);retry.current=null;nearBottom.current=true;
       }catch(error){
         if(provider==='claude'&&epoch===navigation.current&&(error as {status?:number}).status===409){
           try{
             const latest=await api<JobView>(`/jobs/${job.id}`);
             if(epoch===navigation.current){
               setJob(latest);
-              // The SDK can close input before the final status is observable.
-              // Resume the preserved draft only after this exact job ends.
-              retryClosedFollowup.current={jobId:job.id,epoch,signature:JSON.stringify(data)};
-              setError(latest.status==='running'?t('Claude завершает ход. Черновик отправится после завершения.'):'');
+              // The SDK can close input before the final status is observable. This exact message
+              // waits beside the composer and is sent after this job ends; the field is free at once.
+              setPendingSend({jobId:job.id,key,text,attachments:files});consume();retry.current=null;
               return;
             }
           }catch{/* Preserve the original rejection when refreshing fails. */}
@@ -613,7 +688,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if (sessionId && !confirmed) {setPendingTakeover(true);return;}
     sending.current = true;setBusy(true);setError('');
     const epoch = ++navigation.current;
-    const data = { provider, cwd, sessionId, ...(taskRun?{taskRunId:taskRun.id}:{}), text: draft, attachments: attachments.map((a) => a.id), model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: "default", ...(provider==='claude'?{maxBudgetUsd:Number.isFinite(budget)&&budget>=0.1?Math.min(100,budget):5,claudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), takeoverConfirmed: confirmed };
+    // The chat's access chip overrides the device default from Settings; Plan is a Claude mode of its own.
+    const access=chatAccess,timeout=approvalTimeout(composerPreferences);
+    const data = { provider, cwd, sessionId, ...(taskRun?{taskRunId:taskRun.id}:{}), text, attachments: ids, model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: provider==='claude'&&access==='plan'?'plan':'default', ...(provider==='claude'?{maxBudgetUsd:Number.isFinite(budget)&&budget>=0.1?Math.min(100,budget):5,claudeAccess:access==='plan'?claudeAccess:access as ClaudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess:access as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), ...(timeout?{approvalTimeoutMinutes:timeout}:{}), takeoverConfirmed: confirmed };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {
@@ -621,24 +698,37 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       if (epoch !== navigation.current) return;
       // Freeze the displayed history before the next turn; the server saves full history independently.
       if (job && job.errorCode!=='codex_thread_busy') setHistory((old) => [...old, ...job.messages]);
-      if(provider==='codex')submissions.current!.set(next.id,{key:currentDraftKey(),text:draft,attachments});
-      drafts.current!.delete(currentDraftKey());
-      setRejectedDrafts(old=>{const next={...old};delete next[currentDraftKey()];return next;});
-      setJob(next);setTakeover(true);setDraft('');setAttachments([]);retry.current = null;nearBottom.current = true;
+      if(provider==='codex')submissions.current!.set(next.id,{key,text,attachments:files});
+      setRejectedDrafts(old=>{const next={...old};delete next[key];return next;});
+      setJob(next);setTakeover(true);consume();retry.current = null;nearBottom.current = true;
       if(sessionId)for(const item of activity.items)if(item.status==='error'&&item.provider===provider&&item.sessionId===sessionId)activity.markViewed(item);
     } catch (e) {if (epoch === navigation.current) setError((e as Error).message);} finally {sending.current = false;setBusy(false);}
   }
-  async function upload(files: FileList | File[] | null) {
-    if (!files || !connection || uploading) return;
-    setUploading(true);setError('');
-    const epoch = navigation.current;
-    try {
-      if (files.length + attachments.length > 10) throw new Error(t("Можно прикрепить до 10 файлов"));
-      for (const file of Array.from(files)) {
-        const a = await api<Attachment>('/uploads', { cwd, name: file.name, base64: await fileBase64(file) });
-        if (epoch === navigation.current) setAttachments((old) => [...old, {...a,file}]);
-      }
-    } catch (e) {setError((e as Error).message);} finally {setUploading(false);}
+  /** Updates one draft file wherever its draft is kept, so a finished upload is never lost. */
+  function patchAttachment(id:string,change:(item:Attachment)=>Attachment){
+    setAttachments(old=>old.map(item=>item.id===id?change(item):item));
+    for(const [key,value] of drafts.current!)if(value.attachments.some(item=>item.id===id))drafts.current!.set(key,{...value,attachments:value.attachments.map(item=>item.id===id?change(item):item)});
+  }
+  // Uploads run one after another; files added meanwhile (paste, drop, picker) wait in line with their own card.
+  const uploadQueue=useRefForWorkspace<Promise<void>>(Promise.resolve());
+  function enqueueUpload(item:Attachment,root:string){
+    uploadQueue.current=uploadQueue.current.then(async()=>{
+      try{const uploaded=await api<Attachment>('/uploads',{cwd:root,name:item.name,base64:await fileBase64(item.file!)});patchAttachment(item.id,()=>({...uploaded,file:item.file,...(item.pastedText?{pastedText:true}:{})}));}
+      catch(e){patchAttachment(item.id,old=>({...old,status:'failed',error:(e as Error).message}));}
+    });
+  }
+  function upload(files: File[], options?: {pastedText?:boolean}) {
+    if (!connection || !files.length) return;
+    const room=10-attachments.length;
+    if(files.length>room){setError(t("Можно прикрепить до 10 файлов"));files=files.slice(0,Math.max(0,room));if(!files.length)return;}
+    const cards:Attachment[]=files.map(file=>({id:'local-'+crypto.randomUUID(),name:file.name,size:file.size,file,status:'uploading',...(options?.pastedText?{pastedText:true}:{})}));
+    setAttachments(old=>[...old,...cards]);
+    for(const card of cards)enqueueUpload(card,cwd);
+  }
+  function retryUpload(id:string){const item=attachments.find(a=>a.id===id);if(!item?.file)return;const next:Attachment={...item,status:'uploading',error:undefined};patchAttachment(id,()=>next);enqueueUpload(next,cwd);}
+  async function insertPastedText(id:string){
+    const item=attachments.find(a=>a.id===id);if(!item?.file)return;
+    try{const text=await item.file.text();setDraft(current=>current.trim()?current.replace(/\s+$/,'')+'\n\n'+text:text);setAttachments(old=>old.filter(a=>a.id!==id));}catch(e){setError((e as Error).message);}
   }
   function startDemo() {setDemo(true);setTab('chats');setMobileChat(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.10.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
   // Leaving on the phone also removes it from the PC's device list; an unreachable or older PC is not a blocker.
@@ -723,15 +813,15 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;markScrolling();rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}
-            {!loading && !history.length && !job && !selected && <div className="welcome"><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={15} /></button>)}</div></div>}
+            {!loading && !history.length && !job && !selected && <div className={'welcome'+(draft.trim()||attachments.length?' welcome-collapsed':'')}><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={15} /></button>)}</div></div>}
             {!loading && selected && !history.length && !job && <p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>}
             {selected&&!loading&&<p className="history-page-status muted" role="status" aria-live="polite">{loadingOlder?(locale().startsWith('ru')?'Загружаем сообщения…':'Loading messages…'):historyError?(locale().startsWith('ru')?'Не удалось обновить историю':'History could not be refreshed'):fromStart||hasMore===null?(locale().startsWith('ru')?'Начало чата':'Beginning of chat'):(locale().startsWith('ru')?'Выше есть ещё сообщения · прокрутите вверх':'More messages above · scroll up')}{historyError&&hasMore!==null&&<button className="text-button" onClick={()=>void extendHistory()}>{locale().startsWith('ru')?'Повторить загрузку':'Retry loading'}</button>}</p>}
             <MessageList connection={connection} cwd={cwd} key={`${provider}-history`} provider={provider} messages={history} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>
             {hasMore !== null && historyWindow.current >= 5000 && <p className="muted" role="status">{t("Достигнут предел окна: 5000 сообщений")}</p>}
             {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={job.messages} streaming={running} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>}
             {job && <PartialMessage key={`${provider}-${job.id}-partial`} provider={provider} streaming={running} text={job.partial||''}/>}
-            {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers });}} />)}
-            {running && <RunningAction job={job}/>}
+            {job?.expiredApprovals?.map((item,index)=><p key={`expired-${index}`} className="approval-expired transcript-event" role="status">{t('Время ожидания истекло — агенту отправлен отказ')} · {item.tool}</p>)}
+            {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers, extra) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers, ...extra });if(allow&&a.tool==='ExitPlanMode'&&extra?.mode){const key=currentDraftKey(),mode=extra.mode;setAccessChoices(old=>({...old,[key]:mode}));}}} />)}
             {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error">{t(job.error)}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
             {job?.status === 'done' && <div className="turn-complete" role="status"><ShieldCheck size={13} />{t(" Готово ")}{turnEnd?.id===job.id&&<><span>· <time dateTime={new Date(turnEnd.at).toISOString()}>{new Date(turnEnd.at).toLocaleTimeString(locale(),{hour:'2-digit',minute:'2-digit'})}</time></span><span className="turn-duration">· {elapsed(turnEnd.at-job.startedAt)}</span></>}{job.cost !== undefined && <span>· ${job.cost.toFixed(4)}</span>}</div>}
             <div ref={bottom} />
@@ -739,16 +829,21 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         </div>
         {(showScrollActions||fromStart)&&!readingMode&&<button className="scroll-latest" data-scrolling={scrolling||undefined} aria-label={unseen?t('К новым сообщениям: {0}',unseen):t('К новым сообщениям')} title={t('К новым сообщениям')} disabled={loading || busy} onClick={()=>{const el=scroll.current;if(fromStart||!el){void jumpHistory(false);return;}nearBottom.current=true;el.scrollTop=el.scrollHeight;lastScrollTop.current=el.scrollTop;setShowScrollActions(false);}}><ArrowDown size={20} aria-hidden="true"/>{unseen>0&&<span className="scroll-latest-count" aria-hidden="true">{unseen>99?'99+':unseen}</span>}</button>}
         <ChatOverlay edge="bottom">
-        {Boolean(job?.pendingInputIds?.length)&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}
-        <div className="composer-area">{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}{error && <div className="error" role="alert">{t(error)}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
+        {/* Hosts without the queue view still report how many follow-ups wait. */}
+        {Boolean(job?.pendingInputIds?.length)&&!job?.queued&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}
+        <div className="composer-area">{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}
+          {!readingMode&&<OutboxShelf items={outbox} busy={busy}/>}
+          {/* One status line above the composer; while a card asks for a decision, the card says it. */}
+          {running&&job&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)}/>}{error && <div className="error" role="alert">{t(error)}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
           <ChatComposer text={draft} onText={setDraft} label={t("Сообщение {0}",engineName)}
             placeholder={demo?t("Подключите ПК, чтобы отправлять сообщения"):t("Что нужно сделать?")}
-            disabled={demo||busy||selected?.readOnly} uploading={uploading}
-            canSend={!(demo||!canRun||selected?.readOnly||busy||loading||uploading||!draft.trim()&&!attachments.length)}
-            attachments={attachments} onRemove={id=>setAttachments(old=>old.filter(a=>a.id!==id))} onFiles={files=>void upload(files)} onSend={()=>void send()}
-            stopLabel={t("Остановить {0}",engineName)} onStop={running?async()=>{retryClosedFollowup.current=null;try{await api(`/jobs/${job!.id}/stop`,{});}catch(e){setError((e as Error).message);}}:undefined}
-            controls={<><ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>{(provider==='codex'||provider==='claude')&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly}/>}</>}
+            disabled={demo||selected?.readOnly} uploading={uploading} busy={busy} stopping={stopping}
+            mode={running?provider==='codex'?'steer':'queue':'send'} enterSends={enterSendsPreference(composerPreferences,Boolean(embedded))} keyHint={Boolean(embedded)}
+            canSend={!(demo||!canRun||selected?.readOnly||busy||loading||uploading||!attachments.every(attachmentReady)||!draft.trim()&&!attachments.length)}
+            attachments={attachments} onRemove={id=>setAttachments(old=>old.filter(a=>a.id!==id))} onFiles={(files,options)=>upload(files,options)} onRetry={retryUpload} onInsertText={id=>void insertPastedText(id)} onRecall={recallLast} onSend={()=>void send()}
+            stopLabel={t("Остановить {0}",engineName)} onStop={running?()=>void stopRun():undefined}
+            controls={<>{(provider==='claude'||provider==='codex')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>{(provider==='codex'||provider==='claude')&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
             usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||'sonnet')).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}/>
         </div></ChatOverlay>
       </>}

@@ -1,0 +1,27 @@
+/* A permission request reads like a sentence: what will run or change, then the decision. */
+:root[data-theme] .approval-card{border:1px solid color-mix(in srgb,var(--status-attention) 55%,var(--line));background:var(--panel);border-radius:14px;padding:16px;margin:18px 0;font-size:var(--chat-font-size,14px)}
+.approval-card .eyebrow{display:flex;align-items:center;gap:6px;color:var(--status-attention);font-size:clamp(11px,calc(11px * var(--ui-scale,1)),14px);letter-spacing:.4px;text-transform:uppercase}
+.approval-card h3{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:1.15em;line-height:1.35;overflow-wrap:anywhere}
+.approval-card h3>svg{flex-shrink:0;color:var(--muted)}
+.approval-card .approval-note{margin:0 0 8px;color:var(--text);line-height:1.5;overflow-wrap:anywhere}
+.approval-card .approval-meta{margin:0 0 8px;color:var(--muted);font-size:.92em;overflow-wrap:anywhere}
+.approval-card .approval-meta code{font-family:Consolas,"Cascadia Mono",ui-monospace,monospace}
+:root[data-theme] .approval-card pre{background:var(--surface);color:var(--text);border-radius:10px;padding:10px 12px;margin:0 0 8px;max-height:min(45dvh,360px);overflow:auto}
+.approval-card .approval-command{white-space:pre-wrap;overflow-wrap:anywhere}
+.approval-card .tool-diff{white-space:pre}
+.approval-card details>summary{min-height:40px;display:flex;align-items:center;color:var(--muted);font-size:.92em}
+.approval-card details>summary::before{content:"›";display:inline-block;margin-right:6px;transition:transform .15s}
+.approval-card details[open]>summary::before{transform:rotate(90deg)}
+.approval-card .approval-plan{max-height:min(55dvh,520px);overflow:auto;padding:4px 2px;border-block:1px solid var(--line);margin-bottom:8px}
+.approval-card .tool-fields{margin:0 0 8px}
+.approval-card .approval-expiry{margin:8px 0 0;color:var(--muted);font-size:clamp(11px,calc(12px * var(--ui-scale,1)),15px);font-variant-numeric:tabular-nums}
+.approval-card .approval-expiry[data-urgent]{color:var(--status-attention)}
+.approval-card .approval-comment{display:grid;gap:6px;margin:12px 0 0;color:var(--text);font-size:.95em}
+:root[data-theme] .approval-card .approval-comment textarea{width:100%;min-height:64px;resize:vertical;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit}
+.approval-card .approval-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.approval-card .approval-actions>button{flex:1 1 140px;min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-align:center}
+.approval-card .approval-actions>.text-button{flex:0 0 auto}
+.approval-card .approval-remember{flex-direction:column;gap:2px}
+.approval-card .approval-remember small{font-family:Consolas,"Cascadia Mono",ui-monospace,monospace;font-size:.8em;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.approval-expired{display:flex;align-items:center;gap:8px;margin:12px 0;color:var(--status-attention);font-size:.92em}
+@media(prefers-reduced-motion:reduce){.approval-card details>summary::before{transition:none}}

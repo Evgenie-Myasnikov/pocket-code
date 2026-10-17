@@ -22,8 +22,12 @@ test('follow-up API authenticates, scopes attachments and replays accepted messa
     const upload=await(await post('/uploads',{cwd:other,name:'note.txt',base64:Buffer.from('test').toString('base64')})).json();
     assert.equal((await post(`/jobs/${id}/messages`,{...input,attachments:[upload.id]})).status,400);
     const responses=await Promise.all([post(`/jobs/${id}/messages`,input),post(`/jobs/${id}/messages`,input)]);assert.deepEqual(responses.map(item=>item.status),[200,200]);
-    assert.equal(jobs.get(id).messages.filter(item=>item.id===input.id).length,1);
+    // A queued follow-up waits beside the composer and joins the transcript only when the agent takes it.
+    assert.equal(jobs.get(id).queued?.filter(item=>item.id===input.id).length,1);assert.equal(jobs.get(id).messages.filter(item=>item.id===input.id).length,0);
     assert.equal((await post(`/jobs/${id}/messages`,{...input,text:'Changed'})).status,409);
     jobs.stop(id);assert.equal((await post(`/jobs/${id}/messages`,{id:randomUUID(),text:'Late'})).status,409);
+    // An undelivered follow-up can still be withdrawn after Stop, once.
+    assert.equal((await post(`/jobs/${id}/messages/${input.id}/cancel`,{})).status,200);assert.deepEqual(jobs.get(id).queued,[]);
+    assert.equal((await post(`/jobs/${id}/messages/${input.id}/cancel`,{})).status,409);
   }finally{jobs.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(root,{recursive:true,force:true});}
 });
