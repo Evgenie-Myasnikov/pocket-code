@@ -98,7 +98,7 @@ test('scrolling to history edges loads automatically once and preserves the visi
   await expect(page.locator('.message')).toHaveCount(201);
   await expect.poll(()=>oldAnchor.evaluate(el=>el.getBoundingClientRect().top)).toBeCloseTo(oldTop,0);
   expect(windows.filter(window=>window===200)).toHaveLength(1);await expect(page.getByText('Beginning of chat',{exact:true})).toHaveCount(1);
-  await page.getByRole('button',{name:'Go to beginning'}).click();await expect(page.locator('.message')).toHaveCount(100);
+  await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitem',{name:'Go to beginning'}).click();await expect(page.locator('.message')).toHaveCount(100);
   await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(0);
   await scroller.evaluate(el=>{el.scrollTo({top:el.scrollHeight,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
   await expect(page.locator('.message')).toHaveCount(201);await expect(page.getByText('History message 201',{exact:true})).toHaveCount(1);
@@ -153,7 +153,7 @@ test('chat position and jump controls survive downward scrolling, tab changes an
  await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
  await scroller.evaluate(el=>{el.scrollTop=1800;el.dispatchEvent(new Event('scroll'));});
  await scroller.evaluate(el=>{el.scrollTop=1900;el.dispatchEvent(new Event('scroll'));});
- await expect(page.getByRole('button',{name:'Go to beginning'})).toBeVisible();
+ await expect(page.getByRole('button',{name:/^Jump to latest messages/})).toBeVisible();
  const before=await scroller.evaluate(el=>el.scrollTop);
  await openSection(page,'Settings');
  await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
@@ -163,7 +163,7 @@ test('chat position and jump controls survive downward scrolling, tab changes an
  await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
  await page.reload();await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
  await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
- await expect(page.getByRole('button',{name:'Go to beginning'})).toBeVisible();
+ await expect(page.getByRole('button',{name:/^Jump to latest messages/})).toBeVisible();
 });
 
 
@@ -183,7 +183,7 @@ test('Codex byte-limited history advances by returned offsets in both directions
   await scroller.evaluate(el=>{el.scrollTo({top:0,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
   await expect(page.locator('.message')).toHaveCount(60);
   expect(requests.some(query=>query.includes('end=30'))).toBe(true);
-  await page.getByRole('button',{name:'Go to beginning'}).click();await expect(page.locator('.message')).toHaveCount(30);
+  await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitem',{name:'Go to beginning'}).click();await expect(page.locator('.message')).toHaveCount(30);
   await scroller.evaluate(el=>{el.scrollTo({top:el.scrollHeight,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
   await expect(page.locator('.message')).toHaveCount(60);
   expect(requests.some(query=>query.includes('offset=30'))).toBe(true);

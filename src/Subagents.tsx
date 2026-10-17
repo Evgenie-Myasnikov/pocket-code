@@ -1,11 +1,11 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowLeft,Check,ChevronRight,Circle,LoaderCircle,RefreshCw,TriangleAlert,X} from 'lucide-react';
 import {request,type Connection} from './api';
 import {useModal} from './navigation';
 import {t,useLanguage} from './i18n';
-import {Message} from './Messages';
+import {Message,MessageList} from './Messages';
 import {agentLabel as label} from './subagent-labels';
-import type {ChatMessage,SubagentView} from '../server/types';
+import type {Block,ChatMessage,SubagentView} from '../server/types';
 export type {SubagentView} from '../server/types';
 import './subagents.css';
 
@@ -14,7 +14,7 @@ const states=new Set(['running','completed','error','stopped','unknown']);
 function status(agent:SubagentView){return states.has(agent.status)?agent.status:'unknown';}
 function State({agent}:{agent:SubagentView}){
   const value=status(agent),Icon=value==='running'?LoaderCircle:value==='completed'?Check:value==='error'?TriangleAlert:Circle;
-  return <span className={'subagent-status '+value}><Icon size={14} aria-hidden="true"/>{label(value)}</span>;
+  return <span className={'subagent-status '+value} data-status={value}><Icon size={14} aria-hidden="true"/>{label(value)}</span>;
 }
 
 /** Remount request state when its authenticated parent changes; never show another chat's children. */
@@ -36,6 +36,8 @@ function SubagentsPanel({connection,provider,parentId,onClose,initialAgentId,ini
   const visibleMessages=messageAgentId===selected?messages:[];
   const visibleHistoryError=messageAgentId===selected?historyError:'';
   const loadingHistory=messageAgentId!==selected||historyBusy;
+  // Calls and their results pair up exactly as in the main transcript.
+  const toolResults=useMemo(()=>{const blocks=visibleMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b] as [string,Block]));},[visibleMessages]);
 
   useEffect(()=>{
     let active=true,timer:ReturnType<typeof setTimeout>|undefined;setListBusy(true);
@@ -87,13 +89,18 @@ function SubagentsPanel({connection,provider,parentId,onClose,initialAgentId,ini
       </>:<section className="subagent-detail">
         {agent&&agent.name.length>110?<details className="subagent-full-name"><summary><h3>{agent.name.slice(0,110)}…</h3></summary><p>{agent.name}</p></details>:<h3>{agent?.name||label('agents')}</h3>}{agent&&<State agent={agent}/>}
         {visibleHistoryError&&<Failure text={label('historyError')} error={visibleHistoryError}/>}
-        {agent?.prompt&&<details className="subagent-context" open={!visibleMessages.length}><summary>{label('task')}</summary><p>{agent.prompt}</p></details>}
-        {agent?.result&&<details className="subagent-context" open={!visibleMessages.length}><summary>{label('result')}</summary><Message message={{id:`${agent.id}-result`,role:'assistant',blocks:[{type:'text',text:agent.result}]}} provider={provider}/></details>}
+        {agent?.result&&<details className="subagent-context subagent-result" open><summary><ChevronRight size={16} className="subagent-summary-chevron" aria-hidden="true"/>{label('result')}</summary><Message message={{id:`${agent.id}-result`,role:'assistant',blocks:[{type:'text',text:agent.result}]}} provider={provider}/></details>}
+        {agent?.prompt&&<TaskQuote text={agent.prompt}/>}
         {loadingHistory&&!visibleMessages.length&&<p role="status">{label('historyLoading')}</p>}
         {!loadingHistory&&!visibleMessages.length&&!visibleHistoryError&&<p className="subagents-empty">{label('noHistory')}</p>}
-        {!!visibleMessages.length&&<div className="subagent-messages" aria-label={label('messages')}>{visibleMessages.map(message=><Message key={message.id} message={message} provider={provider}/>)}</div>}
+        {!!visibleMessages.length&&<div className="subagent-messages" aria-label={label('messages')}><MessageList messages={visibleMessages} provider={provider} toolResults={toolResults} mode="detailed"/></div>}
       </section>}
     </div>
   </aside>;
+}
+/** The task reads as a two-line quote that can be expanded. */
+function TaskQuote({text}:{text:string}){
+  const [expanded,setExpanded]=useState(false),long=text.length>160||text.split(/\r?\n/).length>2;
+  return <figure className="subagent-task" data-expanded={expanded||!long}><figcaption>{label('task')}</figcaption><blockquote>{text}</blockquote>{long&&<button className="text-button" aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)}>{label(expanded?'less':'more')}</button>}</figure>;
 }
 function Failure({text,error}:{text:string;error:string}){return <div className="subagents-error" role="status"><p>{text}</p><details><summary>{label('details')}</summary><p>{t(error)}</p></details></div>;}

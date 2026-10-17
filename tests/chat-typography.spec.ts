@@ -7,7 +7,7 @@ async function openChat(page: Page, provider: 'codex' | 'claude', language: 'en'
   await page.addInitScript(({ provider, language }) => {
     sessionStorage.setItem('connection', JSON.stringify({ url: 'http://127.0.0.1:4319', token: 'test-only-'.repeat(5) }));
     localStorage.setItem('pocket-code-workspace', provider); localStorage.setItem('pocket-code-language-v1', language);
-    localStorage.setItem('pocket-code-appearance-v1', JSON.stringify({ textSize: 8, scale: 100 }));
+    localStorage.setItem('pocket-code-appearance-v1', JSON.stringify({ textSize: 8, scale: 100 })); localStorage.setItem('pocket-code-detail-mode-v1', 'detailed');
   }, { provider, language });
   const messages = [{ id: 'typography-message', role: 'assistant', blocks: [
     { type: 'text', text: 'A readable answer.\n\n| Name | Value |\n| --- | --- |\n| Item | 42 |\n\n```ts\nconst answer = 42;\n```' },
@@ -40,9 +40,9 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
   test(`${provider} ${language}: chat labels, commands, changes and rich content scale with 8–22px body`, async ({ page }) => {
     await openChat(page, provider, language);
     const selectors = [
-      '.markdown>p', '.message-label', '.claude-mark', '.tool-card.combined summary', '.tool-card.combined .activity-details>strong',
-      '.tool-card.combined summary span', '.tool-card.combined .activity-details>pre', '.tool-result-content .markdown>p',
-      '.tool-card:not(.combined)>summary', '.tool-card:not(.combined) .activity-details>pre', '.markdown>pre code', '.markdown table',
+      '.markdown>p', '.message-label', '.claude-mark', '.tool-card.combined summary', '.tool-card.combined .tool-command',
+      '.tool-card.combined summary span', '.tool-card.combined .tool-output', '.tool-result-content .copy-action',
+      '.tool-card:not(.combined)>summary', '.tool-card:not(.combined) .tool-diff', '.markdown .code-block pre code', '.code-block-bar>span', '.markdown table',
       '.document-card>strong', '.document-card>pre', '.thinking summary', '.thinking p', '.subagent-card strong', '.subagent-card small',
     ];
     let baseline: number[] | undefined, navigationFont = 0;

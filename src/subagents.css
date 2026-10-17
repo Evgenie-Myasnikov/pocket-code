@@ -29,3 +29,14 @@
 .subagent-inline>div{padding:0 8px 8px;}
 @media(hover:hover){:root[data-theme] .message .subagent-card:hover,:root[data-theme] .subagent-activity>button:hover{background:transparent;}}
 .subagent-card:focus-visible,.subagent-inline>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:16px;}
+/* One status vocabulary and the shared status tokens in both themes. */
+.subagent-status[data-status=running]{color:var(--status-running)}.subagent-status[data-status=completed]{color:var(--status-done)}.subagent-status[data-status=error]{color:var(--status-error)}.subagent-status[data-status=stopped]{color:var(--status-stopped)}
+.subagent-card[data-status=running] .subagent-status-dot{background:var(--status-running)}.subagent-card[data-status=completed] .subagent-status-dot{background:var(--status-done)}.subagent-card[data-status=error] .subagent-status-dot{background:var(--status-error)}
+.subagent-card[data-status=error] small{color:var(--status-error)}
+/* The card reads as name, then status, with a chevron saying it opens the panel. */
+.subagent-card>span:nth-child(2){flex-direction:column;align-items:flex-start}
+.subagent-task{margin:0 0 14px}.subagent-task figcaption{color:var(--muted);font-weight:500;margin-bottom:4px}
+.subagent-task blockquote{margin:0;padding-left:12px;border-left:2px solid var(--line);white-space:pre-wrap;line-height:1.55;overflow-wrap:anywhere}
+.subagent-task[data-expanded=false] blockquote{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.subagent-task .text-button{min-height:44px;padding:4px 0}
+.subagent-context>summary{display:flex;align-items:center;gap:6px}.subagent-summary-chevron{flex:none;transition:transform .15s}.subagent-context[open] .subagent-summary-chevron{transform:rotate(90deg)}

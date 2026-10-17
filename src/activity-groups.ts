@@ -1,6 +1,10 @@
 import type {Block,ChatMessage} from '../server/types';
-import {toolActivity} from './tool-activity';
+import {describeTool,basename} from './tool-registry';
+import {plural} from './plural';
+import {t} from './i18n';
 
+/** Brief folds a turn's routine activity into one line; detailed groups it by meaning. Errors, questions and running calls always stay visible. */
+export type DetailMode='brief'|'detailed';
 export type ActivityBlock={block:Block;result?:Block;index:number;messageId:string;running:boolean};
 export function visibleMessageBlocks(message:ChatMessage,results?:Map<string,Block>,running=false):ActivityBlock[]{
  return message.blocks.flatMap((block,index)=>{
@@ -10,35 +14,65 @@ export function visibleMessageBlocks(message:ChatMessage,results?:Map<string,Blo
   return [{block,result,index,messageId:message.id,running}];
  });
 }
-export function activityGroupKey({block,result,running}:ActivityBlock):string|undefined{
+export function activityGroupKey({block,result,running}:ActivityBlock,mode:DetailMode='detailed'):string|undefined{
  if(block.type==='tool_use'){
-  const a=toolActivity(block,result,running);
-  // Errors must remain visible even when their surrounding calls are collapsed.
-  return a.failed?undefined:[a.kind,a.label,a.kind==='tool'?block.name||'':''].join('|');
+  const view=describeTool(block,result,running);
+  // Errors, denials, questions and the call in progress must remain visible even when their surroundings are collapsed.
+  if(view.failed||view.status==='denied'||view.active||view.kind==='question')return undefined;
+  if(mode==='brief')return 'activity';
+  return view.kind==='tool'?'tool|'+(view.mcp||block.name||''):view.kind;
  }
- if(block.type==='thinking')return 'thinking';
+ if(block.type==='thinking')return mode==='brief'?'activity':'thinking';
  return undefined;
 }
+// A plan update never splits the work around it: it joins the group it falls into.
+const runKey=(items:ActivityBlock[],mode:DetailMode)=>items.map(item=>activityGroupKey(item,mode)).find(key=>key!=='plan')||'plan';
+const joins=(key:string|undefined,items:ActivityBlock[]|undefined,mode:DetailMode)=>{if(!key||!items)return false;const current=runKey(items,mode);return current!==undefined&&activityGroupKey(items[0],mode)!==undefined&&(key===current||key==='plan'||current==='plan');};
 export type ActivityRun={key:string;items:ActivityBlock[]};
-export function groupActivityBlocks(blocks:ActivityBlock[]):ActivityRun[]{
+export function groupActivityBlocks(blocks:ActivityBlock[],mode:DetailMode='detailed'):ActivityRun[]{
  const runs:ActivityRun[]=[];
- for(const item of blocks){const key=activityGroupKey(item),last=runs.at(-1);
-  if(key&&last&&activityGroupKey(last.items[0])===key)last.items.push(item);
+ for(const item of blocks){const key=activityGroupKey(item,mode),last=runs.at(-1);
+  if(joins(key,last?.items,mode))last!.items.push(item);
   else runs.push({key:`${item.messageId}:${item.index}`,items:[item]});
  }
  return runs;
 }
 export type TranscriptRun={key:string;message?:ChatMessage;items?:ActivityBlock[]};
-export function groupActivityMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null):TranscriptRun[]{
+export function groupActivityMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null,mode:DetailMode='detailed'):TranscriptRun[]{
  const runs:TranscriptRun[]=[];
  for(const message of messages){
   const items=visibleMessageBlocks(message,results,running?.has(message));
   if(!items.length)continue;
-  if(!items.every(item=>activityGroupKey(item)!==undefined)){runs.push({key:message.id,message});continue;}
+  if(!items.every(item=>activityGroupKey(item,mode)!==undefined)){runs.push({key:message.id,message});continue;}
   for(const item of items){const last=runs.at(-1);
-   if(last?.items&&activityGroupKey(last.items[0])===activityGroupKey(item))last.items.push(item);
+   if(joins(activityGroupKey(item,mode),last?.items,mode))last!.items!.push(item);
    else runs.push({key:`${message.id}:${item.index}`,items:[item]});
   }
  }
  return runs;
+}
+/** "Explored 5 files · 2 searches · ran 3 commands · edited 2 files +24 −5", counted from what the calls touched. */
+export function summarizeActivity(items:ActivityBlock[]){
+ const read=new Set<string>(),edited=new Set<string>();let searches=0,commands=0,web=0,tools=0,thinking=0,plans=0,added=0,removed=0;
+ for(const {block,result,running} of items){
+  if(block.type==='thinking'){thinking++;continue;}
+  if(block.type!=='tool_use')continue;
+  const view=describeTool(block,result,running);
+  if(view.kind==='explore'){if(view.search)searches++;else if(view.files.length)view.files.forEach(file=>read.add(basename(file)));else tools++;}
+  else if(view.kind==='command')commands++;
+  else if(view.kind==='edit'){view.files.forEach(file=>edited.add(file));if(!view.files.length)edited.add(block.id||String(edited.size));added+=view.added;removed+=view.removed;}
+  else if(view.kind==='web')web++;
+  else if(view.kind==='plan')plans++;
+  else tools++;
+ }
+ const parts:string[]=[];
+ if(read.size)parts.push(t('Изучил')+' '+plural(read.size,['{0} файл','{0} файла','{0} файлов']));
+ if(searches)parts.push(plural(searches,['{0} поиск','{0} поиска','{0} поисков']));
+ if(commands)parts.push(t('Выполнил')+' '+plural(commands,['{0} команду','{0} команды','{0} команд']));
+ if(edited.size)parts.push(t('Изменил')+' '+plural(edited.size,['{0} файл','{0} файла','{0} файлов'])+(added||removed?` +${added} −${removed}`:''));
+ if(web)parts.push(plural(web,['{0} запрос в интернет','{0} запроса в интернет','{0} запросов в интернет']));
+ if(tools)parts.push(plural(tools,['{0} действие','{0} действия','{0} действий']));
+ if(!parts.length&&plans)parts.push(t('Обновил план'));
+ if(thinking)parts.push(t('Рассуждения'));
+ return parts.map((part,index)=>index?part.charAt(0).toLowerCase()+part.slice(1):part).join(' · ');
 }

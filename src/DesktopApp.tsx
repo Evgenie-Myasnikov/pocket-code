@@ -4,6 +4,7 @@ import {InboxButton,NotificationInbox,useBoardNotices,type BoardNoticeTarget} fr
 import {ChatRunStatus,RunStatusDot,relativeTime,fullTime} from './run-status';
 import {providerName} from './ActivityList';
 import {useChatShortcuts} from './use-chat-shortcuts';
+import {detailMode,setDetailMode} from './detail-mode';
 import {readChatCache,writeChatCache} from './chat-cache';
 import {DesktopSettings} from './DesktopSettings';
 import {DesktopWorkspaces} from './DesktopWorkspaces';
@@ -136,7 +137,7 @@ export function DesktopApp(){
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
   function startChat(){if(!state.online||!projectRoot)return;setNotificationChat(null);setBoardChat(undefined);setCreating(true);setSelected(null);setPage('chats');}
   function openChat(session:Session){setNotificationChat(null);setBoardChat(undefined);setSelected(session);setPage('chats');}
-  // Keyboard: Ctrl+N new chat, Ctrl+Tab / Ctrl+Shift+Tab next or previous chat, Ctrl+Alt+U inbox, Ctrl+/ the list of shortcuts.
+  // Keyboard: Ctrl+N new chat, Ctrl+Tab / Ctrl+Shift+Tab next or previous chat, Ctrl+Alt+U inbox, Ctrl+O brief or detailed transcript, Ctrl+/ the list of shortcuts.
   const shortcutActions=useRef({startChat,cycle:(_step:number)=>{}});
   shortcutActions.current={startChat,cycle:step=>{if(!visible.length)return;const index=visible.findIndex(item=>item.sessionId===selected?.sessionId);openChat(visible[index<0?(step>0?0:visible.length-1):(index+step+visible.length)%visible.length]);}};
   useEffect(()=>{const key=(event:KeyboardEvent)=>{
@@ -147,8 +148,9 @@ export function DesktopApp(){
     if(event.code==='KeyN'&&!event.altKey&&!event.shiftKey){event.preventDefault();shortcutActions.current.startChat();}
     else if(event.key==='Tab'&&!event.altKey){event.preventDefault();shortcutActions.current.cycle(event.shiftKey?-1:1);}
     else if(event.code==='KeyU'&&event.altKey&&!event.shiftKey){event.preventDefault();setInboxOpen(true);}
+    else if(event.code==='KeyO'&&!event.altKey&&!event.shiftKey){event.preventDefault();setDetailMode(detailMode('detailed')==='brief'?'detailed':'brief');}
   };document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[]);
-  const shortcuts:[string,string][]=[['Ctrl+N',label('New chat in the current project','Новый чат в текущем проекте')],['Ctrl+Tab',label('Next chat','Следующий чат')],['Ctrl+Shift+Tab',label('Previous chat','Предыдущий чат')],['Ctrl+Alt+U',label('Open the inbox','Открыть входящие')],['Ctrl+/',label('Show keyboard shortcuts','Показать сочетания клавиш')],['Ctrl+A',label('Select the conversation','Выделить переписку')],['Ctrl+V',label('Paste into the message','Вставить в сообщение')],['Esc',label('Close a panel or dialog','Закрыть панель или диалог')]];
+  const shortcuts:[string,string][]=[['Ctrl+N',label('New chat in the current project','Новый чат в текущем проекте')],['Ctrl+Tab',label('Next chat','Следующий чат')],['Ctrl+Shift+Tab',label('Previous chat','Предыдущий чат')],['Ctrl+Alt+U',label('Open the inbox','Открыть входящие')],['Ctrl+O',label('Brief or detailed transcript','Кратко или подробно')],['Ctrl+/',label('Show keyboard shortcuts','Показать сочетания клавиш')],['Ctrl+A',label('Select the conversation','Выделить переписку')],['Ctrl+V',label('Paste into the message','Вставить в сообщение')],['Esc',label('Close a panel or dialog','Закрыть панель или диалог')]];
   const connectionPanel=<DesktopConnection state={state} action={action} onState={setState} label={label}/>;
   return <div className="desktop-app" style={railWidth===null?undefined:{['--desktop-rail-width' as string]:railWidth+'px'}}>
     {page==='workspace'&&<WorkspaceIdentity connection={state.online?connection:null} value={projectSpaces}/>}

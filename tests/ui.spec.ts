@@ -23,7 +23,8 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await expect(page.getByText('History message 149.', { exact: false })).toBeVisible();
   await page.getByLabel('Сообщение Claude').fill('Keep this draft');
   await page.locator('.conversation').evaluate(el => { el.scrollTop -= 350; el.dispatchEvent(new Event('scroll')); });
-  await page.getByRole('button', { name: 'В начало чата', exact: true }).click();
+  await page.getByRole('button', { name: 'Ещё действия', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'В начало чата', exact: true }).click();
   await expect(page.getByText('History message 0.', { exact: false })).toBeVisible();
   await expect(page.getByLabel('Сообщение Claude')).toHaveValue('Keep this draft');
   await page.waitForTimeout(3300);

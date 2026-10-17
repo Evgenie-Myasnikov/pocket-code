@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {groupActivityBlocks,groupActivityMessages,visibleMessageBlocks} from '../src/activity-groups';
+import {groupActivityBlocks,groupActivityMessages,visibleMessageBlocks,summarizeActivity} from '../src/activity-groups';
 import type {Block,ChatMessage} from '../server/types';
 const call=(id:string,name='Bash'):Block=>({type:'tool_use',id,name,input:{command:id,status:'completed'}});
 const msg=(id:string,blocks:Block[],role:ChatMessage['role']='assistant'):ChatMessage=>({id,role,blocks});
@@ -14,9 +14,20 @@ test('text, user input, unknown data and errors break groups; errors stay visibl
  const barriers=[msg('text',[{type:'text',text:'Response'}]),msg('user',[{type:'text',text:'Next request'}],'user'),msg('unknown',[{type:'codexItem',content:{future:true}}]),msg('failed',[{...call('error'),input:{status:'failed'}}])];
  for(const barrier of barriers){const runs=groupActivityMessages([msg('a',[call('a')]),barrier,msg('b',[call('b')])]);assert.equal(runs.length,3);assert.equal(runs[1].message,barrier);}
 });
-test('different tool names and running/completed states never share a label',()=>{
- const a=msg('a',[{type:'tool_use',name:'Bash'}]),b=msg('b',[call('b')]),c=msg('c',[call('c','Search')]),d=msg('d',[call('d','Read')]);
- assert.equal(groupActivityMessages([a,b,c,d],undefined,new Set([a])).length,4);
+test('a running call stays alone and calls group by meaning, not by tool name',()=>{
+ const a=msg('a',[{type:'tool_use',name:'Bash'}]),b=msg('b',[call('b')]),c=msg('c',[call('c','Grep')]),d=msg('d',[{type:'tool_use',id:'d',name:'Read',input:{file_path:'src/a.ts'}}]);
+ const runs=groupActivityMessages([a,b,c,d],undefined,new Set([a]));
+ assert.equal(runs.length,3);assert.deepEqual(runs[2].items?.map(i=>i.block.name),['Grep','Read']);
+ assert.equal(summarizeActivity(runs[2].items!),'Explored 1 file · 1 search');
+});
+test('a plan update joins the surrounding group and brief mode folds a turn into one summary',()=>{
+ const read=(id:string,file:string):Block=>({type:'tool_use',id,name:'Read',input:{file_path:file}});
+ const todo:Block={type:'tool_use',id:'t',name:'TodoWrite',input:{todos:[{content:'Fix',status:'completed'},{content:'Test',status:'in_progress',activeForm:'Testing'}]}};
+ const edit:Block={type:'tool_use',id:'e',name:'Edit',input:{file_path:'src/a.ts',old_string:'a\nb',new_string:'a\nc\nd'}};
+ const messages=[msg('1',[read('r1','src/a.ts')]),msg('2',[todo]),msg('3',[read('r2','src/b.ts')]),msg('4',[call('x')]),msg('5',[edit])];
+ assert.deepEqual(groupActivityMessages(messages).map(r=>r.items?.length),[3,1,1]);
+ const brief=groupActivityMessages(messages,undefined,null,'brief');assert.equal(brief.length,1);
+ assert.equal(summarizeActivity(brief[0].items!),'Explored 2 files · ran 1 command · edited 1 file +2 −1');
 });
 test('within-message groups preserve adjacent results, thinking and text order',()=>{
  const m=msg('one',[call('a'),{type:'tool_result',tool_use_id:'a',content:'ok'},call('b'),{type:'text',text:'Summary'},{type:'thinking',thinking:'one'},{type:'thinking',thinking:'two'}]);

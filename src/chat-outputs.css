@@ -15,3 +15,7 @@
 .chat-output-list:not(.chat-output-gallery) .chat-output-image-frame small{font-size:10px}
 @media(max-width:760px){.chat-outputs-panel{width:100%;border:0;}.chat-outputs-header,.chat-outputs-filters,.chat-outputs-back,.chat-outputs-scroll{padding-inline:12px;}}
 @media(max-height:480px){.chat-outputs-header{padding-block:0;}.chat-outputs-filters{padding-block:5px;}.chat-output-scope{margin-bottom:4px;}.chat-outputs-scroll{padding-top:8px;}}
+/* One horizontally scrolling row: the Agent/Mine segment, then kinds with counts. */
+.chat-outputs-filters{display:flex;align-items:center;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}.chat-outputs-filters::-webkit-scrollbar{display:none}
+.chat-outputs-filters .chat-output-scope{flex:none;margin:0;gap:0;padding-right:8px;border-right:1px solid var(--line)}.chat-outputs-filters .chat-output-scope button{flex:none}.chat-outputs-filters .chat-output-categories{flex:none;flex-wrap:nowrap}.chat-outputs-filters button{flex:none;white-space:nowrap}
+.chat-outputs-count{color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}

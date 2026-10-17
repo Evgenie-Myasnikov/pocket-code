@@ -15,7 +15,7 @@ type Props={provider?:string;sessionId?:string;connection:Connection;cwd:string;
 type Artifact={name:string;mimeType:string;data?:string;text?:string};
 const words={
   title:['Results','Результаты'],close:['Back to chat','Вернуться в чат'],back:['All results','Все результаты'],
-  results:['Assistant results','Результаты AI'],sources:['Your sources','Ваши материалы'],all:['All','Всё'],
+  results:['Agent','Агент'],sources:['Mine','Мои'],found:['Found in the full history','Найдено во всей истории'],searching:['Searching the full history','Ищем во всей истории'],interrupted:['Search interrupted','Поиск прерван'],all:['All','Всё'],
   images:['Images','Изображения'],documents:['Documents','Документы'],code:['Code','Код'],links:['Links','Ссылки'],tools:['Tools','Инструменты'],
   loaded:['Loaded conversation · newest first','Загруженная часть чата · сначала новые'],earlier:['Load more messages','Загрузить ещё сообщения'],loading:['Loading…','Загрузка…'],
   limit:['Showing up to 800 recent items. The full content remains in the chat.','Показано до 800 последних элементов. Полное содержимое остаётся в чате.'],
@@ -25,7 +25,7 @@ const words={
   saved:['Saved content from this conversation','Содержимое, сохранённое в этом чате'],
   missing:['This item has no supported preview.','Для этого элемента нет поддерживаемого предпросмотра.'],
   remote:['External content opens only when you choose to load it.','Внешнее содержимое загружается только по вашему нажатию.'],
-  categories:['Visibility categories','Категории видимости'],scope:['Show results or sources','Показывать результаты или материалы'],
+  categories:['Filter results','Фильтр результатов'],scope:['Show agent results or your materials','Показывать результаты агента или ваши материалы'],
   image:['Image','Изображение'],document:['Document','Документ'],toolResult:['Tool result','Результат инструмента'],toolError:['Tool error','Ошибка инструмента'],
 } as const;
 const icons={images:Image,documents:FileText,code:Code2,links:Link,tools:Wrench};
@@ -41,21 +41,24 @@ function OutputPanel({connection,cwd,messages,onClose,onLoadMore,hasMore,loading
   useModal(panel,true,()=>selected?setSelected(null):onClose());
   useEffect(()=>{if(scroll.current)scroll.current.scrollTop=selected?0:savedScroll.current;if(!first.current)backButton.current?.focus({preventScroll:true});first.current=false;},[selected]);
   const scoped=outputs.filter(item=>source==='all'||item.source===source),visible=scoped.filter(item=>filter==='all'||item.category===filter);
-  const title=(item:ChatOutput)=>item.title==='Image'?label('image'):item.title==='Document'?label('document'):item.title==='Code'?label('code'):item.title==='Tool result'?label('toolResult'):item.title==='Tool error'?label('toolError'):item.title;
+  const generic=(item:ChatOutput)=>item.title==='Image'?label('image'):item.title==='Document'?label('document'):item.title==='Code'?label('code'):item.title==='Tool result'?label('toolResult'):item.title==='Tool error'?label('toolError'):null;
+  // A generic kind gains the file name, so two images are told apart without opening them.
+  const title=(item:ChatOutput)=>{const kind=generic(item);if(kind===null)return item.title;const name=item.path?item.path.split(/[\\/]/).filter(Boolean).pop():'';return name?`${kind} · ${name}`:kind;};
+  const root=cwd.replace(/[\\/]+$/,''),relative=(path:string)=>{const normal=path.replace(/\\/g,'/'),base=root.replace(/\\/g,'/');return base&&normal.toLowerCase().startsWith(base.toLowerCase()+'/')?normal.slice(base.length+1):path;};
   const choose=(item:ChatOutput)=>{if(item.category==='images'){setSelectedImage(item);return;}savedScroll.current=scroll.current?.scrollTop||0;setSelected(item);};
   const changeSource=(value:OutputSource|'all')=>{setSource(value);setFilter('all');setVisibleCount(100);savedScroll.current=0;if(scroll.current)scroll.current.scrollTop=0;};
   return <aside ref={panel} className="chat-outputs-panel" role="dialog" aria-modal="true" aria-label={label('title')}>
-    <header className="chat-outputs-header"><h2>{label('title')}</h2><button className="icon-button" aria-label={label('close')} onClick={onClose}><X size={20}/></button></header>
+    <header className="chat-outputs-header"><h2>{label('title')}{!selected&&<span className="chat-outputs-count"> · {visible.length}</span>}</h2><button className="icon-button" aria-label={label('close')} onClick={onClose}><X size={20}/></button></header>
     {selected?<div className="chat-outputs-back"><button ref={backButton} onClick={()=>setSelected(null)}><ArrowLeft size={18}/>{label('back')}</button></div>:<div className="chat-outputs-filters">
-      <div className="chat-output-scope" role="group" aria-label={label('scope')}>{(['all','results','sources'] as const).map(value=><button key={value} aria-pressed={source===value} onClick={()=>changeSource(value)}>{label(value)}</button>)}</div>
+      <div className="chat-output-scope" role="group" aria-label={label('scope')}>{(['results','sources'] as const).map(value=><button key={value} aria-pressed={source===value} onClick={()=>changeSource(source===value?'all':value)}>{label(value)}</button>)}</div>
       <div className="chat-output-categories" role="group" aria-label={label('categories')}>{categories.map(value=><button key={value} aria-pressed={filter===value} onClick={()=>{setFilter(value);if(scroll.current)scroll.current.scrollTop=0;}}>{label(value)} <span>{value==='all'?scoped.length:scoped.filter(item=>item.category===value).length}</span></button>)}</div>
     </div>}
     <div ref={scroll} className="chat-outputs-scroll" onScroll={event=>{const el=event.currentTarget;if(el.scrollHeight-el.scrollTop-el.clientHeight<400)setVisibleCount(value=>value+100);}}>
       {selected?<><h3 className="chat-output-title">{title(selected)}</h3><OutputPreview key={selected.id} output={selected} connection={connection} cwd={cwd} label={label}/></>:<>
-        <p className="chat-output-note" role="status">{sessionId?(index.error?(language==='ru'?'\u041f\u043e\u0438\u0441\u043a \u043f\u0440\u0435\u0440\u0432\u0430\u043d':'Search interrupted'):index.scanning?(language==='ru'?'Ищем файлы во всей истории':'Searching the full history'):(language==='ru'?'История проверена':'History scanned'))+' · '+index.count:label('loaded')}</p>
+        <p className="chat-output-note" role="status">{sessionId?label(index.error?'interrupted':index.scanning?'searching':'found')+' · '+index.count:label('loaded')}</p>
         {index.error&&<p role="alert">{index.error}<button onClick={index.retry}>{language==='ru'?'Повторить':'Retry'}</button></p>}
         {!visible.length&&<p className="chat-output-empty">{index.scanning?(language==='ru'?'Пока ничего не найдено. Поиск продолжается…':'Nothing found yet. Still searching…'):(language==='ru'?'Нет элементов этой категории.':'No items in this category.')}</p>}
-        <ul className={'chat-output-list'+(filter==='images'?' chat-output-gallery':'')}>{visible.slice(0,visibleCount).map(item=>{const Icon=icons[item.category];return <li key={item.id} className={item.category==='images'?'chat-output-image-item':''}>{item.category==='images'?<OutputImageCard output={item} title={title(item)} connection={connection} cwd={cwd} queue={thumbnails} onOpen={()=>choose(item)}/>:<button onClick={()=>choose(item)} className="chat-output-row"><Icon size={20}/><span><strong>{title(item)}</strong><small>{item.path||item.href||label(item.category)}</small></span><ChevronRight size={18}/></button>}</li>;})}</ul>
+        <ul className={'chat-output-list'+(filter==='images'?' chat-output-gallery':'')}>{visible.slice(0,visibleCount).map(item=>{const Icon=icons[item.category];return <li key={item.id} className={item.category==='images'?'chat-output-image-item':''}>{item.category==='images'?<OutputImageCard output={item} title={title(item)} connection={connection} cwd={cwd} queue={thumbnails} onOpen={()=>choose(item)}/>:<button onClick={()=>choose(item)} className="chat-output-row"><Icon size={20}/><span><strong>{title(item)}</strong><small title={item.path||item.href}>{item.path?relative(item.path):item.href||label(item.category)}</small></span><ChevronRight size={18}/></button>}</li>;})}</ul>
         {!sessionId&&hasMore&&onLoadMore&&<button className="secondary chat-output-earlier" onClick={onLoadMore} disabled={loadingMore}>{loadingMore?label('loading'):label('earlier')}</button>}
       </>}
     </div>

@@ -3,7 +3,10 @@ import {ChatRunStatus,RunStatusDot,relativeTime,fullTime,dayGroup,dayGroupLabel,
 import {providerName} from './ActivityList';
 import {useTranscriptFollow,transcriptFollowing} from './use-transcript-follow';
 import {useClaudeAccess} from './claude-access';
-import {RunningAction} from './RunningAction';
+import {RunningAction,elapsed} from './RunningAction';
+import {useDetailMode,setDetailMode} from './detail-mode';
+import {turnChanges as computeTurnChanges} from './turn-changes';
+import {PlanBar,latestPlan} from './PlanBar';
 import './section-header.css';
 import {ChatComposer} from './ChatComposer';
 import {ChatOverlay} from './ChatOverlay';
@@ -44,7 +47,7 @@ import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
 import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, Terminal, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop } from 'lucide-react';
+import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, Terminal, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop, ArrowDown } from 'lucide-react';
 import { Connect, type ConnectedPc } from './Connect';
 import { connectionProblem as classifyProblem, type ConnectionProblem } from './connection-errors';
 import { useAppearance } from './Appearance';
@@ -242,6 +245,19 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const outputMessages=useMemo(()=>uniqueMessages([...history,...(job?.errorCode!=='codex_thread_busy'?job?.messages||[]:[])]),[history,job?.messages,job?.errorCode]);
   const runningMessages=useMemo(()=>job?.status==='running'?new Set(job.messages):null,[job?.messages,job?.status]);
   const toolResults=useMemo(()=>{const blocks=outputMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b]));},[outputMessages]);
+  const detail=useDetailMode(embedded?'detailed':'brief');
+  const changesByTurn=useMemo(()=>computeTurnChanges(outputMessages,toolResults,running),[outputMessages,toolResults,running]);
+  const plan=useMemo(()=>latestPlan(outputMessages),[outputMessages]);
+  // New replies since the person scrolled away from the end, counted for the round "latest" button.
+  const seenLast=useRef(''),lastMessageId=outputMessages.at(-1)?.id||'';
+  if(!showScrollActions&&!fromStart)seenLast.current=lastMessageId;
+  const unseen=showScrollActions&&!fromStart&&seenLast.current?outputMessages.slice(outputMessages.findIndex(message=>message.id===seenLast.current)+1||outputMessages.length).filter(message=>message.role==='assistant'&&message.blocks.some(block=>block.type==='text'&&block.text)).length:0;
+  const [scrolling,setScrolling]=useState(false),scrollIdle=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  const markScrolling=()=>{setScrolling(true);clearTimeout(scrollIdle.current);scrollIdle.current=setTimeout(()=>setScrolling(false),700);};
+  useEffect(()=>()=>clearTimeout(scrollIdle.current),[]);
+  // The end of a turn is timed only when this screen saw it run, so a reopened chat never shows a made-up duration.
+  const [turnEnd,setTurnEnd]=useState<{id:string;at:number}|null>(null),sawRunning=useRef('');
+  useEffect(()=>{if(!job)return;if(job.status==='running')sawRunning.current=job.id;else if(sawRunning.current===job.id){sawRunning.current='';setTurnEnd({id:job.id,at:Date.now()});}},[job?.id,job?.status]);
   const hasOutputs=useMemo(()=>extractChatOutputs(outputMessages,1).length>0,[outputMessages]);
   // Review follows the open conversation, never a remembered folder from another screen.
   const reviewCwd=selected?selected.cwd:job?.cwd||cwd;
@@ -272,6 +288,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   return agentMap;
   },[history,job?.messages,agentList,running]);
   const openSubagent=useCallback((agent:SubagentView)=>setAgentPanel({initial:agent}),[setAgentPanel]);
+  const reviewReady=Boolean((availableReview||taskRun)&&connection&&!demo&&!selected?.readOnly);
+  const openTurnReview=useMemo(()=>reviewReady?()=>setReviewOpen(true):undefined,[reviewReady,setReviewOpen]);
   useEffect(()=>{
     setAgentPanel(null);setAgentList([]);setOutputsOpen(false);
     if(!connection||demo||tab!=='chats'||!parentChatId||parentChatId.startsWith('pending-'))return;
@@ -688,7 +706,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>setReviewOpen(true)}:undefined}
           outputs={hasOutputs?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
           subagents={agentMap.size>0&&parentChatId?{count:agentMap.size,running:[...agentMap.values()].filter(agent=>agent.status==='running').length,disabled:!connection||demo,open:()=>setAgentPanel({})}:undefined}
-          reading={outputMessages.length>0||Boolean(job?.partial)?{disabled:loading||!history.length&&!job,open:()=>toggleReadingMode(true)}:undefined}/>
+          reading={outputMessages.length>0||Boolean(job?.partial)?{disabled:loading||!history.length&&!job,open:()=>toggleReadingMode(true)}:undefined}
+          top={selected&&!demo?{disabled:loading||busy,open:()=>void jumpHistory(true)}:undefined} detail={{value:detail,set:setDetailMode}}/>
       </>:tab==='workspace'?<header className="chat-header" data-section="board"><h1>{t("Доска")}</h1></header>:<header className="chat-header" data-section={tab}>
         <div className="header-title"><h1>{tab==='connection'||tab==='chats'?t('Подключение к ПК'):tab==='settings'?t("Настройки"):tab==='files'?t("Правила"):t("История изменений")}</h1></div>
       </header>}
@@ -701,26 +720,27 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {tab==='chats'&&taskRun&&!readingMode&&<button className="chat-task-entry" onClick={()=>setTaskPanel(true)}>{taskRun.title} · {taskStageLabel(taskRun.stage,locale().startsWith('ru'))}</button>}
       </ChatOverlay>
       {tab === 'connection' ? connectView() : onboardingVisible ? connectView(true) : tab === 'workspace' ? connection?<WorkBoards focusTarget={noticeTarget} compactContext local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={tab==='files'?'rules':'changelog'}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={connectView()} online={!!pcStatus?.online} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={setSettingsPage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget}/> : <>
-        <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
+        <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;markScrolling();rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}
             {!loading && !history.length && !job && !selected && <div className="welcome"><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={15} /></button>)}</div></div>}
             {!loading && selected && !history.length && !job && <p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>}
             {selected&&!loading&&<p className="history-page-status muted" role="status" aria-live="polite">{loadingOlder?(locale().startsWith('ru')?'Загружаем сообщения…':'Loading messages…'):historyError?(locale().startsWith('ru')?'Не удалось обновить историю':'History could not be refreshed'):fromStart||hasMore===null?(locale().startsWith('ru')?'Начало чата':'Beginning of chat'):(locale().startsWith('ru')?'Выше есть ещё сообщения · прокрутите вверх':'More messages above · scroll up')}{historyError&&hasMore!==null&&<button className="text-button" onClick={()=>void extendHistory()}>{locale().startsWith('ru')?'Повторить загрузку':'Retry loading'}</button>}</p>}
-            <MessageList connection={connection} cwd={cwd} key={`${provider}-history`} provider={provider} messages={history} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined}/>
+            <MessageList connection={connection} cwd={cwd} key={`${provider}-history`} provider={provider} messages={history} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>
             {hasMore !== null && historyWindow.current >= 5000 && <p className="muted" role="status">{t("Достигнут предел окна: 5000 сообщений")}</p>}
-            {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={job.messages} streaming={running} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined}/>}
+            {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={job.messages} streaming={running} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>}
             {job && <PartialMessage key={`${provider}-${job.id}-partial`} provider={provider} streaming={running} text={job.partial||''}/>}
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers });}} />)}
             {running && <RunningAction job={job}/>}
             {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error">{t(job.error)}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
-            {job?.status === 'done' && <div className="turn-complete" role="status"><ShieldCheck size={13} />{t(" Готово ")}{job.cost !== undefined && <span>· ${job.cost.toFixed(4)}</span>}</div>}
+            {job?.status === 'done' && <div className="turn-complete" role="status"><ShieldCheck size={13} />{t(" Готово ")}{turnEnd?.id===job.id&&<><span>· <time dateTime={new Date(turnEnd.at).toISOString()}>{new Date(turnEnd.at).toLocaleTimeString(locale(),{hour:'2-digit',minute:'2-digit'})}</time></span><span className="turn-duration">· {elapsed(turnEnd.at-job.startedAt)}</span></>}{job.cost !== undefined && <span>· ${job.cost.toFixed(4)}</span>}</div>}
             <div ref={bottom} />
           </div>
         </div>
-        <ChatOverlay edge="bottom"><div className="chat-scroll-actions" hidden={!showScrollActions && !fromStart} style={!showScrollActions && !fromStart ? { display: 'none' } : undefined}><button className="secondary" disabled={loading || busy} onClick={() => void jumpHistory(true)}><ArrowUp size={16} />{t("В начало чата")}</button><button className="secondary" disabled={loading || busy} onClick={() => void jumpHistory(false)}>{t("К новым сообщениям ↓")}</button></div>
+        {(showScrollActions||fromStart)&&!readingMode&&<button className="scroll-latest" data-scrolling={scrolling||undefined} aria-label={unseen?t('К новым сообщениям: {0}',unseen):t('К новым сообщениям')} title={t('К новым сообщениям')} disabled={loading || busy} onClick={()=>{const el=scroll.current;if(fromStart||!el){void jumpHistory(false);return;}nearBottom.current=true;el.scrollTop=el.scrollHeight;lastScrollTop.current=el.scrollTop;setShowScrollActions(false);}}><ArrowDown size={20} aria-hidden="true"/>{unseen>0&&<span className="scroll-latest-count" aria-hidden="true">{unseen>99?'99+':unseen}</span>}</button>}
+        <ChatOverlay edge="bottom">
         {Boolean(job?.pendingInputIds?.length)&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}
-        <div className="composer-area">{error && <div className="error" role="alert">{t(error)}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
+        <div className="composer-area">{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}{error && <div className="error" role="alert">{t(error)}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
           <ChatComposer text={draft} onText={setDraft} label={t("Сообщение {0}",engineName)}
             placeholder={demo?t("Подключите ПК, чтобы отправлять сообщения"):t("Что нужно сделать?")}
