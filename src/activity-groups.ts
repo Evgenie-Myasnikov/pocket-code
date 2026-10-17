@@ -5,16 +5,19 @@ import {t} from './i18n';
 
 /** Brief folds a turn's routine activity into one line; detailed groups it by meaning. Errors, questions and running calls always stay visible. */
 export type DetailMode='brief'|'detailed';
-export type ActivityBlock={block:Block;result?:Block;index:number;messageId:string;running:boolean};
-export function visibleMessageBlocks(message:ChatMessage,results?:Map<string,Block>,running=false):ActivityBlock[]{
- return message.blocks.flatMap((block,index)=>{
+export type ActivityBlock={block:Block;result?:Block;index:number;messageId:string;running:boolean;live?:boolean};
+/** `live` marks the newest message of a running turn: its trailing reasoning is still being written and stays open, outside any group. */
+export function visibleMessageBlocks(message:ChatMessage,results?:Map<string,Block>,running=false,live=false):ActivityBlock[]{
+ const items=message.blocks.flatMap((block,index):ActivityBlock[]=>{
   const previous=message.blocks[index-1],next=message.blocks[index+1];
   if(block.type==='tool_result'&&block.tool_use_id&&(results?.has(block.tool_use_id)||previous?.type==='tool_use'&&previous.id===block.tool_use_id))return [];
   const result=block.type==='tool_use'&&block.id?(results?.get(block.id)||(next?.type==='tool_result'&&next.tool_use_id===block.id?next:undefined)):undefined;
   return [{block,result,index,messageId:message.id,running}];
  });
+ const last=items.at(-1);if(live&&running&&last?.block.type==='thinking')last.live=true;
+ return items;
 }
-export function activityGroupKey({block,result,running}:ActivityBlock,mode:DetailMode='detailed'):string|undefined{
+export function activityGroupKey({block,result,running,live}:ActivityBlock,mode:DetailMode='detailed'):string|undefined{
  if(block.type==='tool_use'){
   const view=describeTool(block,result,running);
   // Errors, denials, questions and the call in progress must remain visible even when their surroundings are collapsed.
@@ -22,7 +25,7 @@ export function activityGroupKey({block,result,running}:ActivityBlock,mode:Detai
   if(mode==='brief')return 'activity';
   return view.kind==='tool'?'tool|'+(view.mcp||block.name||''):view.kind;
  }
- if(block.type==='thinking')return mode==='brief'?'activity':'thinking';
+ if(block.type==='thinking')return live?undefined:mode==='brief'?'activity':'thinking';
  return undefined;
 }
 // A plan update never splits the work around it: it joins the group it falls into.
@@ -41,7 +44,7 @@ export type TranscriptRun={key:string;message?:ChatMessage;items?:ActivityBlock[
 export function groupActivityMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null,mode:DetailMode='detailed'):TranscriptRun[]{
  const runs:TranscriptRun[]=[];
  for(const message of messages){
-  const items=visibleMessageBlocks(message,results,running?.has(message));
+  const items=visibleMessageBlocks(message,results,running?.has(message),message===messages.at(-1));
   if(!items.length)continue;
   if(!items.every(item=>activityGroupKey(item,mode)!==undefined)){runs.push({key:message.id,message});continue;}
   for(const item of items){const last=runs.at(-1);

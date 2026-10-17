@@ -39,6 +39,21 @@ test('the round latest button replaces the two pills and the beginning lives in 
  await page.locator('.conversation').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
  const latest=page.getByRole('button',{name:/^Jump to latest messages/});
  if(await page.locator('.conversation').evaluate(el=>el.scrollHeight-el.clientHeight>80)){await expect(latest).toBeVisible();await latest.click();await expect(latest).toHaveCount(0);}
- await page.getByRole('button',{name:'More actions',exact:true}).click();await expect(page.getByRole('menuitem',{name:'Go to beginning'})).toBeVisible();
+ await page.getByRole('button',{name:'More actions',exact:true}).click();await expect(page.getByRole('menuitem',{name:'Go to beginning'})).toBeFocused();
+ await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitemradio',{name:'Brief'})).toBeFocused();await page.keyboard.press('ArrowUp');await page.keyboard.press('ArrowUp');await expect(page.getByRole('menuitemradio',{name:'Detailed'})).toBeFocused();
  await page.keyboard.press('Escape');await expect(page.getByRole('menu')).toHaveCount(0);await expect(page.getByRole('button',{name:'Back to chats',exact:true})).toBeVisible();
+});
+test('reasoning stays open while it is the newest block of a running turn and folds when the turn moves on',async({page})=>{
+ await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
+ await page.evaluate(async()=>{
+  const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{MessageList}=await import('/src/Messages.tsx' as string);
+  const ask={id:'ask',role:'user',blocks:[{type:'text',text:'Check the sample'}]},think={id:'think',role:'assistant',blocks:[{type:'thinking',thinking:'Synthetic reasoning in progress.'}]},read={id:'read',role:'assistant',blocks:[{type:'tool_use',id:'r1',name:'Read',input:{file_path:'C:/Sample/a.ts'}}]};
+  const root=document.createElement('div');root.id='live-fixture';document.body.append(root);const view=createRoot(root);
+  const render=(messages:unknown[],running:boolean)=>view.render(React.createElement(MessageList,{messages,streaming:running,runningMessages:running?new Set(messages):null,mode:'brief'}));
+  (window as unknown as {renderLive:typeof render}).renderLive=render;(window as unknown as {liveMessages:unknown[]}).liveMessages=[ask,think,read];render([ask,think],true);
+ });
+ const fixture=page.locator('#live-fixture');
+ await expect(fixture.locator('details.thinking')).toHaveJSProperty('open',true);await expect(fixture.locator('details.thinking p')).toHaveText('Synthetic reasoning in progress.');
+ await page.evaluate(()=>{const w=window as unknown as {renderLive(m:unknown[],r:boolean):void;liveMessages:unknown[]};w.renderLive(w.liveMessages,true);});
+ await expect(fixture.locator('details.thinking')).toHaveJSProperty('open',false);await expect(fixture.locator('.tool-card .tool-title',{hasText:'Reading a.ts'})).toBeVisible();
 });

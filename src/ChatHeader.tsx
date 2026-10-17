@@ -11,7 +11,11 @@ type Props={title:string;project:string;provider:string;branch?:string;notificat
 function ChatMenu({top,detail}:{top?:Props['top'];detail?:Props['detail']}){
   const [place,setPlace]=useState<{top:number;right:number}|null>(null),button=useRef<HTMLButtonElement|null>(null),menu=useRef<HTMLDivElement|null>(null);
   useEffect(()=>{if(!place)return;menu.current?.querySelector<HTMLElement>('[role^=menuitem]:not(:disabled)')?.focus();
-    const close=(event:Event)=>{if(event instanceof KeyboardEvent){if(event.key!=='Escape')return;event.stopPropagation();event.preventDefault();button.current?.focus();}else if(menu.current?.contains(event.target as Node)||button.current?.contains(event.target as Node))return;setPlace(null);};
+    const close=(event:Event)=>{if(event instanceof KeyboardEvent){
+      // A menu moves with the arrow keys; Tab leaves it closed.
+      if(event.key==='ArrowDown'||event.key==='ArrowUp'||event.key==='Home'||event.key==='End'){const items=[...menu.current?.querySelectorAll<HTMLElement>('[role^=menuitem]:not(:disabled)')||[]];if(!items.length)return;event.preventDefault();const index=items.indexOf(document.activeElement as HTMLElement),next=event.key==='Home'?0:event.key==='End'||index<0&&event.key==='ArrowUp'?items.length-1:index<0?0:(index+(event.key==='ArrowDown'?1:-1)+items.length)%items.length;items[next].focus();return;}
+      if(event.key==='Tab'){setPlace(null);return;}
+      if(event.key!=='Escape')return;event.stopPropagation();event.preventDefault();button.current?.focus();}else if(menu.current?.contains(event.target as Node)||button.current?.contains(event.target as Node))return;setPlace(null);};
     document.addEventListener('pointerdown',close,true);document.addEventListener('keydown',close,true);return()=>{document.removeEventListener('pointerdown',close,true);document.removeEventListener('keydown',close,true);};},[place]);
   const toggle=()=>{if(place){setPlace(null);return;}const rect=button.current!.getBoundingClientRect();setPlace({top:rect.bottom+4,right:Math.max(8,window.innerWidth-rect.right)});};
   const run=(action:()=>void)=>{setPlace(null);action();};

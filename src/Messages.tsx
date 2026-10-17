@@ -16,7 +16,7 @@ function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
 }
-type MessageProps={connection?:Connection|null;cwd?:string;message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean;mode?:DetailMode};
+type MessageProps={connection?:Connection|null;cwd?:string;message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean;mode?:DetailMode;live?:boolean};
 export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'animateInitial'>&{text:string}){
   const startedEmpty=useRef(!text);
   return text?<Message {...shared} animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
@@ -33,7 +33,7 @@ export const MessageList=memo(function MessageList({messages,runningMessages,tur
   return groupActivityMessages(messages,shared.toolResults,runningMessages,shared.mode).map(run=>{
     const ids=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))],ended=ids.map(id=>turnChanges?.get(id)).find(Boolean);
     const body=run.message?
-    <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} {...shared} animateInitial={!initialIds.current.has(run.message.id)}/>:
+    <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} animateInitial={!initialIds.current.has(run.message.id)}/>:
     <article key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
       {ids.slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
@@ -41,7 +41,7 @@ export const MessageList=memo(function MessageList({messages,runningMessages,tur
     return ended?<Fragment key={run.key}>{body}<TurnChangesChip changes={ended} onReview={onReview}/></Fragment>:body;
   });
 });
-export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode }: MessageProps) {
+export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false }: MessageProps) {
   useLanguage();
   // A message made only of background-task notices is an event line, not the person's bubble.
   const notices=message.role==='user'?message.blocks.map(block=>block.type==='text'?parseClaudeTaskNotification(block.text||''):undefined):[];
@@ -53,7 +53,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   const plain=displayBlocks.filter(block=>block.type==='text').map(block=>block.text).join('\n');
   const attachments=isUser?displayBlocks.filter(block=>['attachment','image','document'].includes(block.type)):[];
   const displayMessage=isUser?{...message,blocks:displayBlocks.filter(block=>!attachments.includes(block))}:message;
-  const content = groupActivityBlocks(visibleMessageBlocks(displayMessage,toolResults,running),mode).map(run => {
+  const content = groupActivityBlocks(visibleMessageBlocks(displayMessage,toolResults,running,live),mode).map(run => {
       const {block,result}=run.items[0];
       if(activityGroupKey(run.items[0],mode))return <ActivityGroup key={run.key} items={run.items}/>;
       return <RichBlock key={run.key} running={running} streaming={streaming&&message.role==='assistant'} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
@@ -65,7 +65,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
     </>}
   </article>;
 },(before,after)=>{
-  if(before.connection!==after.connection||before.cwd!==after.cwd||before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.streaming!==after.streaming||before.animateInitial!==after.animateInitial||before.onSubagent!==after.onSubagent||before.mode!==after.mode)return false;
+  if(before.connection!==after.connection||before.cwd!==after.cwd||before.message!==after.message||before.provider!==after.provider||before.running!==after.running||before.streaming!==after.streaming||before.animateInitial!==after.animateInitial||before.onSubagent!==after.onSubagent||before.mode!==after.mode||before.live!==after.live)return false;
   // A result or agent update affects only the messages that refer to it.
   return after.message.blocks.every(block=>{
     if(block.agent&&before.agents?.get(block.agent.id)!==after.agents?.get(block.agent.id))return false;
