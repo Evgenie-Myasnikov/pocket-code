@@ -7,6 +7,9 @@ for(const width of [320,390])test(`bottom bar starts on Chats, hides inside a co
  await expect(bar).toBeVisible();await expect(page.locator('.mobile-menu-button')).toHaveCount(0);
  await expect(bar.getByRole('button',{name:'Chats',exact:true})).toHaveAttribute('aria-current','page');
  await expect(page.locator('.sidebar>.chat-list-actions>h1')).toHaveText('Chats');
+ // While the inbox sheet is open it alone is the current place in the bar.
+ const inbox=bar.getByRole('button',{name:'Inbox',exact:true});await inbox.click();await expect(page.getByRole('dialog',{name:'Inbox',exact:true})).toBeVisible();await expect(inbox).toHaveAttribute('aria-current','page');await expect(bar.locator('[aria-current]')).toHaveCount(1);await expect(bar.locator('button.active')).toHaveCount(0);
+ await page.keyboard.press('Escape');await expect(bar.getByRole('button',{name:'Chats',exact:true})).toHaveAttribute('aria-current','page');
  for(const button of await bar.getByRole('button').all()){const box=(await button.boundingBox())!;expect(box.height).toBeGreaterThanOrEqual(48);expect(box.x+box.width).toBeLessThanOrEqual(width+1);}
  const more=bar.getByRole('button',{name:'More',exact:true});
  for(const section of ['Rules','Changelog','Settings']){

@@ -13,7 +13,7 @@ export function RunStatusIcon({status,size=16}:{status:RunStatus;size?:number}){
 /** Colour is always paired with a shape and a word, so the state survives monochrome, forced colours and screen readers. */
 export function ChatRunStatus({status,size=14}:{status:RunStatus;size?:number}){return <span className={'run-status run-status-'+status} data-status={status}><RunStatusIcon status={status} size={size}/>{runStatusLabel(status)}</span>;}
 /** A small dot for icons; the visually hidden text names the state for TalkBack and Narrator. */
-export function RunStatusDot({status,className=''}:{status:RunStatus;className?:string}){return <span className={('run-status-dot run-status-'+status+' '+className).trim()}><span className="visually-hidden">{runStatusLabel(status)}</span></span>;}
+export function RunStatusDot({status,className='',labelled=true}:{status:RunStatus;className?:string;labelled?:boolean}){return <span className={('run-status-dot run-status-'+status+' '+className).trim()} aria-hidden={labelled?undefined:true}>{labelled&&<span className="visually-hidden">{runStatusLabel(status)}</span>}</span>;}
 
 export function relativeTime(at:number,now=Date.now()){
   const seconds=Math.round((at-now)/1000),format=new Intl.RelativeTimeFormat(locale(),{numeric:'auto',style:'short'});

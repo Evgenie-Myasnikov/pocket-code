@@ -78,7 +78,8 @@ export function NotificationInbox({open,onClose,notices,activity,onOpenActivity,
     const text=answer.trim();if(!text||sending)return;const generation=epoch.current;setSending(true);setError('');
     try{const board=await request<ProjectBoard>(connection!,'/boards/'+item.boardId),note=board.notes.find(n=>n.id===item.noteId);if(!note)throw Error('Missing note');
       await request(connection!,'/boards/'+board.id,{revision:board.revision,versions:board.versions,notes:board.notes.map(n=>n.id===note.id?{...n,description:[n.description.trim(),t('Ответ: {0}',text)].filter(Boolean).join('\n\n'),status:n.status==='questions'?'ready':n.status}:n)});
-      await notices.markRead([item.id]);if(generation===epoch.current){setReply(null);setAnswer('');setUndo(null);}}
+      // The answer is already on the card: a failed read mark must not invite a retry that appends it twice.
+      await notices.markRead([item.id]).catch(()=>{});if(generation===epoch.current){setReply(null);setAnswer('');setUndo(null);}}
     catch{if(generation===epoch.current)setError('Не удалось отправить ответ. Проверьте подключение и повторите.');}
     finally{if(generation===epoch.current)setSending(false);}
   }

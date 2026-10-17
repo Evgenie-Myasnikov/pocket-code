@@ -34,11 +34,16 @@
 - inbox: tapping a board notice shows progress immediately and ignores repeated taps.
 - engine updates: browsing another provider's chats no longer changes which engine the PC checks for compatibility; only changing the setting in Settings → Updates sends it.
 - cleanup: removed the unused mobile workspace header.
+- shell: while the inbox is open on the phone, only Inbox is marked as the current place in the bottom bar; the PC connection entry under More is marked current when shown.
+- inbox: if an answer to a board question was saved but marking the notice read failed, the sheet no longer reports a send error that would invite a retry and add the answer twice.
+- desktop: Ctrl+/ no longer opens the shortcut list on top of another dialog, and chat rows no longer announce their run state twice.
+- i18n: the empty local-history hint in a chat is translated to English again for every provider.
 
 ### Validation
 - TypeScript check passed; no remaining question-mark placeholders in src. Browser scenarios passed: device pairing (including a Miro 401 that keeps the pairing), follow-up composer and task pipeline (12), edge/compact chat layout (7). Transcript specs tool-activity/activity-groups/rich-updates/chat-surfaces show the same 5 failures with and without these changes (height and navigation assertions). Device checks not run.
 - Connection area: TypeScript check and unit tests passed (332/333; the board-evidence test failure predates this work). 48 of 52 browser scenarios passed across connect-usability, device-pairing, qr-routing, workspace-recovery, settings-navigation, language and desktop-ui; qr-routing, settings-navigation and workspace-recovery fail identically on the previous commit, and the desktop note-deletion scenario passed on rerun. The C# shell was not compiled; no physical Android or Windows checks.
 - Shell and inbox area: TypeScript check passed; unit tests 333/334 (the board-evidence failure predates this work; new badge-count test added). Browser: mobile-menu, notification-placement, section-header, notification-center (incl. new badge, reply-sheet and Undo scenarios), edge-chat, compact-chat, desktop-ui, language, connect-usability, settings-navigation, followup-composer, workspace-recovery, responsive-layout (now 72/72) and 25 other updated specs pass. Still failing and also failing on the previous commit: chat-recovery reading mode, chat-surfaces (3), navigation-usability, chat-pc-scope, attachment-tray (2), codex-access selection, copilot-provider, workspaces histories, ui QR image, usage-limits failed refresh. workspaces preference reload failed 1 of 10 repeated runs (intermittent).
+- Shell and inbox review fixes: TypeScript check passed; unit tests 333/334 (same pre-existing board-evidence failure). Browser: mobile-menu (with the new inbox current-place check), notification-center, notification-placement, desktop-ui, section-header, responsive-layout and language pass (126/126). A local phone (390px, Russian, dark and light) and desktop (1440px) probe found no horizontal overflow, no sub-44px targets and no untranslated interface text.
 
 ## [0.26.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.8...v0.26.9) (2026-10-14)
 

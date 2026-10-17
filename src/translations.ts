@@ -769,5 +769,6 @@ export const english: Record<string, string> = {
   "Основные разделы": "Main sections",
   "Ещё": "More",
   "Нет связи · {0}": "Offline · {0}",
+  "В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.": "No messages in local history yet. Check that this chat is open in {0} on your PC.",
   "Не подключено": "Not connected"
 };
