@@ -61,7 +61,9 @@ test('Copilot instruction files and .claude/CLAUDE.md are found with honest read
     await writeFile(path.join(base,'.claude/CLAUDE.md'),'# Claude project');await writeFile(path.join(base,'.claude/rules/ui.md'),'---\npaths:\n  - "src/ui/**"\n---\n# UI');await writeFile(path.join(base,'.agents/rules/style.md'),'# Style');
     const {documents}=await projectDocuments(base),find=(file:string)=>documents.find(doc=>doc.path===file)!;
     assert.deepEqual(documents.filter(doc=>!doc.builtIn).map(doc=>doc.path).sort(),['.agents/rules/style.md','.claude/CLAUDE.md','.claude/rules/ui.md','.github/copilot-instructions.md','.github/instructions/api.instructions.md','AGENTS.md'].sort());
-    assert.equal(find('AGENTS.md').readers?.find(item=>item.provider==='claude')?.status,'loaded','without a root CLAUDE.md Claude reads AGENTS.md');
+    assert.deepEqual(find('AGENTS.md').readers?.find(item=>item.provider==='claude'),{provider:'claude',status:'shadowed',reason:'claude-md'},'.claude/CLAUDE.md also stops Claude from reading AGENTS.md');
+    await rm(path.join(base,'.claude/CLAUDE.md'));assert.equal((await projectDocuments(base)).documents.find(doc=>doc.path==='AGENTS.md')?.readers?.find(item=>item.provider==='claude')?.status,'loaded','without any CLAUDE.md Claude reads AGENTS.md');
+    await writeFile(path.join(base,'CLAUDE.local.md'),'# Local');assert.equal((await projectDocuments(base)).documents.find(doc=>doc.path==='AGENTS.md')?.readers?.find(item=>item.provider==='claude')?.status,'shadowed','CLAUDE.local.md also stops Claude from reading AGENTS.md');
     assert.equal(find('.github/copilot-instructions.md').appliesTo,'copilot');
     assert.deepEqual(find('.github/instructions/api.instructions.md').readers?.find(item=>item.provider==='copilot'),{provider:'copilot',status:'on-demand',reason:'apply-to'});assert.equal(find('.github/instructions/api.instructions.md').scope,'src/api/**');
     assert.equal(find('.claude/rules/ui.md').scope,'src/ui/**');assert.equal(find('.claude/CLAUDE.md').appliesTo,'claude');

@@ -193,6 +193,13 @@ test('desktop has direct Rules and Changelog with internal Git project selection
  await desktop(page);const nav=page.getByRole('navigation');await expect(nav.getByRole('button',{name:'Project',exact:true})).toHaveCount(0);await nav.getByRole('button',{name:'Rules',exact:true}).click();
  await expect(page.getByLabel('Git project')).toHaveValue('C:\\Demo\\Atlas');await expect(page.locator('.project-docs-markdown')).toContainText('Use synthetic data.');await nav.getByRole('button',{name:'Changelog',exact:true}).click();await expect(page.locator('.project-docs-markdown')).toContainText('Synthetic entry');
  await expect(page.locator('.document-library').getByRole('button',{name:/^Refresh/})).toHaveCount(1);const before=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length);await page.getByRole('button',{name:'Refresh document',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length)).toBeGreaterThan(before);await page.screenshot({path:'artifacts/screenshots/desktop-changelog.png'});
+ // From the Files tab, the sidebar Changelog/Rules buttons still switch the library back.
+ await page.getByRole('tab',{name:'Files'}).click();await expect(page.getByRole('button',{name:'README.md'})).toBeVisible();await nav.getByRole('button',{name:'Changelog',exact:true}).click();await expect(page.getByRole('tab',{name:'Changelog'})).toHaveAttribute('aria-selected','true');await expect(page.locator('.project-docs-markdown')).toContainText('Synthetic entry');
+ await page.getByRole('tab',{name:'Files'}).click();await nav.getByRole('button',{name:'Rules',exact:true}).click();await expect(page.getByRole('tab',{name:'Rules'})).toHaveAttribute('aria-selected','true');
+ // The audit prompt reaches one new chat; a later New chat in another project does not inherit it.
+ await page.getByRole('button',{name:'All rules'}).click();await page.getByRole('button',{name:'Check rules'}).click();await expect(page.locator('.composer textarea')).toHaveValue(/Review this project's AI agent rules/);
+ await page.locator('.desktop-sessions button').filter({hasText:'Documentation'}).click();await expect(page.locator('.conversation-inner,.desktop-transcript').first()).toContainText('Garden documentation');
+ await page.getByRole('button',{name:'New chat',exact:true}).click();await expect(page.locator('.composer textarea')).toHaveValue('');
 });
 
 

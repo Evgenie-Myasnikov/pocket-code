@@ -60,7 +60,8 @@ function resolveReaders(doc:ProjectDocument,present:Set<string>):RuleReader[] {
   const lower=doc.path.toLowerCase(),scoped=Boolean(doc.scope);
   const read=(claude:RuleReader['status'],codex:RuleReader['status'],copilot:RuleReader['status'],reason?:RuleReader['reason']):RuleReader[]=>[['claude',claude],['codex',codex],['copilot',copilot]].map(([provider,status])=>({provider:provider as RuleProvider,status:status as RuleReader['status'],...(status==='shadowed'||status==='on-demand'?{reason}:{})}));
   if(lower==='agents.md'){
-    const claude:RuleReader=present.has('claude.md')?{provider:'claude',status:'shadowed',reason:'claude-md'}:{provider:'claude',status:'loaded'};
+    // Claude Code reads AGENTS.md only when none of its own memory files (CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md) exists.
+    const claude:RuleReader=['claude.md','.claude/claude.md','claude.local.md'].some(file=>present.has(file))?{provider:'claude',status:'shadowed',reason:'claude-md'}:{provider:'claude',status:'loaded'};
     const codex:RuleReader=present.has('agents.override.md')?{provider:'codex',status:'shadowed',reason:'override'}:{provider:'codex',status:'loaded'};
     return [claude,codex,{provider:'copilot',status:'loaded'}];
   }
