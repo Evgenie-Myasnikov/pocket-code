@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.27.1 (2026-10-19)
 
 Branch: codex/chat-grid-0.27.1 (from the published 0.27.0 source). Not released.
 
