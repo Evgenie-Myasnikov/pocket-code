@@ -14,8 +14,8 @@ import {BoardContextMenu} from './BoardContextMenu';
 import {CardActionMenu,type CardAction} from './CardActionMenu';
 import {DeleteBoardNote} from './DeleteBoardNote';
 import {useBoardZoom} from './use-board-zoom';
-import {useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {ArrowLeft,Plus,Minus,RefreshCw,MessageSquare,X,Bot,Maximize,PanelTop,FolderInput,Play,Trash2} from 'lucide-react';
+import {useEffect,useRef,useState} from 'react';
+import {ArrowLeft,Plus,RefreshCw,MessageSquare,X,Bot,PanelTop,FolderInput,Play,Trash2} from 'lucide-react';
 import {request,type Connection} from './api';
 import {useLanguage,t} from './i18n';
 import {useBackAction,useModal} from './navigation';
@@ -29,7 +29,6 @@ export type BoardChat={taskRun?:TaskRun;root:string;prompt:string;note:BoardNote
 export type BoardView=ProjectBoard&{branches:string[];error?:string;repositoryUnavailable?:boolean;repositoryFile?:string;repositoryRevision?:string};
 /** The open board survives switching tabs: the mobile shell unmounts this view, so the selection lives above it for the session. */
 const remembered=new Map<string,BoardView>();
-const zoomSteps=[.25,.5,.75,1,1.25,1.5,2,3];
 function DiscardChanges({onKeep,onDiscard}:{onKeep():void;onDiscard():void}){
   const dialog=useRef<HTMLElement|null>(null);useModal(dialog,true,onKeep);
   return <div className="modal-backdrop"><section ref={dialog} className="board-dialog" role="alertdialog" aria-modal="true" aria-label={t('Отменить изменения?')}><h2>{t('Отменить изменения?')}</h2><p>{t('Изменения в заметке не сохранены.')}</p><footer><button type="button" onClick={onKeep}>{t('Продолжить редактирование')}</button><button type="button" className="danger" onClick={onDiscard}>{t('Отменить изменения')}</button></footer></section></div>;
@@ -48,9 +47,8 @@ export function WorkBoards({connection,roots,workspaces,onChat,local=false,compa
   const host=workspaces.catalog.host;const canEdit=!board?.repositoryUnavailable&&!board?.source&&!workspaces.offline&&(host||!!workspaces.workspace&&workspaces.workspace.role!=='viewer');
   const agentAvailable=!!board&&host&&!board.repositoryUnavailable&&!board.source;
   const lock=useRef(false),navigation=useRef(0),canvas=useRef<HTMLDivElement>(null),boardRef=useRef(board);boardRef.current=board;
-  const noteDialog=useRef<HTMLFormElement|null>(null),versionDialog=useRef<HTMLFormElement|null>(null),titleInput=useRef<HTMLInputElement>(null),origin=useRef(''),fresh=useRef(false),quiet=useRef(0),pendingScroll=useRef<{left:number;top:number}|null>(null);
+  const noteDialog=useRef<HTMLFormElement|null>(null),versionDialog=useRef<HTMLFormElement|null>(null),titleInput=useRef<HTMLInputElement>(null),origin=useRef(''),fresh=useRef(false),quiet=useRef(0);
   useBoardZoom(canvas,board?board.root+board.id:undefined,zoom,setZoom);useBoardPan(canvas,board?board.root+board.id:undefined);
-  useLayoutEffect(()=>{const el=canvas.current;if(el&&pendingScroll.current){el.scrollLeft=pendingScroll.current.left;el.scrollTop=pendingScroll.current.top;pendingScroll.current=null;}},[zoom]);
   useEffect(()=>{if(scopeRef.current===scope)return;scopeRef.current=scope;navigation.current++;setBoardState(remembered.get(scope)||null);setEditing(null);setBranchAction(null);},[scope]);
   const openNote=(note:BoardNote|null,tab:'note'|'agent'='note')=>{origin.current=note?JSON.stringify(note):'';setDiscard(false);setNoteTab(tab);setEditing(note);};
   const dirty=!!editing&&canEdit&&JSON.stringify(editing)!==origin.current;
@@ -90,9 +88,7 @@ export function WorkBoards({connection,roots,workspaces,onChat,local=false,compa
     const end=(e:PointerEvent)=>{el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',end);highlight(null);const restore=()=>{card.style.left=note.x+'px';card.style.top=note.y+'px';};if(e.type==='pointerup'&&moved&&!canvas.current?.dataset.pinching){const {column,...position}=placement;void save(board!.notes.map(n=>n.id===note.id?{...n,...position}:n),board!.versions,true).then(saved=>{if(!saved)restore();});}else restore();};
     el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
   }
-  const zoomTo=(next:number)=>{const el=canvas.current;next=Math.max(.15,Math.min(3,next));if(!el||next===zoom)return;const w=el.clientWidth/2,h=el.clientHeight/2;pendingScroll.current={left:(el.scrollLeft+w)/zoom*next-w,top:(el.scrollTop+h)/zoom*next-h};setZoom(next);};
   const contentWidth=board?Math.max(1100,versions.length*columnWidth,...board.notes.map(n=>n.x+330)):0,contentHeight=board?Math.max(800,...board.notes.map(n=>n.y+330)):0;
-  const fit=()=>{const el=canvas.current;if(!el)return;const next=Math.max(.15,Math.min(1,(el.clientWidth-16)/(contentWidth+columnWidth),(el.clientHeight-16)/contentHeight));pendingScroll.current={left:0,top:0};if(next===zoom){el.scrollLeft=0;el.scrollTop=0;pendingScroll.current=null;}else setZoom(next);};
   const noteMenu=(note:BoardNote,point:{x:number;y:number})=>{if(busy)return;setError('');setMenu({note,point});};
   const menuItems:CardAction[]=!menu||!board?[]:menu.move?[...versions.map(v=>({label:v||l('Ideas','Идеи'),current:(menu.note.branch||'')===v,disabled:(menu.note.branch||'')===v,onSelect:()=>moveNote(menu.note,v)})),{label:t('Назад'),Icon:ArrowLeft,onSelect:()=>setMenu({...menu,move:false})}]:[
     {label:t('Открыть'),Icon:PanelTop,onSelect:()=>openNote({...menu.note,dependencies:[...menu.note.dependencies]})},
@@ -119,7 +115,6 @@ export function WorkBoards({connection,roots,workspaces,onChat,local=false,compa
         {board.notes.map(n=>{const task=runs.get(board.id+'/'+n.id),stage=task&&taskDisplayStage(task);return <article className={'board-note status-'+n.status+(focusTarget?.noteId===n.id?' board-note-highlight':'')} key={n.id} data-note-id={n.id} onContextMenu={e=>{if(!busy){e.preventDefault();e.stopPropagation();noteMenu(n,{x:e.clientX,y:e.clientY});}}} style={{left:n.x,top:n.y}}><button className="note-drag" aria-label={l('Move note','Переместить заметку')+' '+n.title} onPointerDown={e=>drag(e,n)} onKeyDown={e=>{const dir:Record<string,[number,number]>={ArrowLeft:[-24,0],ArrowRight:[24,0],ArrowUp:[0,-24],ArrowDown:[0,24]};if(canEdit&&dir[e.key]){e.preventDefault();const [x,y]=dir[e.key];void save(board.notes.map(v=>v.id===n.id?{...v,...boardPlacement(v.x+(x?Math.sign(x)*columnWidth:0),v.y+(y?Math.sign(y)*Math.max(24,gridStep):0),versions,280,gridStep)}:v));}}}>⠿ </button><button className="note-content" onClick={()=>openNote({...n,dependencies:[...n.dependencies]})} onKeyDown={e=>{if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();const box=e.currentTarget.getBoundingClientRect();noteMenu(n,{x:box.left+16,y:box.top+24});}}}><strong>{n.title}</strong>{n.description?<p>{n.description}</p>:<p className="note-placeholder">{l('Add details…','Добавить описание…')}</p>}<BoardTaskMeta note={n} status={statusLabels[n.status]}/></button>{task&&stage&&<button type="button" className={'note-task-stage task-stage-'+stage} aria-label={t('Задача AI: {0}. Открыть результат',taskStageLabel(stage))} onClick={()=>setTaskDetail(task)}><span><Bot size={14} aria-hidden="true"/>{taskStageLabel(stage)}</span></button>}<BoardImages connection={connection} root={board.root} images={n.images}/>{!board.repositoryFile&&!board.source&&!board.repositoryUnavailable&&<button className="note-chat" disabled={!host&&!n.chat} onClick={()=>startChat(n)}><MessageSquare size={16}/>{n.chat?l('Open chat','Открыть чат'):l('Discuss with AI','Обсудить с AI')}</button>}</article>;})}
       </div></div></div>
       {!board.notes.length&&<div className="board-empty"><strong>{t('Заметок пока нет')}</strong>{canEdit&&<><button type="button" className="primary" disabled={busy} onClick={()=>newNote()}><Plus size={20}/>{t('Создать заметку')}</button><small>{t('Или удерживайте палец на пустом месте холста (правый клик на ПК).')}</small></>}</div>}
-      <div className="board-zoom" role="group" aria-label={t('Масштаб доски')}><button type="button" className="icon-button" aria-label={t('Уменьшить')} disabled={zoom<=.15} onClick={()=>zoomTo([...zoomSteps].reverse().find(step=>step<zoom-.01)??.15)}><Minus size={20}/></button><button type="button" className="board-zoom-value" aria-label={t('Масштаб {0}%. Вернуть 100%',Math.round(zoom*100))} onClick={()=>zoomTo(1)}>{Math.round(zoom*100)}%</button><button type="button" className="icon-button" aria-label={t('Увеличить')} disabled={zoom>=3} onClick={()=>zoomTo(zoomSteps.find(step=>step>zoom+.01)??3)}><Plus size={20}/></button><button type="button" className="icon-button" aria-label={t('Вписать доску')} onClick={fit}><Maximize size={20}/></button></div>
       </div></>}
     {menu&&board&&<CardActionMenu label={t('Действия с заметкой «{0}»',menu.note.title)} point={menu.point} items={menuItems} onClose={()=>setMenu(null)}/>}
     {deleting&&board&&<DeleteBoardNote title={deleting.title} busy={busy} error={error} onClose={()=>setDeleting(null)} onDelete={async()=>{if(!canEdit||busy)return false;return save(board.notes.filter(n=>n.id!==deleting.id).map(n=>({...n,dependencies:n.dependencies.filter(id=>id!==deleting.id)})));}}/>}

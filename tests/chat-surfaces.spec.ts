@@ -37,7 +37,7 @@ for(const profile of [{width:320,language:'en',textSize:8},{width:360,language:'
   test(`quiet user and subagent surfaces fit ${profile.width}px ${profile.language} ${profile.textSize}px`,async({page})=>{
     await page.setViewportSize({width:profile.width,height:820});await openChat(page,profile.language,profile.textSize);
     await expect(page.locator('.chat-header select')).toHaveCount(0);
-    const header=page.locator('.chat-header');const titleBox=await header.locator('.header-title h1').boundingBox(),contextBox=await header.locator('.chat-context').boundingBox();expect(contextBox!.y).toBeGreaterThanOrEqual(titleBox!.y+titleBox!.height-1);
+    const header=page.locator('.chat-header');const titleBox=await header.locator('.header-title h1').evaluate(h=>{const walker=document.createTreeWalker(h,NodeFilter.SHOW_TEXT),range=document.createRange(),text=walker.nextNode();if(text)range.selectNodeContents(text);else range.selectNodeContents(h);const b=range.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height};}),contextBox=await header.locator('.chat-context').boundingBox();expect(contextBox!.y).toBeGreaterThanOrEqual(titleBox!.y+titleBox!.height-1);
     expect((await header.boundingBox())!.height).toBeLessThanOrEqual(110);
     for(const control of await header.locator('button').all()){const rect=await control.boundingBox();expect(rect!.x).toBeGreaterThanOrEqual(0);expect(rect!.x+rect!.width).toBeLessThanOrEqual(profile.width);expect(rect!.height).toBeGreaterThanOrEqual(48);}
     await expect(header.getByRole('button',{name:'Review',exact:true})).toBeVisible();

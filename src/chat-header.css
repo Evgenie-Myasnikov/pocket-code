@@ -40,3 +40,37 @@ header.chat-header.chat-header-conversation .header-title>h1{display:block;margi
 header.chat-header .chat-context-picker select{min-height:36px;padding-block:0}
 .chat-context-picker select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px}
 .mobile-back .chat-tab-status{right:-6px;top:-4px}
+
+/* Floating controls over the transcript: back, title, inbox and every action are separate round pills with their own surface, never a full-width band. */
+header.chat-header-conversation{--chat-pill-surface:color-mix(in srgb,var(--panel) 80%,transparent);--chat-pill-solid:var(--panel);--chat-pill-border:color-mix(in srgb,var(--line) 75%,transparent);--chat-pill-blur:blur(14px) saturate(1.3);padding-top:6px;padding-bottom:6px}
+header.chat-header-conversation .chat-header-main{gap:8px}
+header.chat-header-conversation .chat-header-actions{gap:8px}
+header.chat-header-conversation :is(.mobile-back,.header-title,.board-notifications-trigger,.chat-header-actions>button){background:var(--chat-pill-surface);border:1px solid var(--chat-pill-border);box-shadow:var(--shadow-sm);-webkit-backdrop-filter:var(--chat-pill-blur);backdrop-filter:var(--chat-pill-blur);color:var(--text);box-sizing:border-box}
+header.chat-header-conversation :is(.mobile-back,.board-notifications-trigger){width:48px;height:48px;min-width:48px;min-height:48px;padding:0;border-radius:var(--radius-pill);display:inline-flex;align-items:center;justify-content:center;flex:0 0 48px}
+header.chat-header-conversation .board-notifications-trigger svg{width:20px;height:20px}
+header.chat-header-conversation .chat-header-actions>button{border-radius:var(--radius-pill);padding:0 14px}
+header.chat-header-conversation .chat-header-actions>button.chat-menu-button{width:48px;padding:0}
+header.chat-header-conversation .chat-header-actions>button:hover:not(:disabled),header.chat-header-conversation :is(.mobile-back,.board-notifications-trigger):hover{background:color-mix(in srgb,var(--chat-pill-solid) 88%,var(--text) 12%);color:var(--text)}
+header.chat-header-conversation .chat-header-actions>button:disabled{color:var(--muted)}
+/* The title is a chip that hugs its text; the inbox and actions keep to the right. */
+header.chat-header.chat-header-conversation .header-title{flex:0 1 auto;justify-content:center;min-height:48px;padding:4px 16px;border-radius:24px;margin-right:auto;gap:1px}
+header.chat-header.chat-header-conversation .header-title>h1{line-height:1.3}
+/* With a title button the button fills the chip (a 48px target) and the subtitle sits inside it, above the button's bottom padding. */
+header.chat-header-conversation .header-title{position:relative;align-self:center}
+header.chat-header.chat-header-conversation .header-title:has(.chat-title-button){padding:0;gap:0;min-width:120px}
+header.chat-header-conversation .header-title .chat-title-button{display:block;width:100%;min-height:48px;padding:6px 16px calc(clamp(10px,calc(11px * var(--ui-scale,1)),14px) * 1.3 + 8px);border-radius:inherit;line-height:1.3}
+header.chat-header-conversation .header-title:has(.chat-title-button)>.chat-context{position:absolute;left:16px;right:16px;bottom:6px;pointer-events:none}
+header.chat-header-conversation :is(.mobile-back,.board-notifications-trigger,.chat-header-actions>button):focus-visible,header.chat-header-conversation .header-title:has(.chat-title-button:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+header.chat-header-conversation .chat-title-button:focus-visible{outline:0}
+@container chat-workspace (max-width:620px){
+  header.chat-header-conversation .chat-header-actions{gap:6px}
+  header.chat-header-conversation .chat-header-actions>button{padding:0 12px}
+}
+@container chat-workspace (max-width:420px){
+  header.chat-header-conversation .chat-header-actions>button{width:48px;padding:0}
+}
+@media(max-height:500px){header.chat-header-conversation .chat-header-actions>button{width:48px;padding:0}}
+/* Without backdrop blur, or when the system asks for less transparency, every pill is a solid token surface. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){header.chat-header-conversation{--chat-pill-surface:var(--chat-pill-solid)}}
+@media(prefers-reduced-transparency:reduce){header.chat-header-conversation{--chat-pill-surface:var(--chat-pill-solid);--chat-pill-blur:none}}
+@media(forced-colors:active){header.chat-header-conversation :is(.mobile-back,.header-title,.board-notifications-trigger,.chat-header-actions>button){background:Canvas;border:1px solid ButtonText;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;forced-color-adjust:auto}}

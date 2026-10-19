@@ -51,7 +51,8 @@ import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
 
 import {extractChatOutputs} from './chat-outputs';
 import {useBackAction,useBackNavigation,useModal} from './navigation';
-import { preferences, preferredRoot, savePreferredRoot, savePreferences, selectedWorkspace, saveSelectedWorkspace, clampBudget, type WorkspaceProvider, type PreferenceChange } from './preferences';
+import { preferences, preferredRoot, savePreferredRoot, savePreferences, selectedWorkspace, saveSelectedWorkspace, clampBudget, chatListView, saveChatListView, chatGrouping, saveChatGrouping, type ChatListView, type ChatGrouping, type WorkspaceProvider, type PreferenceChange } from './preferences';
+import { ChatGrid, ChatViewControls } from './ChatGrid';
 import { useWorkspaceState, useWorkspaceRef } from './workspace-state';
 import { Updates } from './Updates';
 import { useLanguage } from './i18n';
@@ -155,6 +156,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const returnToChats=()=>{setTab('chats');setMobileChat(chatViewOpen);};
   const liveSettings=useLiveSettings();
   const [settingsPage,setSettingsPage]=useState<SettingsPage>('index'),[settingsSubpage,setSettingsSubpage]=useState<'access'|null>(null);
+  const [chatView,setChatViewState]=useState<ChatListView>(chatListView),[chatGroups,setChatGroupsState]=useState<ChatGrouping>(chatGrouping);
+  const setChatView=(value:ChatListView)=>{setChatViewState(value);saveChatListView(value);},setChatGroups=(value:ChatGrouping)=>{setChatGroupsState(value);saveChatGrouping(value);};
   const [draft, setDraft] = useStateForWorkspace(''),[search, setSearch] = useStateForWorkspace(''),[model, setModel] = useStateForWorkspace(id=>preferences(id).model);
   const codexEffort=useCodexEffort(provider==='codex'?providerInfo?.models:undefined,model);
   const claudeAccess=useClaudeAccess();
@@ -837,11 +840,13 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {connection&&!demo&&<ConnectionStatus offline={offline}/>}
       {providerChips}
       <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти чат")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      {connection&&<ChatViewControls view={chatView} onView={setChatView} grouping={chatGroups} onGrouping={setChatGroups}/>}
       <div className="session-list">
         {waiting.length>0&&!search&&<section className="session-group session-group-waiting" aria-labelledby="waiting-chats"><h2 className="list-label" id="waiting-chats">{t('Ждут вас')}<span>{waiting.length}</span></h2>
           {waiting.map(item=><button className="session-row" key={item.provider+':'+item.id} disabled={busy||uploading||Boolean(activityTarget)} onClick={()=>openActivity(item)}><MessageSquare size={16}/><div><strong>{item.title||t('Новый разговор')}</strong><small>{providerName(item.provider)} · {basename(item.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={item.status}/></small></div></button>)}</section>}
         {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><MessageSquare size={16}/><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={j.approvals?.length?'needs_input':'running'}/></small></div></button>)}
-        {grouped.map(group=><section className="session-group" key={group.group} aria-label={dayGroupLabel(group.group)}><h2 className="list-label">{dayGroupLabel(group.group)}<span>{group.items.length}</span></h2>{group.items.map(sessionRow)}</section>)}
+        {chatView==='grid'&&connection?visible.length>0&&<ChatGrid connection={demo?null:connection} provider={provider} sessions={visible} grouping={chatGroups} status={sessionStatus} disabled={busy||uploading} selectedId={mobileChat?selected?.sessionId:undefined} onOpen={s=>void openSession(s)}/>
+        :grouped.map(group=><section className="session-group" key={group.group} aria-label={dayGroupLabel(group.group)}><h2 className="list-label">{dayGroupLabel(group.group)}<span>{group.items.length}</span></h2>{group.items.map(sessionRow)}</section>)}
         {/* "No chats yet" only after the PC answered; before that a skeleton, or why the list cannot load. */}
         {!visible.length && connection && !search && !demo && !sessionsLoaded ? unreachable ? <div className="empty-list" role="status"><MessageSquare size={32} /><p>{t('Список чатов загрузится, когда ПК будет на связи.')}</p><button className="secondary" onClick={()=>retryNow()}>{t('Повторить')}</button></div> : <div className="loading-skeleton" role="status" aria-label={t('Загружаем чаты…')}><span/><span/><span/></div>
         : !visible.length && <div className="empty-list"><MessageSquare size={32} /><p>{search ? t("Ничего не найдено") : connection ? t("Здесь появятся чаты {0} из разрешённых папок.",engineName) : t('Подключите ПК, чтобы видеть чаты.')}</p>{!connection&&!search&&!demo&&<button className="primary" onClick={()=>setMobileChat(true)}>{t('Подключить компьютер')}</button>}</div>}

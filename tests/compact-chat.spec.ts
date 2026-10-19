@@ -19,7 +19,8 @@ for(const width of [320,1280])test(`compact attachments, focus and edge treatmen
  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Open diagram.png'})).toBeFocused();
  await page.getByRole('button',{name:'Open notes.md'}).click();await expect(page.getByRole('heading',{name:'Notes',exact:true})).toBeVisible();await page.keyboard.press('Escape');
  expect(await page.locator('.conversation').evaluate(el=>getComputedStyle(el).maskImage)).toContain('linear-gradient');
- if(width===320)expect(await page.locator('.mobile-back').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+ // Back is a round floating button with its own surface (the transparent band is covered by edge-chat and chat-grid specs).
+ if(width===320){const back=await page.locator('.mobile-back').evaluate(el=>({bg:getComputedStyle(el).backgroundColor,radius:parseFloat(getComputedStyle(el).borderTopLeftRadius)}));expect(back.bg).not.toBe('rgba(0, 0, 0, 0)');expect(back.radius).toBeGreaterThanOrEqual(24);}
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`.local/compact-chat-${width}.png`});
 });

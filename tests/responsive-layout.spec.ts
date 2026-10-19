@@ -75,7 +75,7 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   await expect(page.locator('.message').last()).toBeVisible();
   await withinViewport(page,'.chat-header button,.chat-header select,.chat-header h1,.composer-tools button,.composer-tools select,.mobile-tabbar',profile.width,profile.height);
   await targets(page,'.chat-header button,.chat-header select,.composer-tools button,.composer-tools select,.mobile-tabbar button');
-  const titleBox=await page.locator('.header-title h1').boundingBox(),projectBox=await page.locator('.chat-context').boundingBox();
+  const titleBox=await page.locator('.header-title h1').evaluate(h=>{const walker=document.createTreeWalker(h,NodeFilter.SHOW_TEXT),range=document.createRange(),text=walker.nextNode();if(text)range.selectNodeContents(text);else range.selectNodeContents(h);const b=range.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height};}),projectBox=await page.locator('.chat-context').boundingBox();
   if(profile.width<=760&&profile.height>540)expect(titleBox!.y+titleBox!.height).toBeLessThanOrEqual(projectBox!.y+1);
   else if(profile.width<=760)await expect(page.locator('.chat-context')).toBeHidden();
   expect((await page.locator('.conversation').boundingBox())!.height).toBeGreaterThan(65);

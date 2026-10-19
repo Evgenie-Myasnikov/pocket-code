@@ -17,6 +17,8 @@ times. Provider chips above the list switch between Claude, Codex and Copilot.
 On Windows, Ctrl+N starts a chat, Ctrl+Tab/Ctrl+Shift+Tab switch chats, Ctrl+Alt+U
 opens the inbox and Ctrl+/ lists the shortcuts.
 
+**Not yet released:** the list/grid switch under the search field shows chats as tiles. Each tile has the chat's latest image (when it has one), the start of the latest AI reply, the title, project and time or run state. Group the grid **By date** (Today, Yesterday, This week, Earlier) or **By project** (one section per project folder). Both choices are remembered on the device. Previews load only for visible tiles; tapping a tile opens the chat. In the Windows window the grid fills the main area when no chat is open.
+
 A running answer follows its rendered height until you scroll upward.
 Already received text appears immediately on entry; new letters fade in with a
 short pause between words. Appearance controls the reveal speed; Instant and

@@ -82,13 +82,14 @@ test('column plus, the Version field and Move to version replace dragging betwee
  await expect.poll(()=>state.board.notes.find((n:any)=>n.title==='Idea card')?.branch).toBe('');
 });
 
-test('zoom controls, fit, refresh on a phone and refresh on return to the app',async({page})=>{
+test('no zoom bar, Ctrl+wheel zoom, refresh on a phone and refresh on return to the app',async({page})=>{
  const state=await setup(page,{notes:[{id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',title:'Zoom card',description:'Synthetic acceptance criteria',branch:'',status:'ready',priority:'normal',owner:'',dependencies:[],x:24,y:72}]});const canvas=page.locator('.board-canvas'),scale=()=>canvas.evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a);
- await page.getByRole('button',{name:'Zoom out',exact:true}).click();await expect.poll(scale).toBeCloseTo(.75);
- await page.getByRole('button',{name:'Zoom 75%. Reset to 100%',exact:true}).click();await expect.poll(scale).toBeCloseTo(1);
- await page.getByRole('button',{name:'Fit board',exact:true}).click();await expect.poll(scale).toBeLessThan(1);
+ // The floating zoom plaque is gone on every width; pinch and Ctrl+wheel still zoom the canvas.
+ await expect(page.locator('.board-zoom')).toHaveCount(0);await expect(page.getByRole('group',{name:'Board zoom'})).toHaveCount(0);await expect(page.getByRole('button',{name:'Fit board',exact:true})).toHaveCount(0);
+ await page.locator('.board-viewport').dispatchEvent('wheel',{deltaY:300,ctrlKey:true,clientX:200,clientY:250});await expect.poll(scale).toBeLessThan(1);
  await page.setViewportSize({width:390,height:844});await expect(page.getByRole('button',{name:'Refresh board',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'New note',exact:true})).toBeVisible();
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await expect(page.locator('.board-zoom')).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'.local/board-no-zoom-bar-390.png'});
  const reads=state.reads;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await expect.poll(()=>state.reads).toBeGreaterThan(reads);
 });
 

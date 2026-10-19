@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+Branch: codex/chat-grid-0.27.1 (from the published 0.27.0 source). Not released.
+
+### Features
+- chats: a List / Grid switch under the chat search shows chats as tiles with the chat's latest image, the start of the latest AI reply (plain text, clamped), the title, project and relative time or run state. The grid groups **By date** (Today, Yesterday, This week, Earlier) or **By project** (one section per project folder); both choices are remembered per device. Phone: two columns at 390 px, one at 320 px; the Windows window shows an auto-fill grid in the main area when no chat is open. Tiles show skeleton lines while previews load, text only without an image, and "No AI reply yet" when there is no reply. Tapping or pressing Enter on a tile opens the chat like a list row.
+- host: `GET /api/sessions/previews?provider=&ids=` returns, for up to 48 listed chats, the latest assistant text (markdown stripped, about 400 characters) and only the name of the latest local or inline image; `GET /api/sessions/:id/preview-image` serves that image through the same session, permitted-folder and upload checks as message attachments. Remote image URLs are never chosen. Previews are computed only for tiles near the viewport, cached per provider, chat and last-modified time (500 entries), with at most three transcript reads at once; the chat list request is unchanged.
+- boards: the floating zoom plaque (− / % / + / Fit board) is removed on phone and desktop; pinch and Ctrl+wheel zoom remain.
+- chat header: the top edge is transparent again with the existing transcript edge fade; back, the title chip, inbox, Review, Results, Read and the menu are separate round floating buttons with their own blurred token surface and 48 px targets. Without backdrop blur, with reduced transparency or in forced colours they use a solid surface.
+
+### Validation
+- TypeScript check passed. Unit tests 374/374 on the first full run, including the new session-previews tests (text stripping, image choice, cache and concurrency, endpoint access checks with synthetic transcripts). A later run had 4 failures in task-runs/task-runs-api verification tests (spawned check commands timing out); those files are untouched here and fail the same way at 0.27.0 (fe7fee6) in a clean worktree.
+- Browser: new chat-grid spec (6: phone 390 dark and light and 320 by date and project, preference persistence, keyboard open, header pills over a scrolled transcript, reduced-transparency/forced-colours fallback, desktop 1440 dark and light with cached previews) and edge-chat, compact-chat, work-boards, board-preview, desktop-ui, responsive-layout and mobile-menu pass: 124 of 127. The 3 chat-surfaces failures (header height 119 px against a 110 px limit) also fail with the 0.27.0 header styles and predate this work; work-boards, compact-chat, responsive-layout and chat-surfaces assertions were updated for the removed zoom bar and the title chip.
+- Synthetic screenshots were inspected locally and are not published. Not checked on a physical Android phone or in the Windows application window.
+
 ## [0.27.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.9...v0.27.0) (2026-10-19)
 
 ### Features

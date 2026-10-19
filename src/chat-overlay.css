@@ -12,10 +12,8 @@
 .chat-overlay{padding-left:var(--safe-area-inset-left,env(safe-area-inset-left));padding-right:var(--safe-area-inset-right,env(safe-area-inset-right))}
 .chat-overlay> *{flex-shrink:0}
 :root[data-theme] .chat-overlay header.chat-header-conversation{background:transparent;border:0;box-shadow:none;pointer-events:none}
-/* The top band is opaque by default, so no transcript text ever prints under the title or icons (at any edge-fade strength). */
-.chat-overlay-top{background:var(--bg);box-shadow:0 1px 0 transparent;transition:box-shadow .15s}
-.chat-overlay-top[data-scrolled=true]{box-shadow:0 1px 0 var(--line)}
-@media(min-width:761px) and (pointer:fine){@supports((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root:not([data-chat-edge-fade=off]) .chat-overlay-top{background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2)}}}
+/* The top edge is transparent: the transcript fades out beneath it, and each header control carries its own round surface (chat-header.css). */
+.chat-overlay-top{background:transparent;box-shadow:none}
 .chat-overlay header.chat-header-conversation :is(button,select,a){pointer-events:auto}
 .chat-overlay .chat-start-context{border:0}
 .chat-overlay .chat-scroll-actions{background:transparent;border:0}

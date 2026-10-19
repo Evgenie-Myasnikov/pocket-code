@@ -14,6 +14,7 @@ import { review, reviewAvailability } from './review.js';
 import { readClaudeUsage } from './claude-usage.js';
 import { documentProjects, projectDocuments, readProjectDocument } from './project-docs.js';
 import { projectArtifact } from './project-artifact.js';
+import { SessionPreviews, isPreviewImageType, type SessionPreview } from './session-previews.js';
 import type { ReleaseUpdater } from './updates.js';
 import cors from 'cors';
 import path from 'node:path';
@@ -386,6 +387,42 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/projects',async(_req,res)=>res.json(await projectFolders()));
   app.get('/api/document-projects',async(req,res)=>res.json(await documentProjects(await projectFolders(),z.enum(['rules','changelog','files']).parse(req.query.kind))));
   app.get('/api/sessions', async (req, res) => res.json(await sessions(providerSchema.parse(req.query.provider))));
+  // Chat grid previews: computed only for the tiles a client shows, cached per session version, at most three transcript reads at once.
+  const previews=new SessionPreviews({capacity:500,concurrency:3});
+  type ListedSession=Awaited<ReturnType<typeof sessions>>[number];
+  const previewMessages=async(provider:'claude'|'codex'|'copilot',s:ListedSession)=>provider==='codex'?(await codex().messagePage(s.sessionId,{window:80})).messages
+    :provider==='copilot'?(await copilot().messages(s.sessionId)).slice(-300)
+    :(await historyReads(JSON.stringify([provider,s.sessionId,s.cwd]),()=>sdk.getSessionMessages(s.sessionId,{dir:s.cwd}))).slice(-400).map(normalize).filter((m):m is NonNullable<typeof m>=>!!m);
+  // Local image files need a permitted project folder, exactly like /message-attachment; read-only history shows inline images only.
+  const previewCwd=async(s:ListedSession)=>{if(!s.cwd||s.readOnly)return null;try{return await allowedPath(accessRoots(),s.cwd,true);}catch{return null;}};
+  app.get('/api/sessions/previews',async(req,res)=>{
+    const provider=providerSchema.parse(req.query.provider),ids=z.string().max(48*40).parse(req.query.ids||'').split(',').filter(Boolean);
+    const wanted=z.array(uuid).max(48).parse([...new Set(ids)]),listed=new Map((await sessions(provider)).map(s=>[s.sessionId,s]));
+    const result:SessionPreview[]=await Promise.all(wanted.map(async id=>{
+      const s=listed.get(id);if(!s)return {sessionId:id,error:true as const};
+      try{
+        if(s.cwd&&(!s.readOnly||workspaceAccess.current()))await allowedPath(accessRoots(),s.cwd,true);
+        const entry=await previews.get(provider,s.sessionId,s.lastModified,()=>previewMessages(provider,s));
+        const image=entry.image&&(entry.image.inline||await previewCwd(s))?{name:entry.image.name}:null;
+        return {sessionId:id,lastModified:s.lastModified,text:entry.text,image};
+      }catch{return {sessionId:id,error:true as const};}
+    }));
+    res.json({previews:result});
+  });
+  app.get('/api/sessions/:id/preview-image',async(req,res)=>{
+    const provider=providerSchema.parse(req.query.provider),s=await session(String(req.params.id),provider);
+    const entry=await previews.get(provider,s.sessionId,s.lastModified,()=>previewMessages(provider,s));
+    if(!entry.image)throw new HttpError(404,'This chat has no image.');
+    if(entry.image.path){
+      const cwd=await previewCwd(s);if(!cwd)throw new HttpError(403,'Attachment is outside permitted folders');
+      const artifact=await messageAttachment(cwd,config.uploads,entry.image.path);
+      if(!('data' in artifact)||!artifact.data||!isPreviewImageType(artifact.mimeType))throw new HttpError(415,'This file is not a supported image');
+      res.json({name:artifact.name,mimeType:artifact.mimeType,data:artifact.data});return;
+    }
+    const inline=await previews.inline(()=>previewMessages(provider,s));
+    if(!inline)throw new HttpError(404,'This chat has no image.');
+    res.json({name:entry.image.name,mimeType:inline.mimeType,data:inline.data});
+  });
   app.get('/api/sessions/:id/messages', async (req, res) => {
     const provider = providerSchema.parse(req.query.provider);
     const s = await session(req.params.id, provider);

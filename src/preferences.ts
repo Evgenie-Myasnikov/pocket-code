@@ -40,3 +40,10 @@ export function selectedWorkspace(): WorkspaceProvider {
 export function saveSelectedWorkspace(provider: WorkspaceProvider) {
   try { localStorage.setItem('pocket-code-workspace', provider); } catch { /* Keep the workspace selected for this session. */ }
 }
+export type ChatListView='list'|'grid';
+export type ChatGrouping='date'|'project';
+/** List or tile grid, and how the grid is grouped: per device, the same keys on the phone and in the Windows window. */
+export function chatListView():ChatListView{try{return localStorage.getItem('pocket-code-chat-view')==='grid'?'grid':'list';}catch{return 'list';}}
+export function saveChatListView(value:ChatListView){try{localStorage.setItem('pocket-code-chat-view',value);}catch{/* Keep the view for this session. */}}
+export function chatGrouping():ChatGrouping{try{return localStorage.getItem('pocket-code-chat-grouping')==='project'?'project':'date';}catch{return 'date';}}
+export function saveChatGrouping(value:ChatGrouping){try{localStorage.setItem('pocket-code-chat-grouping',value);}catch{/* Keep the grouping for this session. */}}
