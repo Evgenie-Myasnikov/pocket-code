@@ -24,6 +24,7 @@ import type {Connection} from './api';
 import type {WorkspaceProvider,CodexAccess} from './preferences';
 import pkg from '../package.json';
 import {useEffect,useRef,type ReactNode} from 'react';
+import {useBackAction} from './navigation';
 import './settings.css';
 
 export type SettingsPage='index'|'appearance'|'workspace'|'usage'|'jira'|'miro'|'updates'|'connection'|'notifications'|'about';
@@ -45,6 +46,10 @@ export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,sub
   const [subpage,setSubpage]=useState<Subpage>(subpageRequest||'index');
   useEffect(()=>setSubpage(subpageRequest||'index'),[page,subpageRequest]);
   useEffect(()=>{if(subpage==='access'&&provider==='copilot')setSubpage('index');},[provider,subpage]);
+  // Android Back and Esc leave an AI account page for the AI accounts list first, the same level the on-screen Back names.
+  useBackAction(()=>{setSubpage('index');return true;},10,page==='workspace'&&subpage!=='index');
+  const previousSub=useRef(subpage);
+  useEffect(()=>{const prior=previousSub.current;previousSub.current=subpage;if(subpage==='index'&&prior!=='index')content.current?.querySelector<HTMLButtonElement>(`[data-settings-subpage="${prior}"]`)?.focus({preventScroll:true});},[subpage]);
   const live=useLiveSettings(),claudeAccess=useClaudeAccess(),alerts=useRunAlertsPreference(),limitAlerts=useLimitAlertsPreference();
   const groups=groupedCategories('phone',jiraEnabled()?[]:['jira']),category=settingsCategories.find(item=>item.id===page);
   const content=useRef<HTMLDivElement|null>(null),previous=useRef(page),indexScroll=useRef(0);

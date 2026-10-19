@@ -148,7 +148,9 @@ test('desktop exposes account sign-out confirmation and automatic updates',async
  await page.getByRole('button',{name:'Cancel',exact:true}).click();expect(await page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='provider-logout'))).toBeFalsy();
  await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.getByRole('button',{name:'Sign out now',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='provider-logout'&&c.provider==='claude'))).toBeTruthy();
- await page.getByRole('button',{name:'AI accounts',exact:true}).click();await expect(page.getByRole('navigation',{name:'AI providers'})).toBeVisible();await page.getByRole('button',{name:/^Updates/}).click();await expect(page.getByLabel('Automatically update the Windows app and PC host')).toBeChecked();await page.getByRole('button',{name:'Check for updates',exact:true}).click();
+ await page.getByRole('button',{name:'AI accounts',exact:true}).click();await expect(page.getByRole('navigation',{name:'AI providers'})).toBeVisible();await page.getByRole('button',{name:/^Updates/}).click();await expect(page.getByLabel('Automatically update the Windows app and PC host')).toBeChecked();
+ // Theme input styles must not flatten the switch: it keeps its size and the checked track takes the accent (same colour as its border).
+ const autoUpdate=page.getByRole('switch',{name:'Automatically update the Windows app and PC host'});await expect(autoUpdate).toHaveCSS('height','22px');await expect(autoUpdate).toHaveCSS('padding-top','0px');expect(await autoUpdate.evaluate(e=>{const c=getComputedStyle(e);return c.backgroundColor===c.borderTopColor;})).toBe(true);await page.getByRole('button',{name:'Check for updates',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='check-update'))).toBeTruthy();
 });
 test('desktop follows the newest run, streams partial text and shows question/error/completion status',async({page})=>{
