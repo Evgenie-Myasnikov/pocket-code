@@ -18,7 +18,8 @@ function readIndex():Index{
 }
 const saveIndex=(index:Index)=>{try{localStorage.setItem(INDEX,JSON.stringify(index));}catch{/* The next write rebuilds it. */}};
 /** Cached value with the time it was saved, so screens can say how old the data is. */
-export async function readOfflineEntry(connection:Connection,endpoint:string):Promise<{value:unknown;at:number}|undefined>{try{const raw=localStorage.getItem(await offlineKey(connection,endpoint));if(!raw)return undefined;const entry=JSON.parse(raw);return {value:entry.value,at:Number(entry.at)||0};}catch{return undefined;}}
+// An unchanged answer only refreshes the index, so the index time is when the PC last confirmed this copy.
+export async function readOfflineEntry(connection:Connection,endpoint:string):Promise<{value:unknown;at:number}|undefined>{try{const key=await offlineKey(connection,endpoint),raw=localStorage.getItem(key);if(!raw)return undefined;const entry=JSON.parse(raw);return {value:entry.value,at:Math.max(Number(entry.at)||0,readIndex()[key]?.at||0)};}catch{return undefined;}}
 export async function readOffline(connection:Connection,endpoint:string){return (await readOfflineEntry(connection,endpoint))?.value;}
 const lastWritten=new Map<string,string>();
 /** Unchanged answers are not written again; a full storage evicts the oldest snapshots by the index. */

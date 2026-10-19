@@ -167,7 +167,7 @@ public sealed class PocketDesktop:Form {
         Text="Pocket Code";ClientSize=new Size(1280,850);MinimumSize=new Size(900,640);StartPosition=FormStartPosition.CenterScreen;
         BackColor=Color.FromArgb(17,21,18);AutoScaleMode=AutoScaleMode.Dpi;Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath)??SystemIcons.Application;Controls.Add(web);
         HandleCreated+=(_,e)=>ApplyWindowTheme(true,Color.FromArgb(17,21,18),Color.FromArgb(230,232,227),Color.FromArgb(42,48,43));
-        var menu=new ContextMenuStrip();menu.Items.Add("Открыть",null,(_,e)=>RestoreWindow());menu.Items.Add("Подключить / отключить",null,async(_,e)=>await Toggle());menu.Items.Add(new ToolStripSeparator());menu.Items.Add("Выход",null,async(_,e)=>await ExitApp());
+        var menu=new ContextMenuStrip();trayOpen=menu.Items.Add("",null,(_,e)=>RestoreWindow());trayToggle=menu.Items.Add("",null,async(_,e)=>await Toggle());menu.Items.Add(new ToolStripSeparator());trayExit=menu.Items.Add("",null,async(_,e)=>await ExitApp());LocalizeTray();
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         tray.BalloonTipClicked+=(_,e)=>{OpenRunAlert();CompleteRunAlert();};tray.BalloonTipClosed+=(_,e)=>CompleteRunAlert();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
@@ -218,6 +218,9 @@ public sealed class PocketDesktop:Form {
             BeginInvoke((Action)(async()=>{try{webReady=false;Controls.Remove(web);web.Dispose();web=NewWebView();Controls.Add(web);await InitializeWeb();}catch(Exception error){Log("Interface restart failed: "+error.Message);}}));
         }
     }
+    // The tray menu follows the interface language the window reports with its alert settings.
+    ToolStripItem trayOpen,trayToggle,trayExit;
+    void LocalizeTray(){bool ru=preferences.RunLanguage=="ru";if(trayOpen==null)return;trayOpen.Text=ru?"Открыть":"Open";trayToggle.Text=ru?"Подключить / отключить":"Connect / disconnect";trayExit.Text=ru?"Выход":"Exit";}
     void Log(string line){try{Directory.CreateDirectory(storage);File.AppendAllText(Path.Combine(storage,"desktop-window.log"),DateTime.UtcNow.ToString("o")+" "+line+Environment.NewLine);}catch(IOException){}catch(UnauthorizedAccessException){}}
     async Task Bridge(string source,string payload){
         Uri origin;if(!Uri.TryCreate(source,UriKind.Absolute,out origin)||origin.GetLeftPart(UriPartial.Authority)!=Origin||origin.AbsolutePath!="/index.html")return;
@@ -230,6 +233,7 @@ public sealed class PocketDesktop:Form {
                 if(preview){result=true;}else{
                     preferences.RunAlerts=message.ContainsKey("enabled")&&message["enabled"] is bool&&(bool)message["enabled"];
                     preferences.RunLanguage=message.ContainsKey("language")&&Convert.ToString(message["language"])=="ru"?"ru":"en";
+                    LocalizeTray();
                     if(!preferences.RunAlerts){preferences.PendingRunAlerts=new object[0];preferences.NotificationCursor=0;preferences.NotificationSeen=new string[0];activeRunAlert=null;}
                     Save();result=true;
                 }
@@ -270,7 +274,7 @@ public sealed class PocketDesktop:Form {
                     else{string deviceName=message.ContainsKey("name")?message["name"] as string:null;if(String.IsNullOrWhiteSpace(deviceName)||deviceName.Length>80)throw new InvalidOperationException("Invalid device name.");result=await Send(reader,"/devices/"+parsed+"/rename",true,json.Serialize(new{name=deviceName}));}
                 }
                 else if(action=="toggle")await Toggle();
-                else if(action=="restart-host"){if(!preview&&!online&&!changing){if(owner!=null){owner.Dispose();owner=null;}preferences.Connect=true;Save();nextAttempt=DateTime.MinValue;Launch();Push();}}
+                else if(action=="restart-host"){if(!preview&&!online&&!changing){changing=true;Push();try{while(polling&&!exiting)await Task.Delay(50);if(!exiting&&!online){if(owner!=null){owner.Dispose();owner=null;}preferences.Connect=true;Save();nextAttempt=DateTime.MinValue;Launch();}}finally{changing=false;Push();}}}
                 else if(action=="jira"){if(!preview&&jiraUrl!=null)OpenUrl(jiraUrl);}
                 else if(action=="check-update"){await Send(reader,"/updates/check",true);StartUpdate();}
                 else if(action=="settings"){

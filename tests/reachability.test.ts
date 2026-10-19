@@ -66,8 +66,9 @@ test('a tunnel 502/530 for a cacheable read returns the saved copy; a host JSON 
 test('offline cache keeps its age, skips unchanged writes and evicts without parsing values',async()=>{
   clearOffline();
   await writeOffline(host,'/health',{name:'Synthetic PC'});
+  const first=(await readOfflineEntry(host,'/health'))!.at;await new Promise(resolve=>setTimeout(resolve,5));
   const before=writes;await writeOffline(host,'/health',{name:'Synthetic PC'});
-  const entry=await readOfflineEntry(host,'/health');assert.deepEqual(entry?.value,{name:'Synthetic PC'});assert.ok((entry?.at||0)>0);
+  const entry=await readOfflineEntry(host,'/health');assert.ok((entry?.at||0)>first,'the age is the last confirmation, not the last change');assert.deepEqual(entry?.value,{name:'Synthetic PC'});assert.ok((entry?.at||0)>0);
   assert.equal(writes-before,1,'an unchanged answer only refreshes the index');
   const parse=JSON.parse;let parsed=0;JSON.parse=((text:string,...rest:[])=>{parsed++;return parse(text,...rest);}) as typeof JSON.parse;
   try{for(let n=0;n<25;n++)await writeOffline(host,'/boards/'+n.toString(16).padStart(8,'0'),{id:n});}finally{JSON.parse=parse;}

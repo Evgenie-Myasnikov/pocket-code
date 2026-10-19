@@ -300,7 +300,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     onEdit:()=>{setOfflineQueue(old=>old.filter(other=>other.id!==item.id));mergeDraft(item.key,item.text,item.attachments);},onRemove:()=>setOfflineQueue(old=>old.filter(other=>other.id!==item.id)),removeLabel:t('Не отправлять')}))];
   /** Up in an empty field brings back the last message the person wrote. */
   const recallLast=()=>{for(const message of [...outputMessages].reverse()){if(message.role!=='user')continue;const text=message.blocks.filter(block=>block.type==='text').map(block=>block.text||'').join('\n').trim();if(text&&!text.startsWith('<task-notification'))return text;}return undefined;};
-  const keyActions=useRef({stop:()=>{}});keyActions.current={stop:()=>void stopRun()};
+  // While the run status is unknown, Esc retries the connection like the Stop button instead of sending a stop the PC cannot receive.
+  const keyActions=useRef({stop:()=>{}});keyActions.current={stop:()=>{if(runUnknown)retryNow();else void stopRun();}};
   useEffect(()=>{
     // Windows: Esc stops the run; Ctrl+Shift+M, I and E open the access, model and effort pickers of this chat; Ctrl+Shift+D opens Review.
     if(!embedded)return;
@@ -860,6 +861,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <div className="header-title"><h1>{tab==='connection'||tab==='chats'?t('Подключение к ПК'):tab==='settings'?t("Настройки"):docView==='files'?t('Файлы'):docView==='rules'?t("Правила"):t("История изменений")}</h1></div>
       </header>}
       {connection&&!connectionScreen&&!demo&&!embedded&&<ConnectionStatus offline={offline} hostError={networkError?t(networkError):''}/>}
+      {/* The Windows window shows reachability above the chat; a host error from a chat read still needs its own line here. */}
+      {embedded&&networkError&&!connectionScreen&&<div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
       {/* Only a PC that answered /providers can say a provider is missing or signed out; an unreachable PC is the status line's job. */}
       {!canRun && !demo && !unreachable && providersLoaded && tab==='chats' && connection && !connection.workspaceId && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить {0}.",engineName)}</div>}
