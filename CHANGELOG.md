@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.27.0 (2026-10-19)
+## [0.27.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.9...v0.27.0) (2026-10-19)
 
 ### Features
 - connection: show a connected-PC card on the phone with address, PC version, last contact, a latency check and copyable diagnostics; keep scanning a new QR as a secondary action.
@@ -171,6 +171,9 @@
 - Platform review fixes: TypeScript check passed; unit tests 365/366 (only the pre-existing board-evidence check fails; the offline-cache test now fails without the cache-age fix). The Windows shell compiles with csc and the WebView2 SDK (tray menu and restart guard not run on a desktop). Browser: connection-status, chat-recovery, desktop-ui, followup-composer and work-boards 57/58 (only the pre-existing reading-mode check); a synthetic 390 px probe confirmed the offline follow-up waits in "Waiting to send" and leaves when the PC answers, with 48 px status buttons, and the 1440 px layout was inspected.
 - Design system area: TypeScript check passed; unit tests 368/370 in the full run (the pre-existing board-evidence check and one task-run timing test that passes 14/14 when its file runs alone); new design-tokens unit test (no hex literals in component CSS, weights and layers from tokens, no bare status classes or global .error, complete semantic families). Browser: new design-tokens spec (contrast for 20 theme × palette combinations plus high-contrast and colour-blind layers; equal PC status rows in both themes) passes; full run 344/366, and all 22 failures also fail on the previous commit when the same specs run there (attachment-tray, chat-pc-scope, chat-surfaces, usability, workspace-entry, workspaces, copilot-provider and others). Tests that parsed computed colours as rgb() now resolve them through a canvas (OKLCH palettes); the board-grid test expects "8 px" option labels. Android resources and Java changes were not built or run on a device.
 - Design system review fixes: TypeScript check passed; unit tests 367/370 in the full run (the pre-existing board-evidence check plus two timing tests in run-notifications and task-runs that pass 8/8 and 14/14 when their files run alone). Browser: design-tokens (new text-size floor check at 1440 px and 390 px, which failed on the previous commit with an 11.9 px connection line), appearance-controls, desktop-ui, chat-typography, subagents, device-pairing, compact-chat and edge-chat 61/61; a probe confirmed High contrast and colour-blind mode change field borders, muted text and status colours for every named palette in both themes.
+
+- Release validation: TypeScript/Vite, unit tests (all passed), Android (versionCode 85) and Windows builds passed. Source privacy checks passed for 648 entries; decoded artifact audits passed for 383 host files, 517 APK entries and 480 Windows entries. APK signer matches 0.26.9. Downloaded GitHub assets match the manifest hashes and the exact source tag; GitHub privacy CI passed. Physical Android and Windows shell checks were not performed.
+- Published [v0.27.0](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.27.0) from [df3bc03f66bb3c5fb19e14ec38e373bafdb7e91a](https://github.com/Evgenie-Myasnikov/pocket-code/commit/df3bc03f66bb3c5fb19e14ec38e373bafdb7e91a) on [codex/review-0.27.0](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/review-0.27.0); APK, Windows package, host bundle and update manifest are available.
 
 ## [0.26.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.8...v0.26.9) (2026-10-14)
 

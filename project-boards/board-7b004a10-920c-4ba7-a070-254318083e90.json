@@ -21,7 +21,8 @@
     "0.26.6": "codex/compact-chat-0.26.6",
     "0.26.7": "codex/edge-chat-0.26.7",
     "0.26.8": "codex/unified-inbox-0.26.8",
-    "0.26.9": "codex/claude-recovery-0.26.9"
+    "0.26.9": "codex/claude-recovery-0.26.9",
+    "0.27.0": "codex/review-0.27.0"
   },
   "format": "pocket-code-board",
   "version": 1,
@@ -475,9 +476,9 @@
     {
       "id": "5d0c9a3e-8f21-4b7a-9c64-2e1f7a8b3d50",
       "title": "Ревью интерфейса и функционала: решения по 10 зонам",
-      "description": "Экспертное ревью 0.26.9 по 10 зонам (подключение, оболочка, лента, поле ввода, Review, доски, документы, настройки, платформа, дизайн-система) с синтетическими скриншотами, двойной проверкой находок и сравнением с лучшими инструментами. Реализованы решения P0–P2 на ветке codex/review-improvements; детали и проверки в CHANGELOG.md, раздел Unreleased.\nОткрыто: проверка на настоящем Android и в окне Windows, сборка C#-оболочки, решения с пометкой partial/skipped (единый список чатов всех провайдеров, богатые уведомления Android, поиск по настройкам).\nRelease 0.27.0 authorized; preparing audited packages from codex/review-0.27.0.",
+      "description": "Экспертное ревью 0.26.9 по 10 зонам (подключение, оболочка, лента, поле ввода, Review, доски, документы, настройки, платформа, дизайн-система) с синтетическими скриншотами, двойной проверкой находок и сравнением с лучшими инструментами. Реализованы решения P0–P2 на ветке codex/review-improvements; детали и проверки в CHANGELOG.md, раздел Unreleased.\nОткрыто: проверка на настоящем Android и в окне Windows, сборка C#-оболочки, решения с пометкой partial/skipped (единый список чатов всех провайдеров, богатые уведомления Android, поиск по настройкам).\nRelease 0.27.0 authorized; preparing audited packages from codex/review-0.27.0.\nPublished 2026-10-19: 0.27.0. Branch: codex/review-0.27.0; exact source: df3bc03f66bb3c5fb19e14ec38e373bafdb7e91a. Evidence in CHANGELOG.md. Physical Android and Windows shell checks remain unperformed.",
       "branch": "0.27.0",
-      "status": "review",
+      "status": "done",
       "priority": "high",
       "x": 2740,
       "y": 1570,
