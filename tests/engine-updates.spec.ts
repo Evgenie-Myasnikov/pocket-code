@@ -11,7 +11,7 @@ test('AI compatibility settings show versions and persist the server-side automa
  return route.fulfill({status:404,json:{error:'Synthetic endpoint'}});
  });
  await page.setViewportSize({width:320,height:740});await page.goto('http://127.0.0.1:5173');await openSection(page,'Settings');await page.getByRole('button',{name:'Updates',exact:true}).click();
- await expect(page.getByText('Codex 1.2.3 · Claude 2.3.4')).toBeVisible();await page.getByLabel('Create an AI task when a version changes').uncheck();await expect.poll(()=>enabled).toBe(false);
+ await expect(page.getByText('Codex CLI 1.2.3 · Claude Code 2.3.4')).toBeVisible();await page.getByLabel('Create an AI task when a version changes').uncheck();await expect.poll(()=>enabled).toBe(false);
  await page.getByRole('button',{name:'Check AI versions'}).click();await page.locator('.engine-updates summary').click();await expect(page.getByText('Waiting for the project to be idle')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

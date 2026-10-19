@@ -183,7 +183,7 @@ test('an error stays until hidden, finished results clear with Undo and backgrou
 test('mobile appearance controls edge opacity without changing transcript geometry',async({page})=>{
  await host(page);await page.setViewportSize({width:390,height:844});await open(page);
  const chat=page.locator('.conversation'),geometry=await chat.boundingBox();
- await navigate(page,'Settings');await page.getByRole('button',{name:/Appearance.*language/}).click();
+ await navigate(page,'Settings');await page.getByRole('button',{name:/Appearance.*language/}).click();await page.locator('.appearance-advanced summary').click();
  const slider=page.getByRole('slider',{name:'Chat edge fade',exact:true});await expect(slider).toHaveValue('100');await slider.fill('50');
  await expect.poll(()=>page.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--chat-edge-floor'))).toBe('0.5');
  await navigate(page,'Chats');await newChat(page);expect(await chat.boundingBox()).toEqual(geometry);expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toContain('0.5');

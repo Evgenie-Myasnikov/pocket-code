@@ -96,7 +96,8 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   await page.locator('.review-panel').getByRole('button',{name:language==='en'?'Back to chat':'Вернуться в чат',exact:true}).click();
   const settings=language==='en'?'Settings':'Настройки';
   await openSection(page,settings);
-  await expect(page.locator('.settings-index .settings-category')).toHaveCount(9);
+  // Jira stays hidden until issues have a place in the app, so the phone lists eight sections.
+  await expect(page.locator('.settings-index .settings-category')).toHaveCount(8);
   await expect(page.locator('.chat-header .review-button')).toHaveCount(0);
   await expect(page.locator('.chat-header .project-picker')).toHaveCount(0);
   await withinViewport(page,'.settings-panel button',profile.width);

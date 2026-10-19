@@ -33,5 +33,5 @@ test('usage details clear failed refreshes and do not present expired quotas as 
  });
  await expect(page.locator('.codex-usage progress')).toHaveAttribute('value','70');
  mode='expired';await page.getByRole('button',{name:'Refresh limits'}).click();await expect(page.locator('.codex-usage progress')).toHaveCount(0);await expect(page.locator('.codex-usage-window')).toContainText('No data');
- mode='failed';await page.getByRole('button',{name:'Refresh limits'}).click();await expect(page.locator('.codex-usage-bucket')).toHaveCount(0);await expect(page.locator('.codex-usage [role="status"]')).toBeVisible();
+ mode='failed';await page.getByRole('button',{name:'Refresh limits'}).click();await expect(page.locator('.codex-usage .notice-warning')).toContainText('Could not refresh limits');await expect(page.locator('.codex-usage progress')).toHaveCount(0);await expect(page.locator('.codex-usage-window')).toContainText('No data');await expect(page.locator('.codex-usage [role="status"]')).toBeVisible();
 });

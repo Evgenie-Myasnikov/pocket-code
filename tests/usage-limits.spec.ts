@@ -67,9 +67,7 @@ test('switching workspace rejects late usage replies and loads Claude limits', a
   const pending = new Promise<void>(resolve => { release = resolve; });
   await setup(page, async (route, provider) => { if (provider === 'codex') await pending; await route.fulfill({ json: snapshot(provider === 'codex' ? 'Old Codex bucket' : 'Claude', provider === 'codex' ? 2 : 81) }); });
   await expect(page.locator('.codex-usage').getByText('Loading limits…')).toBeVisible();
-  await page.locator('.workspace-picker-settings select').selectOption('claude');
-  await openSection(page,'Settings');
-  await page.getByRole('button', { name: 'Usage limits', exact: true }).click();
+  await page.getByRole('region', { name: 'Limits overview', exact: true }).getByRole('button', { name: /^Claude/ }).click();
   const card = page.getByRole('region', { name: 'Claude usage limits', exact: true });
   await expect(card.getByText('81% remaining')).toBeVisible();
   release();
@@ -90,4 +88,21 @@ test('usage is requested only while settings are mounted and empty data stays un
   await page.clock.fastForward(120_000);
   expect(reads).toBe(previous);
   await expect(page.locator('.codex-usage')).toHaveCount(0);
+});
+
+test('a limit warning above the composer names the tightest window, can be hidden and returns only at the next level', async ({ page }) => {
+  let remaining = 20;
+  await setup(page, route => route.fulfill({ json: snapshot('Codex', remaining) }));
+  await openChatList(page);await newChat(page);
+  const alert = page.locator('.limit-alert');
+  await expect(alert).toContainText('Codex: 20% of the “5 hours” limit left');
+  await expect(alert).toHaveClass(/limit-alert-warning/);
+  await alert.getByRole('button', { name: 'Hide' }).click();
+  await expect(alert).toHaveCount(0);
+  remaining = 8;await openSection(page,'Settings');await page.getByRole('button', { name: 'Usage limits', exact: true }).click();await expect(page.locator('.codex-usage').getByText('8% remaining')).toBeVisible();
+  await openChatList(page);await newChat(page);
+  await expect(alert).toContainText('Codex: 8% of the “5 hours” limit left');
+  await expect(alert).toHaveClass(/limit-alert-danger/);
+  await alert.getByRole('button', { name: 'Details' }).click();
+  await expect(page.getByRole('region', { name: 'Codex usage limits', exact: true })).toBeVisible();
 });

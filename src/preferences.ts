@@ -2,6 +2,11 @@ import {validModelId} from '../server/provider-model';
 export type WorkspaceProvider = 'claude' | 'codex' | 'copilot';
 export type CodexAccess = 'full' | 'ask' | 'auto';
 function codexAccess(value:unknown):CodexAccess{return value==='ask'||value==='auto'?value:'full';}
+/** The host accepts $0.10–$100 per Claude request; anything else would turn every following message into a 400. */
+export const budgetRange={min:0.1,max:100,fallback:5} as const;
+export function clampBudget(value:unknown,fallback:number=budgetRange.fallback):number{return typeof value==='number'&&Number.isFinite(value)?Math.round(Math.min(budgetRange.max,Math.max(budgetRange.min,value))*100)/100:fallback;}
+/** Parses a typed amount ("0,5", "$5", " 20 "); null when it is not a number at all. */
+export function parseBudget(text:string):number|null{const value=Number(text.replace(/[$\s]/g,'').replace(',','.'));return text.trim()&&Number.isFinite(value)?value:null;}
 const preferenceKey = (provider: WorkspaceProvider) => `pocket-code-chat-preferences-${provider}`;
 export function preferences(provider: WorkspaceProvider = 'claude') {
   try {
@@ -12,6 +17,12 @@ export function preferences(provider: WorkspaceProvider = 'claude') {
 }
 export function savePreferences(provider: WorkspaceProvider, value: ReturnType<typeof preferences>) {
   try { localStorage.setItem(preferenceKey(provider), JSON.stringify(value)); } catch { /* Keep in-memory preferences when storage is unavailable. */ }
+}
+export type PreferenceChange={provider:WorkspaceProvider;budget?:number;codexAccess?:CodexAccess};
+/** Settings pages outside the chat (desktop settings) change a device default; open chats pick it up through this event. */
+export function updatePreferences(change:PreferenceChange){
+  const current=preferences(change.provider);savePreferences(change.provider,{...current,...(change.budget!==undefined?{budget:clampBudget(change.budget,current.budget)}:{}),...(change.codexAccess?{codexAccess:codexAccess(change.codexAccess)}:{})});
+  if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent<PreferenceChange>('pocket-code-preferences',{detail:change}));
 }
 export function preferredRoot(host: string, roots: string[], provider: WorkspaceProvider = 'claude') {
   try {

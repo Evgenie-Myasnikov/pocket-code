@@ -31,7 +31,7 @@ async function connect(page:Page) {
 }
 async function switchSidebar(page:Page,provider:string){
  await openSection(page,'Settings');
- await page.locator('[data-settings-category="workspace"]').click();await page.locator('.workspace-picker-settings select').selectOption(provider);await openSection(page,'Chats');
+ await page.locator('[data-settings-category="workspace"]').click();await page.locator('.workspace-picker-settings').getByRole('radio',{name:provider==='claude'?'Claude':provider==='codex'?'Codex':'Copilot',exact:true}).click();await openSection(page,'Chats');
 }
 const switchHeader=switchSidebar;
 

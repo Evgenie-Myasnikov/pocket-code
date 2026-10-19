@@ -363,6 +363,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
   });
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
+  app.post('/api/provider-connections/:provider/login/cancel',async(req,res)=>res.json(await providerConnections.cancel(providerSchema.parse(req.params.provider))));
   app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));
   app.post('/api/provider-connections/:provider/logout',async(req,res)=>res.json(await providerConnections.logout(providerSchema.parse(req.params.provider))));
   app.get('/api/copilot/status',async(_req,res)=>res.json(await copilot().status()));
@@ -592,6 +593,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   if (config.webDir) app.use(express.static(config.webDir));
   app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status = error instanceof z.ZodError ? 400 : error.status || 500;
+    // A per-request spend limit outside the range is a settings problem, not a malformed request; name it so the chat can point to Settings.
+    if (error instanceof z.ZodError && error.issues.some(issue => issue.path.includes('maxBudgetUsd'))) { res.status(400).json({ error: 'Лимит стоимости запроса вне диапазона $0.10–$100. Измените его в настройках доступа Claude.', code: 'budget_out_of_range' }); return; }
     res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message, ...(error instanceof HttpError&&error.code?{code:error.code}:{}) });
   });
   async function maintainEngines() {

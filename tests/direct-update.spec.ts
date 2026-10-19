@@ -69,7 +69,7 @@ test('a paired PC that does not answer leaves the phone updating itself',async({
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));
   await openSection(page,'Settings');await page.getByRole('button',{name:'Updates',exact:true}).click();
-  await expect(page.getByRole('region',{name:'Updates',exact:true}).getByRole('heading',{name:'Updates',exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'From GitHub',exact:true}).getByRole('heading',{name:'From GitHub',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Check for updates',exact:true})).toBeVisible();
   await expect.poll(()=>calls(page,'downloadRelease').then(list=>list.length)).toBeGreaterThan(0);
   expect(github.every(url=>url.startsWith('https://api.github.com/repos/Evgenie-Myasnikov/pocket-code/')||url.startsWith('https://github.com/Evgenie-Myasnikov/pocket-code/releases/download/'))).toBe(true);

@@ -1,11 +1,11 @@
 import {useState} from 'react';
-import {useLanguage} from './i18n';
+import {t,useLanguage} from './i18n';
 import {useStreamSpeed,setStreamSpeed} from './stream-speed';
 
 export function StreamSpeedSettings(){
- const speed=useStreamSpeed(),ru=useLanguage()==='ru',[error,setError]=useState('');
- const label=ru?'Скорость появления букв':'Letter reveal speed';
- return <div><label>{label}<select aria-label={label} value={speed} onChange={e=>{try{setStreamSpeed(Number(e.target.value));setError('');}catch{setError(ru?'Не удалось сохранить скорость.':'Could not save the speed.');}}}>
-  <option value={20}>{ru?'Медленно':'Slow'}</option><option value={40}>{ru?'Обычно':'Normal'}</option><option value={80}>{ru?'Быстро':'Fast'}</option><option value={0}>{ru?'Мгновенно':'Instant'}</option>
- </select></label>{error&&<p role="alert">{error}</p>}</div>;
+ useLanguage();const speed=useStreamSpeed(),[error,setError]=useState('');
+ const label=t('Скорость появления букв');
+ return <div><label>{label}<select aria-label={label} value={speed} onChange={e=>{try{setStreamSpeed(Number(e.target.value));setError('');}catch{setError(t('Не удалось сохранить скорость.'));}}}>
+  <option value={20}>{t('Медленно')}</option><option value={40}>{t('Обычно')}</option><option value={80}>{t('Быстро')}</option><option value={0}>{t('Мгновенно')}</option>
+ </select></label>{error&&<p className="error" role="alert">{error}</p>}</div>;
 }

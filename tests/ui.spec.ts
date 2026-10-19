@@ -32,8 +32,10 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await page.getByRole('button', { name: /К новым сообщениям/ }).click();
   await expect(page.getByText('History message 149.', { exact: false })).toBeVisible();
   await openSection(page,'Настройки');
-  await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await page.getByLabel('Тема', { exact: true }).selectOption('light');
+  await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await page.getByRole('radio',{name:'Светлая',exact:true}).check();
   await page.getByRole('button', { name: 'Мята', exact: false }).click();
+  await page.getByRole('radio',{name:'Крупно',exact:true}).check();await expect(page.getByLabel('Размер текста чата', { exact: true })).toHaveValue('17');
+  await page.locator('.appearance-advanced summary').click();
   await page.getByLabel('Размер текста чата', { exact: true }).focus(); await page.keyboard.press('End');
   await page.getByLabel('Масштаб интерфейса', { exact: true }).focus(); await page.keyboard.press('End');
   await page.getByLabel('Компактные отступы').check();
@@ -42,14 +44,17 @@ test('jump to actual beginning and persist appearance on a narrow phone', async 
   await page.screenshot({ path: 'artifacts/screenshots/appearance-mobile.png', fullPage: true });
   await page.reload();
   await openSection(page,'Настройки');
-  await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('light');
+  await page.getByRole('button',{name:'Оформление и язык',exact:true}).click();await expect(page.getByRole('radio',{name:'Светлая',exact:true})).toBeChecked();
   await expect(page.getByRole('button', { name: /Мята/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByLabel('Размер текста чата', { exact: true })).toHaveValue('22');
   await expect(page.getByLabel('Масштаб интерфейса', { exact: true })).toHaveValue('130');
   await expect(page.getByLabel('Компактные отступы')).toBeChecked();
+  await expect(page.getByRole('button',{name:'Вернуть по умолчанию: Размер текста чата'})).toBeVisible();
   await page.getByRole('button', { name: 'Сбросить оформление' }).click();
-  await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('dark');
+  await expect(page.getByRole('radio',{name:'Тёмная',exact:true})).toBeChecked();
   await expect(page.getByLabel('Размер текста чата', { exact: true })).toHaveValue('14');
+  await page.getByRole('button',{name:'Отменить',exact:true}).click();
+  await expect(page.getByRole('radio',{name:'Светлая',exact:true})).toBeChecked();await expect(page.getByLabel('Размер текста чата', { exact: true })).toHaveValue('22');
 });
 
 test('open history syncs Desktop updates without erasing the draft and marks outside projects read-only', async ({ page }) => {

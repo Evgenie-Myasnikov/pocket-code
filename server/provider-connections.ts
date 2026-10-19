@@ -31,7 +31,7 @@ export function loginScript(executable:string,provider:ProviderId,method:string)
  return `$ErrorActionPreference='Stop'; $Host.UI.RawUI.WindowTitle='Pocket Code - ${provider} sign-in'; try { ${secret?`$secure=Read-Host 'Enter your key or token (hidden)' -AsSecureString; $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure); try { $plain=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr); $plain | ${command} } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr); $plain=$null; $secure.Dispose() }`:command}; $result=$LASTEXITCODE; if($result -ne 0){Write-Host 'Sign-in did not complete. Close this window and retry in Pocket Code.'; Read-Host 'Press Enter to close' | Out-Null}; exit $result } catch { Write-Host 'Sign-in failed. Check the CLI installation and retry.'; Read-Host 'Press Enter to close' | Out-Null; exit 1 }`;
 }
 export class ProviderConnections{
- private children=new Map<ProviderId,ChildProcess>();private loginState=new Map<ProviderId,Login>();private cache?:{at:number;value:any};private pending?:Promise<any>;private closed=false;
+ private children=new Map<ProviderId,ChildProcess>();private cancelled=new Set<ProviderId>();private loginState=new Map<ProviderId,Login>();private cache?:{at:number;value:any};private pending?:Promise<any>;private closed=false;
  constructor(private probes:Partial<Record<ProviderId,Probe>>,private busy:(id:ProviderId)=>boolean,private refresh:(id:ProviderId)=>Promise<void>,private copilotLogout?:()=>Promise<void>){}
  async logout(id:ProviderId){
   if(this.closed)throw new HttpError(503,'Host is stopping');
@@ -70,9 +70,16 @@ export class ProviderConnections{
   // A visible console is intentional: the user selected an interactive sign-in method.
   const child=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:false,detached:true,stdio:'ignore'});
   this.children.set(id,child);this.loginState.set(id,{state:'waiting',method});this.cache=undefined;
-  let finished=false;const finish=async(code:number|null)=>{if(finished)return;finished=true;clearTimeout(timer);this.children.delete(id);if(this.closed)return;this.loginState.set(id,{state:'checking',method});try{if(code!==0){this.loginState.set(id,{state:'error',method,reason:'cancelled-or-failed'});return;}await this.refresh(id);this.cache=undefined;const result=await this.load();const provider=result.providers.find((item:any)=>item.id===id);this.loginState.set(id,{state:provider?.authenticated?'complete':'error',method,reason:provider?.authenticated?undefined:provider?.server==='unavailable'?'verification-failed':'sign-in-required'});}catch{this.loginState.set(id,{state:'error',method});}this.cache=undefined;};
+  let finished=false;const finish=async(code:number|null)=>{if(finished)return;finished=true;clearTimeout(timer);this.children.delete(id);if(this.closed)return;if(this.cancelled.delete(id)){this.loginState.set(id,{state:'idle',method,reason:'cancelled'});this.cache=undefined;return;}this.loginState.set(id,{state:'checking',method});try{if(code!==0){this.loginState.set(id,{state:'error',method,reason:'cancelled-or-failed'});return;}await this.refresh(id);this.cache=undefined;const result=await this.load();const provider=result.providers.find((item:any)=>item.id===id);this.loginState.set(id,{state:provider?.authenticated?'complete':'error',method,reason:provider?.authenticated?undefined:provider?.server==='unavailable'?'verification-failed':'sign-in-required'});}catch{this.loginState.set(id,{state:'error',method});}this.cache=undefined;};
   child.once('error',()=>void finish(1));child.once('exit',code=>void finish(code));
   const timer=setTimeout(()=>{this.kill(child);void finish(1);},10*60*1000);timer.unref();return this.loginState.get(id);
+ }
+ /** Closes the sign-in window started from Pocket Code; the account stays as it was. */
+ async cancel(id:ProviderId){
+  if(!Object.hasOwn(loginMethods,id))throw new HttpError(400,'Unknown provider');
+  const child=this.children.get(id),state=this.loginState.get(id);
+  if(!child||state?.state!=='waiting')return state||{state:'idle'};
+  this.cancelled.add(id);this.kill(child);this.loginState.set(id,{state:'idle',method:state.method,reason:'cancelled'});this.cache=undefined;return this.loginState.get(id);
  }
  private kill(child:ChildProcess){if(child.pid&&process.platform==='win32')execFile('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{windowsHide:true},()=>{});else child.kill();}
  close(){this.closed=true;for(const child of this.children.values())this.kill(child);this.children.clear();}

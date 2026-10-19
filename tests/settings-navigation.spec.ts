@@ -19,7 +19,7 @@ async function setup(page:Page){
 test('home stays focused; categorized Settings restores focus and Back preserves the draft',async({page})=>{
   await page.setViewportSize({width:390,height:844});await setup(page);
   await expect(page.locator('.sidebar .brand,.sidebar .host-card,.sidebar-footer')).toHaveCount(0);await newChat(page);await page.getByLabel('Message Codex').fill('Keep my draft');
-  await openSection(page,'Settings');await expect(page.locator('.settings-index .settings-category')).toHaveCount(9);await expect(page.locator('.appearance-settings,.codex-access-settings,.usage-limits,.settings-computer')).toHaveCount(0);
+  await openSection(page,'Settings');await expect(page.locator('.settings-index .settings-category')).toHaveCount(8);await expect(page.locator('.appearance-settings,.codex-access-settings,.usage-limits,.settings-computer')).toHaveCount(0);
   await page.locator('[data-settings-category="workspace"]').click();await expect(page.getByRole('button',{name:'All settings',exact:true})).toBeFocused();await page.getByRole('button',{name:'Agent access',exact:true}).click();await expect(page.getByRole('radio',{name:'Full access',exact:true})).toBeChecked();
   await page.keyboard.press('Escape');await expect(page.locator('[data-settings-category="workspace"]')).toBeFocused();await page.keyboard.press('Escape');await newChat(page);await expect(page.getByLabel('Message Codex')).toHaveValue('Keep my draft');
   await openSection(page,'Settings');await page.getByRole('button',{name:'About',exact:true}).click();await expect(page.locator('.settings-about')).toContainText('Pocket Code');await expect(page.locator('.settings-about')).toContainText('BETA');

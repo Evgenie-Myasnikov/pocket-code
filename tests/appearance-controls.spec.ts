@@ -11,8 +11,9 @@ test('sliders and native frame follow palette and theme',async({page})=>{
   const root=document.createElement('div');root.id='appearance-fixture';root.style.cssText='padding:24px;max-width:480px;background:var(--bg)';document.body.replaceChildren(root);
   function Fixture(){return React.createElement(AppearanceSettings,useAppearance());}createRoot(root).render(React.createElement(Fixture));
  });
+ await page.locator('.appearance-advanced summary').click();
  const slider=page.locator('input[type=range]').first();await expect(slider).toBeVisible();await expect(slider).toHaveCSS('appearance','none');await expect(slider).toHaveCSS('height','48px');
- const theme=page.locator('select').first();await theme.selectOption('light');
+ const theme={selectOption:(mode:string)=>page.locator('input[name=appearance-theme][value='+mode+']').check()};await theme.selectOption('light');
  await expect.poll(()=>page.evaluate(()=>(window as any).themeCalls.at(-1)?.dark)).toBe(false);
  const before=await page.evaluate(()=>(window as any).themeCalls.at(-1).background);await page.locator('.palette-options button').nth(2).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).themeCalls.at(-1).background)).not.toBe(before);

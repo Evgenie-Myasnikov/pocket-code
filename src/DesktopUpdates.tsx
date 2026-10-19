@@ -1,7 +1,19 @@
 import type {DesktopState} from './desktop-bridge';
-import {useLanguage} from './i18n';
-export function DesktopUpdates({state,action}:{state:DesktopState;action:(name:string,args?:Record<string,unknown>)=>unknown}){
- const ru=useLanguage()==='ru';const messages:Record<string,[string,string]>={idle:['Ready to check','Готово к проверке'],checking:['Checking GitHub…','Проверяем GitHub…'],current:['Up to date','Установлена актуальная версия'],downloading:['Downloading update…','Скачиваем обновление…'],preparing:['Preparing update…','Подготавливаем обновление…'],ready:['Update ready. Waiting for active tasks to finish.','Обновление готово. Ждём завершения активных задач.'],restarting:['Restarting…','Перезапускаемся…'],complete:['Windows application updated','Приложение Windows обновлено'],paused:['Update paused; check again to resume.','Обновление приостановлено. Проверьте ещё раз.'],error:['Update failed. Previous version kept. Check the connection and retry.','Обновление не удалось. Предыдущая версия сохранена. Проверьте соединение и повторите.']};
- const busy=['checking','downloading','preparing','ready','restarting'].includes(state.updateState||'');
- return <section><h2>{ru?'Обновления приложения':'Application updates'}</h2><p>Pocket Code {state.version}</p><label className="desktop-toggle"><input type="checkbox" checked={state.autoUpdate!==false} onChange={event=>void action('settings',{autoUpdate:event.target.checked})}/>{ru?'Автоматически обновлять приложение и сервер ПК':'Automatically update the Windows app and PC host'}</label><p role="status">{(messages[state.updateState||'idle']||messages.idle)[ru?1:0]} {state.updateVersion}</p><button className="secondary" disabled={busy||!state.online} onClick={()=>void action('check-update')}>{ru?'Проверить обновления':'Check for updates'}</button><p className="muted">{ru?'Проверка при подключении и каждые 6 часов. Перед перезапуском дождёмся завершения задач. Аккаунты, чаты и настройки сохранятся.':'Checks after connecting and every 6 hours. Restart waits for tasks to finish. Accounts, chats and settings are preserved.'}</p></section>;
+import {useId} from 'react';
+import {t,useLanguage} from './i18n';
+import {Notice,type NoticeTone} from './Notice';
+const messages:Record<string,string>={idle:'Готово к проверке',checking:'Проверяем GitHub…',current:'Установлена актуальная версия',downloading:'Скачиваем обновление…',preparing:'Подготавливаем обновление…',ready:'Обновление готово. Ждём завершения активных задач.',restarting:'Перезапускаемся…',complete:'Приложение Windows обновлено',paused:'Обновление приостановлено. Проверьте ещё раз.',error:'Обновление не удалось. Предыдущая версия сохранена.'};
+const tones:Record<string,NoticeTone>={current:'success',complete:'success',ready:'info',paused:'warning',error:'error'};
+/** Every state names what happens next; when a check is impossible the reason and the fix sit next to the disabled button. */
+export function DesktopUpdates({state,action,onConnection}:{state:DesktopState;action:(name:string,args?:Record<string,unknown>)=>unknown;onConnection?:()=>void}){
+ useLanguage();const reason=useId();
+ const updateState=state.updateState||'idle',busy=['checking','downloading','preparing','ready','restarting'].includes(updateState);
+ const message=t(messages[updateState]||messages.idle)+(state.updateVersion?' '+state.updateVersion:'');
+ const check=<button className="secondary" disabled={busy||!state.online} aria-describedby={!state.online?reason:undefined} onClick={()=>void action('check-update')}>{updateState==='error'||updateState==='paused'?t('Повторить'):t('Проверить обновления')}</button>;
+ return <section className="desktop-updates"><h2>{t('Обновления приложения')}</h2><p>Pocket Code {state.version}</p>
+  <label className="desktop-toggle"><input type="checkbox" role="switch" checked={state.autoUpdate!==false} onChange={event=>void action('settings',{autoUpdate:event.target.checked})}/><span>{t('Автоматически обновлять приложение и сервер ПК')}<small>{t('Проверка при подключении и каждые 6 часов. Перед перезапуском дождёмся завершения задач. Аккаунты, чаты и настройки сохранятся.')}</small></span></label>
+  {!state.online?<Notice tone="warning" id={reason} title={t('Сервер ПК не в сети')} action={onConnection&&<button className="secondary" onClick={onConnection}>{t('Открыть подключение')}</button>}>{updateState==='error'?t('Последнее обновление не удалось, предыдущая версия сохранена. Запустите сервер ПК, чтобы проверить снова.'):t('Проверка обновлений недоступна, пока сервер ПК не запущен.')}</Notice>
+   :tones[updateState]?<Notice tone={tones[updateState]} action={updateState==='error'||updateState==='paused'?check:undefined}>{message}</Notice>:<p role="status">{message}</p>}
+  {!(state.online&&(updateState==='error'||updateState==='paused'))&&check}
+ </section>;
 }

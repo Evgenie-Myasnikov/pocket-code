@@ -8,7 +8,7 @@ The hidden section drawer is replaced by a bottom bar (Chats · Board · Inbox �
 
 ## Coordinated updates — 2026-10-01
 
-After an Android upgrade, PC update status stays in Settings → Updates instead of adding another persistent chat panel. The sequence distinguishes downloading, preparing installation, waiting for ongoing work, restarting, success and failure. Temporary network failures during a planned restart use reconnection feedback; stale responses from a different connection are ignored. Failure exposes an explicit retry. Android installation remains a system-confirmed action.
+The Windows application owns PC host updates: Settings → Updates on the PC distinguishes checking, downloading, preparing, waiting for ongoing work, restarting, success and failure, and states why a check is unavailable (for example, the host is offline) with a way to fix it. The phone only receives the APK the PC prepared, or checks GitHub itself when no PC answers; it does not show PC host update progress. A planned host restart currently appears on the phone as ordinary reconnection feedback. Failure exposes an explicit retry. Android installation remains a system-confirmed action.
 
 The host stages a separate verified copy, defers restarting while jobs, queues, terminals or mutations are active, verifies the new process and restores the previous version when startup fails. These safeguards preserve the user's work context; they do not substitute for physical-device testing.
 

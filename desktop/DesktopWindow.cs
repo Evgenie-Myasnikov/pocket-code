@@ -207,6 +207,10 @@ public sealed class PocketDesktop:Form {
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"";
                 if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$"))throw new InvalidOperationException("Invalid provider.");
                 result=await Send(reader,"/provider-connections/"+provider+"/logout",true);
+            }else if(action=="provider-login-cancel"){
+                string provider=message.ContainsKey("provider")?message["provider"] as string:"";
+                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$"))throw new InvalidOperationException("Invalid provider.");
+                result=await Send(reader,"/provider-connections/"+provider+"/login/cancel",true);
             }else if(action=="provider-login"){
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"",method=message.ContainsKey("method")?message["method"] as string:"";
                 if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$")||!Regex.IsMatch(method??"",@"^(browser|console|sso|device|key|token|accessToken)$"))throw new InvalidOperationException("Invalid sign-in method.");

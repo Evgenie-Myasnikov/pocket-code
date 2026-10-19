@@ -12,7 +12,7 @@ test('Review opens on the right and preserves the draft; smaller settings surviv
   await page.getByRole('button',{name:'Back to chat',exact:true}).click();await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');
   await page.getByLabel('Claude model').selectOption('sonnet');
   await openSection(page,'Settings');await page.getByRole('button',{name:'Appearance & language',exact:true}).click();
-  await page.getByLabel('Chat text size',{exact:true}).fill('8');await page.getByLabel('Interface scale',{exact:true}).fill('60');
+  await page.locator('.appearance-advanced summary').click();await page.getByLabel('Chat text size',{exact:true}).fill('8');await page.getByLabel('Interface scale',{exact:true}).fill('60');
   await page.reload();await openSection(page,'Settings');await page.getByRole('button',{name:'Appearance & language',exact:true}).click();
   await expect(page.getByLabel('Chat text size',{exact:true})).toHaveValue('8');await expect(page.getByLabel('Interface scale',{exact:true})).toHaveValue('60');
   await openSection(page,'Chats');await page.getByRole('button',{name:/Интеграционный тест/}).click();await expect(page.getByLabel('Claude model')).toHaveValue('sonnet');
