@@ -14,7 +14,7 @@ const states=new Set(['running','completed','error','stopped','unknown']);
 function status(agent:SubagentView){return states.has(agent.status)?agent.status:'unknown';}
 function State({agent}:{agent:SubagentView}){
   const value=status(agent),Icon=value==='running'?LoaderCircle:value==='completed'?Check:value==='error'?TriangleAlert:Circle;
-  return <span className={'subagent-status '+value} data-status={value}><Icon size={14} aria-hidden="true"/>{label(value)}</span>;
+  return <span className="subagent-status" data-status={value}><Icon size={14} aria-hidden="true"/>{label(value)}</span>;
 }
 
 /** Remount request state when its authenticated parent changes; never show another chat's children. */
@@ -77,15 +77,15 @@ function SubagentsPanel({connection,provider,parentId,onClose,initialAgentId,ini
   return <aside ref={panel} className="subagents-panel" role="dialog" aria-modal="true" aria-label={label('agents')}>
     <header className="subagents-header"><h2>{label('agents')} <span>{agents.length||''}</span></h2><button className="icon-button" aria-label={label('close')} onClick={onClose}><X size={20}/></button></header>
     <div className="subagents-toolbar">
-      {selected?<button ref={backButton} className="subagent-back" onClick={()=>setSelected('')}><ArrowLeft size={18}/>{label('back')}</button>:<p>{label('note')}</p>}
-      <button className="icon-button" aria-label={label('refresh')} disabled={listBusy||historyBusy} onClick={()=>setRefresh(value=>value+1)}><RefreshCw size={18}/></button>
+      {selected?<button ref={backButton} className="subagent-back" onClick={()=>setSelected('')}><ArrowLeft size={20}/>{label('back')}</button>:<p>{label('note')}</p>}
+      <button className="icon-button" aria-label={label('refresh')} disabled={listBusy||historyBusy} onClick={()=>setRefresh(value=>value+1)}><RefreshCw size={20}/></button>
     </div>
     <div className="subagents-scroll" ref={content}>
       {listError&&<Failure text={label('listError')} error={listError}/>}
       {!selected?<>
         {listBusy&&!agents.length&&<p role="status">{label('loading')}</p>}
         {!listBusy&&!agents.length&&!listError&&<p className="subagents-empty">{label('empty')}</p>}
-        <ul className="subagent-list">{agents.map(item=><li key={item.id}><button className="subagent-row" onClick={()=>choose(item.id)}><span><strong>{item.name}</strong><State agent={item}/></span><ChevronRight size={18} aria-hidden="true"/></button></li>)}</ul>
+        <ul className="subagent-list">{agents.map(item=><li key={item.id}><button className="subagent-row" onClick={()=>choose(item.id)}><span><strong>{item.name}</strong><State agent={item}/></span><ChevronRight size={20} aria-hidden="true"/></button></li>)}</ul>
       </>:<section className="subagent-detail">
         {agent&&agent.name.length>110?<details className="subagent-full-name"><summary><h3>{agent.name.slice(0,110)}…</h3></summary><p>{agent.name}</p></details>:<h3>{agent?.name||label('agents')}</h3>}{agent&&<State agent={agent}/>}
         {visibleHistoryError&&<Failure text={label('historyError')} error={visibleHistoryError}/>}

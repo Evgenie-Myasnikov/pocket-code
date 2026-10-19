@@ -42,10 +42,10 @@ export function Files({ connection, root, onProject }: {connection: Connection;r
   useEffect(() => {let valid = true;setLoading(true);setError('');setListing(null);request<Listing>(connection, '/files?path=' + encodeURIComponent(current)).then((data) => {if (valid) setListing(data);}).catch((e) => {if (valid) setError(e.message);}).finally(() => {if (valid) setLoading(false);});return () => {valid = false;};}, [connection, current]);
   const relative=current.length>root.length&&current.toLowerCase().startsWith(root.toLowerCase())?current.slice(root.length).replace(/^[\\/]+/,''):'';
   return <div className="files-panel">
-    <div className="breadcrumb"><button className="icon-button" aria-label={t("На папку выше")} disabled={!listing?.parent||current===root} onClick={() => listing?.parent && setCurrent(listing.parent)}><ArrowLeft size={17} /></button><code>{(root.split(/[\\/]/).filter(Boolean).pop()||root)+(relative?'/'+relative.replace(/\\/g,'/'):'')}</code></div>
+    <div className="breadcrumb"><button className="icon-button" aria-label={t("На папку выше")} disabled={!listing?.parent||current===root} onClick={() => listing?.parent && setCurrent(listing.parent)}><ArrowLeft size={16} /></button><code>{(root.split(/[\\/]/).filter(Boolean).pop()||root)+(relative?'/'+relative.replace(/\\/g,'/'):'')}</code></div>
     {onProject&&<button className="secondary use-folder" disabled={!listing} onClick={() => onProject(current)}>{t("Новый чат в этой папке ")}<ChevronRight size={16} /></button>}
     {loading && <p className="muted" role="status">{t("Читаем папку на ПК…")}</p>}{error && <div className="project-docs-error" role="alert">{t(error)}</div>}
-    {listing?.entries.map((e) => <button className="file-row" key={e.path} onClick={() => e.directory ? setCurrent(e.path) : setPreview(e.path)}>{e.directory ? <Folder size={18} /> : imageFile.test(e.name)?<ImageIcon size={18}/>:<FileText size={18} />}<span>{e.name}</span><ChevronRight size={14} /></button>)}
+    {listing?.entries.map((e) => <button className="file-row" key={e.path} onClick={() => e.directory ? setCurrent(e.path) : setPreview(e.path)}>{e.directory ? <Folder size={20} /> : imageFile.test(e.name)?<ImageIcon size={20}/>:<FileText size={20} />}<span>{e.name}</span><ChevronRight size={14} /></button>)}
     {listing?.entries.length === 0 && <p className="muted">{t("В этой папке пока нет файлов.")}</p>}
     {preview && <FilePreview connection={connection} root={root} path={preview} onClose={()=>setPreview('')}/>}
   </div>;

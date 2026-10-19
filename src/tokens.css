@@ -1,0 +1,75 @@
+/* Design tokens: the one place for raw colours, type, spacing, radii, elevation, layers and motion.
+   Component CSS uses roles from here (and --bg/--panel/--surface/--line/--muted/--text/--accent from the palette files); tests/design-tokens.test.ts blocks new hex literals elsewhere. */
+
+/* Fallback palette (dark Sage) until Appearance sets data-theme and data-palette; appearance.css and neutral-themes.css define the real roles. */
+:root{--bg:#111512;--panel:#171b18;--surface:#202620;--line:#2a302b;--muted:#8a958b;--text:#e6e8e3;--accent:#c3dda8;--accent-dark:#1b2a16}
+
+/* Semantic families. Each has -fg (text and icons, at least 4.5:1 on --bg and on its own -bg), -bg (a tinted pill or banner surface) and -border (at least 3:1 on --bg).
+   Status is never colour alone: components pair it with a glyph and a word (run-status.tsx). */
+:root{
+ --success-fg:#8bcf9f;--warning-fg:#e8c06a;--danger-fg:#f09a90;--info-fg:#86bdf0;--review-fg:#c3a0e0;--running-fg:var(--accent);
+ --danger-solid:#b4443e;--on-danger:#fff;--on-avatar:#fff;--qr-paper:#fff;--brand-miro:#ffd02f;--brand-miro-ink:#050038;--on-accent:var(--accent-dark);
+ --scrim:rgb(0 0 0 / .55);--shadow-faint:rgb(0 0 0 / .06);--shadow-soft:rgb(0 0 0 / .15);--shadow-color:rgb(0 0 0 / .33);
+}
+:root[data-theme=light]{
+ --success-fg:#28663a;--warning-fg:#7f5300;--danger-fg:#a33728;--info-fg:#1b5a96;--review-fg:#6a3fa0;
+ --danger-solid:#a51d26;--scrim:rgb(0 0 0 / .42);--shadow-faint:rgb(0 0 0 / .05);--shadow-soft:rgb(0 0 0 / .1);--shadow-color:rgb(0 0 0 / .16);
+}
+:root{
+ --success-bg:color-mix(in srgb,var(--success-fg) 14%,var(--bg));--warning-bg:color-mix(in srgb,var(--warning-fg) 14%,var(--bg));--danger-bg:color-mix(in srgb,var(--danger-fg) 14%,var(--bg));--info-bg:color-mix(in srgb,var(--info-fg) 14%,var(--bg));--review-bg:color-mix(in srgb,var(--review-fg) 14%,var(--bg));--running-bg:color-mix(in srgb,var(--running-fg) 14%,var(--bg));
+ --success-border:color-mix(in srgb,var(--success-fg) 72%,var(--bg));--warning-border:color-mix(in srgb,var(--warning-fg) 72%,var(--bg));--danger-border:color-mix(in srgb,var(--danger-fg) 72%,var(--bg));--info-border:color-mix(in srgb,var(--info-fg) 72%,var(--bg));--review-border:color-mix(in srgb,var(--review-fg) 72%,var(--bg));--running-border:color-mix(in srgb,var(--running-fg) 72%,var(--bg));
+ /* Older names stay as aliases so every surface reads the same family. */
+ --danger:var(--danger-fg);--error:var(--danger-fg);
+ --status-attention:var(--warning-fg);--status-error:var(--danger-fg);--status-running:var(--running-fg);--status-done:var(--success-fg);--status-review:var(--review-fg);--status-stopped:var(--muted);
+ --board-status-questions:var(--warning-fg);--board-status-ready:var(--info-fg);--board-status-working:var(--running-fg);--board-status-review:var(--review-fg);--board-status-done:var(--success-fg);
+ --priority-critical:var(--danger-fg);--priority-high:var(--warning-fg);
+}
+
+/* Review diff colours (GitHub-like pairs); contrast-modes.css swaps them for the colour-blind mode. */
+:root{--diff-add-fg:#55c78a;--diff-del-fg:#f38787;--diff-add-bg:#3fb95024;--diff-del-bg:#f8514924;--diff-add-word:#3fb95066;--diff-del-word:#f8514966}
+:root[data-theme=light]{--diff-add-fg:#1a7f37;--diff-del-fg:#cf222e;--diff-add-bg:#dafbe1;--diff-del-bg:#ffebe9;--diff-add-word:#abf2bc;--diff-del-word:#ffcecb}
+
+/* Border and state roles. --line stays the quiet divider; fields and other control boundaries use --input (at least 3:1, WCAG 1.4.11). */
+:root{
+ --border-subtle:var(--line);--border:var(--line);--border-strong:color-mix(in oklab,var(--muted) 78%,var(--bg));--input:var(--border-strong);--ring:var(--accent);
+ --bg-hover:color-mix(in srgb,var(--text) 7%,transparent);--bg-active:color-mix(in srgb,var(--text) 12%,transparent);
+}
+
+/* Mono keeps Consolas first on Windows (Review measures its column width); phones, which have no Consolas, get the bundled JetBrains Mono with Cyrillic instead of an arbitrary system face. */
+/* Type: weights match the loaded faces (Golos 400/500/600, Manrope 500/700); one tracking value for uppercase labels; chrome never drops below 11 px on phones and 12 px on the PC at 100 %. */
+:root{
+ --fw-regular:400;--fw-medium:500;--fw-semibold:600;--fw-display:700;--tracking-caps:.08em;
+ --font-sans:'Golos Text',system-ui,sans-serif;--font-display:'Manrope','Golos Text',sans-serif;--font-mono:Consolas,'Cascadia Mono','JetBrains Mono',monospace;
+ --type-min:11px;
+ --type-label-11:var(--fw-medium) calc(max(var(--type-min),11px) * var(--ui-scale,1))/1.4 var(--font-sans);
+ --type-label-12:var(--fw-medium) calc(12px * var(--ui-scale,1))/1.45 var(--font-sans);
+ --type-label-13:var(--fw-medium) calc(13px * var(--ui-scale,1))/1.45 var(--font-sans);
+ --type-label-14:var(--fw-medium) calc(14px * var(--ui-scale,1))/1.45 var(--font-sans);
+ --type-copy-13:var(--fw-regular) calc(13px * var(--ui-scale,1))/1.6 var(--font-sans);
+ --type-copy-14:var(--fw-regular) calc(14px * var(--ui-scale,1))/1.6 var(--font-sans);
+ --type-copy-16:var(--fw-regular) calc(16px * var(--ui-scale,1))/1.6 var(--font-sans);
+ --type-heading-16:var(--fw-semibold) calc(16px * var(--ui-scale,1))/1.35 var(--font-display);
+ --type-heading-20:var(--fw-display) calc(20px * var(--ui-scale,1))/1.3 var(--font-display);
+ --type-heading-24:var(--fw-display) calc(24px * var(--ui-scale,1))/1.25 var(--font-display);
+ --type-mono-12:var(--fw-regular) calc(12px * var(--ui-scale,1))/1.6 var(--font-mono);
+ --type-mono-13:var(--fw-regular) calc(13px * var(--ui-scale,1))/1.6 var(--font-mono);
+}
+@media(min-width:761px) and (pointer:fine){:root{--type-min:12px}}
+
+/* Spacing, radii, elevation and layers. Compact mode steps the spacing scale down one notch instead of patching selectors. */
+:root{
+ --space-unit:calc(4px * var(--ui-scale,1));
+ --space-1:var(--space-unit);--space-2:calc(var(--space-unit) * 2);--space-3:calc(var(--space-unit) * 3);--space-4:calc(var(--space-unit) * 4);--space-5:calc(var(--space-unit) * 6);--space-6:calc(var(--space-unit) * 8);--space-7:calc(var(--space-unit) * 10);--space-8:calc(var(--space-unit) * 12);--space-9:calc(var(--space-unit) * 16);
+ --radius:12px;--radius-sm:calc(var(--radius) - 4px);--radius-md:var(--radius);--radius-lg:calc(var(--radius) + 6px);--radius-pill:999px;
+ --shadow-sm:0 1px 4px var(--shadow-color);--shadow-md:0 8px 28px var(--shadow-color);--shadow-lg:0 12px 48px var(--shadow-color);--shadow-side:-20px 0 64px var(--shadow-color);
+ --material-card:var(--radius-md);--material-menu:var(--radius-md);--material-modal:calc(var(--radius) + 4px);--material-sheet:calc(var(--radius) + 8px);--material-toast:var(--radius-sm);
+ /* Global layers; values 1–8 stay local to a component stacking context. */
+ --z-popover:10;--z-header:20;--z-drawer:30;--z-panel:90;--z-panel-top:100;--z-chat-menu:120;--z-dialog:140;--z-alert:200;--z-sheet:1000;--z-menu:1050;--z-modal:1100;--z-toast:1400;
+ --icon-sm:calc(16px * var(--ui-scale,1));--icon-md:calc(20px * var(--ui-scale,1));--icon-lg:calc(24px * var(--ui-scale,1));--icon-xl:calc(32px * var(--ui-scale,1));
+}
+:root[data-compact=true]{--space-unit:calc(3px * var(--ui-scale,1))}
+
+/* Motion: Material 3 curves and three durations; reduced motion keeps only short fades. */
+:root{--ease-standard:cubic-bezier(.2,0,0,1);--ease-emphasized-decelerate:cubic-bezier(.05,.7,.1,1);--ease-emphasized-accelerate:cubic-bezier(.3,0,.8,.15);--dur-short:100ms;--dur-medium:200ms;--dur-long:300ms}
+@media(prefers-reduced-motion:reduce){:root{--dur-medium:120ms;--dur-long:150ms}}
+

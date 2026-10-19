@@ -50,12 +50,12 @@ export const ReviewFileDiff=memo(function ReviewFileDiff({file,connection,cwd,mo
  const skeleton=Math.max(2,Math.min(12,file.added+file.removed+1));
  return <article ref={element} className={'review-file'+(viewed?' viewed':'')} data-path={file.path} data-status={status?.key}>
   <div className="review-file-heading">
-   <button type="button" className="review-file-toggle" aria-expanded={open} onClick={()=>onToggle(file.path,!open)}>{open?<ChevronDown size={17}/>:<ChevronRight size={17}/>}{status&&<span className="review-file-status" data-status={status.key}>{status.label}</span>}<strong title={file.path}>{folder&&<span className="review-file-folder">{folder}</span>}{name}</strong><FileStats file={file} patchAdded={patchAdded}/></button>
+   <button type="button" className="review-file-toggle" aria-expanded={open} onClick={()=>onToggle(file.path,!open)}>{open?<ChevronDown size={16}/>:<ChevronRight size={16}/>}{status&&<span className="review-file-status" data-status={status.key}>{status.label}</span>}<strong title={file.path}>{folder&&<span className="review-file-folder">{folder}</span>}{name}</strong><FileStats file={file} patchAdded={patchAdded}/></button>
    {changedSinceViewed&&<span className="review-file-changed">{t('Изменён после просмотра')}</span>}
    <label className="review-viewed" title={t('Просмотрено')}><input type="checkbox" checked={viewed} onChange={event=>onViewed(file,event.target.checked)}/><span>{t('Просмотрено')}</span></label>
   </div>
   {open&&<div className="review-file-patch">
-   {error&&<p className="review-file-error" role="alert">{t(error)}<button type="button" className="text-button" onClick={()=>setRetry(n=>n+1)}><RotateCw size={15}/>{t('Повторить')}</button></p>}
+   {error&&<p className="review-file-error" role="alert">{t(error)}<button type="button" className="text-button" onClick={()=>setRetry(n=>n+1)}><RotateCw size={16}/>{t('Повторить')}</button></p>}
    {data?.binary?<p>{t('Двоичный или слишком большой файл')}</p>:data?<>
     <DiffTable patch={data.patch} path={file.path} layout={layout} fontSize={fontSize} fitWidth={fitWidth} wrap={wrap} compact={compact} width={width} selection={selection} onSelectLine={onSelectLine?(side,line,extend,text)=>onSelectLine(file,side,line,extend,text,lines):undefined}/>
     {/* Unchanged lines around the edits, without leaving Review. */}

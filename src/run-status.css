@@ -1,7 +1,5 @@
-/* Status tokens: each value keeps at least 4.5:1 against --bg and --panel in its theme, so the same token colours dots, icons and text. */
-:root{--status-attention:#e8c06a;--status-error:#f09a90;--status-running:#86bdf0;--status-done:#8bcf9f;--status-stopped:var(--muted,#a0a8a0)}
-:root[data-theme=light]{--status-attention:#7f5300;--status-error:#a33728;--status-running:#1b5a96;--status-done:#28663a}
-.run-status{display:inline-flex;align-items:center;gap:4px;min-width:0;font-weight:500;white-space:nowrap}
+/* Status colours are aliases of the semantic families in tokens.css (at least 4.5:1 against --bg and --panel in every theme and palette). */
+.run-status{display:inline-flex;align-items:center;gap:4px;min-width:0;font-weight:var(--fw-medium);white-space:nowrap}
 .run-status-needs_input{--run-status:var(--status-attention)}.run-status-error{--run-status:var(--status-error)}.run-status-running{--run-status:var(--status-running)}.run-status-done{--run-status:var(--status-done)}.run-status-stopped{--run-status:var(--status-stopped)}
 .run-status,.run-status-icon{color:var(--run-status)}
 .run-status-icon{flex:none}

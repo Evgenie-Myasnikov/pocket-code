@@ -48,7 +48,7 @@ export function CodexUsage({ connection, provider = 'codex' }: { connection: Con
   const paced = Array.isArray(snapshot?.buckets) && snapshot!.buckets.some(bucket => bucket.windows.some(window => window.windowDurationMins && window.resetsAt !== null));
 
   return <section className="codex-usage" aria-label={t('Лимиты {0}', providerName)}>
-    <div className="codex-usage-heading"><h3>{t('Лимиты {0}', providerName)}</h3><button className="icon-button" type="button" onClick={() => refresh.current()} disabled={!connection || busy} aria-label={t('Обновить лимиты')} title={t('Обновить лимиты')}><RefreshCw size={18}/></button></div>
+    <div className="codex-usage-heading"><h3>{t('Лимиты {0}', providerName)}</h3><button className="icon-button" type="button" onClick={() => refresh.current()} disabled={!connection || busy} aria-label={t('Обновить лимиты')} title={t('Обновить лимиты')}><RefreshCw size={20}/></button></div>
     <p className="muted">{t('Общие лимиты аккаунта {0} на ПК — для всех чатов и устройств.', providerName)}</p>
     {!connection && <p>{t('Подключитесь к ПК, чтобы увидеть лимиты.')}</p>}
     {busy && !snapshot && <p role="status">{t('Загружаем лимиты…')}</p>}
@@ -60,7 +60,7 @@ export function CodexUsage({ connection, provider = 'codex' }: { connection: Con
       <div className="codex-usage-windows">{bucket.windows.map(window => {
         const remaining = validRemaining(window, snapshot.checkedAt, now), tone = remaining === null ? null : usageTone(remaining), pace = remaining === null ? null : usagePace(window, remaining, now), Icon = tone === 'danger' ? AlertCircle : tone === 'warning' ? AlertTriangle : null;
         return <div className={'codex-usage-window' + (tone ? ' usage-tone-' + tone : '')} key={window.id}>
-          <div className="codex-usage-window-heading"><span>{windowLabel(window, provider)}</span><strong>{Icon && <Icon size={15} aria-hidden="true"/>}{remaining === null ? t('Нет данных') : t('Осталось {0}%', percentLabel(remaining))}</strong></div>
+          <div className="codex-usage-window-heading"><span>{windowLabel(window, provider)}</span><strong>{Icon && <Icon size={16} aria-hidden="true"/>}{remaining === null ? t('Нет данных') : t('Осталось {0}%', percentLabel(remaining))}</strong></div>
           {windowCount > 1 && narrowest?.window === window && <span className="codex-usage-closest">{t('Ближе всего к лимиту')}</span>}
           {remaining !== null && <div className="codex-usage-bar"><progress max={100} value={remaining} aria-label={t('Оставшийся лимит: {0}', windowLabel(window, provider))}/>{pace && <span className="codex-usage-pace-marker" style={{ insetInlineStart: `${Math.round((1 - pace.elapsed) * 1000) / 10}%` }} aria-hidden="true"/>}</div>}
           {pace?.ahead && <small className="codex-usage-pace"><TrendingUp size={14} aria-hidden="true"/>{pace.runsOutAt ? t('Опережаете темп · при таком расходе закончится ≈ {0}', momentLabel(pace.runsOutAt, now)) : t('Опережаете темп')}</small>}

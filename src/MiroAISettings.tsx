@@ -22,7 +22,7 @@ export function MiroAISettings({connection,root,linked}:{connection:Connection;r
   <p>{status.authenticated?t('Вход Miro сохранён на этом ПК.'):t('Для AI нужна отдельная авторизация приложения Miro. Вход внутри доски не даёт доступ к API.')}</p>
   {!status.canManage?<p>{t('Настройте доступ на хост-ПК.')}</p>:<>
    <details className="miro-api-setup disclosure">
-    <summary><ChevronDown className="disclosure-chevron" size={18} aria-hidden="true"/>{t('Настроить вход Miro')}</summary>
+    <summary><ChevronDown className="disclosure-chevron" size={20} aria-hidden="true"/>{t('Настроить вход Miro')}</summary>
     <p>{t('Создайте приложение Miro с правами boards:read и boards:write и зарегистрируйте адрес возврата:')}</p>
     <code>{status.redirectUri}</code>
     <a href="https://developers.miro.com/docs/getting-started-with-oauth" target="_blank" rel="noopener noreferrer">{t('Инструкция Miro')}</a>
@@ -34,7 +34,7 @@ export function MiroAISettings({connection,root,linked}:{connection:Connection;r
    </details>
    {status.configured&&<button className={status.authenticated?'secondary':'primary'} disabled={busy} onClick={()=>void run(async()=>{const reply=await request<{url:string}>(connection,'/miro/oauth/start',{});const parsed=new URL(reply.url);if(parsed.origin!=='https://miro.com'||parsed.pathname!=='/oauth/authorize')throw Error(t('Некорректный адрес входа.'));setLoginUrl(parsed.href);})}>{status.authenticated?t('Войти в Miro заново'):t('Войти в Miro')}</button>}
    {loginUrl&&<a className="miro-sign-in" href={loginUrl} target="_blank" rel="noopener noreferrer">{t('Продолжить в браузере на этом ПК')}</a>}
-   <details className="miro-api-setup disclosure"><summary><ChevronDown className="disclosure-chevron" size={18} aria-hidden="true"/>{t('Использовать токен приложения')}</summary>
+   <details className="miro-api-setup disclosure"><summary><ChevronDown className="disclosure-chevron" size={20} aria-hidden="true"/>{t('Использовать токен приложения')}</summary>
     <p>{t('Для личного приложения разработчика Miro. Вставьте токен доступа здесь на ПК. Хост проверит привязанную доску и сохранит токен зашифрованным вне Git.')}</p>
     <form onSubmit={e=>{e.preventDefault();void run(async()=>{try{await request(connection,'/miro/token',{root,token});}finally{setToken('');}});}}><label>{t('Токен доступа')}<input type="password" autoComplete="new-password" value={token} maxLength={8192} onChange={e=>setToken(e.target.value)} disabled={busy}/></label><button className="secondary" disabled={busy||!token||!linked}>{t('Проверить и сохранить токен')}</button></form>
    </details>

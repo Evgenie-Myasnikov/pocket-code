@@ -30,7 +30,7 @@ export function QuestionDialog({approval,provider,decide,autoOpen=true}:{approva
   finally{sending.current=false;setBusy(false);}
  }
  if(resolved)return null;
- return <><section className="question-request" aria-live="polite"><MessageCircle size={18} aria-hidden="true"/><div><strong>{ru?`${provider} ${plural(questions.length,['задал {0} вопрос','задал {0} вопроса','задал {0} вопросов'])}`:`${provider} asked ${questions.length} question${questions.length===1?'':'s'}`}</strong><p>{questions[0]?.question}</p><button ref={answerButton} type="button" onClick={()=>setOpen(true)}>{l('Answer questions','Ответить на вопросы')}{questions.length>1?` · ${questions.length}`:''}</button></div></section>
+ return <><section className="question-request" aria-live="polite"><MessageCircle size={20} aria-hidden="true"/><div><strong>{ru?`${provider} ${plural(questions.length,['задал {0} вопрос','задал {0} вопроса','задал {0} вопросов'])}`:`${provider} asked ${questions.length} question${questions.length===1?'':'s'}`}</strong><p>{questions[0]?.question}</p><button ref={answerButton} type="button" onClick={()=>setOpen(true)}>{l('Answer questions','Ответить на вопросы')}{questions.length>1?` · ${questions.length}`:''}</button></div></section>
  {open&&createPortal(<div className="question-overlay" onClick={e=>{if(e.target===e.currentTarget)close();}}><div ref={dialog} className="question-dialog" role="dialog" aria-modal="true" aria-labelledby={title}>
   <header><div><small>{provider}</small><h2 id={title}>{l('Questions for you','Вопросы к вам')}</h2></div><button type="button" className="icon-button" aria-label={l('Close questions','Закрыть вопросы')} onClick={close}><X size={20}/></button></header>
   <form onSubmit={e=>{e.preventDefault();void submit(true);}}>
@@ -44,7 +44,7 @@ export function QuestionDialog({approval,provider,decide,autoOpen=true}:{approva
     {q.allowFreeform!==false&&<label className="question-custom">{l('Your answer','Свой ответ')}<textarea rows={2} maxLength={10000} value={custom[index]||''} onChange={e=>{setCustom(previous=>({...previous,[index]:e.target.value}));if(!q.multiSelect)setSelected(previous=>({...previous,[index]:[]}));}}/></label>}
    </fieldset>)}
    {expired&&<p role="status">{l('This request has expired. Wait for a new question from the agent.','Время ожидания истекло. Дождитесь нового вопроса от агента.')}</p>}
-   {error&&<p role="alert" className="error">{error}</p>}</div>
+   {error&&<p role="alert" className="error-banner">{error}</p>}</div>
    <footer><button type="button" className="secondary" disabled={busy||expired} onClick={()=>void submit(false)}>{l('Decline','Отклонить')}</button><button type="submit" className="primary" disabled={busy||expired||!complete}>{busy?l('Sending…','Отправляем…'):l('Send answers','Отправить ответы')}</button></footer>
   </form>
  </div></div>,document.body)}</>;

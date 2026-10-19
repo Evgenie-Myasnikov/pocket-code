@@ -1,7 +1,7 @@
 /* Phone navigation: a bottom bar with Chats, Board, Inbox and More. It is hidden inside an open conversation, where Back returns to the list. */
 .mobile-tabbar{display:none}
-.mobile-menu-backdrop{position:fixed;inset:0;z-index:1000;background:#0007;display:flex;align-items:flex-end}
-.mobile-menu-panel{width:100%;max-height:85dvh;box-sizing:border-box;background:var(--bg);color:var(--text);padding:8px 14px calc(16px + env(safe-area-inset-bottom));border-radius:20px 20px 0 0;box-shadow:0 -10px 40px #0003;overflow:auto;animation:section-menu-in .16s ease-out}
+.mobile-menu-backdrop{position:fixed;inset:0;z-index:var(--z-sheet);background:var(--scrim);display:flex;align-items:flex-end}
+.mobile-menu-panel{width:100%;max-height:85dvh;box-sizing:border-box;background:var(--bg);color:var(--text);padding:8px 14px calc(16px + env(safe-area-inset-bottom));border-radius:20px 20px 0 0;box-shadow:0 -10px 40px var(--shadow-soft);overflow:auto;animation:section-menu-in .16s ease-out}
 .mobile-menu-panel>header{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 8px 8px;font-size:1.15rem}
 .mobile-menu-panel .mobile-nav{position:static;display:flex;flex-direction:column;align-items:stretch;gap:6px;height:auto;padding:0;border:0;background:transparent}
 .mobile-menu-panel .mobile-nav>button{box-sizing:border-box;display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:16px;min-height:52px;width:100%;padding:12px 16px;border:0;border-radius:14px;background:transparent;color:var(--muted);font-size:1rem;text-align:left}
@@ -15,7 +15,7 @@
  .app:not(.embedded-chat){padding-bottom:env(safe-area-inset-bottom)}
  .app.has-tabbar:not(.embedded-chat){padding-bottom:calc(64px + env(safe-area-inset-bottom))}
  .app:not(.embedded-chat)>.sidebar,.app:not(.embedded-chat)>.workspace{padding-bottom:0}
- .app.has-tabbar>.mobile-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);height:calc(64px + env(safe-area-inset-bottom));padding:0 4px env(safe-area-inset-bottom);box-sizing:border-box;background:var(--bg);border-top:1px solid var(--line)}
+ .app.has-tabbar>.mobile-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-header);display:grid;grid-template-columns:repeat(4,1fr);height:calc(64px + env(safe-area-inset-bottom));padding:0 4px env(safe-area-inset-bottom);box-sizing:border-box;background:var(--bg);border-top:1px solid var(--line)}
  .mobile-tabbar>button,.mobile-tabbar .board-notifications-trigger{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;height:64px;min-height:48px;padding:6px 2px;border:0;border-radius:12px;background:transparent;color:var(--muted);font:inherit;font-size:clamp(11px,calc(12px * var(--ui-scale,1)),14px);line-height:1.2}
  .mobile-tabbar .board-notifications{display:flex;width:100%}
  .mobile-tabbar .board-notifications-trigger svg{width:22px;height:22px}

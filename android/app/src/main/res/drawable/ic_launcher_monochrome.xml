@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon layer (Android 13+): the pocket-shield outline from public/pocket-code.svg, placed in the same 768-unit foreground frame that scripts/build-icons.mjs uses. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="768" android:viewportHeight="768">
+    <group android:translateX="128" android:translateY="128">
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="24" android:strokeLineJoin="round" android:fillColor="#00000000" android:pathData="M142,138H370V294Q370,326 338,342L256,386L174,342Q142,326 142,294Z"/>
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="24" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" android:pathData="M222,210L188,244L222,278M290,210L324,244L290,278"/>
+    </group>
+</vector>

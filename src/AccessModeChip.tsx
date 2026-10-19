@@ -53,7 +53,7 @@ export function AccessModeChip({provider,value,onChange,running=false,liveChange
     {open&&<div className="access-menu" id={menu} role="menu" aria-label={t('Режим доступа')} style={{left:place.left,bottom:place.bottom}}>
       {options.map(option=><button key={option.value} type="button" role="menuitemradio" aria-checked={option.value===value} data-danger={option.danger||undefined} onClick={()=>choose(option)}
         onKeyDown={event=>{const items=[...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role=menuitemradio]')||[])],index=items.indexOf(event.currentTarget);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();items[(index+(event.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus();}}}>
-        <option.Icon size={18} aria-hidden="true"/><span><strong>{option.label}</strong><small>{confirming===option.value?t('Нажмите ещё раз, чтобы включить полный доступ для этого чата.'):option.note}{pending(option)&&option.value!==value?' · '+t('со следующего сообщения'):''}</small></span>
+        <option.Icon size={20} aria-hidden="true"/><span><strong>{option.label}</strong><small>{confirming===option.value?t('Нажмите ещё раз, чтобы включить полный доступ для этого чата.'):option.note}{pending(option)&&option.value!==value?' · '+t('со следующего сообщения'):''}</small></span>
       </button>)}
     </div>}
   </div>;

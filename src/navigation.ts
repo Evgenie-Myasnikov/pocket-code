@@ -1,7 +1,7 @@
 import {useEffect,useRef,type RefObject} from 'react';
 import {Capacitor,registerPlugin} from '@capacitor/core';
 
-const NativeNavigation=registerPlugin<{minimize():Promise<void>;embeddedBoards():Promise<{supported:boolean}>}>('Navigation');
+export const NativeNavigation=registerPlugin<{minimize():Promise<void>;embeddedBoards():Promise<{supported:boolean}>;systemBars(options:{dark:boolean;background:string}):Promise<void>}>('Navigation');
 export async function supportsEmbeddedBoards(){if(Capacitor.getPlatform()!=='android')return true;try{return (await NativeNavigation.embeddedBoards()).supported;}catch{return false;}}
 const handlers=new Map<symbol,{priority:number;handle:()=>boolean}>();
 export function useBackAction(handle:()=>boolean,priority=0,enabled=true){

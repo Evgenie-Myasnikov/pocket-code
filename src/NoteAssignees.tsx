@@ -17,7 +17,7 @@ export function NoteAssignees({note,people,onChange,disabled=false}:{note:BoardN
   useEffect(()=>{if(open)dialog.current?.showModal();else dialog.current?.close();},[open]);
   return <div className="note-assignees" aria-label={ru?'Участники заметки':'Note participants'}>
     {ids.map(id=>{const person=people.find(p=>p.id===id)||{id,name:ru?'Участник':'Participant'};return <span className="assignee-chip" key={id}><span className="assignee-avatar"><PersonAvatar person={person}/>{onChange&&<button type="button" className="assignee-remove" disabled={disabled} aria-label={(ru?'Убрать ':'Remove ')+person.name} title={(ru?'Убрать ':'Remove ')+person.name} onClick={()=>onChange(ids.filter(v=>v!==id))}><X size={10}/></button>}</span><span className="assignee-name">{person.name}</span></span>;})}
-    {onChange&&<button ref={trigger} type="button" className="assignee-add" disabled={disabled} aria-label={label} title={label} onClick={()=>{setSearch('');setOpen(true);}}><Plus size={18}/></button>}
+    {onChange&&<button ref={trigger} type="button" className="assignee-add" disabled={disabled} aria-label={label} title={label} onClick={()=>{setSearch('');setOpen(true);}}><Plus size={20}/></button>}
     <dialog ref={dialog} className="assignee-picker" aria-label={label} onCancel={()=>setOpen(false)} onClose={()=>{setOpen(false);trigger.current?.focus();}}>
       <header><h3>{label}</h3><button type="button" className="icon-button" aria-label={ru?'Закрыть':'Close'} onClick={()=>setOpen(false)}><X size={20}/></button></header>
       <input autoFocus aria-label={ru?'Найти участника':'Find participant'} placeholder={ru?'Имя участника':'Participant name'} value={search} onChange={e=>setSearch(e.target.value)}/>

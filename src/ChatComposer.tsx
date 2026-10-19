@@ -82,14 +82,14 @@ export function ChatComposer({text,label,placeholder,disabled,uploading,canSend,
     <div className="composer-tools">
       <input hidden ref={files} type="file" multiple onChange={event=>{const incoming=Array.from(event.target.files||[]);event.target.value='';if(incoming.length)onFiles(incoming);}}/>
       <button type="button" className="icon-button composer-attach" aria-label={t('Прикрепить файлы')} disabled={disabled} onClick={()=>files.current?.click()}>
-        {uploading?<LoaderCircle size={19} className="composer-uploading"/>:<Paperclip size={19}/>}
+        {uploading?<LoaderCircle size={20} className="composer-uploading"/>:<Paperclip size={20}/>}
       </button>
       <div className="composer-models">{controls}</div>
       <div className="composer-actions">
-        {onStop&&<button type="button" className={'icon-button stop-button'+(stopOnly?' stop-primary':'')} aria-label={stopping?t('Останавливаю…'):stopLabel} title={stopping?t('Останавливаю…'):stopLabel+(keyHint?' (Esc)':'')} aria-busy={stopping||undefined} disabled={stopping} onPointerDown={keepFocus} onClick={onStop}>{stopping?<LoaderCircle size={17} className="composer-uploading"/>:stopRetry?<RefreshCw size={16}/>:<Square size={stopOnly?16:13}/>}</button>}
+        {onStop&&<button type="button" className={'icon-button stop-button'+(stopOnly?' stop-primary':'')} aria-label={stopping?t('Останавливаю…'):stopLabel} title={stopping?t('Останавливаю…'):stopLabel+(keyHint?' (Esc)':'')} aria-busy={stopping||undefined} disabled={stopping} onPointerDown={keepFocus} onClick={onStop}>{stopping?<LoaderCircle size={16} className="composer-uploading"/>:stopRetry?<RefreshCw size={16}/>:<Square size={stopOnly?16:13}/>}</button>}
         {!stopOnly&&<button type="button" className="send-button" data-mode={mode} aria-label={sendLabel} title={`${sendLabel} · ${shortcut}`} aria-keyshortcuts={enterSends?'Enter':'Control+Enter'} aria-busy={busy||undefined} disabled={!canSend} aria-description={blockedReason}
           onPointerDown={keepFocus} onClick={send}>
-          {busy?<LoaderCircle size={19} className="composer-uploading"/>:mode==='later'?<Clock size={19}/>:mode==='queue'?<ListPlus size={19}/>:mode==='steer'?<CornerDownRight size={19}/>:<ArrowUp size={20}/>}
+          {busy?<LoaderCircle size={20} className="composer-uploading"/>:mode==='later'?<Clock size={20}/>:mode==='queue'?<ListPlus size={20}/>:mode==='steer'?<CornerDownRight size={20}/>:<ArrowUp size={20}/>}
         </button>}
       </div>
     </div>

@@ -41,9 +41,9 @@ export function ConnectionStatus({offline=false,hostError='',onRetry,className='
   const folded=compact&&!open;
   return <div className={'connection-status connection-status-'+line.tone+(folded?' connection-status-compact':'')+(className?' '+className:'')} role="status" aria-live="polite">
     <button type="button" className="connection-status-main" aria-expanded={line.detail&&!folded?open:undefined} onClick={()=>{if(folded)setCompact(false);else if(line.detail)setOpen(value=>!value);}} title={line.text}>
-      <Icon size={15} aria-hidden="true" className={line.tone==='progress'||reach.checking?'connection-status-spin':undefined}/><span>{folded?line.short:line.text}</span>{line.detail&&!folded&&<ChevronDown size={14} aria-hidden="true" className="connection-status-chevron"/>}
+      <Icon size={16} aria-hidden="true" className={line.tone==='progress'||reach.checking?'connection-status-spin':undefined}/><span>{folded?line.short:line.text}</span>{line.detail&&!folded&&<ChevronDown size={14} aria-hidden="true" className="connection-status-chevron"/>}
     </button>
-    {line.retry&&!folded&&<button type="button" className="text-button connection-status-retry" onClick={retry}><RefreshCw size={13} aria-hidden="true"/>{t('Повторить')}</button>}
+    {line.retry&&!folded&&<button type="button" className="text-button connection-status-retry" onClick={retry}><RefreshCw size={14} aria-hidden="true"/>{t('Повторить')}</button>}
     {open&&line.detail&&!folded&&<p className="connection-status-detail">{line.detail}</p>}
   </div>;
 }

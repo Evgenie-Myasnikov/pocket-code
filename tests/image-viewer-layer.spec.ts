@@ -16,9 +16,9 @@ for(const width of [390,1280])for(const fade of [0,100])test(`image viewer cover
   const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
   const points=[[2,2],[innerWidth-2,2],[2,innerHeight-2],[innerWidth-2,innerHeight-2],[innerWidth/2,40],[innerWidth/2,innerHeight-40]];
   let masked=false;for(let p=el.parentElement;p;p=p.parentElement){const s=getComputedStyle(p);if(s.maskImage!=='none'||Number(s.opacity)<1)masked=true;}
-  return {full:rect.x===0&&rect.y===0&&rect.width===innerWidth&&rect.height===innerHeight,top:points.every(([x,y])=>el.contains(document.elementFromPoint(x,y))),masked,background:style.backgroundColor};
+  return {full:rect.x===0&&rect.y===0&&rect.width===innerWidth&&rect.height===innerHeight,top:points.every(([x,y])=>el.contains(document.elementFromPoint(x,y))),masked,opaque:(()=>{const c=document.createElement('canvas').getContext('2d')!;c.fillStyle=style.backgroundColor;c.fillRect(0,0,1,1);return c.getImageData(0,0,1,1).data[3]===255;})()};
  });
- expect(coverage.full).toBe(true);expect(coverage.top).toBe(true);expect(coverage.masked).toBe(false);expect(coverage.background).toMatch(/^rgb\(/);
+ expect(coverage.full).toBe(true);expect(coverage.top).toBe(true);expect(coverage.masked).toBe(false);expect(coverage.opaque).toBe(true);
  expect(await page.getByLabel('Underlying input').evaluate(el=>!!el.closest('[inert]'))).toBe(true);
  await viewer.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(viewer.getByLabel('Zoom',{exact:true})).toHaveText('1.5×');
  await page.screenshot({path:`.local/image-viewer-layer-${width}-${fade}.png`});

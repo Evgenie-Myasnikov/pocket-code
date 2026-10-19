@@ -71,12 +71,12 @@ export function ApprovalCard({approval,decide,provider='claude',autoOpenQuestion
   const deny=()=>{if(commentable&&!denying){setDenying(true);return;}void submit(false,comment.trim()?{message:comment.trim()}:undefined);};
   const view=plan?{Icon:ListChecks,title:t('Утвердить план?'),body:<div className="approval-plan"><Markdown text={str(approval.input.plan)}/></div>}:describe(approval);
   return <section className="approval-card" data-tool={approval.tool} aria-label={view.title}>
-    <div className="eyebrow"><ShieldCheck size={15} aria-hidden="true"/>{t('Нужно ваше решение')}</div>
-    <h3><view.Icon size={18} aria-hidden="true"/>{view.title}</h3>
+    <div className="eyebrow"><ShieldCheck size={16} aria-hidden="true"/>{t('Нужно ваше решение')}</div>
+    <h3><view.Icon size={20} aria-hidden="true"/>{view.title}</h3>
     {view.body}
     {!plan&&<details className="approval-raw"><summary>{t('Подробности')}</summary><pre>{JSON.stringify(approval.input,null,2)}</pre></details>}
     <Expiry expiresAt={approval.expiresAt}/>
-    {error&&<div className="error" role="alert">{t(error)}</div>}
+    {error&&<div className="error-banner" role="alert">{t(error)}</div>}
     {denying&&<label className="approval-comment">{plan?t('Что изменить в плане? (необязательно)'):t('Что сделать вместо этого? (необязательно)')}<textarea rows={2} maxLength={4000} autoFocus value={comment} disabled={busy} onChange={event=>setComment(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();deny();}if(event.key==='Escape'){event.stopPropagation();setDenying(false);}}}/></label>}
     <div className="approval-actions">
       {plan?<>

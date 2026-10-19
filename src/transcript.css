@@ -1,12 +1,12 @@
 /* Activity rows: icon + object of the action, explicit state words, errors visible without opening the row. */
 .message .tool-card.activity-row>summary{flex-wrap:wrap;row-gap:2px}
 .tool-title{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tool-title.mono{font-family:Consolas,"Cascadia Mono",ui-monospace,monospace;font-size:.92em}
-.tool-diffstat{flex:none;font-variant-numeric:tabular-nums;font-size:.9em}.tool-diffstat b{font-weight:500;color:var(--status-done)}.tool-diffstat i{font-style:normal;color:var(--status-error)}
+.tool-title.mono{font-family:var(--font-mono);font-size:.92em}
+.tool-diffstat{flex:none;font-variant-numeric:tabular-nums;font-size:.9em}.tool-diffstat b{font-weight:var(--fw-medium);color:var(--status-done)}.tool-diffstat i{font-style:normal;color:var(--status-error)}
 .tool-state{flex:none;display:inline-flex;align-items:center;font-size:.85em}
-.tool-state[data-status=running]{color:var(--status-running)}.tool-state[data-status=failed]{color:var(--status-error);font-weight:500}.tool-state[data-status=denied]{color:var(--status-attention)}.tool-state[data-status=nomatch]{color:var(--muted)}
+.tool-state[data-status=running]{color:var(--status-running)}.tool-state[data-status=failed]{color:var(--status-error);font-weight:var(--fw-medium)}.tool-state[data-status=denied]{color:var(--status-attention)}.tool-state[data-status=nomatch]{color:var(--muted)}
 .tool-spinner{animation:run-status-spin 1.4s linear infinite}
-.tool-error-lines{flex-basis:100%;min-width:0;margin:2px 0 4px 26px;padding-left:10px;border-left:2px solid var(--status-error);white-space:pre-wrap;overflow-wrap:anywhere;font:.85em/1.5 Consolas,"Cascadia Mono",ui-monospace,monospace;color:var(--text)}
+.tool-error-lines{flex-basis:100%;min-width:0;margin:2px 0 4px 26px;padding-left:10px;border-left:2px solid var(--status-error);white-space:pre-wrap;overflow-wrap:anywhere;font:.85em/1.5 var(--font-mono);color:var(--text)}
 .tool-output-block{margin:4px 0;padding-left:10px;border-left:2px solid var(--line)}
 .tool-output-block.failed{border-left-color:var(--status-error)}
 .tool-output-block>.tool-output{white-space:pre;overflow:auto;overflow-wrap:normal;margin:2px 0}
@@ -15,8 +15,8 @@
 .tool-output-actions{display:flex;flex-wrap:wrap;gap:4px}
 .copy-action{display:inline-flex;align-items:center;gap:6px;min-height:48px;padding:4px 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:.82em}
 .copy-action:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 9%,transparent);color:var(--text)}
-.tool-command{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 6px;font:.88em/1.5 Consolas,"Cascadia Mono",ui-monospace,monospace;color:var(--text)}
-.tool-diff{white-space:pre;overflow:auto;max-height:min(60dvh,560px);margin:0 0 6px;font:.88em/1.5 Consolas,"Cascadia Mono",ui-monospace,monospace}
+.tool-command{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 6px;font:.88em/1.5 var(--font-mono);color:var(--text)}
+.tool-diff{white-space:pre;overflow:auto;max-height:min(60dvh,560px);margin:0 0 6px;font:.88em/1.5 var(--font-mono)}
 .tool-diff [data-line=add]{color:var(--status-done);background:color-mix(in srgb,var(--status-done) 10%,transparent)}
 .tool-diff [data-line=del]{color:var(--status-error);background:color-mix(in srgb,var(--status-error) 10%,transparent)}
 .tool-diff [data-line=meta]{color:var(--muted)}
@@ -26,11 +26,11 @@
 .plan-checklist{list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:4px}
 .plan-checklist li{display:flex;align-items:flex-start;gap:8px;line-height:1.45;color:var(--text)}.plan-checklist li>svg{flex:none;margin-top:.15em}
 .plan-checklist li[data-status=completed]{color:var(--muted)}.plan-checklist li[data-status=completed]>span{text-decoration:line-through}
-.plan-checklist li[data-status=in_progress]{color:var(--accent);font-weight:500}
+.plan-checklist li[data-status=in_progress]{color:var(--accent);font-weight:var(--fw-medium)}
 .plan-checklist li[data-status=pending]{color:var(--muted)}
 .plan-bar{margin:0 0 6px;border-radius:14px;background:var(--panel);color:var(--text);overflow:hidden}
 .plan-bar-toggle{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:6px 12px;border:0;background:transparent;color:inherit;font:inherit;font-size:.9em;text-align:left}
-.plan-bar-count{flex:none;font-weight:600;font-variant-numeric:tabular-nums}.plan-bar-current{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.plan-bar-count{flex:none;font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums}.plan-bar-current{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 .plan-bar-chevron{flex:none;margin-left:auto;color:var(--muted);transition:transform .15s}.plan-bar[data-open=true] .plan-bar-chevron{transform:rotate(180deg)}
 .plan-bar>.plan-checklist{max-height:40dvh;overflow:auto;margin:0;padding:0 12px 10px}
 @media(pointer:coarse){.plan-bar-toggle{min-height:48px}}
@@ -40,13 +40,13 @@
 .markdown table{-webkit-overflow-scrolling:touch}
 .code-block{margin:14px 0;min-width:0}
 .code-block-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 2px 0 4px;color:var(--muted);font-size:.8em}
-.code-block-bar>span{font-family:Consolas,"Cascadia Mono",ui-monospace,monospace;text-transform:lowercase}
+.code-block-bar>span{font-family:var(--font-mono);text-transform:lowercase}
 .code-block>pre{margin-top:2px!important}
 /* Background-task notices are centred events, not the person's bubble. */
 :root .message.transcript-event-message,:root[data-theme] article.message.transcript-event-message{display:block;width:100%;max-width:100%;margin:10px auto;padding:0;border:0;background:transparent}
 .claude-task-notification.transcript-event{margin:6px auto;max-width:min(560px,100%);padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:.9em}
 .claude-task-notification.transcript-event>summary{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:4px 10px;cursor:pointer;list-style:none;text-align:center}
-.claude-task-notification.transcript-event>summary>strong{display:inline;margin:0;font-weight:500;color:var(--text);white-space:nowrap}
+.claude-task-notification.transcript-event>summary>strong{display:inline;margin:0;font-weight:var(--fw-medium);color:var(--text);white-space:nowrap}
 .claude-task-notification.transcript-event>summary>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .claude-task-notification.transcript-event[open] .event-chevron{transform:rotate(90deg)}
 .claude-task-notification.transcript-event>:not(summary){padding:0 14px}.claude-task-notification.transcript-event>p{white-space:pre-wrap;color:var(--text)}
@@ -59,13 +59,13 @@ button.turn-changes:hover{color:var(--text);border-color:var(--accent)}
 .running-action-time{flex:none;font-variant-numeric:tabular-nums;color:var(--muted);font-size:.92em}
 .turn-complete .turn-duration,.turn-complete time{font-variant-numeric:tabular-nums}
 /* One round "latest" button replaces the two wide pills; it fades out while the person scrolls. */
-.scroll-latest{position:absolute;z-index:4;right:max(16px,var(--safe-area-inset-right,env(safe-area-inset-right)));bottom:calc(var(--chat-overlay-bottom,170px) + 12px);display:flex;align-items:center;justify-content:center;width:48px;height:48px;min-width:48px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--text);box-shadow:0 3px 14px #0003;transition:opacity .2s}
+.scroll-latest{position:absolute;z-index:4;right:max(16px,var(--safe-area-inset-right,env(safe-area-inset-right)));bottom:calc(var(--chat-overlay-bottom,170px) + 12px);display:flex;align-items:center;justify-content:center;width:48px;height:48px;min-width:48px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--text);box-shadow:0 3px 14px var(--shadow-soft);transition:opacity .2s}
 .scroll-latest[data-scrolling]{opacity:0;pointer-events:none}
-.scroll-latest-count{position:absolute;top:-6px;right:-4px;min-width:18px;padding:1px 5px;border-radius:10px;background:var(--accent);color:var(--bg);font-size:11px;font-weight:600;line-height:1.4;font-variant-numeric:tabular-nums}
+.scroll-latest-count{position:absolute;top:-6px;right:-4px;min-width:18px;padding:1px 5px;border-radius:10px;background:var(--accent);color:var(--bg);font-size:11px;font-weight:var(--fw-semibold);line-height:1.4;font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){.scroll-latest{transition:none}.tool-spinner{animation:none}}
 /* Rare actions live in a menu; the title is a shortcut to the beginning of the chat. */
 .chat-header-conversation .chat-header-actions>button.chat-menu-button{min-width:48px;padding:0}
-.chat-menu{position:fixed;z-index:120;min-width:220px;max-width:calc(100vw - 16px);padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);box-shadow:0 12px 40px #0005;display:flex;flex-direction:column}
+.chat-menu{position:fixed;z-index:var(--z-chat-menu);min-width:220px;max-width:calc(100vw - 16px);padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);box-shadow:0 12px 40px var(--shadow-color);display:flex;flex-direction:column}
 .chat-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:8px 12px;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;text-align:left}
 .chat-menu button:hover:not(:disabled),.chat-menu button:focus-visible{background:color-mix(in srgb,var(--accent) 10%,transparent)}
 .chat-menu [role=group]{border-top:1px solid var(--line);margin-top:4px;padding-top:4px}

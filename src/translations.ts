@@ -1501,4 +1501,13 @@ export const english: Record<string, string> = {
   "Доступна версия {0}{1}.": "Version {0}{1} is available.",
   "{0} МБ": "{0} MB",
   "Android требует один раз разрешить Pocket Code устанавливать приложения. Затем вернитесь сюда и нажмите «Установить обновление».": "Android asks once to allow Pocket Code to install apps. Then come back here and tap “Install update”.",
+  "Тест ждёт старый текст кнопки. Исправил ожидание в": "The test expects the old button text. Fixed the expectation in",
+  "Проверьте вход вручную после выкладки.": "Check sign-in by hand after the release.",
+  "Ответить агенту…": "Reply to the agent…",
+  "Контраст": "Contrast",
+  "Как в системе": "Match system",
+  "Высокий": "High",
+  "Высокий контраст усиливает рамки полей и второстепенный текст.": "High contrast strengthens field borders and secondary text.",
+  "Цвета для дальтоников": "Colour-blind friendly colours",
+  "Синий и оранжевый вместо зелёного и красного в статусах и Review": "Blue and orange instead of green and red in statuses and Review",
 };

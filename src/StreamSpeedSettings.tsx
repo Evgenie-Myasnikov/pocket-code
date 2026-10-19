@@ -7,5 +7,5 @@ export function StreamSpeedSettings(){
  const label=t('Скорость появления букв');
  return <div><label>{label}<select aria-label={label} value={speed} onChange={e=>{try{setStreamSpeed(Number(e.target.value));setError('');}catch{setError(t('Не удалось сохранить скорость.'));}}}>
   <option value={20}>{t('Медленно')}</option><option value={40}>{t('Обычно')}</option><option value={80}>{t('Быстро')}</option><option value={0}>{t('Мгновенно')}</option>
- </select></label>{error&&<p className="error" role="alert">{error}</p>}</div>;
+ </select></label>{error&&<p className="error-banner" role="alert">{error}</p>}</div>;
 }

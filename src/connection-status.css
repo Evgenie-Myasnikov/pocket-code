@@ -1,11 +1,11 @@
 /* One opaque status line for the PC connection; theme tokens keep it readable in light and dark themes. */
-.connection-status{--connection-tone:var(--status-attention,#e8c06a);flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:6px 12px;padding:6px 10px 6px 12px;min-height:40px;border:1px solid color-mix(in srgb,var(--connection-tone) 40%,var(--line,#3b4b30));border-radius:12px;background:color-mix(in srgb,var(--connection-tone) 10%,var(--panel,#1c231c));color:var(--text,#e6ebe0);font-size:calc(13px * var(--ui-scale,1));line-height:1.4;position:relative;z-index:1;box-shadow:0 4px 14px rgb(0 0 0 / .12)}
-.connection-status-progress{--connection-tone:var(--status-running,#86bdf0)}.connection-status-warning{--connection-tone:var(--danger,#d4736f)}
+.connection-status{--connection-tone:var(--status-attention);flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:6px 12px;padding:6px 10px 6px 12px;min-height:40px;border:1px solid color-mix(in srgb,var(--connection-tone) 40%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--connection-tone) 10%,var(--panel));color:var(--text);font-size:calc(13px * var(--ui-scale,1));line-height:1.4;position:relative;z-index:1;box-shadow:0 4px 14px rgb(0 0 0 / .12)}
+.connection-status-progress{--connection-tone:var(--status-running)}.connection-status-warning{--connection-tone:var(--danger)}
 .connection-status-main{display:flex;align-items:center;gap:8px;flex:1;min-width:0;min-height:30px;border:0;background:transparent;color:inherit;font:inherit;text-align:start;padding:0;cursor:pointer}
 .connection-status-main svg{flex-shrink:0;color:var(--connection-tone)}.connection-status-main span{min-width:0;overflow-wrap:anywhere}
 .connection-status-chevron{opacity:.7}.connection-status-main[aria-expanded=true] .connection-status-chevron{transform:rotate(180deg)}
-.connection-status-retry{display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:0 8px;font-size:inherit;color:var(--text,#e6ebe0)}
-.connection-status-detail{flex-basis:100%;margin:0 0 4px;color:var(--muted,#a0a8a0);font-size:calc(12.5px * var(--ui-scale,1))}
+.connection-status-retry{display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:0 8px;font-size:inherit;color:var(--text)}
+.connection-status-detail{flex-basis:100%;margin:0 0 4px;color:var(--muted);font-size:calc(12.5px * var(--ui-scale,1))}
 .connection-status-compact{align-self:center;flex:0 0 auto;width:auto;min-height:32px;padding:2px 12px;border-radius:999px;margin-inline:auto}
 .connection-status-compact .connection-status-main{flex:0 0 auto}
 .connection-status-spin{animation:connection-status-spin 1s linear infinite}
@@ -18,11 +18,11 @@
 /* Phone fingers need full-size targets: the line itself and Retry stay 48px tall without growing the padding. */
 @media(max-width:760px),(pointer:coarse){.connection-status{padding-block:0}.connection-status-main,.connection-status-retry{min-height:48px}.connection-status-compact{min-height:48px;padding-block:0}}
 /* While the first answer is on its way, lists show skeleton rows instead of a confident "nothing here". */
-.loading-skeleton{display:grid;gap:10px;padding:8px 0}.loading-skeleton span{display:block;height:46px;border-radius:10px;background:linear-gradient(90deg,color-mix(in srgb,var(--text,#e6ebe0) 6%,transparent),color-mix(in srgb,var(--text,#e6ebe0) 12%,transparent),color-mix(in srgb,var(--text,#e6ebe0) 6%,transparent));background-size:200% 100%;animation:loading-skeleton 1.4s ease-in-out infinite}
+.loading-skeleton{display:grid;gap:10px;padding:8px 0}.loading-skeleton span{display:block;height:46px;border-radius:10px;background:linear-gradient(90deg,color-mix(in srgb,var(--text) 6%,transparent),color-mix(in srgb,var(--text) 12%,transparent),color-mix(in srgb,var(--text) 6%,transparent));background-size:200% 100%;animation:loading-skeleton 1.4s ease-in-out infinite}
 @keyframes loading-skeleton{from{background-position:100% 0}to{background-position:-100% 0}}
 .offline-empty{display:grid;justify-items:center;gap:10px;text-align:center}
 .history-loading{display:inline-flex;align-items:center;gap:8px}.history-loading svg{animation:connection-status-spin 1s linear infinite}
 @media(prefers-reduced-motion:reduce){.loading-skeleton span,.history-loading svg{animation:none}}
-.run-unknown .running-action-quiet{color:var(--status-attention,#e8c06a)}
-.prompt-composer .composer-hint.composer-blocked{color:var(--status-attention,#e8c06a);opacity:1}
+.run-unknown .running-action-quiet{color:var(--status-attention)}
+.prompt-composer .composer-hint.composer-blocked{color:var(--status-attention);opacity:1}
 .history-error-reason{display:block;margin-top:2px;opacity:.85;overflow-wrap:anywhere}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash background before the WebView paints: one constant per system theme; MainActivity then applies the app theme saved by window-theme.ts. -->
+    <color name="splash_background">#f7f8f5</color>
+</resources>

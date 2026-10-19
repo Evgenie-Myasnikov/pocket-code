@@ -27,7 +27,7 @@ export function OutputImageCard({output,title,connection,cwd,queue,onOpen}:{queu
     return()=>{active=false;cancel();if(objectUrl)URL.revokeObjectURL(objectUrl);setSrc(null);};
   },[near,remote,queue,connection,cwd,output.path,output.block]);
   return <button ref={element} className="chat-output-image-card" aria-label={title} onClick={onOpen}>
-    <span className="chat-output-image-frame">{src?<img src={src} alt="" decoding="async"/>:<><Image size={30}/><small>{remote?<><CloudDownload size={15}/>{ru?'Внешнее изображение':'External image'}</>:failed?(ru?'Нажмите для просмотра':'Tap to view'):ru?'Предпросмотр…':'Preview…'}</small></>}</span>
+    <span className="chat-output-image-frame">{src?<img src={src} alt="" decoding="async"/>:<><Image size={32}/><small>{remote?<><CloudDownload size={16}/>{ru?'Внешнее изображение':'External image'}</>:failed?(ru?'Нажмите для просмотра':'Tap to view'):ru?'Предпросмотр…':'Preview…'}</small></>}</span>
     <strong>{title}</strong>
   </button>;
 }

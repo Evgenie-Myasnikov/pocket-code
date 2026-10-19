@@ -63,7 +63,7 @@ function Document({block}:{block:Block}) {
   const [error,setError]=useState(''); const source=block.source;
   const pdf=source?.media_type==='application/pdf' && source.data && source.data.length<=14_000_000 && /^[A-Za-z0-9+/\r\n]*={0,2}$/.test(source.data) ? source.data : null;
   const title=block.title || t('Документ');
-  return <section className="document-card"><strong>📎 {title}</strong>{source?.text && <pre>{source.text}</pre>}{pdf && (Capacitor.isNativePlatform()?<button className="secondary" onClick={()=>void Documents.openDocument({data:pdf,name:title}).catch(e=>setError(e.message))}>{t('Открыть PDF')}</button>:<a href={`data:application/pdf;base64,${pdf}`} download="document.pdf">{t('Скачать PDF')}</a>)}{safeWebUrl(source?.url) && <a href={safeWebUrl(source?.url)!} target="_blank" rel="noopener noreferrer">{t('Открыть документ')}</a>}{error && <p className="error">{t(error)}</p>}</section>;
+  return <section className="document-card"><strong>📎 {title}</strong>{source?.text && <pre>{source.text}</pre>}{pdf && (Capacitor.isNativePlatform()?<button className="secondary" onClick={()=>void Documents.openDocument({data:pdf,name:title}).catch(e=>setError(e.message))}>{t('Открыть PDF')}</button>:<a href={`data:application/pdf;base64,${pdf}`} download="document.pdf">{t('Скачать PDF')}</a>)}{safeWebUrl(source?.url) && <a href={safeWebUrl(source?.url)!} target="_blank" rel="noopener noreferrer">{t('Открыть документ')}</a>}{error && <p className="error-banner">{t(error)}</p>}</section>;
 }
 const TAIL=12;
 /** Command output keeps its exact text: monospace, ANSI removed, the last lines first, with copy actions and an error stripe. */
@@ -150,7 +150,7 @@ export function RichBlock({block,depth=0,result,onSubagent,running=false,streami
   }
   if(block.type==='subagent' && block.agent) {
     const agent=block.agent,label=t(({running:'Работает',completed:'Готово',error:'Ошибка',stopped:'Остановлено',unknown:'Статус неизвестен'} as const)[agent.status]);
-    return onSubagent?<button className={`subagent-card subagent-${agent.status}`} data-status={agent.status} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span><ChevronRight size={16} className="subagent-card-chevron" aria-hidden="true"/></button>:<Disclosure className="subagent-inline" summary={<>{agent.name} · {label}</>}>{()=> <>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</>}</Disclosure>;
+    return onSubagent?<button className="subagent-card" data-status={agent.status} onClick={()=>onSubagent(agent)}><span className="subagent-status-dot" aria-hidden="true"/><span><strong>{agent.name}</strong><small>{label}</small></span><ChevronRight size={16} className="subagent-card-chevron" aria-hidden="true"/></button>:<Disclosure className="subagent-inline" summary={<>{agent.name} · {label}</>}>{()=> <>{agent.prompt&&<Markdown text={agent.prompt}/>} {agent.result&&<Markdown text={agent.result}/>}</>}</Disclosure>;
   }
   if(block.type==='image'){const src=imageSource(block);return src?<Picture src={src} alt={block.title||t('Изображение')}/>:<span className="attachment-chip">📎 {t('Изображение недоступно в сохранённой истории')}</span>;}
   if(block.type==='document')return <Document block={block}/>;

@@ -2,14 +2,14 @@
 .question-request>svg{flex-shrink:0;margin-top:3px;color:var(--accent)}
 .question-request p{margin:6px 0;color:var(--muted);overflow-wrap:anywhere}
 .question-request button{min-height:44px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px;color:var(--text)}
-.question-overlay{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;padding:16px;background:#0008}
-.question-dialog{display:flex;flex-direction:column;width:min(560px,100%);max-height:calc(100dvh - 32px);min-height:0;overflow:hidden;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 60px #0005;font-size:var(--chat-font-size,14px)}
+.question-overlay{position:fixed;inset:0;z-index:var(--z-modal);display:grid;place-items:center;padding:16px;background:var(--scrim)}
+.question-dialog{display:flex;flex-direction:column;width:min(560px,100%);max-height:calc(100dvh - 32px);min-height:0;overflow:hidden;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 60px var(--shadow-color);font-size:var(--chat-font-size,14px)}
 .question-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
 .question-dialog h2{margin:4px 0 0;font-size:1.2em}.question-dialog small{color:var(--muted)}
 .question-dialog form{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .question-body{overflow:auto;overscroll-behavior:contain;padding:20px}
 .question-dialog fieldset{border:0;padding:0;margin:0 0 22px;min-width:0}
-.question-dialog legend{font-weight:600;overflow-wrap:anywhere;margin-bottom:12px}
+.question-dialog legend{font-weight:var(--fw-semibold);overflow-wrap:anywhere;margin-bottom:12px}
 .question-options{display:grid;gap:8px}.question-options label{display:flex;gap:12px;align-items:flex-start;padding:12px;min-height:44px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
 .question-options label.selected{background:var(--surface);border-color:var(--accent)}
 .question-options input{width:18px;min-width:18px;height:18px;margin:2px 0;accent-color:var(--accent)}
@@ -20,6 +20,6 @@
 @media(max-width:480px){.question-overlay{padding:8px}.question-dialog{max-height:calc(100dvh - 16px);border-radius:18px}.question-dialog header,.question-body{padding:14px}.question-dialog footer{padding:10px 14px;flex-wrap:wrap}}
 /* The global label+label gap does not apply inside the options list; options and their notes stay readable. */
 .question-dialog .question-options label+label{margin-top:0}
-.question-options strong{font-size:max(13px,1em);font-weight:500;color:var(--text)}
+.question-options strong{font-size:max(13px,1em);font-weight:var(--fw-medium);color:var(--text)}
 .question-options small{font-size:max(12px,.9em);color:var(--muted)}
 .question-dialog legend small{font-size:max(12px,.9em)}

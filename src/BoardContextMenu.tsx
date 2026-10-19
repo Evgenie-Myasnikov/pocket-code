@@ -27,5 +27,5 @@ export function BoardContextMenu({viewport,boardId,zoom,enabled,onCreate}:{viewp
     return()=>{cancel();el.removeEventListener('pointerdown',down);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);el.removeEventListener('contextmenu',context);el.removeEventListener('scroll',dismiss);el.removeEventListener('wheel',dismiss);window.removeEventListener('blur',dismiss);window.removeEventListener('resize',dismiss);document.removeEventListener('pointerdown',outside);};
   },[boardId,enabled]);
   if(!position||!enabled)return null;
-  return <div className="board-context-menu" role="menu" style={{left:position.left,top:position.top}}><button ref={button} role="menuitem" onClick={()=>{onCreate({x:position.x,y:position.y});setPosition(null);}}><Plus size={18}/>{ru?'Создать заметку':'Create note'}</button></div>;
+  return <div className="board-context-menu" role="menu" style={{left:position.left,top:position.top}}><button ref={button} role="menuitem" onClick={()=>{onCreate({x:position.x,y:position.y});setPosition(null);}}><Plus size={20}/>{ru?'Создать заметку':'Create note'}</button></div>;
 }

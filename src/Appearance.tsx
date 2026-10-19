@@ -1,30 +1,35 @@
-import { t, useLanguage } from "./i18n";import { useEffect, useState, type ReactNode } from 'react';
-import { ChevronDown, RotateCcw } from 'lucide-react';
+import { t, useLanguage } from "./i18n";import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { ArrowUp, ChevronDown, RotateCcw } from 'lucide-react';
 import { Notice } from './Notice';
 import { useStreamSpeed, setStreamSpeed } from './stream-speed';
 import { useEdgeFade, setEdgeFade } from './chat-edge-fade';
 import { useBoardGrid, setBoardGrid } from './board-grid';
 import './appearance.css';
 import './neutral-themes.css';
+import './contrast-modes.css';
 import {BoardGridSettings} from './BoardGridSettings';
 import {StreamSpeedSettings} from './StreamSpeedSettings';
 import {EdgeFadeSettings} from './EdgeFadeSettings';
 import {useApplyEdgeFade} from './chat-edge-fade';
 
-const palettes = [
-{ id: 'neutral', name: 'Нейтральная', color: '#a6a6a6', hue: 0 },
-{ id: 'codex', name: 'Codex', color: '#e5e5e5', hue: 0 },
-{ id: 'claude', name: 'Claude', color: '#ce967b', hue: 25 },
-{ id: 'copilot', name: 'Copilot', color: '#8db3ff', hue: 215 },
-{ id: 'sage', name: 'Шалфей', color: '#c3dda8', hue: 94 },
-{ id: 'ocean', name: 'Океан', color: '#9fcfff', hue: 211 },
-{ id: 'lilac', name: 'Сирень', color: '#d2b5ff', hue: 267 },
-{ id: 'rose', name: 'Роза', color: '#f4b7c9', hue: 340 },
-{ id: 'amber', name: 'Янтарь', color: '#f1cb89', hue: 38 },
-{ id: 'mint', name: 'Мята', color: '#abe3da', hue: 170 }];
+type Swatch = { dark: [string, string]; light: [string, string] };
+/** Hue palettes are generated in OKLCH (appearance.css); hslHue only feeds the fallback for WebViews without OKLCH. Named palettes are fixed presets (neutral-themes.css). */
+const generated = (hue: number): Swatch => ({ dark: [`oklch(.18 .008 ${hue})`, `oklch(.84 .075 ${hue})`], light: [`oklch(.978 .005 ${hue})`, `oklch(.45 .1 ${hue})`] });
+export const palettes: { id: string; name: string; hue: number; hslHue: number; swatch: Swatch }[] = [
+{ id: 'neutral', name: 'Нейтральная', hue: 0, hslHue: 0, swatch: { dark: ['#171614', '#ddd5c8'], light: ['#faf9f7', '#4a4238'] } },
+{ id: 'codex', name: 'Codex', hue: 0, hslHue: 0, swatch: { dark: ['#181818', '#e5e5e5'], light: ['#ffffff', '#252525'] } },
+{ id: 'claude', name: 'Claude', hue: 0, hslHue: 25, swatch: { dark: ['#242321', '#e2ac8b'], light: ['#faf9f5', '#9b472b'] } },
+{ id: 'copilot', name: 'Copilot', hue: 0, hslHue: 215, swatch: { dark: ['#0d1117', '#9bbcff'], light: ['#ffffff', '#1754bd'] } },
+{ id: 'sage', name: 'Шалфей', hue: 132, hslHue: 94, swatch: generated(132) },
+{ id: 'ocean', name: 'Океан', hue: 225, hslHue: 195, swatch: generated(225) },
+{ id: 'lilac', name: 'Сирень', hue: 306, hslHue: 267, swatch: generated(306) },
+{ id: 'rose', name: 'Роза', hue: 356, hslHue: 340, swatch: generated(356) },
+{ id: 'amber', name: 'Янтарь', hue: 81, hslHue: 38, swatch: generated(81) },
+{ id: 'mint', name: 'Мята', hue: 184, hslHue: 170, swatch: generated(184) }];
 
-type Appearance = {palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;compact: boolean;};
-const defaults: Appearance = { palette: 'sage', theme: 'dark', textSize: 14, scale: 100, spacing: 1.85, compact: false };
+type Contrast = 'auto' | 'normal' | 'more';
+type Appearance = {palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
+const defaults: Appearance = { palette: 'sage', theme: 'dark', textSize: 14, scale: 100, spacing: 1.85, compact: false, contrast: 'auto', colorblind: false };
 const storageKey = 'pocket-code-appearance-v1';
 const bounded = (value: unknown, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 function load(): Appearance {
@@ -33,7 +38,8 @@ function load(): Appearance {
     return { palette: palettes.some((p) => p.id === data.palette) ? data.palette : defaults.palette,
       theme: ['dark', 'light', 'system'].includes(data.theme) ? data.theme : defaults.theme,
       textSize: bounded(data.textSize, 8, 22, 14), scale: bounded(data.scale, 60, 130, 100),
-      spacing: bounded(data.spacing, 1.1, 2.2, 1.85), compact: data.compact === true };
+      spacing: bounded(data.spacing, 1.1, 2.2, 1.85), compact: data.compact === true,
+      contrast: ['auto', 'normal', 'more'].includes(data.contrast) ? data.contrast : defaults.contrast, colorblind: data.colorblind === true };
   } catch {return defaults;}
 }
 /** Second line of the settings index: what is set now, not what the page is about. */
@@ -51,7 +57,11 @@ export function useAppearance() {
     applyTheme();system.addEventListener('change', applyTheme);
     root.dataset.compact = String(appearance.compact);
     root.dataset.palette = appearance.palette;
-    root.style.setProperty('--palette-hue', String(palettes.find((p) => p.id === appearance.palette)!.hue));
+    const palette = palettes.find((p) => p.id === appearance.palette)!;
+    root.style.setProperty('--palette-hue', String(palette.hue));root.style.setProperty('--palette-hsl-hue', String(palette.hslHue));
+    // Automatic contrast leaves the attribute off so @media (prefers-contrast: more) can apply.
+    if (appearance.contrast === 'auto') delete root.dataset.contrast; else root.dataset.contrast = appearance.contrast;
+    root.dataset.colorblind = String(appearance.colorblind);
     root.style.setProperty('--chat-font-size', `${appearance.textSize}px`);
     root.style.setProperty('--ui-scale', String(appearance.scale / 100));
     root.style.setProperty('--chat-line-height', String(appearance.spacing));
@@ -82,28 +92,32 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
   useEffect(() => { if (!undo) return; const timer = setTimeout(() => setUndo(null), 10_000); return () => clearTimeout(timer); }, [undo]);
   const restore = (value: Snapshot) => { setAppearance({ ...value.appearance }); try { setStreamSpeed(value.speed); setEdgeFade(value.fade); setBoardGrid(value.grid); } catch { /* Appearance still applies; the save error explains storage problems. */ } };
   const changed = { textSize: appearance.textSize !== defaults.textSize, scale: appearance.scale !== defaults.scale, spacing: Math.abs(appearance.spacing - defaults.spacing) > 0.001 };
-  const pageChanged = !matchesPreset(appearance, sizePresets[1].value) || appearance.theme !== defaults.theme || appearance.palette !== defaults.palette || speed !== 40 || fade !== 100 || grid !== 8;
+  const pageChanged = !matchesPreset(appearance, sizePresets[1].value) || appearance.theme !== defaults.theme || appearance.palette !== defaults.palette || appearance.contrast !== defaults.contrast || appearance.colorblind !== defaults.colorblind || speed !== 40 || fade !== 100 || grid !== 8;
+  const light = appearance.theme === 'light' || appearance.theme === 'system' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches;
   return <section className="appearance-settings" aria-label={t("Настройки интерфейса")}>
     <div className="appearance-preview" role="group" aria-label={t("Пример переписки")}>
       <div className="appearance-preview-user">{t("Почему падает тест входа?")}</div>
-      <div className="appearance-preview-agent"><span className="eyebrow">{t("АГЕНТ")}</span><p>{t("Тест ждёт старый текст кнопки. Исправил ожидание:")}</p><code>expect(button).toHaveText('Sign in')</code></div>
+      <div className="appearance-preview-agent"><span className="eyebrow">{t("АГЕНТ")}</span><p>{t("Тест ждёт старый текст кнопки. Исправил ожидание в")} <code className="appearance-preview-inline">login.spec.ts</code>:</p><code>expect(button).toHaveText('Sign in')</code><blockquote>{t("Проверьте вход вручную после выкладки.")}</blockquote></div>
       <div className="appearance-preview-tool"><span className="appearance-preview-dot" aria-hidden="true" />{t("Запускает npm test · 12 с")}</div>
+      <div className="appearance-preview-composer" aria-hidden="true"><span>{t("Ответить агенту…")}</span><span className="appearance-preview-send"><ArrowUp size={16} /></span></div>
     </div>
     <p className="muted">{t("Изменения видны сразу и сохраняются на этом устройстве.")}</p>
     <fieldset className="appearance-segmented"><legend>{t("Тема")}</legend><div className="segmented-options">{([['dark', 'Тёмная'], ['light', 'Светлая'], ['system', 'Системная']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-theme" value={id} checked={appearance.theme === id} onChange={() => setAppearance((p) => ({ ...p, theme: id }))} /><span>{t(title)}</span></label>)}</div></fieldset>
-    <fieldset className="palette-field"><legend>{t("Цветовая палитра")}</legend><div className="palette-options">{palettes.map((p) => <button type="button" key={p.id} aria-pressed={appearance.palette === p.id} onClick={() => setAppearance((old) => ({ ...old, palette: p.id }))}><span style={{ background: p.color }} />{t(p.name)}{appearance.palette === p.id && <b aria-hidden="true">✓</b>}</button>)}</div></fieldset>
+    <fieldset className="palette-field"><legend>{t("Цветовая палитра")}</legend><div className="palette-options">{palettes.map((p) => <button type="button" key={p.id} aria-pressed={appearance.palette === p.id} onClick={() => setAppearance((old) => ({ ...old, palette: p.id }))}><span className="palette-swatch" aria-hidden="true" style={{ '--swatch-bg': p.swatch[light ? 'light' : 'dark'][0], '--swatch-accent': p.swatch[light ? 'light' : 'dark'][1] } as CSSProperties} />{t(p.name)}{appearance.palette === p.id && <b aria-hidden="true">✓</b>}</button>)}</div></fieldset>
     <fieldset className="appearance-segmented"><legend>{t("Размер")}</legend><div className="segmented-options">{sizePresets.map((item) => <label key={item.id}><input type="radio" name="appearance-size" checked={preset?.id === item.id} onChange={() => setAppearance((p) => ({ ...p, ...item.value }))} /><span>{t(item.title)}</span></label>)}</div>{!preset && <p className="muted">{t("Сейчас выбраны свои значения в разделе «Дополнительно».")}</p>}</fieldset>
-    <details className="disclosure appearance-advanced" open={advanced} onToggle={(event) => setAdvanced((event.currentTarget as HTMLDetailsElement).open)}><summary><ChevronDown className="disclosure-chevron" size={18} aria-hidden="true" />{t("Дополнительно")}</summary>
+    <fieldset className="appearance-segmented"><legend>{t("Контраст")}</legend><div className="segmented-options">{([['auto', 'Как в системе'], ['normal', 'Обычный'], ['more', 'Высокий']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-contrast" value={id} checked={appearance.contrast === id} onChange={() => setAppearance((p) => ({ ...p, contrast: id }))} /><span>{t(title)}</span></label>)}</div><p className="muted">{t("Высокий контраст усиливает рамки полей и второстепенный текст.")}</p></fieldset>
+    <label className="desktop-toggle appearance-colorblind"><input type="checkbox" role="switch" checked={appearance.colorblind} onChange={(e) => setAppearance((p) => ({ ...p, colorblind: e.target.checked }))} /><span>{t("Цвета для дальтоников")}<small>{t("Синий и оранжевый вместо зелёного и красного в статусах и Review")}</small></span></label>
+    <details className="disclosure appearance-advanced" open={advanced} onToggle={(event) => setAdvanced((event.currentTarget as HTMLDetailsElement).open)}><summary><ChevronDown className="disclosure-chevron" size={20} aria-hidden="true" />{t("Дополнительно")}</summary>
       <SliderRow label="Размер текста чата" output={`${appearance.textSize} px`} changed={changed.textSize} onReset={() => setAppearance((p) => ({ ...p, textSize: defaults.textSize }))}><input aria-label={t("Размер текста чата")} type="range" min="8" max="22" step="1" value={appearance.textSize} onChange={(e) => setAppearance((p) => ({ ...p, textSize: Number(e.target.value) }))} /></SliderRow>
       <SliderRow label="Масштаб интерфейса" output={`${appearance.scale}%`} changed={changed.scale} onReset={() => setAppearance((p) => ({ ...p, scale: defaults.scale }))}><input aria-label={t("Масштаб интерфейса")} type="range" min="60" max="130" step="5" value={appearance.scale} onChange={(e) => setAppearance((p) => ({ ...p, scale: Number(e.target.value) }))} /></SliderRow>
       <SliderRow label="Межстрочный интервал" output={appearance.spacing.toFixed(2)} changed={changed.spacing} onReset={() => setAppearance((p) => ({ ...p, spacing: defaults.spacing }))}><input aria-label={t("Межстрочный интервал")} type="range" min="1.1" max="2.2" step="0.05" value={appearance.spacing} onChange={(e) => setAppearance((p) => ({ ...p, spacing: Number(e.target.value) }))} /></SliderRow>
-      <label className="compact-toggle"><input type="checkbox" checked={appearance.compact} onChange={(e) => setAppearance((p) => ({ ...p, compact: e.target.checked }))} />{t("Компактные отступы")}</label>
+      <label className="desktop-toggle compact-toggle"><input type="checkbox" role="switch" checked={appearance.compact} onChange={(e) => setAppearance((p) => ({ ...p, compact: e.target.checked }))} />{t("Компактные отступы")}</label>
       <StreamSpeedSettings />
       <EdgeFadeSettings />
       <BoardGridSettings />
     </details>
     {undo ? <Notice tone="info" action={<button type="button" className="secondary" onClick={() => { restore(undo); setUndo(null); }}>{t("Отменить")}</button>}>{t("Оформление сброшено.")}</Notice>
       : <button type="button" className="text-button appearance-reset" disabled={!pageChanged} onClick={() => { setUndo({ appearance: { ...appearance }, speed, fade, grid }); restore({ appearance: { ...defaults }, speed: 40, fade: 100, grid: 8 }); }}><RotateCcw size={16} aria-hidden="true" />{t("Сбросить оформление")}</button>}
-    {saveError && <p role="alert" className="error">{t(saveError)}</p>}
+    {saveError && <p role="alert" className="error-banner">{t(saveError)}</p>}
   </section>;
 }

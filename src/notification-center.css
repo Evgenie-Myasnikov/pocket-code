@@ -1,5 +1,5 @@
 .notification-center .inbox-processes section,.notification-center .inbox-board{margin:12px 0 20px}
-.notification-center h3{display:flex;align-items:center;gap:8px;font-size:var(--category-detail-size);font-weight:500;color:var(--muted);margin:12px 0}
+.notification-center h3{display:flex;align-items:center;gap:8px;font-size:var(--category-detail-size);font-weight:var(--fw-medium);color:var(--muted);margin:12px 0}
 .notification-center h3 span{font-size:.9em;opacity:.7}
 .notification-center h3 .text-button{margin-left:auto;min-height:44px;padding:8px;font-size:inherit;color:var(--accent)}
 .inbox-process-item{display:flex;align-items:center;gap:4px}
@@ -7,7 +7,7 @@
 .inbox-process-row:hover,.inbox-process-row:focus-visible{background:var(--panel)}
 .inbox-process-row>svg{flex-shrink:0;margin-top:3px}
 .inbox-process-row>span:not(.inbox-pill){display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;overflow-wrap:anywhere}
-.inbox-process-row strong{font-size:var(--category-title-size);font-weight:500;line-height:1.4}
+.inbox-process-row strong{font-size:var(--category-title-size);font-weight:var(--fw-medium);line-height:1.4}
 .inbox-process-row small{font-size:var(--category-detail-size);color:var(--muted)}
 .inbox-pill{flex:none;align-self:center;padding:2px 8px;border-radius:999px;border:1px solid var(--run-status);color:var(--run-status);font-size:var(--category-detail-size);line-height:1.5;white-space:nowrap}
 .inbox-dismiss{flex:none;min-height:44px;min-width:44px;padding:8px;color:var(--muted)}
@@ -30,10 +30,10 @@
 .board-notification-reply label{display:grid;gap:6px;font-size:var(--category-detail-size);color:var(--muted)}.board-notification-reply textarea{width:100%;box-sizing:border-box;min-height:96px;font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
 .board-reply-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.board-reply-actions>button{min-height:44px}
 .inbox-snackbar{display:flex;align-items:center;gap:12px;margin:8px 12px calc(8px + env(safe-area-inset-bottom));padding:6px 6px 6px 14px;border-radius:12px;background:var(--text);color:var(--bg);font-size:var(--category-detail-size)}
-.inbox-snackbar span{flex:1}.inbox-snackbar .text-button{color:var(--bg);font-weight:600;min-height:44px}
+.inbox-snackbar span{flex:1}.inbox-snackbar .text-button{color:var(--bg);font-weight:var(--fw-semibold);min-height:44px}
 /* The bell: number for what needs you, a ring while work runs, a dot for unseen results. */
 .inbox-bell{position:relative;display:inline-grid;place-items:center;border-radius:50%}
-.inbox-bell>b{position:absolute;top:-6px;right:-9px;min-width:16px;padding:0 4px;border-radius:1em;background:var(--accent);color:var(--bg);font-size:10px;line-height:16px;text-align:center;font-weight:700}
+.inbox-bell>b{position:absolute;top:-6px;right:-9px;min-width:16px;padding:0 4px;border-radius:1em;background:var(--accent);color:var(--bg);font-size:var(--type-min);line-height:16px;text-align:center;font-weight:var(--fw-display)}
 .inbox-bell>b.inbox-badge-danger{background:var(--status-error);color:var(--bg)}
 .inbox-unseen-dot{position:absolute;top:-2px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--status-done);box-shadow:0 0 0 2px var(--bg)}
 .inbox-running .inbox-bell::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid transparent;border-top-color:var(--status-running);border-right-color:var(--status-running);animation:inbox-running 1.4s linear infinite}

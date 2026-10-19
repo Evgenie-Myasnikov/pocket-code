@@ -177,21 +177,21 @@ function ProjectDocuments({refreshRevision=0,category,connection,root,onRefreshP
   const failure=(message:string,kind:'list'|'document',saved:boolean)=><div className="project-docs-error" role="alert"><p>{t(kind==='list'?'Не удалось обновить документы.':'Не удалось обновить документ.')}{saved?` ${t('Ниже остаётся последняя загруженная версия.')}`:''}</p><details><summary>{t('Подробности')}</summary><p>{t(message)}</p></details><button className="secondary" disabled={kind==='list'?loading:reading} onClick={()=>kind==='list'?setIndexRevision(value=>value+1):refreshDocument.current()}>{t('Повторить')}</button></div>;
   const readerChips=(item:ProjectDocument)=>{
     const readers=item.readers||[];if(readers.length&&readers.every(reader=>reader.status==='on-demand'&&reader.reason==='linked'))return <span className="rule-chip on-demand">{t('По ссылке из других правил')}</span>;
-    return readers.filter(reader=>reader.status!=='not-read').map(reader=><span key={reader.provider} className={'rule-chip '+reader.status}>{providerName[reader.provider]}: {reader.status==='loaded'?t('читает'):reader.status==='shadowed'?(reader.reason==='claude-md'?t('не читает (есть CLAUDE.md)'):t('заменён AGENTS.override.md')):reader.reason==='paths'||reader.reason==='apply-to'?t('для файлов {0}',item.scope||'…'):t('по ссылке')}</span>);
+    return readers.filter(reader=>reader.status!=='not-read').map(reader=><span key={reader.provider} className="rule-chip" data-status={reader.status}>{providerName[reader.provider]}: {reader.status==='loaded'?t('читает'):reader.status==='shadowed'?(reader.reason==='claude-md'?t('не читает (есть CLAUDE.md)'):t('заменён AGENTS.override.md')):reader.reason==='paths'||reader.reason==='apply-to'?t('для файлов {0}',item.scope||'…'):t('по ссылке')}</span>);
   };
   const refreshLabel=t(selected?'Обновить документ':'Обновить документы');
   const refreshing=selected?reading:loading;
 
   if(selected)return <section className={'project-docs project-docs-reading'+(prefs.wide?' wide':'')} style={{'--reader-scale':prefs.size} as CSSProperties} ref={scroller} aria-label={docName(selected)} onScroll={event=>setShowTop(event.currentTarget.scrollTop>event.currentTarget.clientHeight)}>
     <div className="project-docs-toolbar">
-      {(trail.length||!directDocument.current||category==='rules')?<button className="text-button project-overview-back" onClick={goBack}><ArrowLeft size={18}/><span>{trail.length?t('Назад к {0}',docName(trail.at(-1)!.doc)):t(category==='rules'?'Все правила':'К документам')}</span></button>:<span/>}
+      {(trail.length||!directDocument.current||category==='rules')?<button className="text-button project-overview-back" onClick={goBack}><ArrowLeft size={20}/><span>{trail.length?t('Назад к {0}',docName(trail.at(-1)!.doc)):t(category==='rules'?'Все правила':'К документам')}</span></button>:<span/>}
       <span className="project-docs-actions">
         <span className="project-docs-prefs-anchor"><button className="icon-button project-docs-prefs-button" aria-label={t('Вид читалки')} aria-expanded={prefsOpen} onClick={()=>setPrefsOpen(value=>!value)}><span aria-hidden="true">Aa</span></button>{prefsOpen&&<div className="project-docs-prefs" role="group" aria-label={t('Вид читалки')}>
           <div className="segmented" role="group" aria-label={t('Ширина текста')}><button aria-pressed={!prefs.wide} onClick={()=>updatePrefs({...prefs,wide:false})}>{t('Узкая')}</button><button aria-pressed={prefs.wide} onClick={()=>updatePrefs({...prefs,wide:true})}>{t('Широкая')}</button></div>
           <div className="segmented" role="group" aria-label={t('Размер текста')}>{readerSizes.map(size=><button key={size} aria-pressed={prefs.size===size} aria-label={t('Размер текста {0}%',Math.round(size*100))} onClick={()=>updatePrefs({...prefs,size})}><span style={{fontSize:`${size}em`}}>A</span></button>)}</div>
         </div>}</span>
-        {outline.length>1&&<button className="icon-button project-docs-toc-button" aria-label={t('Оглавление')} aria-expanded={tocOpen} onClick={()=>setTocOpen(true)}><ListTree size={18}/></button>}
-        <button className="icon-button" aria-label={refreshLabel} disabled={refreshing} onClick={()=>refreshDocument.current()}><RefreshCw size={18} className={refreshing?'project-docs-refreshing':''}/></button>
+        {outline.length>1&&<button className="icon-button project-docs-toc-button" aria-label={t('Оглавление')} aria-expanded={tocOpen} onClick={()=>setTocOpen(true)}><ListTree size={20}/></button>}
+        <button className="icon-button" aria-label={refreshLabel} disabled={refreshing} onClick={()=>refreshDocument.current()}><RefreshCw size={20} className={refreshing?'project-docs-refreshing':''}/></button>
       </span>
     </div>
     {(selected.builtIn||selected.path!==selected.name||!onReading)&&<p className="project-document-name" aria-label={t('Путь к файлу')}>{selected.builtIn?t('Встроено в Pocket Code'):selected.path}</p>}
@@ -211,7 +211,7 @@ function ProjectDocuments({refreshRevision=0,category,connection,root,onRefreshP
 
   const authored=documents.length>0,isRules=category==='rules';
   return <section className="project-docs" ref={scroller} aria-label={t(isRules?'Правила':'История изменений')}>
-    <div className="project-docs-toolbar project-docs-toolbar-list"><span/><span className="project-docs-actions"><button className="icon-button" aria-label={refreshLabel} disabled={refreshing} onClick={()=>{if(onRefreshProjects)onRefreshProjects();else setIndexRevision(value=>value+1);}}><RefreshCw size={18} className={refreshing?'project-docs-refreshing':''}/></button></span></div>
+    <div className="project-docs-toolbar project-docs-toolbar-list"><span/><span className="project-docs-actions"><button className="icon-button" aria-label={refreshLabel} disabled={refreshing} onClick={()=>{if(onRefreshProjects)onRefreshProjects();else setIndexRevision(value=>value+1);}}><RefreshCw size={20} className={refreshing?'project-docs-refreshing':''}/></button></span></div>
     <div id="project-documents-list" role="region" aria-label={t(isRules?'Правила':'История изменений')}>
       {listError&&failure(listError,'list',Boolean(index))}
       {loading&&!index&&<><div className="project-docs-list" aria-hidden="true">{[0,1,2].map(item=><span key={item} className="skeleton-card"/>)}</div><p className="visually-hidden" role="status">{t('Загружаем документы…')}</p></>}
@@ -237,11 +237,11 @@ function AgentChain({documents,builtInOn,provider,onProvider,onAudit}:{documents
   const longClaude=provider==='claude'?authored.filter(item=>/(^|\/)claude(\.local)?\.md$/i.test(item.path)&&(item.lines||0)>claudeLines):[];
   const kb=(bytes:number)=>(bytes/1024).toFixed(bytes<10240?1:0);
   return <section className="agent-chain" aria-labelledby="agent-chain-title">
-    <h3 id="agent-chain-title"><ShieldCheck size={18} aria-hidden="true"/>{t('Что видит агент')}</h3>
+    <h3 id="agent-chain-title"><ShieldCheck size={20} aria-hidden="true"/>{t('Что видит агент')}</h3>
     <div className="segmented" role="group" aria-label={t('Провайдер')}>{(['claude','codex','copilot'] as const).map(value=><button key={value} aria-pressed={provider===value} onClick={()=>onProvider(value)}>{providerName[value]}</button>)}</div>
     <ol className="agent-chain-list">
       {builtInOn&&<li className="loaded"><span>{t('Обслуживание доски')}</span><small>{t('Встроено в Pocket Code')}</small></li>}
-      {relevant.map(item=>{const value=reader(item)!;return <li key={item.path} className={value.status}><span>{item.path}</span><small>{value.status==='loaded'?t('читается'):value.status==='shadowed'?(value.reason==='claude-md'?t('не читается: есть CLAUDE.md'):t('не читается: есть AGENTS.override.md')):value.reason==='linked'?t('только по ссылке'):t('для файлов {0}',item.scope||'…')}</small></li>;})}
+      {relevant.map(item=>{const value=reader(item)!;return <li key={item.path} data-status={value.status}><span>{item.path}</span><small>{value.status==='loaded'?t('читается'):value.status==='shadowed'?(value.reason==='claude-md'?t('не читается: есть CLAUDE.md'):t('не читается: есть AGENTS.override.md')):value.reason==='linked'?t('только по ссылке'):t('для файлов {0}',item.scope||'…')}</small></li>;})}
       {missing.map(slot=><li key={slot} className="missing"><span>{slot}</span><small>{t('не создан')}</small></li>)}
     </ol>
     {provider==='codex'&&<div className={'agent-chain-meter'+(codexBytes>codexBudget?' over':codexBytes>codexBudget*0.8?' warn':'')}><span>{t('Бюджет инструкций Codex: {0} КБ из {1} КБ',kb(codexBytes),kb(codexBudget))}</span><meter min={0} max={codexBudget} low={codexBudget*0.8} high={codexBudget} optimum={0} value={Math.min(codexBytes,codexBudget)}/>{codexBytes>codexBudget&&<small>{t('Codex обрежет инструкции сверх лимита.')}</small>}</div>}

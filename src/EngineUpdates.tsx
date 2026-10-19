@@ -24,6 +24,6 @@ export function EngineUpdates({connection,provider}:{connection:Connection|null;
     <p className="muted">{status.sourceRoot?t('Проверяет текущий AI в отдельном чате Pocket Code. Изменения и тесты — в исходниках; публикация отдельно.'):t('Добавьте папку исходников Pocket Code в разрешённые проекты ПК. До этого изменения версий будут только сохраняться.')}</p>
     <button className="secondary" disabled={busy} onClick={()=>void update('/engine-updates/check',{})}>{t('Проверить версии AI')}</button>
     {error&&<Notice tone="error">{error}</Notice>}
-    {status.changes.length>0&&<details className="disclosure"><summary><ChevronDown className="disclosure-chevron" size={18} aria-hidden="true"/>{t('История проверок')} ({status.changes.length})</summary><ul>{status.changes.slice().reverse().map(change=><li key={change.id}>{product(change.engine)}: {change.from} → {change.to}<br/>{t(states[change.state]||change.state)}</li>)}</ul></details>}
+    {status.changes.length>0&&<details className="disclosure"><summary><ChevronDown className="disclosure-chevron" size={20} aria-hidden="true"/>{t('История проверок')} ({status.changes.length})</summary><ul>{status.changes.slice().reverse().map(change=><li key={change.id}>{product(change.engine)}: {change.from} → {change.to}<br/>{t(states[change.state]||change.state)}</li>)}</ul></details>}
   </section>;
 }

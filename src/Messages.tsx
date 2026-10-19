@@ -1,4 +1,5 @@
 import {MessageAttachment} from './MessageAttachment';
+import {ProviderMark} from './ProviderMark';
 import {userAttachmentBlocks} from './user-attachments';
 import type {Connection} from './api';
 import { RichBlock, TaskNotificationEvent } from './RichBlocks';
@@ -24,7 +25,7 @@ export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'ani
 /** The end of a turn that edited files says how much changed and leads to Review. */
 function TurnChangesChip({changes,onReview}:{changes:TurnChanges;onReview?:(changes:TurnChanges)=>void}){
   const label=t('Изменено')+' '+plural(changes.files.length,['{0} файл','{0} файла','{0} файлов'])+` · +${changes.added} −${changes.removed}`;
-  return onReview?<button className="turn-changes" title={changes.files.join(', ')} onClick={()=>onReview(changes)}><GitCompareArrows size={15} aria-hidden="true"/>{label}</button>:<p className="turn-changes" title={changes.files.join(', ')}><GitCompareArrows size={15} aria-hidden="true"/>{label}</p>;
+  return onReview?<button className="turn-changes" title={changes.files.join(', ')} onClick={()=>onReview(changes)}><GitCompareArrows size={16} aria-hidden="true"/>{label}</button>:<p className="turn-changes" title={changes.files.join(', ')}><GitCompareArrows size={16} aria-hidden="true"/>{label}</p>;
 }
 export const MessageList=memo(function MessageList({messages,runningMessages,turnChanges,onReview,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;onReview?:(changes:TurnChanges)=>void}){
   // Messages already present when this transcript mounts are a snapshot, even
@@ -60,7 +61,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
     });
   return <article data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{attachments.length>0&&<div className="message-attachments">{attachments.map((block,index)=><MessageAttachment key={block.attachmentPath||index} block={block} connection={connection} cwd={cwd}/>)}</div>}{content}</div></> : <>
-      {!toolOnly && <div className="message-label">{message.role === 'assistant' ? <><span className="claude-mark">{provider === 'codex' ? '⌘' : '✳'}</span> {provider.toUpperCase()}</> : t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
+      {!toolOnly && <div className="message-label">{message.role === 'assistant' ? <><span className="claude-mark"><ProviderMark provider={provider}/></span> {provider.toUpperCase()}</> : t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
       {content}
     </>}
   </article>;

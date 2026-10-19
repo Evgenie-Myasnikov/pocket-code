@@ -25,6 +25,6 @@ export function CardActionMenu({label,point,items,onClose}:{label:string;point:{
   const width=240,left=Math.max(8,Math.min(point.x,window.innerWidth-width-8)),top=Math.max(8,Math.min(point.y,window.innerHeight-items.length*48-24));
   const firstDanger=items.findIndex(item=>item.danger);
   return createPortal(<div ref={menu} className="board-context-menu card-action-menu" role="menu" aria-label={label} style={{left,top}} onKeyDown={move} onContextMenu={e=>e.preventDefault()}>
-    {items.map((item,index)=><div key={item.label} role="none">{index===firstDanger&&index>0&&<hr role="separator" aria-hidden="true"/>}<button type="button" role="menuitem" className={item.danger?'danger':undefined} disabled={item.disabled} aria-current={item.current||undefined} onClick={()=>{onClose();item.onSelect();}}>{item.Icon&&<item.Icon size={18} aria-hidden="true"/>}<span>{item.label}</span></button></div>)}
+    {items.map((item,index)=><div key={item.label} role="none">{index===firstDanger&&index>0&&<hr role="separator" aria-hidden="true"/>}<button type="button" role="menuitem" className={item.danger?'danger':undefined} disabled={item.disabled} aria-current={item.current||undefined} onClick={()=>{onClose();item.onSelect();}}>{item.Icon&&<item.Icon size={20} aria-hidden="true"/>}<span>{item.label}</span></button></div>)}
   </div>,document.body);
 }

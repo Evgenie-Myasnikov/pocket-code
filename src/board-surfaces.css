@@ -14,7 +14,7 @@
 .work-boards .board-column{border-color:color-mix(in srgb,var(--line) 25%,transparent)}
 .work-boards .board-viewport{background-image:radial-gradient(color-mix(in srgb,var(--line) 35%,transparent) .7px,transparent .8px)}
 .work-boards .board-version{border-bottom:0}
-.work-boards .board-note{border:0;box-shadow:0 3px 14px #00000014;background:color-mix(in srgb,var(--note-color,var(--muted)) 7%,var(--panel));border-radius:12px}
+.work-boards .board-note{border:0;box-shadow:0 3px 14px var(--shadow-faint);background:color-mix(in srgb,var(--note-color,var(--muted)) 7%,var(--panel));border-radius:12px}
 /* The top edge keeps the status visible without colour: dotted idea, dashed questions, thick working. */
 .work-boards .board-note{border-top:3px solid var(--note-color,var(--muted))}.work-boards .board-note.status-idea{border-top-style:dotted}.work-boards .board-note.status-questions{border-top-style:dashed}.work-boards .board-note.status-working{border-top-width:5px}
 .work-boards .note-chat{border-top:0!important}

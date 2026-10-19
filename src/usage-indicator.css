@@ -4,6 +4,6 @@
 .usage-indicator{position:absolute;right:0;top:0;display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:72px;min-height:48px;padding:0 4px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:clamp(11px,calc(12px * var(--ui-scale,1)),16px);font-variant-numeric:tabular-nums;cursor:pointer}
 .usage-indicator svg{flex-shrink:0;fill:none;stroke-width:2}
 .usage-track{stroke:var(--line)}.usage-value{stroke:var(--accent)}
-.usage-warning .usage-value{stroke:var(--status-attention,#e8c06a)}.usage-warning span{color:var(--status-attention,#e8c06a)}
-.usage-low .usage-value{stroke:var(--danger,#d4736f)}.usage-low span{color:var(--danger,#d4736f)}
+.usage-warning .usage-value{stroke:var(--status-attention)}.usage-warning span{color:var(--status-attention)}
+.usage-low .usage-value{stroke:var(--danger)}.usage-low span{color:var(--danger)}
 .usage-indicator:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:8px}

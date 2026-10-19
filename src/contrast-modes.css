@@ -1,0 +1,8 @@
+/* Accessibility layers over the tokens. Imported after the palette files so they win over every palette. */
+/* High contrast: chosen in Appearance, or followed from the system when Appearance is left on Automatic. */
+:root[data-theme][data-contrast=more]{--line:var(--border-strong);--border-strong:color-mix(in oklab,var(--text) 70%,var(--bg));--muted:color-mix(in oklab,var(--text) 82%,var(--bg));--success-bg:color-mix(in srgb,var(--success-fg) 18%,var(--bg));--warning-bg:color-mix(in srgb,var(--warning-fg) 18%,var(--bg));--danger-bg:color-mix(in srgb,var(--danger-fg) 18%,var(--bg));--info-bg:color-mix(in srgb,var(--info-fg) 18%,var(--bg))}
+@media(prefers-contrast:more){:root[data-theme]:not([data-contrast=normal]){--line:var(--border-strong);--border-strong:color-mix(in oklab,var(--text) 70%,var(--bg));--muted:color-mix(in oklab,var(--text) 82%,var(--bg))}}
+
+/* Colour-blind friendly: success/added become blue and danger/removed orange, so pairs never rely on red against green. */
+:root[data-theme][data-colorblind=true]{--success-fg:#7cb8f5;--danger-fg:#f2a65a;--diff-add-fg:#79b8ff;--diff-del-fg:#f0a04b;--diff-add-bg:#388bfd26;--diff-del-bg:#db6d2826;--diff-add-word:#388bfd66;--diff-del-word:#db6d2866}
+:root[data-theme=light][data-colorblind=true][data-colorblind]{--success-fg:#0b5cad;--danger-fg:#9a4a00;--diff-add-fg:#0550ae;--diff-del-fg:#953800;--diff-add-bg:#ddf4ff;--diff-del-bg:#fff1e5;--diff-add-word:#b6e3ff;--diff-del-word:#ffd8b5}

@@ -27,7 +27,7 @@ export function UsageLimits({connection,provider}:{connection:Connection|null;pr
     {connection&&<section className="usage-overview" aria-label={t('Сводка лимитов')}><h3>{t('Сводка лимитов')}</h3>{providers.map(id=>{
       const snapshot=live.usage(id),narrowest=narrowestWindow(snapshot,now),tone=narrowest?usageTone(narrowest.remaining):null,pace=narrowest?usagePace(narrowest.window,narrowest.remaining,now):null,Icon=tone==='danger'?AlertCircle:tone==='warning'?AlertTriangle:pace?.ahead?TrendingUp:null;
       const detail=narrowest?[windowLabel(narrowest.window,id),narrowest.window.resetsAt===null?t('Время сброса неизвестно'):resetLabel(narrowest.window.resetsAt,now),pace?.ahead?t('Опережаете темп'):''].filter(Boolean).join(' · '):failed[id]?t('Нет данных: проверьте вход в {0} на ПК',names[id]):snapshot?t('Провайдер не передал лимиты'):t('Загружаем лимиты…');
-      return <button type="button" key={id} className={'usage-overview-row'+(tone?' usage-tone-'+tone:'')} aria-pressed={selected===id} onClick={()=>setSelected(id)}><span>{names[id]}</span><strong>{Icon&&<Icon size={15} aria-hidden="true"/>}{narrowest?t('Осталось {0}%',percentLabel(narrowest.remaining)):'—'}</strong><small>{detail}</small></button>;
+      return <button type="button" key={id} className={'usage-overview-row'+(tone?' usage-tone-'+tone:'')} aria-pressed={selected===id} onClick={()=>setSelected(id)}><span>{names[id]}</span><strong>{Icon&&<Icon size={16} aria-hidden="true"/>}{narrowest?t('Осталось {0}%',percentLabel(narrowest.remaining)):'—'}</strong><small>{detail}</small></button>;
     })}</section>}
     <CodexUsage connection={connection} provider={selected}/>
   </>;

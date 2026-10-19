@@ -21,6 +21,15 @@ public class NavigationPlugin extends Plugin {
             }
         });
     }
+    /** Status and navigation bar icons follow the app theme (not the system one); the background is kept so the next cold start paints it before the WebView draws. */
+    @PluginMethod public void systemBars(PluginCall call) {
+        boolean dark = Boolean.TRUE.equals(call.getBoolean("dark", true));
+        String background = call.getString("background", "");
+        int color;
+        try { color = android.graphics.Color.parseColor(background); } catch (IllegalArgumentException error) { call.reject("Invalid background colour"); return; }
+        getActivity().getSharedPreferences(MainActivity.THEME_PREFERENCES, android.content.Context.MODE_PRIVATE).edit().putInt(MainActivity.THEME_BACKGROUND, color).putBoolean(MainActivity.THEME_DARK, dark).apply();
+        getActivity().runOnUiThread(() -> { MainActivity.applySystemBars(getActivity(), dark, color); call.resolve(); });
+    }
     @PluginMethod public void minimize(PluginCall call) {
         getActivity().runOnUiThread(() -> { getActivity().moveTaskToBack(true); call.resolve(); });
     }
