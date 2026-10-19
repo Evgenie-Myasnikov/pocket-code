@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.27.0 (2026-10-19)
 
 ### Features
 - connection: show a connected-PC card on the phone with address, PC version, last contact, a latency check and copyable diagnostics; keep scanning a new QR as a secondary action.
