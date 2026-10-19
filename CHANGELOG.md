@@ -147,6 +147,9 @@
 - light themes: agent quotes use the text colour with an accent rule, conversation date rules, the provider mark and former dark-only literals follow the palette, --border and --error are defined, and an empty board note shows its "Add details…" hint as a muted italic placeholder (on Windows only on hover or focus).
 - design system review fixes: a device waiting for confirmation keeps its accent status colour on Windows (its rule still used the old class); the Windows chat-list caption, connection line, empty-chat hint and shortcut keys no longer render below 12 px, and phone captions, labels and the legacy bottom bar no longer fall to 10 px, so the 11/12 px text floor holds; a unit test blocks class-based rules for statuses that moved to data-status.
 
+### Documentation
+- board: add changelog evidence to five recent done cards and a review card for this work.
+
 ### Validation
 - TypeScript check passed; no remaining question-mark placeholders in src. Browser scenarios passed: device pairing (including a Miro 401 that keeps the pairing), follow-up composer and task pipeline (12), edge/compact chat layout (7). Transcript specs tool-activity/activity-groups/rich-updates/chat-surfaces show the same 5 failures with and without these changes (height and navigation assertions). Device checks not run.
 - Connection area: TypeScript check and unit tests passed (332/333; the board-evidence test failure predates this work). 48 of 52 browser scenarios passed across connect-usability, device-pairing, qr-routing, workspace-recovery, settings-navigation, language and desktop-ui; qr-routing, settings-navigation and workspace-recovery fail identically on the previous commit, and the desktop note-deletion scenario passed on rerun. The C# shell was not compiled; no physical Android or Windows checks.
