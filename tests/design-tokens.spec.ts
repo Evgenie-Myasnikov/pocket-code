@@ -48,3 +48,11 @@ test('PC chat-row status dots and labels look the same for every status in both 
   for(const row of rows){expect(row.height).toBe(rows[0].height);expect(row.height).toBeLessThanOrEqual(24);expect(row.dot).toBe(8);expect(row.background).toBe('rgba(0, 0, 0, 0)');expect(row.border).toBe('0px');expect(row.contrast).toBeGreaterThanOrEqual(4.5);}
  }
 });
+
+test('Windows chrome text is at least 12 px at 100 % and phone text at least 11 px',async({page})=>{
+ const smallest=(min:number)=>page.evaluate(min=>[...document.querySelectorAll<HTMLElement>('body *')].filter(el=>[...el.childNodes].some(node=>node.nodeType===3&&node.textContent!.trim())&&el.getBoundingClientRect().width>0&&getComputedStyle(el).visibility!=='hidden'&&parseFloat(getComputedStyle(el).fontSize)<min-.01).map(el=>`${el.className||el.tagName} ${getComputedStyle(el).fontSize}`),min);
+ await page.setViewportSize({width:1440,height:900});await page.goto('http://127.0.0.1:5173/?desktop=1');await page.locator('.desktop-connection-status').waitFor();
+ expect(await smallest(12)).toEqual([]);
+ await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible').first().waitFor();
+ expect(await smallest(11)).toEqual([]);
+});

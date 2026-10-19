@@ -25,6 +25,9 @@ test('status words are never bare class names, and the alert is .error-banner',(
   assert.deepEqual(bareAlert,[]);
   const bareStatus=tsx.flatMap(({file,source})=>[...source.matchAll(/className=\{'[\w-]+ '\+\(?(?:[\w.]*status|value|hostAway)\b/g)].map(match=>`${file}: ${match[0]}`));
   assert.deepEqual(bareStatus,[]);
+  // Elements that moved to data-status must not keep class-based status rules (a pending device lost its colour that way).
+  const staleStatus=css.flatMap(({file,source})=>(source.match(/\.(?:desktop-device-status|subagent-status|subagent-card|rule-chip|connect-chip|desktop-chat-dot|review-file-status)\.(?!run-status-dot)[\w-]+/g)||[]).map(value=>`${file}: ${value}`));
+  assert.deepEqual(staleStatus,[]);
 });
 test('semantic families define fg, bg and border for both themes',()=>{
   const tokens=readFileSync('src/tokens.css','utf8');

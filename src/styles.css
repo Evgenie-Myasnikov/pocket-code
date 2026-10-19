@@ -117,11 +117,11 @@
   .settings-panel,.files-panel {padding:22px 16px;}
   .conversation-inner {padding:18px 16px 12px;}
   .composer-area {padding:6px 10px 8px;}
-  .composer-caption,.history-meta {font-size:clamp(10px,calc(10px * var(--ui-scale,1)),13px);}
-  .message-label,.session-row small,.host-card span,.list-label,.sidebar-footer,.eyebrow {font-size:clamp(9px,calc(10px * var(--ui-scale,1)),13px);}
+  .composer-caption,.history-meta {font-size:clamp(var(--type-min),calc(11px * var(--ui-scale,1)),13px);}
+  .message-label,.session-row small,.host-card span,.list-label,.sidebar-footer,.eyebrow {font-size:clamp(var(--type-min),calc(11px * var(--ui-scale,1)),13px);}
   .settings-panel label {font-size:clamp(10px,calc(12px * var(--ui-scale,1)),16px);}
   .mobile-nav {gap:0;padding-inline:4px;}
-  .mobile-nav button {width:auto;flex:1;min-width:0;font-size:clamp(9px,calc(10px * var(--ui-scale,1)),13px);}
+  .mobile-nav button {width:auto;flex:1;min-width:0;font-size:clamp(var(--type-min),calc(11px * var(--ui-scale,1)),13px);}
   .network-banner {max-height:22dvh;overflow:auto;padding:8px 12px;}
   .update-panel:not(.expanded) {max-height:25dvh;overflow:auto;padding:10px 14px;}
 }
