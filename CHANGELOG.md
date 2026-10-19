@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.27.1 (2026-10-19)
+## [0.27.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.27.0...v0.27.1) (2026-10-19)
 
 Branch: codex/chat-grid-0.27.1 (from the published 0.27.0 source). Not released.
 
@@ -14,6 +14,9 @@ Branch: codex/chat-grid-0.27.1 (from the published 0.27.0 source). Not released.
 - TypeScript check passed. Unit tests 374/374 on the first full run, including the new session-previews tests (text stripping, image choice, cache and concurrency, endpoint access checks with synthetic transcripts). A later run had 4 failures in task-runs/task-runs-api verification tests (spawned check commands timing out); those files are untouched here and fail the same way at 0.27.0 (fe7fee6) in a clean worktree.
 - Browser: new chat-grid spec (6: phone 390 dark and light and 320 by date and project, preference persistence, keyboard open, header pills over a scrolled transcript, reduced-transparency/forced-colours fallback, desktop 1440 dark and light with cached previews) and edge-chat, compact-chat, work-boards, board-preview, desktop-ui, responsive-layout and mobile-menu pass: 124 of 127. The 3 chat-surfaces failures (header height 119 px against a 110 px limit) also fail with the 0.27.0 header styles and predate this work; work-boards, compact-chat, responsive-layout and chat-surfaces assertions were updated for the removed zoom bar and the title chip.
 - Synthetic screenshots were inspected locally and are not published. Not checked on a physical Android phone or in the Windows application window.
+
+- Release validation: TypeScript check passed; unit tests 371/374 in the full run, with the three task-run timing checks passing 19/19 when run alone. Android (versionCode 86) and Windows builds passed. Source privacy checks passed for 653 entries; decoded artifact audits passed for 386 host files, 517 APK entries and 483 Windows entries. APK signer matches 0.27.0. Downloaded GitHub assets match the manifest hashes and the exact source tag; GitHub privacy CI passed. Physical Android and Windows shell checks were not performed.
+- Published [v0.27.1](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.27.1) from [5758303b8b7b760f12ce4a30ccd67cdb6177ecfe](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5758303b8b7b760f12ce4a30ccd67cdb6177ecfe) on [codex/chat-grid-0.27.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/codex/chat-grid-0.27.1); APK, Windows package, host bundle and update manifest are available.
 
 ## [0.27.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.26.9...v0.27.0) (2026-10-19)
 
