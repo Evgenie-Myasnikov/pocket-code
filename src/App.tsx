@@ -35,17 +35,19 @@ import {LimitAlert} from './LimitAlert';
 import './composer-controls.css';
 import {shareMessages,shareSnapshot} from './chat-snapshot';
 import {startVisiblePoll} from './visible-poll';
+import {ConnectionStatus} from './ConnectionStatus';
+import {getReachability,hostDown,hostGate,retryNow,setPrimaryHost,useReachability} from './reachability';
 import {chatCacheScope,readChatCache,writeChatCache,clearChatCache} from './chat-cache';
 
 
 import {attachmentReady,type DraftAttachment} from './AttachmentTray';
-import { Review } from './Review';
+import { Review, Subagents, ChatOutputs, DocumentLibrary } from './lazy-panels';
 import type {ActivityFeed} from './ActivityList';
 import {useActivity} from './useActivity';
 import {useChatNotifications,useRunNotifications,type WatchedChat} from './chat-notifications';
 import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
-import { Subagents } from './Subagents';
-import { ChatOutputs } from './ChatOutputs';
+
+
 import {extractChatOutputs} from './chat-outputs';
 import {useBackAction,useBackNavigation,useModal} from './navigation';
 import { preferences, preferredRoot, savePreferredRoot, savePreferences, selectedWorkspace, saveSelectedWorkspace, clampBudget, type WorkspaceProvider, type PreferenceChange } from './preferences';
@@ -54,7 +56,7 @@ import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
 import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, Terminal, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop, ArrowDown } from 'lucide-react';
+import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, Terminal, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop, ArrowDown, LoaderCircle } from 'lucide-react';
 import { Connect, type ConnectedPc } from './Connect';
 import { connectionProblem as classifyProblem, type ConnectionProblem } from './connection-errors';
 import { useAppearance } from './Appearance';
@@ -62,7 +64,7 @@ import {SettingsPanel,type SettingsPage} from './SettingsPanel';
 import {useLiveSettings} from './live-settings';
 import { PartialMessage, MessageList, ApprovalCard } from './Messages';
 
-import { DocumentLibrary, type DocumentKind } from './DocumentLibrary';
+import type { DocumentKind } from './DocumentLibrary';
 
 import { fileBase64, loadConnection, normalizeUrl, pairDevice, request, saveConnection, type Connection } from './api';
 import { demoMessages, demoSessions } from './demo';
@@ -84,6 +86,8 @@ type RejectedDraft = Draft & {restored: boolean;};
 type PendingSend = {jobId: string;key: string;text: string;attachments: Attachment[];};
 const codexBusyMessage = 'This chat is open in Codex on the PC. Its history is available here, but Codex must release the chat before you can send a message. Finish the task and close Codex on the PC, then try again.';
 const budgetRangeMessage='Лимит стоимости запроса вне диапазона $0.10–$100. Измените его в настройках доступа Claude.';
+/** A failure that only says the PC cannot be reached; the connection status line already tells it, so screens do not repeat it. */
+const connectivityError=(error:unknown)=>{const problem=(error as {problem?:string}|null)?.problem;return problem==='unreachable'||problem==='tls'||problem==='cleartext'||hostDown(getReachability());};
 const uniqueMessages = (messages:ChatMessage[]) => [...new Map(messages.map(message=>[message.id,message])).values()];
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() || p;
 export type EmbeddedChat={activity?:ActivityFeed;inboxOpen?:boolean;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onCreated?(session:Session,job:JobView):void;onBack():void};
@@ -122,7 +126,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const personalBoards=useProjectWorkspaces(connection);const [localBoards,setLocalBoards]=useState(true);
   const [offline,setOffline]=useState(false);
   useEffect(()=>{const stale=()=>setOffline(true),fresh=()=>{setOffline(false);setLastContact(Date.now());};window.addEventListener('pocket-offline-read',stale);window.addEventListener('pocket-online-read',fresh);return()=>{window.removeEventListener('pocket-offline-read',stale);window.removeEventListener('pocket-online-read',fresh);};},[]);
-  const canRun = !offline && !!connection && providerInfo?.available === true && providerInfo.authenticated !== false && !connection?.workspaceId;
+  // One reachability model for every screen: requests report into it and one probe with backoff runs while the PC is away.
+  const reach=useReachability(),unreachable=offline||hostDown(reach),gate=hostGate(connection?.url);
+  const [providersLoaded,setProvidersLoaded]=useState(false);
+  const canRun = !unreachable && !!connection && providerInfo?.available === true && providerInfo.authenticated !== false && !connection?.workspaceId;
   const [boardChat,setBoardChat]=useState<BoardChat|null>(embedded?.boardChat||null);
   const [noticeTarget,setNoticeTarget]=useState<BoardNoticeTarget|null>(null);
   const [boardLaunch,setBoardLaunch]=useState<BoardChat|null>(null);
@@ -235,6 +242,15 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [stopping,setStopping] = useStateForWorkspace(false);
   const [accessChoices,setAccessChoices] = useStateForWorkspace<Record<string,AccessMode>>({});
   const running = job?.status === 'running';
+  // Last confirmed contact with the running job; without it the screen says "status unknown" instead of pretending to stream.
+  const jobContact = useRefForWorkspace({at:0,failures:0});
+  const [runLost,setRunLost] = useStateForWorkspace<number|null>(null);
+  const runUnknown = running && (runLost!==null || unreachable);
+  const [sessionsLoaded,setSessionsLoaded] = useStateForWorkspace(false);
+  /** Follow-ups written while the PC was away; they leave in order when it answers again (kept in memory, for at most a day). */
+  const [offlineQueue,setOfflineQueue] = useStateForWorkspace<(PendingSend&{id:string;at:number})[]>([]);
+  // Only a chat this phone already continues can wait for the PC; a new chat or a takeover needs the PC to answer first.
+  const canQueue = unreachable && !demo && !!connection && !selected?.readOnly && (running&&!!job || takeover && !!(job?.sessionId||selected?.sessionId));
   useEffect(()=>{if(!running)setStopping(false);},[running,job?.id]);
   /** Put a message back into a chat's draft, after anything already typed there. */
   function mergeDraft(key:string,text:string,files:Attachment[],stored=false){
@@ -279,7 +295,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       onEdit:async()=>{if(await withdrawQueued(item.id))mergeDraft(currentDraftKey(),item.text,sentFollowups.current!.get(item.id)||[]);},
       onRemove:()=>void withdrawQueued(item.id),
       // "Send now" stops the turn and sends this message first, as it was written.
-      onSendNow:async()=>{const current=job;if(!current||!await withdrawQueued(item.id))return;setPendingSend({jobId:current.id,key:currentDraftKey(),text:item.text,attachments:sentFollowups.current!.get(item.id)||[]});if(current.status==='running'){setStopping(true);try{await api(`/jobs/${current.id}/stop`,{});}catch(e){setStopping(false);setError((e as Error).message);}}}}))];
+      onSendNow:async()=>{const current=job;if(!current||!await withdrawQueued(item.id))return;setPendingSend({jobId:current.id,key:currentDraftKey(),text:item.text,attachments:sentFollowups.current!.get(item.id)||[]});if(current.status==='running'){setStopping(true);try{await api(`/jobs/${current.id}/stop`,{});}catch(e){setStopping(false);setError((e as Error).message);}}}})),
+  ...offlineQueue.filter(item=>item.key===currentDraftKey()).map(item=>({id:item.id,text:item.text,attachments:item.attachments.length,caption:t('Отправится, когда ПК будет на связи'),
+    onEdit:()=>{setOfflineQueue(old=>old.filter(other=>other.id!==item.id));mergeDraft(item.key,item.text,item.attachments);},onRemove:()=>setOfflineQueue(old=>old.filter(other=>other.id!==item.id)),removeLabel:t('Не отправлять')}))];
   /** Up in an empty field brings back the last message the person wrote. */
   const recallLast=()=>{for(const message of [...outputMessages].reverse()){if(message.role!=='user')continue;const text=message.blocks.filter(block=>block.type==='text').map(block=>block.text||'').join('\n').trim();if(text&&!text.startsWith('<task-notification'))return text;}return undefined;};
   const keyActions=useRef({stop:()=>{}});keyActions.current={stop:()=>void stopRun()};
@@ -304,6 +322,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     setPendingSend(null);
     void send(true,{text:pending.text,attachments:pending.attachments});
   },[canRun,busy,running,uploading,loading,job?.id,job?.status,pendingSend]);
+  useEffect(()=>{
+    // When the PC answers again, waiting follow-ups of this chat leave one at a time; older than a day they return to the draft instead.
+    const next=offlineQueue.find(item=>item.key===currentDraftKey());
+    if(!next||!canRun||busy||uploading||loading||pendingSend||sending.current)return;
+    setOfflineQueue(old=>old.filter(item=>item.id!==next.id));
+    if(Date.now()-next.at>86400000){mergeDraft(next.key,next.text,next.attachments);return;}
+    void send(true,{text:next.text,attachments:next.attachments});
+  },[canRun,busy,uploading,loading,offlineQueue,pendingSend,job?.id,selected?.sessionId]);
   function acknowledgeVisibleActivity(){
     const element=scroll.current;
     if(!element||!element.getClientRects().length||element.closest('[inert]')||document.visibilityState==='hidden'||tab!=='chats'||loading||loadingOlder||error||historyError||activityOpen||embedded?.inboxOpen||activityTarget||reviewOpen||agentPanel||outputsOpen||pendingTakeover)return;
@@ -349,7 +375,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if(!connection||!reviewCwd||demo||selected?.readOnly||networkError||tab!=='chats'||readingMode)return;
     let cancelled=false,timer:ReturnType<typeof setTimeout>|undefined;
     const poll=async()=>{
-      if(document.visibilityState!=='hidden'&&document.querySelector('.workspace')?.getClientRects().length)try{
+      if(document.visibilityState!=='hidden'&&gate()&&document.querySelector('.workspace')?.getClientRects().length)try{
         const value=await request<{available:boolean;mode:'working'|'branch';added?:number;removed?:number;files?:number}>(connection,`/review/availability?cwd=${encodeURIComponent(reviewCwd)}`);
         if(!cancelled)setReviewAvailability(old=>value.available&&(value.mode==='working'||value.mode==='branch')?(old&&old.key===reviewContext&&old.mode===value.mode&&old.added===value.added&&old.removed===value.removed&&old.files===value.files?old:{key:reviewContext,mode:value.mode,added:value.added,removed:value.removed,files:value.files}):null);
       }catch{if(!cancelled)setReviewAvailability(null);}
@@ -383,7 +409,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       try{const data=await request<{agents:SubagentView[]}>(connection!,`/sessions/${encodeURIComponent(parentChatId!)}/subagents?provider=${provider}`);if(!cancelled)setAgentList(old=>shareSnapshot(old,Array.isArray(data.agents)?data.agents.filter(agent=>agent&&typeof agent.id==='string'&&typeof agent.name==='string'):[]));}
       catch{/* Main chat remains usable if an older bridge or provider cannot expose child histories. */}
     }
-    const stop=startVisiblePoll(pollAgents,6000);return()=>{cancelled=true;stop();};
+    const stop=startVisiblePoll(pollAgents,6000,true,document,hostGate(connection.url));return()=>{cancelled=true;stop();};
   },[connection,provider,parentChatId,tab,demo]);
   const api = <T,>(endpoint: string, data?: unknown) => request<T>(connection!, endpoint, data);
   useEffect(()=>{
@@ -412,7 +438,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     setDraft([draft,rejectedDraft.text].filter(Boolean).join('\n\n'));setAttachments(combined);
     setRejectedDrafts(old=>({...old,[currentDraftKey()]:{...rejectedDraft,restored:true}}));
   }
-  useEffect(()=>{if(!connection?.deviceId)return;const beat=()=>void request(connection,'/devices/heartbeat',{}).then(()=>setLastContact(Date.now())).catch(()=>{});beat();const timer=setInterval(beat,15000);const revoked=(event:Event)=>{if((event as CustomEvent).detail===connection.deviceId)void disconnect('revoked');};window.addEventListener('pocket-device-revoked',revoked);return()=>{clearInterval(timer);window.removeEventListener('pocket-device-revoked',revoked);};},[connection]);
+  useEffect(()=>{if(!connection?.deviceId)return;const beat=()=>request(connection,'/devices/heartbeat',{}).then(()=>setLastContact(Date.now())).catch(()=>{});const stopBeat=startVisiblePoll(beat,15000,true,document,hostGate(connection.url));const revoked=(event:Event)=>{if((event as CustomEvent).detail===connection.deviceId)void disconnect('revoked');};window.addEventListener('pocket-device-revoked',revoked);return()=>{stopBeat();window.removeEventListener('pocket-device-revoked',revoked);};},[connection]);
   // Another known route (Wi-Fi, Tailscale, tunnel) can replace an unreachable one without a new QR.
   async function reachableRoute(c:Connection){for(const url of c.routes||[]){if(url===c.url)continue;try{const next={...c,url:normalizeUrl(url)},{stale}=await freshHealth(next);if(!stale)return next;}catch{/* Try the next route. */}}return null;}
   function cancelConnect(){++connectEpoch.current;setConnecting(false);setRestoring(false);}
@@ -429,6 +455,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       if(epoch!==connectEpoch.current)return;
       if(scope!==cacheScope){rememberPosition();rememberDraft();setProjects(null);setProviders([]);setBoardChat(null);setBoardLaunch(null);setActivityTarget(null);}
       setCacheScope(scope);setSaved(c);setConnection(c);setDemo(false);
+      if(!embedded){const host=c;setPrimaryHost(host.url,()=>request(host,'/health'));}
       const {health:h,stale}=await freshHealth(c);if(epoch!==connectEpoch.current)return;if(h.protocol!==1)throw Object.assign(Error(t('Обновите приложение и сервер до одной версии')),{problem:'incompatible'});setHealth(h);
       if(stale){setPaired(true);const alternate=await reachableRoute(c);if(alternate&&epoch===connectEpoch.current){void connect(alternate,true);return;}if(epoch===connectEpoch.current){setConnectionProblem('unreachable');setOffline(true);}return;}
       setConnected(true);setPaired(true);setLastContact(Date.now());setRevoked(null);setRevokedFrom(null);
@@ -436,7 +463,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       if(!embedded&&(h.name!==c.name||h.hostId!==c.hostId||h.routes&&JSON.stringify(h.routes)!==JSON.stringify(c.routes))){const next={...stored,name:h.name,...(h.hostId?{hostId:h.hostId}:{}),...(h.routes?{routes:h.routes}:{})};await saveConnection(next);if(epoch===connectEpoch.current)setSaved(next);}
     }catch(e){if(epoch===connectEpoch.current){const problem=classifyProblem(e);if(problem==='unreachable'&&!c.pairing){const alternate=await reachableRoute(c);if(alternate&&epoch===connectEpoch.current){void connect(alternate,true);return;}}if(epoch===connectEpoch.current){setConnectionError((e as Error).message);setConnectionProblem(problem);if(problem==='unreachable')setOffline(true);}}}finally{if(epoch===connectEpoch.current){setConnecting(false);if(restored)setRestoring(false);}}
   }
-  useEffect(()=>{if(embedded){void connect(embedded.connection);return;}loadConnection().then(c=>{if(!c){setRestoring(false);return;}setSaved(c);if(c.workspaceOnly){setRestoring(false);setTab('settings');setSettingsPage('connection');}else{setPaired(true);void connect(c,true);}}).catch(()=>{setRestoring(false);setConnectionError(locale().startsWith('ru')?'Не удалось восстановить подключение. Отсканируйте QR-код ПК снова.':'Could not restore the connection. Scan the PC QR code again.');});},[]);
+  // The PC answered again: one pass re-reads /health and clears every connection-class error; gated polls refresh on the same event.
+  const recover=useRef(()=>{});recover.current=()=>{
+    const c=connection;if(!c||embedded||connecting)return;const epoch=connectEpoch.current;
+    void freshHealth(c).then(({health:h,stale})=>{if(stale||epoch!==connectEpoch.current||h.protocol!==1)return;setHealth(h);setConnected(true);setPaired(true);setOffline(false);setConnectionError('');setConnectionProblem(undefined);setNetworkError('');setHistoryError('');setLastContact(Date.now());}).catch(()=>{});
+  };
+  useEffect(()=>{const handle=()=>recover.current();window.addEventListener('pocket-recovered',handle);return()=>window.removeEventListener('pocket-recovered',handle);},[]);
+  useEffect(()=>()=>{if(!embedded)setPrimaryHost('',null);},[]);
+  useEffect(()=>{if(embedded){void connect(embedded.connection);return;}loadConnection().then(c=>{if(!c){setRestoring(false);return;}setSaved(c);if(c.workspaceOnly){setRestoring(false);setTab('settings');setSettingsPage('connection');}else{setPaired(true);void connect(c,true);}}).catch(()=>{setRestoring(false);setConnectionError(t('Не удалось восстановить подключение. Отсканируйте QR-код ПК снова.'));});},[]);
   async function switchWorkspace(access:WorkspaceAccess){
     setWorkspaceConnection(access);setLocalBoards(false);setWorkspaceScanner(false);setError('');
     await saveConnection(connection?{...connection,workspaceAccess:access,workspaceAccesses}:{...access,workspaceOnly:true,workspaceAccesses});
@@ -461,15 +495,16 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const lastBoardChat=useRef(embedded?.boardChat);
   useEffect(()=>{const next=embedded?.boardChat;if(!next||next===lastBoardChat.current)return;lastBoardChat.current=next;if(embeddedOpened.current&&next.followUp)appendDraft(next.prompt);},[embedded?.boardChat]);
   useEffect(() => {
+    setProvidersLoaded(false);
     if (!connection || demo) return;
     let cancelled = false;
     async function refreshProviders() {
       try {
         const list = await request<ProviderInfo[]>(connection!, '/providers');
-        if (!cancelled && Array.isArray(list)) setProviders(old=>shareSnapshot(old,list.filter(item => item.id === 'claude' || item.id === 'codex'||item.id==='copilot')));
+        if (!cancelled && Array.isArray(list)) {setProviders(old=>shareSnapshot(old,list.filter(item => item.id === 'claude' || item.id === 'codex'||item.id==='copilot')));setProvidersLoaded(true);}
       } catch { /* Older bridge versions support the existing Claude workspace. */ }
     }
-    const stop=startVisiblePoll(refreshProviders,30000);window.addEventListener('pocket-code-providers',refreshProviders);
+    const stop=startVisiblePoll(refreshProviders,30000,true,document,hostGate(connection.url));window.addEventListener('pocket-code-providers',refreshProviders);
     return () => {cancelled=true;stop();window.removeEventListener('pocket-code-providers',refreshProviders);};
   },[connection,demo]);
   useEffect(() => {
@@ -485,14 +520,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         if (!cancelled) setProjects(previous => previous || health!.roots);
       }
     }
-    const stop=startVisiblePoll(refreshProjects,15000);
+    const stop=startVisiblePoll(refreshProjects,15000,true,document,hostGate(connection.url));
     return () => { cancelled = true;stop(); };
   }, [connection, health, demo]);
   useEffect(()=>{if(provider!=='claude' && model && providerInfo?.models?.length && !providerInfo.models.some(item=>item.id===model))setModel('');},[provider,providerInfo?.models,model]);
   useEffect(()=>{
     if(!cacheScope||demo)return;
     const cached=readChatCache<Session[]>(cacheScope,provider,'sessions');
-    if(Array.isArray(cached))setSessions(cached);
+    if(Array.isArray(cached)){setSessions(cached);setSessionsLoaded(true);}
   },[cacheScope,provider,demo]);
   useEffect(()=>{
     if(!cacheScope||demo||!selected||loading||fromStart||!outputMessages.length)return;
@@ -512,11 +547,11 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           const cacheSnapshot=shareSnapshot(cachedSessions,scopedSessions.slice(0,300));
           if(cacheScope&&cacheSnapshot!==cachedSessions)writeChatCache(cacheScope,provider,'sessions',cacheSnapshot);
           cachedSessions=cacheSnapshot;
-          setSessions(old=>shareSnapshot(old,scopedSessions));if(scopedJobs)setJobs(old=>shareSnapshot(old,scopedJobs));setSelected(old=>old?shareSnapshot(old,scopedSessions.find(item=>item.sessionId===old.sessionId)||old):null);setNetworkError('');
+          setSessions(old=>shareSnapshot(old,scopedSessions));if(scopedJobs)setJobs(old=>shareSnapshot(old,scopedJobs));setSelected(old=>old?shareSnapshot(old,scopedSessions.find(item=>item.sessionId===old.sessionId)||old):null);setNetworkError('');setSessionsLoaded(true);
         }
-      } catch (e) {if (!cancelled) setNetworkError((e as Error).message);}
+      } catch (e) {if (!cancelled) setNetworkError(connectivityError(e)?'':(e as Error).message);}
     }
-    const stop=startVisiblePoll(refresh,5000);return () => {cancelled = true;stop();};
+    const stop=startVisiblePoll(refresh,5000,true,document,hostGate(connection.url));return () => {cancelled = true;stop();};
   }, [connection, demo, provider, Boolean(providerInfo),cacheScope]);
   useEffect(() => {
     if (!connection || !job || demo || job.status !== 'running') return;
@@ -525,11 +560,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       let finished = false;
       try {
         const updated = await request<JobView | null>(connection!, `/jobs/${job!.id}?revision=${revision}`);
-        if (!cancelled) {setNetworkError('');if (updated) {revision = updated.revision;setJob(old=>shareSnapshot(old,updated));finished = updated.status !== 'running';}}
-      } catch (e) {if (!cancelled) setNetworkError((e as Error).message);}
+        if (!cancelled) {setNetworkError('');jobContact.current={at:Date.now(),failures:0};setRunLost(null);if (updated) {revision = updated.revision;setJob(old=>shareSnapshot(old,updated));finished = updated.status !== 'running';}}
+      } catch (e) {if (!cancelled) {setNetworkError(connectivityError(e)?'':(e as Error).message);
+        // After two missed polls the run is shown as "status unknown" instead of a live "writing" state.
+        if(++jobContact.current.failures>=2)setRunLost(jobContact.current.at);}}
       return !finished;
     }
-    const stop=startVisiblePoll(poll,900);return () => {cancelled = true;stop();};
+    jobContact.current={at:Date.now(),failures:0};setRunLost(null);
+    const stop=startVisiblePoll(poll,900,true,document,hostGate(connection.url));return () => {cancelled = true;stop();};
   }, [connection, job?.id, job?.status, demo, provider]);
   useEffect(() => {
     if (!connection || !selected || job && job.errorCode !== 'codex_thread_busy' || demo || loading || loadingOlder || busy || tab !== 'chats') return;
@@ -542,7 +580,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         if (!cancelled && epoch === navigation.current && !sending.current && !paging.current && window===historyWindow.current) {setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(fromStart ? data.next : data.previous);setHistoryError('');}
       } catch (e) {if (!cancelled) setHistoryError((e as Error).message);}
     }
-    const stop=startVisiblePoll(sync,3000,false);
+    const stop=startVisiblePoll(sync,3000,false,document,hostGate(connection.url));
     return () => {cancelled = true;stop();};
   }, [connection, selected?.sessionId, job?.id, job?.errorCode, demo, loading, loadingOlder, busy, tab, fromStart, provider]);
   useEffect(() => {
@@ -565,7 +603,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         }
       } catch (error) {if (!cancelled && epoch === navigation.current) setHistoryError((error as Error).message);}
     }
-    const stop=startVisiblePoll(syncCompleted,3000);return () => {cancelled=true;stop();};
+    const stop=startVisiblePoll(syncCompleted,3000,true,document,hostGate(connection.url));return () => {cancelled=true;stop();};
   },[connection,provider,job?.id,job?.status,demo,busy,loading,loadingOlder,fromStart,tab]);
   useLayoutEffect(()=>{if(tab==='chats'&&scroll.current&&!loading){scroll.current.scrollTop=lastScrollTop.current;setShowScrollActions(fromStart||scroll.current.scrollHeight-scroll.current.scrollTop-scroll.current.clientHeight>=80);}},[provider,tab,mobileChat]);
   useLayoutEffect(()=>{const position=pendingPosition.current,el=scroll.current;if(!position||!el||loading||tab!=='chats')return;pendingPosition.current=null;const message=position.messageId?[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.dataset.messageId===position.messageId):null;el.scrollTop=position.bottom?el.scrollHeight:message&&position.offset!==undefined?el.scrollTop+message.getBoundingClientRect().top-el.getBoundingClientRect().top-position.offset:position.top;lastScrollTop.current=el.scrollTop;nearBottom.current=position.bottom;setShowScrollActions(!position.bottom||fromStart);},[loading,history,provider,tab]);
@@ -632,7 +670,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       // Restore in the existing layout effect, before paint. A delayed RAF could
       // override a user's next scroll and prevent loading the following page.
       pendingPosition.current={top:0,window:100,fromStart:beginning,bottom:!beginning};
-    } catch (e) {setError((e as Error).message);} finally
+    } catch (e) {if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);} finally
     {if (epoch === navigation.current) setLoading(false);}
   }
   useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch;if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});if(target.followUp)appendDraft(target.prompt);}else{newChat(target.root);setDraft(target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
@@ -657,7 +695,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       const resolved=full?.sessionId?{...s,sessionId:full.sessionId,cwd:full.cwd}:s;
       if(resolved.sessionId!==s.sessionId)setSelected(resolved);
       if (!resolved.sessionId.startsWith('pending-')) await loadHistory(resolved, full, epoch, false, savedPosition?.fromStart||false);
-    } catch (e) {if (epoch === navigation.current) setError((e as Error).message);} finally {if (epoch === navigation.current) setLoading(false);}
+    } catch (e) {if (epoch === navigation.current) {if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);}} finally {if (epoch === navigation.current) setLoading(false);}
   }
   function newChat(project = cwd) {
     if (busy || uploading) return;
@@ -669,9 +707,11 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   /** Sends the draft, or a waiting message exactly as it was written. Typing during the request is kept. */
   async function send(confirmed = takeover, payload?: {text:string;attachments:Attachment[]}) {
     const text=payload?payload.text:draft,files=payload?payload.attachments:attachments,ids=files.map(item=>item.id);
-    if (sending.current || loading || uploading || demo || !canRun || selected?.readOnly || !text.trim() && !files.length || !files.every(attachmentReady)) return;
     const key=currentDraftKey();
     const consume=()=>{if(payload)return;setDraft(current=>current===text?'':current.startsWith(text)?current.slice(text.length).trimStart():current);setAttachments(old=>old.filter(item=>!ids.includes(item.id)));drafts.current!.delete(key);};
+    // Without the PC a follow-up to a chat this phone already continues waits in "Waiting to send"; nothing else asks for a takeover first.
+    if (!payload && unreachable && canQueue && !sending.current && !uploading && (text.trim() || files.length) && files.every(attachmentReady)) {setOfflineQueue(old=>[...old,{id:crypto.randomUUID(),at:Date.now(),jobId:job?.id||'',key,text,attachments:files}]);consume();return;}
+    if (sending.current || loading || uploading || demo || !canRun || selected?.readOnly || !text.trim() && !files.length || !files.every(attachmentReady)) return;
     if(running&&job){
       sending.current=true;setBusy(true);setError('');
       const epoch=navigation.current,data={text,attachments:ids},signature=JSON.stringify({jobId:job.id,...data});
@@ -693,7 +733,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             }
           }catch{/* Preserve the original rejection when refreshing fails. */}
         }
-        if(epoch===navigation.current)setError((error as Error).message);
+        if(epoch===navigation.current)setError(connectivityError(error)?t('Не отправлено: нет связи с ПК. Сообщение осталось в поле ввода.'):(error as Error).message);
       }
       finally{sending.current=false;setBusy(false);}
       return;
@@ -716,7 +756,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       setRejectedDrafts(old=>{const next={...old};delete next[key];return next;});
       setJob(next);setTakeover(true);consume();retry.current = null;nearBottom.current = true;
       if(sessionId)for(const item of activity.items)if(item.status==='error'&&item.provider===provider&&item.sessionId===sessionId)activity.markViewed(item);
-    } catch (e) {if (epoch === navigation.current) setError((e as Error).message);} finally {sending.current = false;setBusy(false);}
+    } catch (e) {if (epoch === navigation.current) setError(connectivityError(e)?t('Не отправлено: нет связи с ПК. Сообщение осталось в поле ввода.'):(e as Error).message);} finally {sending.current = false;setBusy(false);}
   }
   /** Updates one draft file wherever its draft is kept, so a finished upload is never lost. */
   function patchAttachment(id:string,change:(item:Attachment)=>Attachment){
@@ -747,7 +787,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   function startDemo() {setDemo(true);setTab('chats');setMobileChat(true);setSessions(demoSessions);setHealth({ name: t("Рабочий компьютер"), roots: ['D:\\Projects\\my-app'], version: '0.10.0', protocol: 1 });setCwd('D:\\Projects\\my-app');setSelected(demoSessions[0]);setHistory(demoMessages);}
   // Leaving on the phone also removes it from the PC's device list; an unreachable or older PC is not a blocker.
   // A revoked key is not sent again: the PC already removed it, and a second 401 would restart this flow.
-  async function disconnect(reason:'user'|'revoked'='user') {if(disconnecting.current)return;disconnecting.current=true;++connectEpoch.current;try {if(workspaceConnection&&!workspaceConnection.deviceId)await request(workspaceConnection,'/workspace-logout',{}).catch(()=>{});if(reason==='user'&&connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);clearOffline();clearReviewViewed();try{localStorage.removeItem("pocket-own-profile");}catch{}clearChatCache();persistPosition.current=()=>{};clearPositions();setRevoked(reason==='revoked'?pcName.current:null);onDisconnect();}catch(e){disconnecting.current=false;setError((e as Error).message);}}
+  async function disconnect(reason:'user'|'revoked'='user') {if(disconnecting.current)return;disconnecting.current=true;++connectEpoch.current;try {if(workspaceConnection&&!workspaceConnection.deviceId)await request(workspaceConnection,'/workspace-logout',{}).catch(()=>{});if(reason==='user'&&connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);setPrimaryHost('',null);clearOffline();clearReviewViewed();try{localStorage.removeItem("pocket-own-profile");}catch{}clearChatCache();persistPosition.current=()=>{};clearPositions();setRevoked(reason==='revoked'?pcName.current:null);onDisconnect();}catch(e){disconnecting.current=false;setError((e as Error).message);}}
   if(workspacePasswordRequest)return <WorkspacePassword busy={busy} error={error} onCancel={()=>{setWorkspacePasswordRequest(null);setError('');}} onSubmit={password=>void joinWorkspace(workspacePasswordRequest,password)}/>;
   // Without a reachable PC the phone still checks, downloads and offers the latest release itself.
   if(!health&&embedded)return <div className="desktop-empty" role="status">{error||t("Loading...")}{error&&<button className="secondary" onClick={()=>void connect(embedded.connection)}>{t("Retry")}</button>}</div>;
@@ -756,7 +796,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   // Until a PC answers once, Board and Chats explain how to pair instead of showing empty lists.
   const onboardingVisible=!embedded&&!demo&&(!connection||!paired)&&(tab==='workspace'||tab==='chats');
   const connectionScreen=onboardingVisible||tab==='connection'||tab==='settings'&&settingsPage==='connection';
-  const pcStatus:ConnectedPc|null=connection&&connected&&health&&!connection.workspaceOnly?{name:health.name,url:connection.url,version:health.version,online:!offline&&!networkError,lastContact,check:async()=>{const start=performance.now(),{stale}=await freshHealth(connection);if(stale)throw Error(t('ПК не ответил. Проверьте сеть и повторите.'));setOffline(false);setLastContact(Date.now());return Math.round(performance.now()-start);}}:null;
+  const pcStatus:ConnectedPc|null=connection&&connected&&health&&!connection.workspaceOnly?{name:health.name,url:connection.url,version:health.version,online:!unreachable&&!networkError,lastContact,check:async()=>{const start=performance.now(),{stale}=await freshHealth(connection);if(stale)throw Error(t('ПК не ответил. Проверьте сеть и повторите.'));setOffline(false);setLastContact(Date.now());return Math.round(performance.now()-start);}}:null;
   const connectView=(onboarding=false)=><Connect initial={saved?.workspaceOnly?null:saved} onConnect={c=>void connect(c)} busy={connecting} error={connectionError} problem={connectionProblem} status={pcStatus} onDisconnect={()=>void disconnect()} onCancel={cancelConnect} onUpdates={()=>{setSettingsPage('updates');setTab('settings');setMobileChat(true);}} revoked={revokedFrom} onboarding={onboarding} restoring={restoring} target={saved?.name} onDemo={onboarding?startDemo:undefined}/>;
   const visible = sessions.filter((s) => `${s.customTitle || ""} ${s.summary} ${s.cwd}`.toLowerCase().includes(search.toLowerCase()));
   // In Settings the provider is a segmented control above the AI account rows (one control, no second Back).
@@ -790,6 +830,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         {bell('icon')}
       </div>
       <nav className="desktop-tabs"><button className={tab === 'workspace' ? 'active' : ''} onClick={() => {setTab('workspace');setMobileChat(true);}}><ClipboardList size={17} />{t('Доска')}</button><button className={tab === 'chats' ? 'active' : ''} onClick={returnToChats} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={17} />{chatStatusDot}</span>{t("Чаты")}</button><button className={tab === 'files' ? 'active' : ''} onClick={() => {setDocView('rules');setTab('files');}}><BookOpen size={17} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} onClick={()=>{setDocView('changelog');setTab('changelog');setMobileChat(true);}}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => {setSettingsPage('index');setTab('settings');setMobileChat(true);}}><Settings size={17} />{t("Настройки")}</button></nav>
+      {connection&&!demo&&<ConnectionStatus offline={offline}/>}
       {providerChips}
       <div className="search"><Search size={16} /><input aria-label={t("Найти чат")} placeholder={t("Найти чат")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
       <div className="session-list">
@@ -797,7 +838,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           {waiting.map(item=><button className="session-row" key={item.provider+':'+item.id} disabled={busy||uploading||Boolean(activityTarget)} onClick={()=>openActivity(item)}><MessageSquare size={16}/><div><strong>{item.title||t('Новый разговор')}</strong><small>{providerName(item.provider)} · {basename(item.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={item.status}/></small></div></button>)}</section>}
         {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><MessageSquare size={16}/><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={j.approvals?.length?'needs_input':'running'}/></small></div></button>)}
         {grouped.map(group=><section className="session-group" key={group.group} aria-label={dayGroupLabel(group.group)}><h2 className="list-label">{dayGroupLabel(group.group)}<span>{group.items.length}</span></h2>{group.items.map(sessionRow)}</section>)}
-        {!visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : connection ? t("Здесь появятся чаты {0} из разрешённых папок.",engineName) : t('Подключите ПК, чтобы видеть чаты.')}</p>{!connection&&!search&&!demo&&<button className="primary" onClick={()=>setMobileChat(true)}>{t('Подключить компьютер')}</button>}</div>}
+        {/* "No chats yet" only after the PC answered; before that a skeleton, or why the list cannot load. */}
+        {!visible.length && connection && !search && !demo && !sessionsLoaded ? unreachable ? <div className="empty-list" role="status"><MessageSquare size={26} /><p>{t('Список чатов загрузится, когда ПК будет на связи.')}</p><button className="secondary" onClick={()=>retryNow()}>{t('Повторить')}</button></div> : <div className="loading-skeleton" role="status" aria-label={t('Загружаем чаты…')}><span/><span/><span/></div>
+        : !visible.length && <div className="empty-list"><MessageSquare size={26} /><p>{search ? t("Ничего не найдено") : connection ? t("Здесь появятся чаты {0} из разрешённых папок.",engineName) : t('Подключите ПК, чтобы видеть чаты.')}</p>{!connection&&!search&&!demo&&<button className="primary" onClick={()=>setMobileChat(true)}>{t('Подключить компьютер')}</button>}</div>}
       </div></aside>
     <main className={`workspace ${chatSurface?'chat-canvas':''}`}>
       {reviewOpen && connection && reviewCwd && <Review key={reviewContext} connection={connection} cwd={reviewCwd} taskRunId={taskRun?.id} initialMode={availableReview?.mode} onlyPaths={reviewPaths} onQuote={quoteToDraft} onClose={()=>{setReviewOpen(false);setReviewPaths(undefined);}}/>}
@@ -816,26 +859,25 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       </>:tab==='workspace'?<header className="chat-header" data-section="board"><h1>{t("Доска")}</h1></header>:<header className="chat-header" data-section={tab}>
         <div className="header-title"><h1>{tab==='connection'||tab==='chats'?t('Подключение к ПК'):tab==='settings'?t("Настройки"):docView==='files'?t('Файлы'):docView==='rules'?t("Правила"):t("История изменений")}</h1></div>
       </header>}
-      {offline&&!connectionScreen&&<div className="network-banner" role="status">{locale().startsWith('ru')?'Офлайн · сохранённые данные, только просмотр':'Offline · saved data, read-only'}</div>}
+      {connection&&!connectionScreen&&!demo&&!embedded&&<ConnectionStatus offline={offline} hostError={networkError?t(networkError):''}/>}
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
-      {historyError && tab==='chats' && <div className="network-banner" role="status">{t("История не обновилась: ")}{t(historyError)}</div>}
-      {networkError && !connectionScreen && <div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
-      {!canRun && !demo && !offline && tab==='chats' && connection && (providerInfo || provider==='codex') && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить рабочее пространство Codex.")}</div>}
+      {/* Only a PC that answered /providers can say a provider is missing or signed out; an unreachable PC is the status line's job. */}
+      {!canRun && !demo && !unreachable && providersLoaded && tab==='chats' && connection && !connection.workspaceId && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить {0}.",engineName)}</div>}
       <Updates connection={connection} expanded={tab === 'settings'&&settingsPage === 'updates'} />
       {tab==='chats'&&taskRun&&!readingMode&&(history.length||job||selected)&&<button className="chat-task-entry" onClick={()=>setTaskPanel(true)}>{taskRun.title} · <span className={'task-stage-text task-stage-'+taskDisplayStage(taskRun)}>{taskRunStageLabel(taskRun)}</span></button>}
       </ChatOverlay>
       {tab === 'connection' ? connectView() : onboardingVisible ? connectView(true) : tab === 'workspace' ? connection?<WorkBoards focusTarget={noticeTarget} compactContext local connection={connection} roots={projectRoots} workspaces={personalBoards} onChat={setBoardLaunch}/>:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div> : (tab === 'files'||tab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={docView} onKind={setDocView} onChat={connection?(root,prompt)=>{if(busy||uploading)return;newChat(root);setDraft(prompt);}:undefined} onFolderChat={connection?path=>newChat(path):undefined}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : tab === 'settings' ? <SettingsPanel connectionPanel={connectView()} online={!!pcStatus?.online} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={page=>{setSettingsSubpage(null);setSettingsPage(page);}} subpageRequest={settingsSubpage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget}/> : <>
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;markScrolling();rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
-          <div className="conversation-inner">{selected && !demo && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop · ` : ''}{job ? t("Продолжение с телефона") : t("История обновляется каждые 3 секунды")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
+          <div className="conversation-inner">{selected && !demo && (job || unreachable && history.length > 0 || selected.source === 'desktop') && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop` : ''}{selected.source === 'desktop' && (job || unreachable && history.length > 0) ? ' · ' : ''}{job ? t("Продолжение с телефона") : unreachable && history.length > 0 ? t("Офлайн · сохранённая копия") : ''}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
             {loading && <div className="center-message">{t("Загружаем историю с ПК…")}</div>}
             {!loading && !history.length && !job && !selected && taskRun && <section className="task-chat-card" aria-label={t('Задача')}><button type="button" className={'task-chat-stage task-stage-text task-stage-'+taskDisplayStage(taskRun)} onClick={()=>setTaskPanel(true)}>{taskRunStageLabel(taskRun)}</button><h2>{taskRun.title}</h2>{taskRun.worktree&&<p className="task-chat-branch"><code>{taskRun.worktree.branch}</code></p>}{(taskRun.noteSnapshot?.description||'').trim()&&<p className="task-chat-criteria">{(taskRun.noteSnapshot?.description||'').trim().split('\n').slice(0,4).join('\n')}</p>}<p className="muted">{t('Проверьте подготовленный запрос и отправьте его, чтобы агент начал. Сам он не отправляется.')}</p></section>}
             {!loading && !history.length && !job && !selected && !taskRun && <div className={'welcome'+(draft.trim()||attachments.length?' welcome-collapsed':'')}><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={15} /></button>)}</div></div>}
-            {!loading && selected && !history.length && !job && <p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>}
-            {selected&&!loading&&<p className="history-page-status muted" role="status" aria-live="polite">{loadingOlder?(locale().startsWith('ru')?'Загружаем сообщения…':'Loading messages…'):historyError?(locale().startsWith('ru')?'Не удалось обновить историю':'History could not be refreshed'):fromStart||hasMore===null?(locale().startsWith('ru')?'Начало чата':'Beginning of chat'):(locale().startsWith('ru')?'Выше есть ещё сообщения · прокрутите вверх':'More messages above · scroll up')}{historyError&&hasMore!==null&&<button className="text-button" onClick={()=>void extendHistory()}>{locale().startsWith('ru')?'Повторить загрузку':'Retry loading'}</button>}</p>}
+            {!loading && selected && !history.length && !job && (unreachable||historyError&&hostDown(reach)?<div className="offline-empty muted" role="status"><p>{t("Этот чат ещё не сохранён на телефоне. Он загрузится, когда ПК будет доступен.")}</p><button className="secondary" onClick={()=>{retryNow();if(selected)void openSession(selected);}}>{t("Повторить")}</button></div>:<p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>)}
+            {selected&&!loading&&(history.length>0||!unreachable)&&<p className="history-page-status muted" role="status" aria-live="polite">{loadingOlder?<span className="history-loading"><LoaderCircle size={15} aria-hidden="true"/>{t('Загружаем сообщения…')}</span>:historyError?<>{t('Не удалось обновить историю')}{!unreachable&&<small className="history-error-reason">{t(historyError)}</small>}</>:unreachable&&hasMore!==null?t('Остальная история загрузится, когда ПК будет на связи'):fromStart||hasMore===null?t('Начало чата'):t('Выше есть ещё сообщения · прокрутите вверх')}{historyError&&hasMore!==null&&!unreachable&&<button className="text-button" onClick={()=>void extendHistory()}>{t('Повторить загрузку')}</button>}</p>}
             <MessageList connection={connection} cwd={cwd} key={`${provider}-history`} provider={provider} messages={history} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>
             {hasMore !== null && historyWindow.current >= 5000 && <p className="muted" role="status">{t("Достигнут предел окна: 5000 сообщений")}</p>}
-            {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={job.messages} streaming={running} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>}
-            {job && <PartialMessage key={`${provider}-${job.id}-partial`} provider={provider} streaming={running} text={job.partial||''}/>}
+            {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={job.messages} streaming={running&&!runUnknown} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>}
+            {job && <PartialMessage key={`${provider}-${job.id}-partial`} provider={provider} streaming={running&&!runUnknown} text={job.partial||''}/>}
             {job?.expiredApprovals?.map((item,index)=><p key={`expired-${index}`} className="approval-expired transcript-event" role="status">{t('Время ожидания истекло — агенту отправлен отказ')} · {item.tool}</p>)}
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers, extra) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers, ...extra });if(allow&&a.tool==='ExitPlanMode'&&extra?.mode){const key=currentDraftKey(),mode=extra.mode;setAccessChoices(old=>({...old,[key]:mode}));}}} />)}
             {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error">{t(job.error)}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
@@ -850,15 +892,15 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <div className="composer-area">{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}
           {!readingMode&&<OutboxShelf items={outbox} busy={busy}/>}
           {/* One status line above the composer; while a card asks for a decision, the card says it. */}
-          {running&&job&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)}/>}{!error&&connection&&!demo&&!readingMode&&!job?.approvals.length&&<LimitAlert provider={provider} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}{error &&<div className="error" role="alert">{t(error)}{!embedded&&t(error)===t(budgetRangeMessage)&&<button className="text-button" onClick={()=>{setError('');setSettingsSubpage('access');setSettingsPage('workspace');setTab('settings');setMobileChat(true);}}>{t('Открыть настройки бюджета')}</button>}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
+          {running&&job&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)&&!runUnknown} lostAt={runUnknown?runLost??jobContact.current.at:undefined}/>}{!error&&connection&&!demo&&!readingMode&&!job?.approvals.length&&<LimitAlert provider={provider} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}{error &&<div className="error" role="alert">{t(error)}{!embedded&&t(error)===t(budgetRangeMessage)&&<button className="text-button" onClick={()=>{setError('');setSettingsSubpage('access');setSettingsPage('workspace');setTab('settings');setMobileChat(true);}}>{t('Открыть настройки бюджета')}</button>}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
           <ChatComposer text={draft} onText={setDraft} label={t("Сообщение {0}",engineName)}
             placeholder={demo?t("Подключите ПК, чтобы отправлять сообщения"):t("Что нужно сделать?")}
             disabled={demo||selected?.readOnly} uploading={uploading} busy={busy} stopping={stopping}
-            mode={running?provider==='codex'?'steer':'queue':'send'} enterSends={enterSendsPreference(composerPreferences,Boolean(embedded))} keyHint={Boolean(embedded)}
-            canSend={!(demo||!canRun||selected?.readOnly||busy||loading||uploading||!attachments.every(attachmentReady)||!draft.trim()&&!attachments.length)}
+            mode={canQueue?'later':running?provider==='codex'?'steer':'queue':'send'} blockedReason={unreachable&&!canQueue&&!demo&&connection?t('Нет связи с ПК · черновик сохранится'):undefined} enterSends={enterSendsPreference(composerPreferences,Boolean(embedded))} keyHint={Boolean(embedded)}
+            canSend={!(demo||!(canRun||canQueue)||selected?.readOnly||busy||loading||uploading||!attachments.every(attachmentReady)||!draft.trim()&&!attachments.length)}
             attachments={attachments} onRemove={id=>setAttachments(old=>old.filter(a=>a.id!==id))} onFiles={(files,options)=>upload(files,options)} onRetry={retryUpload} onInsertText={id=>void insertPastedText(id)} onRecall={recallLast} onSend={()=>void send()}
-            stopLabel={t("Остановить {0}",engineName)} onStop={running?()=>void stopRun():undefined}
+            stopLabel={runUnknown?t("Повторить связь"):t("Остановить {0}",engineName)} stopRetry={runUnknown} onStop={running?runUnknown?()=>retryNow():()=>void stopRun():undefined}
             controls={<>{(provider==='claude'||provider==='codex')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>{(provider==='codex'||provider==='claude')&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
             usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||'sonnet')).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}/>
         </div></ChatOverlay>

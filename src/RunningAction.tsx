@@ -7,7 +7,7 @@ import './running-action.css';
 /** m:ss (or h:mm:ss) with tabular digits, so "slow" is distinguishable from "stuck". */
 export function elapsed(ms:number){const total=Math.max(0,Math.floor(ms/1000)),h=Math.floor(total/3600),m=Math.floor(total%3600/60),s=String(total%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${s}`:`${m}:${s}`;}
 /** One status line above the composer: what the agent does, for how long, and when it last showed activity. */
-export function RunningAction({job,stopping=false,stopHint=false}:{job:JobView;stopping?:boolean;stopHint?:boolean}){
+export function RunningAction({job,stopping=false,stopHint=false,lostAt}:{job:JobView;stopping?:boolean;stopHint?:boolean;lostAt?:number}){
  const ru=useLanguage()==='ru',[now,setNow]=useState(()=>Date.now());
  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
  // Any new revision is activity; a long silence over the network is shown instead of an endless shimmer.
@@ -28,6 +28,8 @@ export function RunningAction({job,stopping=false,stopHint=false}:{job:JobView;s
    label=activity.command||(last.type==='tool_use'&&last.name?activity.title:(activity.kind==='edit'?(ru?'Изменяет файлы':'Editing files'):(ru?'Выполняет действие':'Running an action')));
   }
  }
+ // Without contact the run is not shown as alive: no shimmer, no ticking timer, the age of the last confirmed state instead.
+ if(lostAt!==undefined){const ago=Math.max(0,Math.floor((now-lostAt)/1000));return <div className="running-action run-unknown" data-unknown><span role="status" title={ru?'Статус неизвестен':'Status unknown'}>{ru?'Статус неизвестен':'Status unknown'}</span><span className="running-action-quiet">{ru?`последнее обновление ${ago} с назад`:`last update ${ago}s ago`}</span></div>;}
  return <div className="running-action" data-stopping={stopping||undefined}><span role="status" className={job.approvals.length||stopping?'':'action-shimmer'} title={label}>{label}</span><time className="running-action-time" aria-hidden="true">{elapsed(now-job.startedAt)}</time>
   {quiet>=20&&!job.approvals.length&&<span className="running-action-quiet">{ru?`последняя активность ${quiet} с назад`:`last activity ${quiet}s ago`}</span>}
   {stopHint&&!stopping&&<kbd className="running-action-hint">{ru?'Esc — остановить':'Esc to stop'}</kbd>}</div>;

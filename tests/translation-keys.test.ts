@@ -24,3 +24,11 @@ test('settings strings render in English without Cyrillic',()=>{
   for(const key of ['Разрешать изменения файлов','Подтверждать за меня','Полный доступ','Запрашивать подтверждение','Назад','Все настройки','Аккаунты AI','Доступ агента','Лимит стоимости одного запроса','Ближе всего к лимиту','Сменить аккаунт'])assert.doesNotMatch(t(key),/[А-Яа-яЁё]/,key);
   assert.equal(t('Сброс через {0} · {1}','1 h 48 min','today at 00:55'),'Resets in 1 h 48 min · today at 00:55');
 });
+test('connection and update screens use t() for text and codes from native shells',()=>{
+  // Inline locale ternaries bypass the catalog, and native shells must not send prose the window shows as is.
+  for(const file of ['App.tsx','ConnectionStatus.tsx','project-workspaces.tsx','RepositoryBoards.tsx','DesktopUpdates.tsx','Updates.tsx','desktop-bridge.ts','DesktopApp.tsx']){const source=readFileSync('src/'+file,'utf8');assert.doesNotMatch(source,/startsWith\('ru'\)\?\s*'(?!ru')/,file);}
+  assert.doesNotMatch(readFileSync('src/project-workspaces.tsx','utf8'),/Error\('[A-Z]/);
+  assert.doesNotMatch(readFileSync('src/DesktopApp.tsx','utf8'),/hostStatuses/);
+  setLanguage('en');for(const key of ['ПК не отвечает','Туннель на связи, сервер ПК — нет','Нет связи с ПК · черновик сохранится','Этот чат ещё не сохранён на телефоне. Он загрузится, когда ПК будет доступен.'])assert.doesNotMatch(t(key),/[А-Яа-яЁё]/,key);
+  assert.equal(t('Обновите сервер на ПК, чтобы включить {0}.','Copilot'),'Update the PC host to enable Copilot.');
+});

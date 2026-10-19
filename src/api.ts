@@ -1,7 +1,9 @@
 import { t } from "./i18n";import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { networkFailure, networkProblem } from './connection-errors';
 import {desktopCall} from './desktop-bridge';
-import {cacheable,readOffline,writeOffline,clearConnectionOffline} from './offline-data';
+import {cacheable,readOfflineEntry,writeOffline,clearConnectionOffline} from './offline-data';
+import {proxyFailure,reportCached,reportFail,reportOk} from './reachability';
+import {Installer} from './native-update';
 export type Connection = {url: string;token: string;name?:string;hostId?:string;routes?:string[];desktop?:boolean;pairing?:boolean;deviceId?:string;workspaceId?:string;workspaceInvite?:boolean;workspaceOnly?:boolean;workspaceAccesses?:{url:string;token:string;workspaceId?:string;deviceId?:string;name?:string}[];workspaceAccess?:{url:string;token:string;workspaceId?:string;deviceId?:string;name?:string};};
 let pairing:{key:string;promise:Promise<Connection>}|undefined;
 const revokedKeys=new Set<string>();
@@ -9,7 +11,7 @@ const revokedKeys=new Set<string>();
 const serverMessages:Record<string,string>={budget_out_of_range:'Лимит стоимости запроса вне диапазона $0.10–$100. Измените его в настройках доступа Claude.',pairing_expired:'Код подключения устарел. Отсканируйте текущий QR на ПК.',device_limit:'Достигнут предел устройств. Отключите старое устройство на ПК.',pairing_timeout:'ПК не подтвердил устройство вовремя. Отсканируйте QR снова и подтвердите на ПК.',pairing_rejected:'ПК отклонил это устройство.',device_unauthorized:'Ключ подключения больше не действует. Отсканируйте текущий QR на ПК.'};
 // A stable installation id lets the PC replace this device's entry when it pairs again; the name tells devices apart.
 async function deviceIdentity(platform:'android'|'browser'):Promise<{name:string;model?:string;installation?:string}>{
-  if(platform==='android'&&Capacitor.isNativePlatform())try{const {Installer}=await import('./native-update');const device=await Installer.identity();return {name:device.name||device.model||'Android device',...(device.model?{model:device.model}:{}),...(device.installation?{installation:device.installation}:{})};}catch{/* Older native builds pair without an identity. */}
+  if(platform==='android'&&Capacitor.isNativePlatform())try{const device=await Installer.identity();return {name:device.name||device.model||'Android device',...(device.model?{model:device.model}:{}),...(device.installation?{installation:device.installation}:{})};}catch{/* Older native builds pair without an identity. */}
   let installation:string|undefined;try{installation=localStorage.getItem('pocket-code-installation')||undefined;if(!installation){installation=crypto.randomUUID().replace(/-/g,'');localStorage.setItem('pocket-code-installation',installation);}}catch{installation=undefined;}
   return {name:platform==='android'?'Android device':'Browser',...(installation?{installation}:{})};
 }
@@ -50,8 +52,14 @@ export async function saveConnection(connection: Connection | null) {
     if (connection) await Vault.save({ value: JSON.stringify(connection) });else await Vault.clear();
   } else if (connection) sessionStorage.setItem('connection', JSON.stringify(connection));else sessionStorage.removeItem('connection');
 }
+/** Saved copy of a cacheable read when the PC cannot answer; the event tells screens they show saved data and how old it is. */
+async function offlineRead<T>(connection:Connection,endpoint:string,data:unknown):Promise<{value:T}|undefined>{
+  if(data!==undefined||!cacheable(endpoint))return undefined;
+  const cached=await readOfflineEntry(connection,endpoint);if(!cached||cached.value===undefined)return undefined;
+  reportCached(connection.url,cached.at);window.dispatchEvent(new CustomEvent('pocket-offline-read',{detail:{at:cached.at,endpoint}}));return {value:cached.value as T};
+}
 export async function request<T>(connection: Connection, endpoint: string, data?: unknown): Promise<T> {
-  if(connection.desktop)return desktopCall<T>(data===undefined?'read':'write',{endpoint,...(data===undefined?{}:{data})});
+  if(connection.desktop)return desktopCall<T>(data===undefined?'read':'write',{endpoint,...(data===undefined?{}:{data})}).then(value=>{reportOk(connection.url);return value;},error=>{if((error as {code?:string}).code?.startsWith('host_'))reportFail(connection.url,{cause:'host'});else if((error as {status?:number}).status)reportOk(connection.url);throw error;});
   const timeout = endpoint.startsWith('/jira/workflow') ? 300000 : endpoint === '/devices/pair' ? 150000 : endpoint.startsWith('/jira/') || endpoint.startsWith('/updates/') || endpoint.startsWith('/providers') || endpoint.endsWith('/usage') || endpoint.includes('provider=codex') ? 95000 : 30000;
   const url = normalizeUrl(connection.url) + '/api' + endpoint;
   const headers = { Authorization: `Bearer ${connection.token}`, 'Content-Type': 'application/json' };
@@ -66,9 +74,14 @@ export async function request<T>(connection: Connection, endpoint: string, data?
         body: data === undefined ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(timeout), redirect: 'error' });
       status = response.status;body = status === 204 ? null : await response.text();
     }
-  } catch (error) {if(data===undefined&&cacheable(endpoint)){const cached=await readOffline(connection,endpoint);if(cached!==undefined){window.dispatchEvent(new CustomEvent('pocket-offline-read'));return cached as T;}}throw Object.assign(new Error(networkFailure(url, error)),{problem:networkProblem(error instanceof Error?error.message:String(error))});}
-  if (status === 204) return null as T;
+  } catch (error) {const message=networkFailure(url, error);reportFail(connection.url,{cause:'network',detail:message});const cached=await offlineRead<T>(connection,endpoint,data);if(cached)return cached.value;throw Object.assign(new Error(message),{problem:networkProblem(error instanceof Error?error.message:String(error))});}
+  if (status === 204) {reportOk(connection.url);return null as T;}
   if (typeof body === 'string') {try {body = JSON.parse(body);} catch {body = null;}}
+  // A tunnel or proxy answering for a PC that is down (502–504, Cloudflare 520–530 without a JSON reason) means the PC is unreachable:
+  // read-only screens show their saved copy, exactly as after a dropped connection.
+  if (proxyFailure(status) && !(typeof body?.error === 'string' && body.error)) {reportFail(connection.url,{cause:'tunnel',httpStatus:status});const cached=await offlineRead<T>(connection,endpoint,data);if(cached)return cached.value;}
+  else if (status>=200&&status<300&&(body===null||typeof body!=='object')) {const cached=await offlineRead<T>(connection,endpoint,data);if(cached){reportFail(connection.url,{cause:'network'});return cached.value;}}
+  else reportOk(connection.url);
   // A JSON reason from the host survives; only a bare tunnel/proxy failure (HTML or empty body) gets the generic reconnect hint.
   if (status >= 500 && typeof body?.error === 'string' && body.error) throw Object.assign(new Error(body.code&&serverMessages[body.code]?t(serverMessages[body.code]):t(body.error)),{status,...(body.code?{code:body.code}:{})});
   if (status >= 500) throw Object.assign(new Error(t("Сервер или интернет-туннель пока недоступен (HTTP {0}). Убедитесь, что окно сервера открыто; повторите подключение или отсканируйте новый QR после перезапуска.", status)),{status});

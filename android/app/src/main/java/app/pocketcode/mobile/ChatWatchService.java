@@ -35,9 +35,7 @@ public class ChatWatchService extends Service {
             NotificationChannel channel=new NotificationChannel(CHANNEL,"Chat activity",NotificationManager.IMPORTANCE_LOW);
             channel.setDescription("Progress of the last open Pocket Code chat");
             channel.setShowBadge(false);getSystemService(NotificationManager.class).createNotificationChannel(channel);
-            NotificationChannel attention=new NotificationChannel(ALERT_CHANNEL,"Chat results and questions",NotificationManager.IMPORTANCE_HIGH);
-            attention.setDescription("Completion, errors and requests for your answer");
-            getSystemService(NotificationManager.class).createNotificationChannel(attention);
+            AlertChannels.create(getSystemService(NotificationManager.class));
         }
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
@@ -53,9 +51,18 @@ public class ChatWatchService extends Service {
             if(Build.VERSION.SDK_INT>=29)startForeground(NOTIFICATION_ID,initial,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
             else startForeground(NOTIFICATION_ID,initial);
         }catch(RuntimeException error){stopSelf();return START_NOT_STICKY;}
-        Intent snapshot=new Intent(selection);
-        scheduled=worker.scheduleWithFixedDelay(()->poll(snapshot,epoch),0,5,TimeUnit.SECONDS);
+        Intent snapshot=new Intent(selection);failures=0;
+        scheduled=worker.schedule(()->cycle(snapshot,epoch),0,TimeUnit.SECONDS);
         return START_NOT_STICKY;
+    }
+    // Every 5 s while the PC answers; after failures the interval grows (10, 20, 40, 60 s) instead of knocking on a host that is down.
+    private volatile int failures;
+    private void cycle(Intent config,int epoch){
+        if(epoch!=generation)return;
+        poll(config,epoch);
+        if(epoch!=generation||worker.isShutdown())return;
+        long delay=failures==0?5:Math.min(60,5L<<Math.min(failures,4));
+        try{scheduled=worker.schedule(()->cycle(config,epoch),delay,TimeUnit.SECONDS);}catch(RejectedExecutionException ignored){}
     }
     private String key(Intent value){return value.getStringExtra("url")+"|"+value.getStringExtra("token")+"|"+value.getStringExtra("provider")+"|"+value.getStringExtra("sessionId")+"|"+value.getStringExtra("jobId")+"|"+value.getStringExtra("alerts");}
     private String value(Intent intent,String name){String value=intent.getStringExtra(name);return value==null?"":value;}
@@ -93,9 +100,10 @@ public class ChatWatchService extends Service {
                     if(action.matches("command|files|search|agent|responding|tool"))status=action;
                 }
             }
+            failures=0;
             if(status.equals("idle")&&System.currentTimeMillis()-started>15*60*1000){publish(epoch,"paused",true);return;}
             publish(epoch,status,terminal);
-        }catch(Exception error){publish(epoch,"offline",false);}
+        }catch(Exception error){failures++;publish(epoch,"offline",false);}
         finally{if(connection!=null)connection.disconnect();if(request==connection)request=null;}
     }
     private void publish(int epoch,String state,boolean terminal){
@@ -116,10 +124,10 @@ public class ChatWatchService extends Service {
         android.content.SharedPreferences seen=getSharedPreferences("chat-alerts",MODE_PRIVATE);
         if(seen.contains(key))return;
         NotificationManager manager=getSystemService(NotificationManager.class);
-        if(Build.VERSION.SDK_INT>=24&&!manager.areNotificationsEnabled())return;
-        if(Build.VERSION.SDK_INT>=26&&manager.getNotificationChannel(ALERT_CHANNEL).getImportance()==NotificationManager.IMPORTANCE_NONE)return;
+        String channel=AlertChannels.forState(state);
+        if(!AlertChannels.enabled(manager,channel))return;
         selection.putExtra("jobId",jobId);selection.putExtra("sessionId",sessionId);
-        try{manager.notify("run:"+NotificationIdentity.target(value(config,"url"),value(config,"provider"),sessionId,jobId),ALERT_ID,notification(statusText(state),false,true));}catch(SecurityException ignored){return;}
+        try{manager.notify("run:"+NotificationIdentity.target(value(config,"url"),value(config,"provider"),sessionId,jobId),ALERT_ID,notification(statusText(state),false,channel));}catch(SecurityException ignored){return;}
         rememberAlert(seen,key);
     }
     static void rememberAlert(android.content.SharedPreferences seen,String key){
@@ -144,13 +152,15 @@ public class ChatWatchService extends Service {
             case "update":return text("Update the PC server to track activity","Обновите сервер ПК для отслеживания");
             case "auth":return text("Reconnect to your PC","Подключитесь к ПК заново");
             case "paused":return text("Tracking paused — reopen the chat","Отслеживание приостановлено — откройте чат");
+            case "timeout":return text("Android paused background tracking — open Pocket Code to resume","Android приостановил фоновое отслеживание — откройте Pocket Code, чтобы возобновить");
             default:return text("Chat open — waiting for activity","Чат открыт — ожидаем активности");
         }
     }
     private Notification notification(String status,boolean ongoing){
-        return notification(status,ongoing,false);
+        return notification(status,ongoing,null);
     }
-    private Notification notification(String status,boolean ongoing,boolean attention){
+    private Notification notification(String status,boolean ongoing,String alertChannel){
+        boolean attention=alertChannel!=null;
         Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         open.putExtra("chatNotification",true);
         open.putExtra("connectionUrl",value(selection,"url"));
@@ -158,7 +168,7 @@ public class ChatWatchService extends Service {
         for(String key:new String[]{"provider","sessionId","jobId","cwd","title"})open.putExtra(key,value(selection,key));
         PendingIntent pending=PendingIntent.getActivity(this,attention?ALERT_ID:NOTIFICATION_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         String title=value(selection,"title");if(title.isEmpty())title="Pocket Code";
-        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,attention?ALERT_CHANNEL:CHANNEL):new Notification.Builder(this);
+        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,attention?alertChannel:CHANNEL):new Notification.Builder(this);
         if(attention)builder.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
         return builder.setSmallIcon(R.drawable.ic_chat_notification)
             .setContentTitle(title.substring(0,Math.min(title.length(),120))).setContentText(status)
@@ -167,7 +177,8 @@ public class ChatWatchService extends Service {
             .setVisibility(Notification.VISIBILITY_PRIVATE).setCategory(attention?Notification.CATEGORY_MESSAGE:Notification.CATEGORY_PROGRESS).build();
     }
     @Override public void onTimeout(int startId,int fgsType){
-        getSystemService(NotificationManager.class).notify(NOTIFICATION_ID,notification(statusText("paused"),false));
+        // Android 15+ limits data sync to six hours a day: say so instead of silently stopping alerts.
+        getSystemService(NotificationManager.class).notify(NOTIFICATION_ID,notification(statusText("timeout"),false));
         keepNotification=true;stopForeground(STOP_FOREGROUND_DETACH);stopSelf();
     }
     static void cancelActive(){if(active!=null){active.generation++;active.keepNotification=false;}}

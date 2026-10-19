@@ -108,12 +108,14 @@ public class AppUpdatePlugin extends Plugin {
                     if (status != 200) throw new Exception(token == null ? "GitHub did not provide this release. Check for updates again." : "The PC could not download this release. Check for updates again.");
                     break;
                 }
-                MessageDigest digest = MessageDigest.getInstance("SHA-256"); long received = 0;
+                MessageDigest digest = MessageDigest.getInstance("SHA-256"); long received = 0, reported = 0;
                 try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(partial)) {
                     byte[] buffer = new byte[65536]; int count;
                     while ((count = input.read(buffer)) != -1) {
                         received += count; if (received > expectedSize) throw new Exception("Unexpected update size.");
                         digest.update(buffer, 0, count); output.write(buffer, 0, count);
+                        // Progress for the update card, at most about every 1 % of the file.
+                        if (received - reported >= Math.max(262144, expectedSize / 100) || received == expectedSize) { reported = received; JSObject progress = new JSObject(); progress.put("bytes", received); progress.put("total", expectedSize); notifyListeners("downloadProgress", progress); }
                     }
                 }
                 if (received != expectedSize || !hex(digest.digest()).equals(expected)) throw new Exception("Update checksum verification failed.");

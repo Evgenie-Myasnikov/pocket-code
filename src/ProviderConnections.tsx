@@ -7,7 +7,20 @@ import {startVisiblePoll} from './visible-poll';
 import {Notice} from './Notice';
 import './provider-connections.css';
 import type {DesktopState} from './desktop-bridge';
-export function HostStatus({state}:{state:DesktopState}){useLanguage();return <dl className="host-status"><div><dt><span className={'host-dot'+(state.online?' on':'')} aria-hidden="true"/>{t('Сервер ПК')}</dt><dd>{state.online?(state.hostBusy?t('В работе'):t('В сети')):t('Не в сети')}</dd></div>{state.internet&&<div><dt><span className={'host-dot'+(state.tunnelOnline?' on':'')} aria-hidden="true"/>{t('Интернет-туннель')}</dt><dd>{state.tunnelOnline?t('Подключён'):t('Не подключён')}</dd></div>}</dl>;}
+/** The Windows shell reports host states as codes; older shells still send their English sentence, kept as a fallback. */
+export function hostStatusText(state:DesktopState){
+  const code=state.statusCode;
+  if(code==='connected')return state.status;
+  if(code==='ready'||!code&&state.status==='Ready to connect')return t('Готово к подключению');
+  if(code==='disconnected'||!code&&state.status==='Disconnected')return t('Отключено');
+  if(code==='reconnecting'||!code&&state.status.startsWith('Host unavailable'))return t('Сервер ПК недоступен. Переподключаемся…');
+  if(code==='starting'||!code&&state.status.startsWith('Starting the host'))return t('Запускаем сервер / восстанавливаем связь…');
+  if(code==='preparing'||!code&&state.status.startsWith('Preparing the host'))return t('Готовим сервер. Первый запуск может занять несколько минут.');
+  if(code==='mode-locked')return t('Остановите сервер, чтобы сменить режим подключения.');
+  return code==='failed'?t('Сервер ПК не запустился: {0}',state.status):state.status;
+}
+function RetryIn({at}:{at:number}){const [now,setNow]=useState(()=>Date.now());useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);const left=Math.max(0,Math.ceil((at-now)/1000));return <>{left?t('следующая попытка через {0} с',left):t('пробуем сейчас…')}</>;}
+export function HostStatus({state}:{state:DesktopState}){useLanguage();const working=!state.online&&(state.statusCode==='reconnecting'||state.statusCode==='starting'||state.statusCode==='preparing');return <dl className="host-status"><div><dt><span className={'host-dot'+(state.online?' on':'')} aria-hidden="true"/>{t('Сервер ПК')}</dt><dd>{state.online?(state.hostBusy?t('В работе'):t('В сети')):working?<span className="host-status-working"><Loader2 size={13} aria-hidden="true" className="host-status-spin"/>{state.statusCode==='reconnecting'?t('Переподключение'):t('Запуск')}{state.statusCode==='reconnecting'&&state.nextRetryAt?<> · <RetryIn at={state.nextRetryAt}/></>:null}</span>:t('Не в сети')}</dd></div>{state.internet&&<div><dt><span className={'host-dot'+(state.tunnelOnline?' on':'')} aria-hidden="true"/>{t('Интернет-туннель')}</dt><dd>{state.tunnelOnline?t('Подключён'):t('Не подключён')}</dd></div>}</dl>;}
 
 type Provider='claude'|'codex'|'copilot';
 export type ProviderStatus={id:Provider;installed:boolean;version:string;server:string;authenticated:boolean|null;access?:string;busy:boolean;login:{state:string;reason?:string;method?:string};methods:string[]};

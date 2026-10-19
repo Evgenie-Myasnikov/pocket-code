@@ -4,7 +4,7 @@ import {X,GitBranch,RefreshCw,Check,MessageSquare,Wrench,GitMerge} from 'lucide-
 import {request,type Connection} from './api';
 import {useLanguage,t} from './i18n';
 import {useModal} from './navigation';
-import {Review} from './Review';
+import {Review} from './lazy-panels';
 import {taskDisplayStage,taskPipeline,taskPipelineStep,taskStageLabel,checkStatusLabel,type TaskRun} from './task-run-ui';
 import type {TaskCheck} from '../server/task-checks';
 import type {BoardNoticeTarget} from './BoardNotifications';

@@ -113,7 +113,7 @@ test('a failed edge load waits for another user scroll before retrying',async({p
   });
   await connect(page,'claude');const scroller=page.locator('.conversation');await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
   await scroller.evaluate(el=>{el.scrollTo({top:0,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
-  await expect(page.locator('.network-banner')).toContainText('HTTP 503');
+  await expect(page.locator('.history-page-status')).toContainText('History could not be refreshed');await expect(page.locator('.history-page-status')).toContainText('Synthetic offline history');
   await scroller.evaluate(el=>{el.dispatchEvent(new Event('scroll'));el.dispatchEvent(new Event('scroll'));});expect(attempts).toBe(1);
   await scroller.evaluate(el=>{el.scrollTop=100;el.dispatchEvent(new Event('scroll'));el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
   await expect.poll(()=>attempts).toBe(2);await expect(page.locator('.message')).toHaveCount(100);

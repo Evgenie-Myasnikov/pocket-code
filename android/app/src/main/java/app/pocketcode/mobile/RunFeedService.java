@@ -35,8 +35,7 @@ public class RunFeedService extends Service {
             NotificationManager manager=getSystemService(NotificationManager.class);
             NotificationChannel channel=new NotificationChannel(CHANNEL,"PC chat tracking",NotificationManager.IMPORTANCE_MIN);
             channel.setDescription("Keeps watching PC chats so finished ones can notify you");channel.setShowBadge(false);manager.createNotificationChannel(channel);
-            NotificationChannel attention=new NotificationChannel(ALERT_CHANNEL,"Chat results and questions",NotificationManager.IMPORTANCE_HIGH);
-            attention.setDescription("Completion, errors and requests for your answer");manager.createNotificationChannel(attention);
+            AlertChannels.create(manager);
         }
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
@@ -95,10 +94,9 @@ public class RunFeedService extends Service {
     }
     private void alert(Intent config,JSONObject event){
         NotificationManager manager=getSystemService(NotificationManager.class);
-        if(Build.VERSION.SDK_INT>=24&&!manager.areNotificationsEnabled())return;
-        if(Build.VERSION.SDK_INT>=26&&manager.getNotificationChannel(ALERT_CHANNEL).getImportance()==NotificationManager.IMPORTANCE_NONE)return;
         String provider=event.optString("provider"),sessionId=event.optString("sessionId"),title=event.optString("title","Pocket Code");
-        String jobId=event.optString("jobId"),state=event.optString("status");
+        String jobId=event.optString("jobId"),state=event.optString("status"),channel=AlertChannels.forState(state);
+        if(!AlertChannels.enabled(manager,channel))return;
         String fingerprint=NotificationIdentity.event(value(config,"url"),provider,jobId.isEmpty()?event.optString("id"):jobId,event.optString("version"),state);
         android.content.SharedPreferences alerts=getSharedPreferences("chat-alerts",MODE_PRIVATE);
         if(alerts.contains(fingerprint))return;
@@ -110,7 +108,7 @@ public class RunFeedService extends Service {
         String status="needs_input".equals(state)?text(config,"Waiting for your answer","Ожидает вашего ответа"):
             "error".equals(state)?text(config,"Error — open the chat for details","Ошибка — подробности в чате"):
             "stopped".equals(state)?text(config,"Stopped","Остановлено"):text(config,"Completed — open to view the result","Завершено — откройте результат");
-        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,ALERT_CHANNEL):new Notification.Builder(this).setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,channel):new Notification.Builder(this).setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
         Notification notification=builder.setSmallIcon(R.drawable.ic_chat_notification).setContentTitle(title.substring(0,Math.min(title.length(),120))).setContentText(status)
             .setSubText("copilot".equals(provider)?"Copilot":"codex".equals(provider)?"Codex":"Claude").setContentIntent(pending).setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setCategory(Notification.CATEGORY_MESSAGE).build();
@@ -124,6 +122,14 @@ public class RunFeedService extends Service {
         return builder.setSmallIcon(R.drawable.ic_chat_notification).setContentTitle("Pocket Code").setContentText(text(config,"Watching PC chats for results","Следим за чатами на ПК"))
             .setContentIntent(pending).setOngoing(true).setShowWhen(false).setVisibility(Notification.VISIBILITY_SECRET).setCategory(Notification.CATEGORY_SERVICE).build();
     }
-    @Override public void onTimeout(int startId,int fgsType){stopSelf();}
+    @Override public void onTimeout(int startId,int fgsType){
+        // Tracking stopped by Android: a quiet note says how to resume instead of alerts silently stopping.
+        Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pending=PendingIntent.getActivity(this,NOTIFICATION_ID+1,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Intent current=config!=null?config:new Intent();
+        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this).setPriority(Notification.PRIORITY_MIN);
+        try{getSystemService(NotificationManager.class).notify(NOTIFICATION_ID+1,builder.setSmallIcon(R.drawable.ic_chat_notification).setContentTitle("Pocket Code").setContentText(text(current,"Android paused background tracking — open Pocket Code to resume","Android приостановил фоновое отслеживание — откройте Pocket Code, чтобы возобновить")).setContentIntent(pending).setAutoCancel(true).setVisibility(Notification.VISIBILITY_PRIVATE).build());}catch(SecurityException ignored){}
+        stopSelf();
+    }
     @Override public void onDestroy(){generation++;if(scheduled!=null)scheduled.cancel(true);if(activeRequest!=null)activeRequest.disconnect();worker.shutdownNow();main.removeCallbacksAndMessages(null);config=null;if(active==this)active=null;super.onDestroy();}
 }

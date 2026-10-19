@@ -69,6 +69,11 @@ public static class DesktopReadPolicy {
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");
     }
 }
+/// <summary>A host request that never reached the host: the window reports a code, never .NET exception text.</summary>
+public sealed class DesktopBridgeFailure:Exception {
+    public readonly string Code;
+    public DesktopBridgeFailure(string code,string message):base(message){Code=code;}
+}
 public sealed class PocketDesktop:Form {
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
     [DllImport("kernel32.dll")] static extern uint SetThreadExecutionState(uint flags);
@@ -98,6 +103,8 @@ public sealed class PocketDesktop:Form {
             string file=Path.Combine(storage,"desktop-update","state.json");if(!File.Exists(file))return;
             var state=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(file));
             updateState=(string)state["state"];updateVersion=(string)state["version"];updateTicket=(string)state["ticket"];
+            // Download progress: the archive grows next to state.json while the updater writes it.
+            updateSize=state.ContainsKey("size")?Convert.ToInt64(state["size"]):0;string archive=Path.Combine(storage,"desktop-update",(updateTicket??"")+".zip");updateReceived=updateState=="downloading"&&Regex.IsMatch(updateTicket??"",@"^[a-f0-9]{32}$")&&File.Exists(archive)?new FileInfo(archive).Length:0;
             if(updateState!="ready"||!online||hostBusy||changing||Convert.ToInt32(state["parentId"])!=Process.GetCurrentProcess().Id||!Regex.IsMatch(updateTicket??"",@"^[a-f0-9]{32}$")||updater==null||updater.HasExited)return;
             changing=true;
             try{
@@ -118,12 +125,14 @@ public sealed class PocketDesktop:Form {
     readonly SemaphoreSlim reads=new SemaphoreSlim(8);
     readonly NotifyIcon tray=new NotifyIcon();
     readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer{Interval=4000};
-    readonly WebView2 web=new WebView2{Dock=DockStyle.Fill,DefaultBackgroundColor=Color.FromArgb(17,21,18)};
+    static WebView2 NewWebView(){return new WebView2{Dock=DockStyle.Fill,DefaultBackgroundColor=Color.FromArgb(17,21,18)};}
+    WebView2 web=NewWebView();
     readonly TaskCompletionSource<bool> initialized=new TaskCompletionSource<bool>();
     DesktopPreferences preferences;
     PocketCodeOwnedHost owner;
     bool polling,online,changing,exiting,webReady,autoStartPending,hostBusy,tunnelOnline;
     int failures;
+    long updateSize,updateReceived;
     DateTime nextAttempt=DateTime.MinValue;
     string status="Ready to connect",jiraUrl;
     object[] addresses=new object[0];
@@ -184,9 +193,32 @@ public sealed class PocketDesktop:Form {
         core.AddWebResourceRequestedFilter("*",CoreWebView2WebResourceContext.All);
         core.WebResourceRequested+=(_,e)=>{Uri uri;if(Uri.TryCreate(e.Request.Uri,UriKind.Absolute,out uri)&&(uri.GetLeftPart(UriPartial.Authority)==Origin||uri.Scheme=="data"||uri.Scheme=="blob"||DesktopReadPolicy.AllowsMiroResource(e.Request.Uri,e.ResourceContext==CoreWebView2WebResourceContext.Document)||e.ResourceContext==CoreWebView2WebResourceContext.Image&&uri.Scheme=="https"))return;e.Response=core.Environment.CreateWebResourceResponse(new MemoryStream(),403,"External request blocked","");};
         core.WebMessageReceived+=async(_,e)=>await Bridge(e.Source,e.WebMessageAsJson);
+        core.ProcessFailed+=(_,e)=>WebProcessFailed(e.ProcessFailedKind);
         core.NavigationCompleted+=(_,e)=>{if(e.IsSuccess){webReady=true;if(Visible)web.Focus();Push();initialized.TrySetResult(true);}else initialized.TrySetException(new InvalidOperationException("Desktop interface could not load."));};
         core.Navigate(Origin+"/index.html?desktop=1");
     }
+    // A crashed or hung interface process must not leave a blank window: the host and its tasks keep running meanwhile.
+    int renderRestarts;DateTime renderRestartAt=DateTime.MinValue;bool unresponsivePrompt;
+    void WebProcessFailed(CoreWebView2ProcessFailedKind kind){
+        if(exiting||IsDisposed)return;
+        Log("Interface process failed: "+kind);
+        if(kind==CoreWebView2ProcessFailedKind.RenderProcessUnresponsive){
+            if(unresponsivePrompt)return;unresponsivePrompt=true;
+            BeginInvoke((Action)(()=>{try{bool ru=preferences.RunLanguage=="ru";var answer=MessageBox.Show(this,ru?"Интерфейс не отвечает. Перезагрузить окно? Сервер ПК и задачи продолжат работу.":"The interface is not responding. Reload the window? The PC host and its tasks keep running.","Pocket Code",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2);if(answer==DialogResult.Yes&&web.CoreWebView2!=null)web.CoreWebView2.Reload();}finally{unresponsivePrompt=false;}}));
+            return;
+        }
+        if(kind==CoreWebView2ProcessFailedKind.RenderProcessExited||kind==CoreWebView2ProcessFailedKind.FrameRenderProcessExited){
+            // One automatic reload per minute; a crash loop is left for the person instead of spinning.
+            if(DateTime.UtcNow-renderRestartAt<TimeSpan.FromMinutes(1)&&renderRestarts>0)return;
+            renderRestarts++;renderRestartAt=DateTime.UtcNow;BeginInvoke((Action)(()=>{try{if(web.CoreWebView2!=null)web.CoreWebView2.Reload();}catch(InvalidOperationException){}}));
+            return;
+        }
+        if(kind==CoreWebView2ProcessFailedKind.BrowserProcessExited){
+            // The WebView2 control cannot be reused after its browser process exits: recreate it.
+            BeginInvoke((Action)(async()=>{try{webReady=false;Controls.Remove(web);web.Dispose();web=NewWebView();Controls.Add(web);await InitializeWeb();}catch(Exception error){Log("Interface restart failed: "+error.Message);}}));
+        }
+    }
+    void Log(string line){try{Directory.CreateDirectory(storage);File.AppendAllText(Path.Combine(storage,"desktop-window.log"),DateTime.UtcNow.ToString("o")+" "+line+Environment.NewLine);}catch(IOException){}catch(UnauthorizedAccessException){}}
     async Task Bridge(string source,string payload){
         Uri origin;if(!Uri.TryCreate(source,UriKind.Absolute,out origin)||origin.GetLeftPart(UriPartial.Authority)!=Origin||origin.AbsolutePath!="/index.html")return;
         object id=null;try{
@@ -238,6 +270,7 @@ public sealed class PocketDesktop:Form {
                     else{string deviceName=message.ContainsKey("name")?message["name"] as string:null;if(String.IsNullOrWhiteSpace(deviceName)||deviceName.Length>80)throw new InvalidOperationException("Invalid device name.");result=await Send(reader,"/devices/"+parsed+"/rename",true,json.Serialize(new{name=deviceName}));}
                 }
                 else if(action=="toggle")await Toggle();
+                else if(action=="restart-host"){if(!preview&&!online&&!changing){if(owner!=null){owner.Dispose();owner=null;}preferences.Connect=true;Save();nextAttempt=DateTime.MinValue;Launch();Push();}}
                 else if(action=="jira"){if(!preview&&jiraUrl!=null)OpenUrl(jiraUrl);}
                 else if(action=="check-update"){await Send(reader,"/updates/check",true);StartUpdate();}
                 else if(action=="settings"){
@@ -250,7 +283,8 @@ public sealed class PocketDesktop:Form {
                     Save();
                 }else if(action!="state")throw new InvalidOperationException("Unknown desktop action.");result=Snapshot();
             }Reply(new{id=id,value=result});
-        }catch(Exception error){Reply(new{id=id,error=error.Message});}
+        }catch(DesktopBridgeFailure error){Reply(new{id=id,error=error.Message,code=error.Code});}
+        catch(Exception error){Reply(new{id=id,error=error.Message});}
     }
     void Reply(object message){if(exiting||IsDisposed)return;try{if(web.CoreWebView2!=null)web.CoreWebView2.PostWebMessageAsJson(json.Serialize(message));}catch(InvalidOperationException){}}
     void Push(){if(webReady&&!exiting)Reply(new{state=Snapshot()});}
@@ -285,7 +319,9 @@ public sealed class PocketDesktop:Form {
         foreach(string name in new[]{"provider","sessionId","jobId","cwd","title"})pendingChat[name]=Field(activeRunAlert,name);
         RestoreWindow();Reply(new{chatNotification=true});
     }
-    object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,keepAwake=preferences.KeepAwake,logs=failures>0,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
+    object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,statusCode=StatusCode(),updateSize=updateSize,updateReceived=updateReceived,failures=failures,nextRetryAt=!online&&nextAttempt>DateTime.UtcNow?(long)(nextAttempt-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds:0,keepAwake=preferences.KeepAwake,logs=failures>0,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
+    // The window localizes host states by code; free text stays only as the detail of an unexpected failure.
+    string StatusCode(){if(online)return "connected";if(status=="Ready to connect")return "ready";if(status=="Disconnected")return "disconnected";if(status.StartsWith("Host unavailable"))return "reconnecting";if(status.StartsWith("Starting the host"))return "starting";if(status.StartsWith("Preparing the host"))return "preparing";if(status=="Disconnect before changing connection mode.")return "mode-locked";return "failed";}
     public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();web.Focus();}
     void Save(){if(preview)return;Directory.CreateDirectory(storage);string temp=settingsFile+".tmp";File.WriteAllText(temp,json.Serialize(preferences),Encoding.UTF8);
         // Right after an update handoff another process can briefly hold desktop.json without delete sharing.
@@ -296,7 +332,11 @@ public sealed class PocketDesktop:Form {
         string token=File.ReadAllText(Path.Combine(storage,"connection-key.txt")).Trim();
         using(var request=new HttpRequestMessage(post?HttpMethod.Post:HttpMethod.Get,"http://127.0.0.1:4318/api"+endpoint)){
             request.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",token);if(post)request.Content=new StringContent(requestBody,Encoding.UTF8,"application/json");
-            using(var response=await client.SendAsync(request)){
+            HttpResponseMessage sent;
+            try{sent=await client.SendAsync(request);}
+            catch(HttpRequestException){throw new DesktopBridgeFailure("host_unreachable","The PC host is not answering.");}
+            catch(TaskCanceledException){throw new DesktopBridgeFailure("host_timeout","The PC host did not answer in time.");}
+            using(var response=sent){
                 string body=await response.Content.ReadAsStringAsync();object parsed=null;try{parsed=json.DeserializeObject(body);}catch{}
                 if(!response.IsSuccessStatusCode){var fields=parsed as Dictionary<string,object>;throw new InvalidOperationException(fields!=null&&fields.ContainsKey("error")?Convert.ToString(fields["error"]):"Host request failed: "+(int)response.StatusCode);}return parsed;
             }
@@ -306,11 +346,11 @@ public sealed class PocketDesktop:Form {
     async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;if(runtime.ContainsKey("desktopCheckRequestedAt")){long requested=Convert.ToInt64(runtime["desktopCheckRequestedAt"]);if(requested>lastRequestedUpdate){lastRequestedUpdate=requested;StartUpdate();}}hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
     async Task Poll(){
         if(preview||polling||changing||exiting)return;polling=true;
-        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();await PollRunNotifications();await PollDevices();UpdateKeepAwake();tray.Text="Pocket Code · connected";return;}
+        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();await PollRunNotifications();await PollDevices();UpdateKeepAwake();tray.Text=preferences.RunLanguage=="ru"?"Pocket Code · подключено":"Pocket Code · connected";return;}
             phoneOnline=false;UpdateKeepAwake();
             addresses=new object[0];jiraUrl=null;if(owner!=null&&owner.ActiveCount==0){owner.Dispose();owner=null;nextAttempt=DateTime.UtcNow.AddSeconds(Math.Min(60,5*Math.Pow(2,Math.Min(failures++,4))));}
             if(owner!=null){status="Starting the host / restoring connection…";return;}
-            status=preferences.Connect&&preferences.AutoReconnect?"Host unavailable. Reconnecting…":"Disconnected";tray.Text="Pocket Code · disconnected";
+            status=preferences.Connect&&preferences.AutoReconnect?"Host unavailable. Reconnecting…":"Disconnected";tray.Text=preferences.RunLanguage=="ru"?"Pocket Code · нет подключения":"Pocket Code · disconnected";
             if(preferences.Connect&&(autoStartPending||preferences.AutoReconnect)&&DateTime.UtcNow>=nextAttempt){autoStartPending=false;Launch();}
         }catch(Exception error){status=error.Message;nextAttempt=DateTime.UtcNow.AddSeconds(30);}finally{polling=false;Push();}
     }

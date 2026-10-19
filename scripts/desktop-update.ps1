@@ -32,8 +32,8 @@ $installRoot=Join-Path $env:LOCALAPPDATA 'Pocket Code Desktop'
 $updates=Join-Path $Storage 'desktop-update'
 New-Item -ItemType Directory -Force -Path $updates|Out-Null
 $stateFile=Join-Path $updates 'state.json';$ack=Join-Path $updates 'apply.txt';$ticket=[guid]::NewGuid().ToString('N')
-function State($state,$message,$targetVersion=''){
-    $value=@{state=$state;message=$message;version=$targetVersion;ticket=$ticket;parentId=$ParentId;at=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
+function State($state,$message,$targetVersion='',$size=0){
+    $value=@{state=$state;message=$message;version=$targetVersion;size=$size;ticket=$ticket;parentId=$ParentId;at=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
     $temp=$stateFile+'.tmp';[IO.File]::WriteAllText($temp,($value|ConvertTo-Json -Compress));Move-Item -LiteralPath $temp -Destination $stateFile -Force
 }
 function Get-Public($url,$file){Invoke-WebRequest -UseBasicParsing -Uri $url -Headers @{'User-Agent'='Pocket-Code-Updater';Accept='application/vnd.github+json'} -TimeoutSec 120 -OutFile $file}
@@ -50,7 +50,7 @@ try{
     $manifestPath=Join-Path $updates ($ticket+'.json');Get-Public ($base+'update.json') $manifestPath
     $manifest=Get-Content -LiteralPath $manifestPath -Raw|ConvertFrom-Json
     if(-not (Test-DesktopManifest $release $manifest $Version)){State 'current' 'Up to date';exit 0}
-    State 'downloading' 'Downloading Windows update' $manifest.version
+    State 'downloading' 'Downloading Windows update' $manifest.version $manifest.desktop.size
     $archive=Join-Path $updates ($ticket+'.zip');Get-Public ($base+$manifest.desktop.asset) $archive
     $staged=Join-Path $installRoot ('versions/'+$manifest.version+'-'+$ticket)
     Expand-VerifiedDesktop $archive $staged $manifest.desktop
