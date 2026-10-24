@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.1 (unreleased)
+## [0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.0...v0.28.1) (2026-10-24)
+
+Published [v0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.1) from [b8e800f51c283eea196e721fec080801d79fa5cd](https://github.com/Evgenie-Myasnikov/pocket-code/commit/b8e800f51c283eea196e721fec080801d79fa5cd) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - Boards use a single canvas; legacy tasks retain IDs, metadata, attachments and agent actions. Blank-canvas click/context menus create objects. Inline text editing replaces the object modal; edges/corners resize and four side ports create links. Persistent tools are undo, redo and fit; chat is an icon. Pinch and Ctrl+wheel zoom remain available.
@@ -11,7 +13,7 @@
 - Chat headers use the shared provider menu, rendered above the floating header so it is not clipped. Task undo restores metadata as well as geometry. Public snapshot checks include card descriptions, and chat context bounds their length.
 
 ### Validation
-- TypeScript/web build and 13 targeted persistence, migration, revision, workspace, privacy and MCP checks passed. Seven browser checks passed for inline editing, corner resizing, port connections, undo, legacy card reopening, provider menu, pinch and 60/100/130% scale. Four design-token checks and documentation checks passed. Windows shell compiled successfully. Not packaged, published or checked on physical devices. Legacy Tasks-view browser cases still need conversion to the new UI.
+- TypeScript/web build and 13 targeted persistence, migration, revision, workspace, privacy and MCP checks passed. Seven browser checks passed for inline editing, corner resizing, port connections, undo, legacy card reopening, provider menu, pinch and 60/100/130% scale. Four design-token checks and documentation checks passed. Windows shell compiled successfully. Android, host and Windows packages published; 1,406 decoded artifact entries passed privacy checks. APK signer matches 0.28.0. All four downloaded release assets match the reviewed local files and manifest hashes; GitHub privacy CI passed. Not checked on physical devices. Legacy Tasks-view browser cases still need conversion to the new UI.
 
 ## [0.28.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.27.1...v0.28.0) (2026-10-24)
 
