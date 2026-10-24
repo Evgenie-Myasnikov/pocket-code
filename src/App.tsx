@@ -1,3 +1,5 @@
+import {captureTextAnchor,restoreTextAnchor} from './chat-text-anchor';
+import {chatHistoryRequest,readHistoryView,writeHistoryView} from './chat-history-cache';
 import './compact-ui.css';
 import {ProviderPicker} from './ProviderPicker';
 import {MobileNavigation} from './MobileNavigation';
@@ -422,7 +424,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     }
     const stop=startVisiblePoll(pollAgents,6000,true,document,hostGate(connection.url));return()=>{cancelled=true;stop();};
   },[connection,provider,parentChatId,tab,demo]);
-  const api = <T,>(endpoint: string, data?: unknown) => request<T>(connection!, endpoint, data);
+  const api = <T,>(endpoint:string,data?:unknown):Promise<T>=>data===undefined&&/^\/sessions\/[^/]+\/messages\?/.test(endpoint)?chatHistoryRequest(connection!,endpoint,cacheScope) as Promise<T>:request<T>(connection!,endpoint,data);
   useEffect(()=>{
     // Rejected turns never reached Codex. Recover only the originating draft;
     // navigation or typing a newer message must not lose either piece of work.
@@ -545,6 +547,11 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const timer=setTimeout(()=>writeChatCache(cacheScope,provider,'chat:'+selected.sessionId,outputMessages.slice(-100)),400);
     return()=>clearTimeout(timer);
   },[cacheScope,provider,demo,selected?.sessionId,outputMessages,loading,fromStart]);
+  useEffect(()=>{
+    if(!cacheScope||demo||!selected||loading||!history.length)return;
+    const timer=setTimeout(()=>void writeHistoryView(cacheScope,provider,selected.sessionId,{messages:history,window:historyWindow.current,fromStart,hasMore}),800);
+    return()=>clearTimeout(timer);
+  },[cacheScope,provider,demo,selected?.sessionId,history,loading,fromStart,hasMore]);
   useEffect(() => {
     if (!connection || demo) return;
     let cancelled = false;
@@ -587,8 +594,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     async function sync() {
       try {
         const window=historyWindow.current;
-        const data = await request<{messages: ChatMessage[];previous: number | null;next: number | null;}>(connection!, `/sessions/${encodeURIComponent(selected!.sessionId)}/messages?provider=${provider}&window=${window}${fromStart ? '&from=start' : ''}`);
-        if (!cancelled && epoch === navigation.current && !sending.current && !paging.current && window===historyWindow.current) {setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(fromStart ? data.next : data.previous);setHistoryError('');}
+        const data = await chatHistoryRequest(connection!, `/sessions/${encodeURIComponent(selected!.sessionId)}/messages?provider=${provider}&window=${window}${fromStart ? '&from=start' : ''}`,cacheScope);
+        if (!cancelled && epoch === navigation.current && !sending.current && !paging.current && window===historyWindow.current) {setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore((fromStart ? data.next : data.previous)??null);setHistoryError('');}
       } catch (e) {if (!cancelled) setHistoryError((e as Error).message);}
     }
     const stop=startVisiblePoll(sync,3000,false,document,hostGate(connection.url));
@@ -605,10 +612,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     async function syncCompleted() {
       try {
         const window=historyWindow.current;
-        const data = await request<{messages:ChatMessage[];previous:number|null}>(connection!, `/sessions/${encodeURIComponent(completed.sessionId!)}/messages?provider=${provider}&window=${window}`);
+        const data = await chatHistoryRequest(connection!, `/sessions/${encodeURIComponent(completed.sessionId!)}/messages?provider=${provider}&window=${window}`,cacheScope);
         if (cancelled || epoch !== navigation.current || sending.current || paging.current || window!==historyWindow.current) return;
         if (data.messages.some(message => message.id === lastAnswer!.id)) {
-          setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(data.previous);setHistoryError('');setJob(null);
+          setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(data.previous??null);setHistoryError('');setJob(null);
           setSelected(old => old?.sessionId === completed.sessionId ? old : sessions.find(session => session.sessionId === completed.sessionId) || {sessionId:completed.sessionId!,provider,cwd:completed.cwd,summary:t("Текущая задача"),lastModified:completed.startedAt});
           return false;
         }
@@ -617,9 +624,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const stop=startVisiblePoll(syncCompleted,3000,true,document,hostGate(connection.url));return () => {cancelled=true;stop();};
   },[connection,provider,job?.id,job?.status,demo,busy,loading,loadingOlder,fromStart,tab]);
   useLayoutEffect(()=>{if(tab==='chats'&&scroll.current&&!loading){scroll.current.scrollTop=lastScrollTop.current;setShowScrollActions(fromStart||scroll.current.scrollHeight-scroll.current.scrollTop-scroll.current.clientHeight>=80);}},[provider,tab,mobileChat]);
-  useLayoutEffect(()=>{const position=pendingPosition.current,el=scroll.current;if(!position||!el||loading||tab!=='chats')return;pendingPosition.current=null;const message=position.messageId?[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.dataset.messageId===position.messageId):null;el.scrollTop=position.bottom?el.scrollHeight:message&&position.offset!==undefined?el.scrollTop+message.getBoundingClientRect().top-el.getBoundingClientRect().top-position.offset:position.top;lastScrollTop.current=el.scrollTop;nearBottom.current=position.bottom;setShowScrollActions(!position.bottom||fromStart);},[loading,history,provider,tab]);
+  useLayoutEffect(()=>{const position=pendingPosition.current,el=scroll.current;if(!position||!el||loading||tab!=='chats')return;pendingPosition.current=null;const message=position.messageId?[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.dataset.messageId===position.messageId):null;const textTop=message&&position.textAnchor?restoreTextAnchor(el,message,position.textAnchor):undefined;el.scrollTop=position.bottom?el.scrollHeight:textTop!==undefined?textTop:message&&position.offset!==undefined?el.scrollTop+message.getBoundingClientRect().top-el.getBoundingClientRect().top-position.offset:position.top;lastScrollTop.current=el.scrollTop;nearBottom.current=position.bottom;setShowScrollActions(!position.bottom||fromStart);},[loading,history,provider,tab]);
   useChatReturn(selected?positionKey(cacheScope,provider,selected.sessionId):'',tab==='chats'&&(embedded?embedded.visible!==false:mobileChat),running,!loading&&!busy&&!paging.current,()=>{void jumpHistory(false);});
-  function rememberPosition(){const el=scroll.current;if(!el||loading||!selected||!el.getClientRects().length)return;const top=el.getBoundingClientRect().top,message=[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.getBoundingClientRect().bottom>top);savePosition(positionKey(cacheScope,provider,selected.sessionId),{top:el.scrollTop,window:historyWindow.current,fromStart,bottom:nearBottom.current,messageId:message?.dataset.messageId,offset:message?message.getBoundingClientRect().top-top:undefined});}
+  function rememberPosition(){const el=scroll.current;if(!el||loading||!selected||!el.getClientRects().length)return;const top=el.getBoundingClientRect().top,message=[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.getBoundingClientRect().bottom>top);savePosition(positionKey(cacheScope,provider,selected.sessionId),{top:el.scrollTop,window:historyWindow.current,fromStart,bottom:nearBottom.current,messageId:message?.dataset.messageId,textAnchor:message?captureTextAnchor(el,message):undefined,offset:message?message.getBoundingClientRect().top-top:undefined});}
   const persistPosition=useRef(()=>{});persistPosition.current=rememberPosition;
   useEffect(()=>{const save=()=>{persistPosition.current();flushPositions();};window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',save);return()=>{save();window.removeEventListener('pagehide',save);document.removeEventListener('visibilitychange',save);};},[]);
   useLayoutEffect(()=>{
@@ -664,9 +671,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   async function loadHistory(s: Session, active: JobView | null, epoch: number, older = false, beginning = fromStart) {
     if (older) historyWindow.current = Math.min(5000, historyWindow.current + 100);
     if(active?.errorCode==='codex_thread_busy')active=null;
-    const data = await api<{messages: ChatMessage[];previous: number | null;next: number | null;}>(`/sessions/${encodeURIComponent(s.sessionId)}/messages?provider=${provider}&window=${historyWindow.current}${beginning ? '&from=start' : ''}${active ? `&end=${active.baseMessageCount}` : ''}`);
+    const data = await chatHistoryRequest(connection!,`/sessions/${encodeURIComponent(s.sessionId)}/messages?provider=${provider}&window=${historyWindow.current}${beginning ? '&from=start' : ''}${active ? `&end=${active.baseMessageCount}` : ''}`,cacheScope,cached=>{if(epoch!==navigation.current)return;setHistory(old=>shareMessages(old,uniqueMessages(cached.messages)));setHasMore(beginning?cached.next??null:cached.previous??null);});
     if (epoch !== navigation.current) return;
-    setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(beginning ? data.next : data.previous);setHistoryError('');
+    setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore((beginning ? data.next : data.previous)??null);setHistoryError('');
   }
   async function jumpHistory(beginning: boolean) {
     if (loading || busy) return;
@@ -697,6 +704,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if (demo) {setHistory(demoMessages);return;}
     setLoading(true);
     try {
+      const view=cacheScope?await readHistoryView(cacheScope,provider,s.sessionId):undefined;
+      if(epoch!==navigation.current)return;
+      if(view&&view.fromStart===(savedPosition?.fromStart||false)&&Array.isArray(view.messages)){historyWindow.current=Math.max(historyWindow.current,view.window);setHistory(view.messages);setHasMore(view.hasMore);}
       const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
       const full = active ? await api<JobView>(`/jobs/${active.id}`) : null;
       if (epoch !== navigation.current) return;
@@ -826,7 +836,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   // Status of chats other than the open one, shown on the conversation's Back arrow.
   const otherStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>item.status===status&&!(item.provider===provider&&(item.id===job?.id||item.sessionId&&item.sessionId===(job?.sessionId||selected?.sessionId)))));
   const openInbox=()=>setInboxOpen(true);
-  const bell=(variant:'icon'|'tab')=>!embedded&&!readingMode?<InboxButton notices={notices} activity={activity} open={inboxOpen} onOpen={openInbox} variant={variant}/>:null;
+  const bell=(variant:'icon'|'tab'|'menu')=>!embedded&&!readingMode?<InboxButton notices={notices} activity={activity} open={inboxOpen} onOpen={openInbox} variant={variant}/>:null;
   const openNotice=(target:BoardNoticeTarget)=>{setNoticeTarget(target);setLocalBoards(!workspaceConnection);setWorkspaceScanner(false);setTab('workspace');setMobileChat(true);};
   const showSection=(next:typeof tab,page?:SettingsPage)=>{if(next==='files')setDocView('rules');else if(next==='changelog')setDocView('changelog');if(next==='chats'){returnToChats();return;}if(page)setSettingsPage(page);else if(next==='settings')setSettingsPage('index');setTab(next);setMobileChat(true);};
   // Before pairing, Chats shows the connection steps under a plain section header, not an empty conversation.
@@ -869,7 +879,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
-        <ChatHeader notifications={bell('icon')} title={selected?.customTitle||selected?.summary||(!job&&taskRun?.title)||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
+        <ChatHeader unread={!embedded?(activity.attention||0):0} notifications={bell('menu')} title={selected?.customTitle||selected?.summary||(!job&&taskRun?.title)||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():setMobileChat(false)}
           context={!selected&&!job&&!taskRun?<>{workspacePicker('header')}{!boardChat?.context&&<><span aria-hidden="true">·</span><label className="project-picker"><Folder size={14} aria-hidden="true"/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label></>}</>:undefined}
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>{setReviewPaths(undefined);setReviewOpen(true);},stats:availableReview&&availableReview.files!==undefined?{added:availableReview.added||0,removed:availableReview.removed||0,files:availableReview.files}:undefined}:undefined}

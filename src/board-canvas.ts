@@ -12,7 +12,7 @@ export function boardCanvas(notes:BoardNote[],canvas?:Whiteboard):Whiteboard {
 export function canvasMigrationIssues(notes:BoardNote[],canvas?:Whiteboard){
  const result:string[]=[],noteIds=new Set(notes.map(n=>n.id)),items=canvas?.items||[],ids=new Set([...noteIds,...items.map(i=>i.id)]);
  if(noteIds.size!==notes.length||new Set(items.map(i=>i.id)).size!==items.length)result.push('Duplicate object IDs');
- if((canvas?.links||[]).some(l=>!ids.has(l.from)||!ids.has(l.to)||l.from===l.to))result.push('Invalid visual connections');
+ if((canvas?.links||[]).some(l=>(l.from?!ids.has(l.from):!l.fromPoint)||(l.to?!ids.has(l.to):!l.toPoint)||Boolean(l.from&&l.from===l.to)))result.push('Invalid visual connections');
  if(notes.some(n=>n.dependencies.some(id=>!noteIds.has(id)||id===n.id)))result.push('Invalid task dependencies');
  return result;
 }

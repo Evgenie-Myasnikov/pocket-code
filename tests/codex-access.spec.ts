@@ -62,7 +62,7 @@ test('Codex access selection survives reload and workspace switches without chan
 
 test('Chat hides the mode selector with Full access selected, and empty chats hide unused actions',async({page})=>{
   const sent:any[]=[];await setup(page,{sent});await newChat(page);await expect(page.getByRole('button',{name:'Review',exact:true})).toHaveCount(0);await expect(page.locator('.outputs-entry')).toHaveCount(0);await expect(page.locator('.reading-entry')).toHaveCount(0);
-  await expect(page.getByLabel('Mode',{exact:true})).toHaveCount(0);await page.getByLabel('Message Codex').fill('Plan this task');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);expect(sent[0]).toMatchObject({codexAccess:'full',mode:'default'});await expect(page.locator('.reading-entry')).toBeVisible();await expect(page.locator('.outputs-entry')).toHaveCount(0);
+  await expect(page.getByLabel('Mode',{exact:true})).toHaveCount(0);await page.getByLabel('Message Codex').fill('Plan this task');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);expect(sent[0]).toMatchObject({codexAccess:'full',mode:'default'});await page.getByRole('button',{name:'More actions',exact:true}).click();await expect(page.getByRole('menuitem',{name:'Reading mode',exact:true})).toBeVisible();await expect(page.locator('.outputs-entry')).toHaveCount(0);
 });
 
 test('Review appears for actual branch changes and opens that mode, then disappears in a clean project',async({page})=>{

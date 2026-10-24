@@ -8,7 +8,7 @@ export function ChatOverlay({edge,enabled=true,children}:{edge:'top'|'bottom';en
     const element=ref.current,workspace=element?.closest<HTMLElement>('.workspace');
     if(!enabled||!element||!workspace)return;
     const property=`--chat-overlay-${edge}`;
-    const measure=()=>workspace.style.setProperty(property,`${element.offsetHeight}px`);
+    const measure=()=>{if(element.offsetHeight>0)workspace.style.setProperty(property,`${element.offsetHeight}px`);};
     measure();
     const observer=new ResizeObserver(measure);observer.observe(element);
     // The top band shows a hairline only once the transcript scrolls beneath it.

@@ -34,7 +34,7 @@ async function host(page:Page){
 }
 async function navigate(page:Page,name:string){await openSection(page,name);}
 const drawer=(page:Page)=>page.getByRole('dialog',{name:'Inbox',exact:true});
-const openDrawer=async(page:Page)=>{await page.locator('.board-notifications-trigger:visible').first().click();await expect(drawer(page)).toBeVisible();await drawer(page).evaluate(async element=>{await Promise.all(element.getAnimations().map(animation=>animation.finished));});};
+const openDrawer=async(page:Page)=>{await page.locator('.board-notifications-trigger:visible,.chat-menu-button:visible').first().waitFor();const direct=page.getByRole('button',{name:/^Inbox(?:,|$)/}).filter({visible:true});if(await direct.count())await direct.first().click();else{await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitem',{name:/^Inbox/}).click();}await expect(drawer(page)).toBeVisible();await drawer(page).evaluate(async element=>{await Promise.all(element.getAnimations().map(animation=>animation.finished));});};
 async function open(page:Page,scale=100){
   await page.addInitScript(({scale})=>{
     sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)}));
@@ -46,7 +46,7 @@ async function open(page:Page,scale=100){
 test('activity groups work across providers and closes without losing a draft',async({page})=>{
   await host(page);await page.setViewportSize({width:390,height:844});await open(page);await page.getByLabel('Message Claude').fill('Keep this draft');await openDrawer(page);
   await expect(drawer(page).getByRole('button',{name:/^codex result,/})).toBeVisible();await expect(drawer(page).getByRole('button',{name:/^claude question,/})).toBeVisible();await expect(drawer(page).getByRole('button',{name:/^codex working,/})).toBeVisible();
-  await expect(drawer(page).locator('.inbox-processes section')).toHaveCount(3);await page.keyboard.press('Escape');await expect(drawer(page)).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');await expect(page.locator('.board-notifications-trigger:visible')).toBeFocused();
+  await expect(drawer(page).locator('.inbox-processes section')).toHaveCount(3);await page.keyboard.press('Escape');await expect(drawer(page)).toHaveCount(0);await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');await expect(page.getByRole('button',{name:/^(More actions|Inbox(?:,.*)?)$/}).filter({visible:true}).first()).toBeFocused();
   await openDrawer(page);await expect(drawer(page).getByRole('button',{name:'All chats',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');await page.getByRole('button',{name:'Back to chats',exact:true}).click();await expect(drawer(page)).toHaveCount(0);await expect(page.getByRole('button',{name:'New chat',exact:true})).toBeVisible();
 });
 
@@ -100,7 +100,7 @@ test('failure to open a completed chat leaves its result unread',async({page})=>
 
 test('activity refresh retains old entries offline and moves finished work to completed',async({page})=>{
   const state=await host(page);await open(page);await openDrawer(page);await expect(drawer(page).locator('.inbox-process-row.state-running')).toHaveCount(1);
-  state.error=503;await drawer(page).getByRole('button',{name:'Refresh',exact:true}).click();await expect(drawer(page).locator('.inbox-sync-error')).toBeVisible();await expect(drawer(page).getByRole('button',{name:/^codex working,/})).toBeVisible();
+  state.error=503;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect(drawer(page).locator('.inbox-sync-error')).toBeVisible();await expect(drawer(page).getByRole('button',{name:/^codex working,/})).toBeVisible();
   state.error=0;state.items=state.items.map(value=>value.id==='working'?{...value,status:'done',version:'done-2'}:value);await drawer(page).getByRole('button',{name:'Retry',exact:true}).click();
   await expect(drawer(page).locator('.inbox-sync-error')).toHaveCount(0);await expect(drawer(page).locator('.inbox-process-row.state-running')).toHaveCount(0);await expect(drawer(page).locator('.inbox-process-row.state-done')).toHaveCount(2);
 });
@@ -129,10 +129,9 @@ test('unified bell remains available in every main section',async({page})=>{
  await host(page);await page.setViewportSize({width:390,height:844});await open(page);
  for(const name of ['Board','Chats','Rules','Changelog','Settings']){
   await navigate(page,name);
-  await expect(page.locator('.app-header')).toHaveCount(0);await expect(page.locator('.board-notifications-trigger:visible')).toBeVisible();
-  await expect(page.locator('.board-notifications-trigger:visible')).toHaveCount(1);
+  await expect(page.locator('.app-header')).toHaveCount(0);await expect(page.getByRole('button',{name:/^Inbox(?:,|$)/}).filter({visible:true})).toHaveCount(1);
   await openDrawer(page);expect(await drawer(page).evaluate(el=>Math.abs(el.getBoundingClientRect().right-innerWidth))).toBeLessThan(2);await page.keyboard.press('Escape');
-  await expect(page.locator('.board-notifications-trigger:visible')).toBeFocused();
+  await expect(page.getByRole('button',{name:/^(More actions|Inbox(?:,.*)?)$/}).filter({visible:true}).first()).toBeFocused();
  }
 });
 
@@ -147,26 +146,17 @@ test('Chats tab and the conversation Back arrow show the state of other chats; w
  await expect(page.locator('.session-group-waiting')).toHaveCount(0);
 });
 
-test('badge counts what needs the person; board filter and question reply sheet',async({page})=>{
- await host(page);let reads=0,saved:any=null;
- const board={id:'board-1',root,title:'Synthetic board',revision:3,versions:[],notes:[{id:'note',title:'Synthetic board question',description:'Choose the format',status:'questions',owner:'',x:0,y:0,dependencies:[],images:[],branch:''}]};
- await page.route('**/api/board-notifications',route=>route.fulfill({json:{items:[{id:'notice',boardId:'board-1',noteId:'note',kind:'question',title:'Synthetic board question',message:'Choose the format',at:Date.now()-120000}]}}));
+test('compact inbox hides retired controls and assignments and loads the latest image',async({page})=>{
+ await page.clock.install();await host(page);let reads=0,imageCalls=0,imageVersion=1;
+ await page.route('**/api/board-notifications',route=>route.fulfill({json:{items:[{id:'old-notice',boardId:'old-board',noteId:'old-note',kind:'assigned',title:'Legacy assignment',at:1}]}}));
  await page.route('**/api/board-notifications/read',route=>{reads++;return route.fulfill({json:{ok:true}});});
- await page.route('**/api/boards/board-1',route=>{if(route.request().method()==='POST'){saved=route.request().postDataJSON();return route.fulfill({json:{...board,revision:4}});}return route.fulfill({json:board});});
- await page.setViewportSize({width:390,height:844});await open(page);
- // 1 question waiting + 1 unread board notice; the running and the finished process do not add to the number.
- const trigger=page.locator('.board-notifications-trigger:visible');await expect(trigger.locator('b')).toHaveText('2');await expect(trigger).toHaveClass(/inbox-running/);
- await openDrawer(page);
- await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(3);await expect(drawer(page).getByText('Synthetic board question')).toBeVisible();
- const filters=drawer(page).getByRole('group',{name:'Inbox filter'});await expect(filters.getByRole('button',{name:/^All/})).toHaveAttribute('aria-pressed','true');
- await filters.getByRole('button',{name:/^Board/}).click();await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(0);
- await filters.getByRole('button',{name:/^Running/}).click();await expect(drawer(page).getByText('Synthetic board question')).toHaveCount(0);await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(1);
- await page.keyboard.press('Escape');await openDrawer(page);await expect(filters.getByRole('button',{name:/^All/})).toHaveAttribute('aria-pressed','true');
- await drawer(page).locator('.inbox-notice-row').click();await expect(drawer(page).getByRole('heading',{name:'Answer the question'})).toBeVisible();expect(reads).toBe(0);
- await expect(drawer(page).locator('blockquote')).toHaveText('Choose the format');await drawer(page).getByLabel('Your answer').fill('Use Markdown tables');
- await drawer(page).getByRole('button',{name:'Send answer',exact:true}).click();await expect(drawer(page).getByRole('heading',{name:'Inbox'})).toBeVisible();
- expect(reads).toBe(1);expect(saved.revision).toBe(3);expect(saved.notes[0].status).toBe('ready');expect(saved.notes[0].description).toBe('Choose the format\n\nAnswer: Use Markdown tables');
- await expect(page.locator('.activity-entry,.activity-drawer')).toHaveCount(0);await page.screenshot({path:'.local/unified-processes.png'});
+ const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=160;c.height=100;const ctx=c.getContext('2d')!;ctx.fillStyle='#5b7fb8';ctx.fillRect(0,0,160,100);return c.toDataURL('image/png').split(',')[1];});
+ await page.route('**/api/sessions/previews?*',route=>{const url=new URL(route.request().url());return route.fulfill({json:{previews:(url.searchParams.get('ids')||'').split(',').map(sessionId=>({sessionId,lastModified:imageVersion,text:'Synthetic result',image:sessionId==='session-working'?{name:'latest.png'}:null}))}});});
+ await page.route('**/api/sessions/session-working/preview-image?*',route=>{imageCalls++;return route.fulfill({json:{mimeType:'image/png',data:png}});});
+ await page.setViewportSize({width:390,height:844});await open(page);await expect(page.locator('.chat-header-main .board-notifications-trigger')).toHaveCount(0);await expect(page.locator('.chat-header-actions .reading-entry')).toHaveCount(0);await openDrawer(page);
+ await expect(drawer(page).getByRole('heading',{name:'Inbox',exact:true})).toHaveCount(0);await expect(drawer(page).getByRole('button',{name:'Refresh',exact:true})).toHaveCount(0);await expect(drawer(page).getByRole('group',{name:'Inbox filter'})).toHaveCount(0);await expect(drawer(page).getByText('Legacy assignment')).toHaveCount(0);await expect(drawer(page).locator('.inbox-process-row')).toHaveCount(3);
+ await expect(drawer(page).locator('.inbox-process-row.state-running img')).toBeVisible();await expect(drawer(page).locator('.inbox-process-row.state-done img')).toHaveCount(0);expect(imageCalls).toBe(1);expect(reads).toBe(0);imageVersion=2;await page.clock.fastForward(15100);await expect.poll(()=>imageCalls).toBe(2);await page.screenshot({path:'.local/compact-inbox-image.png'});
+ await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'More actions',exact:true})).toBeFocused();
 });
 
 test('an error stays until hidden, finished results clear with Undo and background polls never flash loading',async({page})=>{

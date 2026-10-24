@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.28.4 (unreleased)
+
+### Features
+- Persist loaded chat pages and assembled history in a bounded 20 MB local cache, up to 5,000 messages per view. Revision sync transfers changed messages and preserves removals/order; unknown revisions and older hosts fall back to full pages. Access errors never fall back to cached responses. Reading positions retain a message ID, character and nearby text across reopening and wrapping changes.
+- Activity inbox rows load the latest available chat image separately through authenticated preview endpoints. Inbox and Reading actions live in the chat overflow menu; the inbox removes its title, manual refresh, filters and legacy assignment section, retaining automatic updates, error retry and finished-result undo.
+
+### Bug Fixes
+- Canvas nodes and links memoize unchanged content and geometry; pointer previews update once per animation frame. A synthetic 400-card/399-link drag reduced metadata renders from 13,600 to 400 and total React render time from 701 ms to 98 ms in the measured run; this is not a physical-device FPS guarantee.
+- Connection dragging requires a 180 ms hold and 5 screen pixels of movement. Selected line endpoints can detach, remain free, reconnect with the same ID, or cancel with Escape; Undo restores endpoints. Free endpoints require host 0.28.4+.
+- Reading mode retains the measured header height while hidden, preventing scroll displacement on exit.
+
+### Validation
+- Web build, 22 targeted geometry/schema/MCP/history/authentication/privacy checks and 22 distinct browser scenarios passed, including 250-message offline reopening, text anchors, delta sync, image refresh, connector detachment and 60/100/130% header layouts. Documentation links and the portable board schema passed; synthetic screenshots inspected. Final packaging and publication pending; no physical-device validation.
+
 ## [0.28.3](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.2...v0.28.3) (2026-10-25)
 
 Published [v0.28.3](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.3) from [15395d9ef269b7fb0b6fa971aecb90fb14f36beb](https://github.com/Evgenie-Myasnikov/pocket-code/commit/15395d9ef269b7fb0b6fa971aecb90fb14f36beb) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

@@ -1,3 +1,4 @@
+import {ChatPageSync} from './chat-page-sync.js';
 import {CustomProviders,mountCustomProviders} from './custom-providers.js';
 import {WindowsJiraStore} from './jira-vault.js';
 import {messageAttachment} from './message-attachment.js';
@@ -426,14 +427,18 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(!inline)throw new HttpError(404,'This chat has no image.');
     res.json({name:entry.image.name,mimeType:inline.mimeType,data:inline.data});
   });
+  const chatPageSync=new ChatPageSync();
   app.get('/api/sessions/:id/messages', async (req, res) => {
     const provider = providerSchema.parse(req.query.provider);
     const s = await session(req.params.id, provider);
+    const known=req.query.known===undefined?undefined:z.string().regex(/^[a-f0-9]{64}$/).parse(req.query.known);
+    const context=JSON.stringify([provider,s.sessionId,s.cwd,req.query.window,req.query.offset,req.query.end,req.query.from]);
+    const send=(page:any)=>res.json(chatPageSync.respond(context,page,known));
     if (provider === 'codex') {
       const window = req.query.window === undefined ? undefined : z.coerce.number().int().min(1).max(5000).parse(req.query.window);
       const offset = z.coerce.number().int().min(0).default(0).parse(req.query.offset);
       const end = req.query.end === undefined ? undefined : z.coerce.number().int().min(0).parse(req.query.end);
-      res.json(await codex().messagePage(s.sessionId, { window, offset: window === undefined ? offset : 0, end, fromStart: req.query.from === 'start' }));
+      send(await codex().messagePage(s.sessionId, { window, offset: window === undefined ? offset : 0, end, fromStart: req.query.from === 'start' }));
       return;
     }
     if (provider==='copilot') {
@@ -443,10 +448,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
         const end = req.query.end === undefined ? all.length : z.coerce.number().int().min(0).parse(req.query.end);
         const available = Math.min(end, all.length), fromStart = req.query.from === 'start';
         const stop = fromStart ? Math.min(size, available) : available, start = fromStart ? 0 : Math.max(0, stop - size);
-        res.json({ messages: all.slice(start, stop), previous: start || null, next: fromStart && stop < available ? stop : null, total: all.length });
+        send({ messages: all.slice(start, stop), previous: start || null, next: fromStart && stop < available ? stop : null, total: all.length });
       } else {
         const offset = z.coerce.number().int().min(0).default(0).parse(req.query.offset);
-        res.json({ messages: all.slice(offset, offset + 100), next: all.length > offset + 100 ? offset + 100 : null });
+        send({ messages: all.slice(offset, offset + 100), next: all.length > offset + 100 ? offset + 100 : null });
       }
       return;
     }
@@ -457,12 +462,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       const available = Math.min(end ?? all.length, all.length);
       const fromStart = req.query.from === 'start';
       const stop = fromStart ? Math.min(size, available) : available, start = fromStart ? 0 : Math.max(0, stop - size);
-      res.json({ messages: all.slice(start, stop).map(normalize).filter(Boolean), previous: start || null, next: fromStart && stop < available ? stop : null, total: all.length });
+      send({ messages: all.slice(start, stop).map(normalize).filter(Boolean), previous: start || null, next: fromStart && stop < available ? stop : null, total: all.length });
       return;
     }
     const offset = z.coerce.number().int().min(0).default(0).parse(req.query.offset);
     const data = await sdk.getSessionMessages(s.sessionId, { dir: s.cwd, offset, limit: 101 });
-    res.json({ messages: data.slice(0, 100).map(normalize).filter(Boolean), next: data.length > 100 ? offset + 100 : null });
+    send({ messages: data.slice(0, 100).map(normalize).filter(Boolean), next: data.length > 100 ? offset + 100 : null });
   });
   const uploads = new Map<string, { path: string; name: string; cwd: string; expires: number }>();
   app.post('/api/uploads', async (req, res) => {

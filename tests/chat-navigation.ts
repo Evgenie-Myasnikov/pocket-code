@@ -18,10 +18,10 @@ export async function newChat(page:Page){
   await page.locator('.new-chat-button:visible').first().click();
   await expect(page.locator('.composer textarea')).toBeVisible();
 }
-/** Provider chips replace the select that used to be the chat list title. */
+/** Provider selection uses the shared compact picker. */
 export async function chooseProvider(page:Page,provider:string){
-  const name=({claude:'Claude',codex:'Codex',copilot:'Copilot'} as Record<string,string>)[provider];
-  const back=page.getByRole('button',{name:/^(Back to chats|К списку чатов)$/}).filter({visible:true});
-  if(!await page.locator('.provider-chips:visible').count()&&await back.count())await back.click();
-  await page.locator('.provider-chips:visible').first().getByRole('button',{name:new RegExp('^'+name)}).click();
+ const name=({claude:'Claude',codex:'Codex',copilot:'Copilot'} as Record<string,string>)[provider];
+ const back=page.getByRole('button',{name:/^(Back to chats|К списку чатов)$/}).filter({visible:true});
+ if(await back.count())await back.click();
+ const picker=page.locator('.sidebar .provider-picker-trigger:visible').first();await picker.click();await page.getByRole('menuitemradio',{name:new RegExp('^'+name)}).click();
 }

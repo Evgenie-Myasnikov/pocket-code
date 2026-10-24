@@ -43,3 +43,7 @@
 .whiteboard .wb-port-visible,.whiteboard .wb-port:focus-visible{opacity:1;pointer-events:auto}
 .wb-port-n{top:calc(-14px * var(--wb-handle-scale,1))}.wb-port-s{bottom:calc(-14px * var(--wb-handle-scale,1))}.wb-port-e{right:calc(-14px * var(--wb-handle-scale,1))}.wb-port-w{left:calc(-14px * var(--wb-handle-scale,1))}
 @media(pointer:coarse){.whiteboard-item.wb-selected .wb-port{opacity:1;pointer-events:auto}}
+
+.wb-link-hit{pointer-events:stroke;cursor:pointer;outline:none}.wb-connection-selected{color:var(--canvas-selection)}
+.whiteboard .wb-link-end{opacity:1;pointer-events:auto;z-index:8;transform:translate(-50%,-50%)}
+.wb-port:after{transition:transform 180ms ease,box-shadow 180ms ease}.wb-port-holding:after{transform:scale(1.2);box-shadow:0 0 0 3px var(--canvas-selection)}.wb-port-ready:after{transform:scale(1.35)}

@@ -1,3 +1,4 @@
+import {clearHistoryCache} from './chat-history-cache';
 import type {Connection} from './api';
 
 const PREFIX='pocket-code-chats-v1:';
@@ -23,5 +24,6 @@ export function writeChatCache(scope:string,provider:string,id:string,value:unkn
   }catch{/* Storage exhaustion must never prevent reading or sending a chat. */}
 }
 export function clearChatCache(){
+  void clearHistoryCache();
   try{for(const key of Object.keys(localStorage))if(key.startsWith(PREFIX))localStorage.removeItem(key);}catch{/* unavailable storage */}
 }

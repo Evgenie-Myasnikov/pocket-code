@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {nearbyPort,portSides,connectorPoints,sideTowards} from '../src/whiteboard-connections';
+import {nearbyPort,portSides,connectorPoints,sideTowards,connectionPoints} from '../src/whiteboard-connections';
 import {portPoint,type WhiteboardItem as Item} from '../src/whiteboard-model';
 
 const a:Item={id:'11111111-1111-4111-8111-111111111111',kind:'sticky',text:'One',x:200,y:200,width:240,height:160,color:'sand'};
@@ -37,4 +37,12 @@ test('legacy automatic sides and pointer previews produce orthogonal paths',()=>
  const points=connectorPoints(a,'n',{x:120,y:100});
  assert.deepEqual(points[0],portPoint(a,'n'));assert.deepEqual(points.at(-1),{x:120,y:100});
  assert.ok(points.every((p,i)=>!i||p.x===points[i-1].x||p.y===points[i-1].y));
+});
+
+test('either or both free ends retain exact endpoints and orthogonal geometry',()=>{
+ const id='33333333-3333-4333-8333-333333333333',free={x:900,y:700};
+ for(const points of [connectionPoints({id,from:a.id,fromSide:'e',toPoint:free},a),connectionPoints({id,fromPoint:free,to:a.id,toSide:'w'},undefined,a),connectionPoints({id,fromPoint:free,toPoint:{x:0,y:0}})]){
+  assert.ok(points.length>=2);assert.ok(points.every((p,i)=>!i||p.x===points[i-1].x||p.y===points[i-1].y));
+ }
+ assert.deepEqual(connectionPoints({id,fromPoint:free,to:a.id,toSide:'w'},undefined,a)[0],free);
 });

@@ -41,3 +41,11 @@ test('anchored links survive serialization and stay on chosen sides after moveme
  const moved=moveItems(saved,[a.id],80,40);assert.deepEqual(moved.links,[link]);assert.deepEqual(portPoint(moved.items[0],link.fromSide),{x:a.x+80+a.width/2,y:a.y+40});
  assert.equal(whiteboardSchema.safeParse({...saved,links:[{...link,fromSide:'invalid'}]}).success,false);
 });
+
+test('free endpoints validate, migrate and persist through repository snapshots',async()=>{
+ const a=item(),id=randomUUID(),canvas={...emptyWhiteboard(),items:[a],links:[{id,from:a.id,fromSide:'e' as const,toPoint:{x:900,y:700}}]};
+ assert.ok(whiteboardSchema.safeParse(canvas).success);assert.deepEqual(canvasMigrationIssues([],canvas),[]);
+ for(const bad of [{id,from:a.id},{id,from:a.id,fromPoint:{x:1,y:2},toPoint:{x:3,y:4}},{id,from:a.id,toPoint:{x:Infinity,y:4}},{id,from:a.id,toPoint:{x:3,y:4},toSide:'n'}])assert.equal(whiteboardSchema.safeParse({...canvas,links:[bad]}).success,false);
+ const root=await mkdtemp(path.join(os.tmpdir(),'free-canvas-'));
+ try{const original=await createProjectBoard(root,[],'en');await updateProjectBoard(root,original.repositoryRevision,original.notes,original.versions,[],canvas);assert.deepEqual((await projectBoard(root))!.canvas,canvas);}finally{await rm(root,{recursive:true,force:true});}
+});

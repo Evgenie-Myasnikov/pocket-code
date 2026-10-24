@@ -7,7 +7,7 @@ async function point(page:Page,index:number,side:'e'|'w'){
 async function start(page:Page){
  const p=await point(page,0,'e');await page.mouse.move(p.x,p.y);
  await expect(page.locator('.whiteboard-item').first().getByRole('button',{name:'Connect e',exact:true})).toHaveCSS('opacity','1');
- await page.mouse.down();
+ await page.mouse.down();await page.waitForTimeout(210);
 }
 
 for(const width of [390,1440])test(`side points only, orthogonal routing and persisted anchors at ${width}`,async({page})=>{

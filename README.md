@@ -51,7 +51,7 @@ working copy, chat, pinned diff, automatic verification commands and human appro
 
 The PC checks releases and supplies the matching APK to Android. The phone can trigger the PC check; Android still asks for installation confirmation. Windows updates preserve local configuration and wait for a safe restart. [Update workflow](docs/USER_GUIDE.md#updates)
 
-Recent conversations and board snapshots can be cached locally. Offline mode does not run AI or synchronize edits without the host. Never share pairing codes, credentials, private chats, local account configuration or runtime storage. **Disconnect and forget** removes the saved phone connection and its caches; provider logout is a separate action.
+Loaded chat pages and assembled history (up to 5,000 messages per view) are cached locally in a bounded 20 MB store, alongside recent conversations and board snapshots. With host 0.28.4+, revision-based sync transfers changed messages and accounts for edits and deletions; older hosts continue returning full pages. Reading positions use message IDs and text fragments so line wrapping does not lose the reading location. Only previously loaded history is available offline. Offline mode does not run AI or synchronize edits without the host. Never share pairing codes, credentials, private chats, local account configuration or runtime storage. **Disconnect and forget** removes the saved phone connection and its caches; provider logout is a separate action.
 
 This is an independent companion, not an official OpenAI, Anthropic, GitHub or Miro app. It does not include subscriptions, reproduce cloud-only chat histories or guarantee every provider feature.
 

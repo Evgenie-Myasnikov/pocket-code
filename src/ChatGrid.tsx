@@ -8,7 +8,7 @@ import type {Session} from './session';
 import type {ChatGrouping,ChatListView,WorkspaceProvider} from './preferences';
 import './chat-grid.css';
 
-type Preview={state:'loading'|'ready'|'error';text:string;image:string|null};
+type Preview={at?:number;imageVersion?:number;state:'loading'|'ready'|'error';text:string;image:string|null};
 type Wire={sessionId:string;lastModified?:number;text?:string;image?:{name:string}|null;error?:true};
 const basename=(value:string)=>value.split(/[\\/]/).filter(Boolean).at(-1)||value;
 
@@ -37,15 +37,15 @@ const previewCache=new Map<string,Preview>(),thumbnailCache=new Map<string,strin
 const queue=thumbnailQueue(2);
 function remember<T>(map:Map<string,T>,key:string,value:T,limit:number,drop?:(value:T)=>void){map.delete(key);map.set(key,value);while(map.size>limit){const [oldest,old]=map.entries().next().value!;map.delete(oldest);drop?.(old);}}
 /** Reads previews only for tiles near the viewport, in small batches, two requests at a time. */
-class PreviewLoader{
-  private wanted=new Map<string,Session>();private timer=0;private active=0;private listeners=new Set<()=>void>();version=0;
-  constructor(private connection:Connection|null,private provider:WorkspaceProvider){}
-  key(session:Session){return (this.connection?.url||'')+'|'+this.provider+'|'+session.sessionId+'|'+session.lastModified;}
-  get(session:Session):Preview{return previewCache.get(this.key(session))||{state:this.connection?'loading':'ready',text:'',image:null};}
+export class PreviewLoader{
+  private wanted=new Map<string,Session&{previewVersion?:string}>();private timer=0;private active=0;private listeners=new Set<()=>void>();version=0;
+  constructor(private connection:Connection|null,private provider:WorkspaceProvider,private maxAge=Infinity){}
+  key(session:Session&{previewVersion?:string}){return (this.connection?.url||'')+'|'+(this.connection?.token||'')+'|'+this.provider+'|'+session.sessionId+'|'+(session.previewVersion??session.lastModified);}
+  get(session:Session&{previewVersion?:string}):Preview{return previewCache.get(this.key(session))||{state:this.connection?'loading':'ready',text:'',image:null};}
   subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>{this.listeners.delete(listener);};};
   private emit(){this.version++;for(const listener of this.listeners)listener();}
-  want(session:Session){
-    if(!this.connection||previewCache.has(this.key(session))||session.sessionId.startsWith('pending-'))return;
+  want(session:Session&{previewVersion?:string}){
+    if(!this.connection||previewCache.has(this.key(session))&&Date.now()-(previewCache.get(this.key(session))?.at||0)<this.maxAge||session.sessionId.startsWith('pending-'))return;
     this.wanted.set(session.sessionId,session);if(!this.timer)this.timer=window.setTimeout(()=>{this.timer=0;this.pump();},60);
   }
   dispose(){window.clearTimeout(this.timer);this.timer=0;this.wanted.clear();}
@@ -55,8 +55,8 @@ class PreviewLoader{
       this.active++;
       void request<{previews:Wire[]}>(this.connection!,`/sessions/previews?provider=${this.provider}&ids=${batch.map(item=>item.sessionId).join(',')}`).then(result=>{
         const found=new Map((Array.isArray(result?.previews)?result.previews:[]).map(item=>[item.sessionId,item]));
-        for(const session of batch){const item=found.get(session.sessionId);remember(previewCache,this.key(session),item&&!item.error?{state:'ready',text:typeof item.text==='string'?item.text:'',image:item.image?.name||null}:{state:'error',text:'',image:null},600);}
-      }).catch(()=>{for(const session of batch)remember(previewCache,this.key(session),{state:'error',text:'',image:null},600);}).finally(()=>{this.active--;this.emit();this.pump();});
+        for(const session of batch){const item=found.get(session.sessionId);remember(previewCache,this.key(session),item&&!item.error?{at:Date.now(),imageVersion:item.lastModified,state:'ready',text:typeof item.text==='string'?item.text:'',image:item.image?.name||null}:{at:Date.now(),state:'error',text:'',image:null},600);}
+      }).catch(()=>{for(const session of batch)remember(previewCache,this.key(session),{at:Date.now(),state:'error',text:'',image:null},600);}).finally(()=>{this.active--;this.emit();this.pump();});
     }
   }
 }
@@ -102,4 +102,19 @@ export function ChatViewControls({view,onView,grouping,onGrouping}:{view:ChatLis
     <div className="chat-view-switch" role="group" aria-label={t('Вид списка чатов')}>{([['list',List,t('Список')],['grid',LayoutGrid,t('Сетка')]] as const).map(([id,Icon,label])=><button key={id} type="button" aria-pressed={view===id} aria-label={label} title={label} onClick={()=>onView(id)}><Icon size={18} aria-hidden="true"/></button>)}</div>
     {view==='grid'&&<div className="chat-view-switch chat-view-grouping" role="group" aria-label={t('Группировка чатов')}>{([['date',t('По дате')],['project',t('По проекту')]] as const).map(([id,label])=><button key={id} type="button" aria-pressed={grouping===id} onClick={()=>onGrouping(id)}>{label}</button>)}</div>}
   </div>;
+}
+
+/** Inbox images use the same authenticated, bounded preview pipeline as chat tiles. */
+export function ChatPreviewImage({session,loader,connection,provider}:{session:Session&{previewVersion?:string};loader:PreviewLoader;connection:Connection;provider:WorkspaceProvider}){
+ const ref=useRef<HTMLSpanElement|null>(null),[near,setNear]=useState(false),[thumb,setThumb]=useState<{key:string;url:string|null}>({key:'',url:null}),[failed,setFailed]=useState('');
+ useSyncExternalStore(loader.subscribe,()=>loader.version);
+ const key=loader.key(session),preview=loader.get(session),imageKey=key+'|'+(preview.imageVersion??'')+'|'+(preview.image||''),url=thumbnailCache.get(imageKey)||(thumb.key===imageKey?thumb.url:null);
+ useEffect(()=>{const node=ref.current;if(!node)return;const observer=new IntersectionObserver(entries=>setNear(entries.some(e=>e.isIntersecting)),{rootMargin:'160px'});observer.observe(node);return()=>observer.disconnect();},[]);
+ useEffect(()=>{if(!near)return;loader.want(session);const timer=window.setInterval(()=>loader.want(session),15000);return()=>clearInterval(timer);},[near,loader,key]);
+ useEffect(()=>{
+  if(!near||!preview.image||thumbnailCache.has(imageKey))return;
+  return queue.enqueue(async()=>{const value=await request<{mimeType:string;data?:string}>(connection,`/sessions/${encodeURIComponent(session.sessionId)}/preview-image?provider=${provider}`);return imageBlob(`data:${value.mimeType};base64,${value.data||''}`);},value=>{if(!value){setFailed(imageKey);return;}remember(thumbnailCache,imageKey,value,80,old=>URL.revokeObjectURL(old));setThumb({key:imageKey,url:value});});
+ },[near,preview.image,connection.url,connection.token,imageKey]);
+ const visible=Boolean(preview.image&&failed!==imageKey);
+ return <span ref={ref} className={visible?'inbox-preview':'inbox-preview-anchor'} aria-hidden="true">{visible&&url&&<img src={url} alt="" decoding="async"/>}</span>;
 }

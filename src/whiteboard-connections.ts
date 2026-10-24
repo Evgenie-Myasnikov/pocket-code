@@ -1,4 +1,4 @@
-import {portPoint,type PortSide,type WhiteboardItem as Item} from './whiteboard-model';
+import {portPoint,type PortSide,type WhiteboardItem as Item,type WhiteboardLink as Link} from './whiteboard-model';
 
 type Point={x:number;y:number};
 export const portSides:PortSide[]=['n','e','s','w'];
@@ -64,3 +64,18 @@ export function connectorPoints(from:Item,fromSide:PortSide,to:Point,target?:{it
 }
 
 export const connectorPath=(points:Point[])=>points.map((p,i)=>`${i?'L':'M'}${p.x},${p.y}`).join(' ');
+
+export function connectionEnds(link:Link,from?:Item,to?:Item){
+ const fromCenter=from?{x:from.x+from.width/2,y:from.y+from.height/2}:link.fromPoint;
+ const toCenter=to?{x:to.x+to.width/2,y:to.y+to.height/2}:link.toPoint;
+ if(!fromCenter||!toCenter)return;
+ const fromSide=from?link.fromSide||sideTowards(from,toCenter):undefined,toSide=to?link.toSide||sideTowards(to,fromCenter):undefined;
+ return {start:from&&fromSide?portPoint(from,fromSide):fromCenter,end:to&&toSide?portPoint(to,toSide):toCenter,fromSide,toSide};
+}
+
+export function connectionPoints(link:Link,from?:Item,to?:Item){
+ const ends=connectionEnds(link,from,to);if(!ends)return [];
+ if(from&&ends.fromSide)return connectorPoints(from,ends.fromSide,ends.end,to&&ends.toSide?{item:to,side:ends.toSide}:undefined);
+ if(to&&ends.toSide)return connectorPoints(to,ends.toSide,ends.start).reverse();
+ return [ends.start,{x:(ends.start.x+ends.end.x)/2,y:ends.start.y},{x:(ends.start.x+ends.end.x)/2,y:ends.end.y},ends.end];
+}

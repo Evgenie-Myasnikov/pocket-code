@@ -74,3 +74,7 @@ header.chat-header-conversation .chat-title-button:focus-visible{outline:0}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){header.chat-header-conversation{--chat-pill-surface:var(--chat-pill-solid)}}
 @media(prefers-reduced-transparency:reduce){header.chat-header-conversation{--chat-pill-surface:var(--chat-pill-solid);--chat-pill-blur:none}}
 @media(forced-colors:active){header.chat-header-conversation :is(.mobile-back,.header-title,.board-notifications-trigger,.chat-header-actions>button){background:Canvas;border:1px solid ButtonText;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;forced-color-adjust:auto}}
+
+.chat-menu-inbox .board-notifications-trigger{width:100%;min-height:48px;justify-content:flex-start;padding:8px 12px;border:0;border-radius:8px;background:transparent;box-shadow:none;color:var(--text)}
+
+.chat-menu-button{position:relative}.chat-menu-badge{position:absolute;top:0;right:0;min-width:16px;padding:0 4px;border-radius:12px;background:var(--accent);color:var(--bg);font-size:var(--type-min);line-height:16px}

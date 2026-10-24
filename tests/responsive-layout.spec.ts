@@ -80,7 +80,7 @@ async function inspectScreens(page:Page,profile:Profile,scale:number,language:'e
   else if(profile.width<=760)await expect(page.locator('.chat-context')).toBeHidden();
   expect((await page.locator('.conversation').boundingBox())!.height).toBeGreaterThan(65);
   if(save)await page.screenshot({path:`artifacts/screenshots/${profile.name}-${scale}-${language}-chat.png`});
-  await page.locator('.reading-entry').click();
+  await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitem',{name:'Reading mode',exact:true}).click();
   await expect(page.locator('.composer-area')).toBeHidden();
   await withinViewport(page,'.reading-exit',profile.width,profile.height);
   expect((await page.locator('.conversation').boundingBox())!.height).toBeGreaterThan(profile.height-40);

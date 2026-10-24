@@ -37,5 +37,7 @@ test('board MCP protects revisions, privacy and old hosts over stdio',async()=>{
   assert.ok((await invoke('update_note',{project:'demo',revision:'a'.repeat(64),id:board.notes[0].id,patch:{title:'Stale edit'}})).isError);assert.equal(writes,1);
   const task=board.notes[0];assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[{...item,id:task.id,kind:'card',text:'Updated task',description:'Updated criteria'}]})).isError);
   assert.equal(board.notes[0].title,'Updated task');assert.equal(board.notes[0].description,'Updated criteria');assert.equal(board.notes[0].priority,task.priority);
+  const free={id:randomUUID(),from:item.id,fromSide:'e',toPoint:{x:800,y:600}};assert.ok((await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[],links:[free]})).isError);
+  version='0.28.4';assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[],links:[free]})).isError);assert.deepEqual(board.canvas.links,[free]);
  }finally{await client.close();await new Promise(resolve=>host.close(resolve));await rm(root,{recursive:true,force:true});}
 });

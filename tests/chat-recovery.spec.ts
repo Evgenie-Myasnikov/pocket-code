@@ -126,11 +126,11 @@ test('reading mode hides controls and preserves the chat, draft and scroll on ex
   await page.getByLabel('Message Claude').fill('Draft kept during reading');
   const anchor=page.getByText('History message 40',{exact:true});await anchor.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
   const offset=()=>anchor.evaluate(el=>el.getBoundingClientRect().top-document.querySelector('.conversation')!.getBoundingClientRect().top);
-  const before=await offset();await page.getByRole('button',{name:'Reading mode',exact:true}).click();
+  const before=await offset();await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitem',{name:'Reading mode',exact:true}).click();
   await expect(page.locator('.app')).toHaveClass(/reading-mode/);await expect(page.locator('.chat-header')).toBeHidden();await expect(page.locator('.mobile-tabbar')).toBeHidden();await expect(page.locator('.composer-area')).toBeHidden();
   await expect(page.getByRole('button',{name:'Exit reading mode'})).toBeVisible();await expect.poll(offset).toBeCloseTo(before,0);
   await page.getByRole('button',{name:'Exit reading mode'}).click();await expect(page.getByLabel('Message Claude')).toHaveValue('Draft kept during reading');await expect.poll(offset).toBeCloseTo(before,0);
-  await page.getByRole('button',{name:'Reading mode',exact:true}).click();await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
+  await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitem',{name:'Reading mode',exact:true}).click();await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
   await expect(page.locator('.app')).not.toHaveClass(/reading-mode/);await expect(page.locator('.header-title')).toContainText('Saved claude chat');await expect(page.getByLabel('Message Claude')).toHaveValue('Draft kept during reading');await expect.poll(offset).toBeCloseTo(before,0);
 });
 
@@ -164,6 +164,21 @@ test('chat position and jump controls survive downward scrolling, tab changes an
  await page.reload();await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
  await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
  await expect(page.getByRole('button',{name:/^Jump to latest messages/})).toBeVisible();
+});
+
+test('more than one hundred loaded messages and their reading position survive an offline reopen',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await host(page);
+ await page.route('**/api/sessions/saved-chat/messages?*',route=>route.fulfill({json:{messages:Array.from({length:250},(_,i)=>message(i+1)),previous:null,next:null}}));
+ await connect(page,'claude');const scroller=page.locator('.conversation');
+ await expect(page.locator('[data-message-id]')).toHaveCount(250);
+ await scroller.evaluate(el=>{el.scrollTop=1900;el.dispatchEvent(new Event('scroll'));});
+ await page.waitForTimeout(1000);
+ await page.getByRole('button',{name:'Back to chats',exact:true}).click();
+ await page.route('**/api/sessions/saved-chat/messages?*',route=>route.abort());
+ await page.reload();await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
+ await expect(page.locator('[data-message-id]')).toHaveCount(250);
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(1900,0);
+ await expect(page.getByText('History message 1',{exact:true})).toHaveCount(1);
 });
 
 

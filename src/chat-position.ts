@@ -1,4 +1,5 @@
-export type ChatPosition={top:number;window:number;fromStart:boolean;bottom:boolean;messageId?:string;offset?:number;followOnReturn?:boolean};
+import type {TextAnchor} from './chat-text-anchor';
+export type ChatPosition={top:number;window:number;fromStart:boolean;bottom:boolean;messageId?:string;offset?:number;followOnReturn?:boolean;textAnchor?:TextAnchor};
 const prefix='pocket-code-position-v1:';
 const memory=new Map<string,ChatPosition>();let timer:ReturnType<typeof setTimeout>|undefined;
 const pending=new Map<string,ChatPosition>();
