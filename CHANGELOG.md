@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.2 (unreleased)
+## [0.28.2](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.1...v0.28.2) (2026-10-24)
+
+Published [v0.28.2](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.2) from [b7fb58c46c11d7fd4f0798b456c364ef96c70ffd](https://github.com/Evgenie-Myasnikov/pocket-code/commit/b7fb58c46c11d7fd4f0798b456c364ef96c70ffd) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Bug Fixes
 - Canvas creation menus open on right-click or the keyboard context-menu key; left-click selects or clears selection. Links retain source/destination sides, preview from the chosen port and highlight the destination. Resize hit areas remain 20/28 screen pixels at every canvas zoom.
@@ -10,7 +12,7 @@
 - Repository board cards are grouped in version frames with 11 reviewed historical synthetic UI screenshots. Local scratch canvas objects are excluded from the public snapshot.
 
 ### Validation
-- Web build, 14 targeted canvas/persistence/privacy/MCP tests, six browser checks and the desktop document navigation check passed. The reported loading failure was not reproduced in those checks and remains open pending the failing screen/error. No release or physical-device validation.
+- Web build, 14 targeted canvas/persistence/privacy/MCP tests, six browser checks and the desktop document navigation check passed. The reported loading failure was not reproduced in those checks and remains open pending the failing screen/error. Android, Windows and host packages published. The audit of 1,406 decoded package entries, APK signer compatibility, GitHub privacy CI and downloaded asset hashes passed. Physical-device validation was not performed.
 
 ## [0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.0...v0.28.1) (2026-10-24)
 
