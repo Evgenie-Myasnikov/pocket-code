@@ -1,13 +1,15 @@
 # Changelog
 
-## 0.28.3 (unreleased)
+## [0.28.3](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.2...v0.28.3) (2026-10-25)
+
+Published [v0.28.3](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.3) from [15395d9ef269b7fb0b6fa971aecb90fb14f36beb](https://github.com/Evgenie-Myasnikov/pocket-code/commit/15395d9ef269b7fb0b6fa971aecb90fb14f36beb) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Bug Fixes
 - Canvas connections start and finish at side midpoint ports. Mouse proximity reveals the point; drops on card bodies, corners or empty space do not attach. Keyboard connections also require a destination port; selected touch objects expose their ports.
 - Saved links and drag previews share orthogonal routing with sharp elbows and outward side leads. Routes update with object geometry; legacy links infer midpoint ports without rewriting their data. Escape and pointer cancellation discard pending connections.
 
 ### Validation
-- Web build, 17 targeted geometry/persistence/privacy/MCP tests and eight browser checks passed. Coverage includes all side pairs, narrow gaps, invalid drops, keyboard activation, Escape, persisted anchors, editing, undo/redo and 390/1440-pixel layouts. Synthetic screenshots inspected. Packaging and publication pending; no physical-device validation.
+- Web build, 17 targeted geometry/persistence/privacy/MCP tests and eight browser checks passed. Coverage includes all side pairs, narrow gaps, invalid drops, keyboard activation, Escape, persisted anchors, editing, undo/redo and 390/1440-pixel layouts. Synthetic screenshots inspected. Android, Windows and host packages published. All 86 web files match across packages; 1,408 decoded artifact entries passed the privacy audit. APK signer compatibility, GitHub CI and hashes of all four downloaded assets passed. No physical-device validation.
 
 ## [0.28.2](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.1...v0.28.2) (2026-10-24)
 
