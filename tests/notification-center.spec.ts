@@ -66,7 +66,7 @@ test('a completed result is acknowledged only after loading and stays viewed aft
 
 test('an unanswered task remains in activity after its chat is opened',async({page})=>{
   await host(page);await page.setViewportSize({width:390,height:844});await open(page);await openDrawer(page);await drawer(page).getByRole('button',{name:/^claude question,/}).click();
-  await expect(page.getByText('Visible result for question',{exact:true})).toBeVisible();await openDrawer(page);await expect(drawer(page).getByRole('button',{name:/^claude question,/})).toBeVisible();
+  await expect(page.getByText('Visible result for question',{exact:true})).toBeVisible();await expect(page.locator('.composer-area .running-action')).toHaveCount(0);await openDrawer(page);await expect(drawer(page).getByRole('button',{name:/^claude question,/})).toBeVisible();
 });
 
 test('completion received while reading older messages stays unread until the bottom is reached',async({page})=>{

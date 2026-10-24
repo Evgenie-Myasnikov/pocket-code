@@ -1,5 +1,6 @@
-param([switch]$FailHealth)
+﻿param([switch]$FailHealth)
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 $originalAppData=$env:LOCALAPPDATA
 $fixture=Join-Path ([IO.Path]::GetTempPath()) ('pocket-update-test-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixture|Out-Null
@@ -31,11 +32,14 @@ function New-Object {
  Microsoft.PowerShell.Utility\New-Object -TypeName $TypeName -ArgumentList $ArgumentList
 }
 try{
- & (Join-Path $PSScriptRoot '../scripts/desktop-update.ps1') -Storage $storage -CurrentExe $previous -Source $fixture -ParentId 2147483646 -Version '1.0.0'
+ $updater=Join-Path $fixture 'desktop-update.ps1'
+ $source=[IO.File]::ReadAllText((Join-Path $PSScriptRoot '../scripts/desktop-update.ps1')).Replace('Local\PocketCodeDesktopUpdate-','Local\PocketCodeDesktopUpdate-Fixture-'+[guid]::NewGuid().ToString('N')+'-')
+ [IO.File]::WriteAllText($updater,$source)
+ & $updater -Storage $storage -CurrentExe $previous -Source $fixture -ParentId 2147483646 -Version '1.0.0'
  $state=Get-Content -LiteralPath (Join-Path $storage 'desktop-update/state.json') -Raw|ConvertFrom-Json
  if(-not (Test-Path -LiteralPath (Join-Path $fixture 'Pocket Code Desktop/current.txt'))){throw $Error[0]}
  $pointer=Get-Content -LiteralPath (Join-Path $fixture 'Pocket Code Desktop/current.txt') -Raw
- if($FailHealth){if($state.state -ne 'error' -or $pointer -cne $previous){throw 'Rollback failed'}}
+ if($FailHealth){if($state.state -ne 'error' -or $state.phase -ne 'health' -or $state.failureCode -ne 'update_error' -or $state.version -ne '2.0.0' -or $pointer -cne $previous){throw 'Rollback failed'}}
  elseif($state.state -ne 'complete' -or $pointer -notlike '*versions*'){throw 'Install failed'}
  Write-Output ('PASS fixture '+$state.state)
 }finally{$env:LOCALAPPDATA=$originalAppData}

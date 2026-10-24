@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Storage,[Parameter(Mandatory=$true)][string]$CurrentExe,[Parameter(Mandatory=$true)][string]$Source,[Parameter(Mandatory=$true)][int]$ParentId,[Parameter(Mandatory=$true)][string]$Version,[switch]$FunctionsOnly)
+﻿param([Parameter(Mandatory=$true)][string]$Storage,[Parameter(Mandatory=$true)][string]$CurrentExe,[Parameter(Mandatory=$true)][string]$Source,[Parameter(Mandatory=$true)][int]$ParentId,[Parameter(Mandatory=$true)][string]$Version,[switch]$FunctionsOnly)
 $ErrorActionPreference='Stop'
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
 function Test-DesktopManifest($release,$manifest,$current){
@@ -27,39 +27,53 @@ function Expand-VerifiedDesktop($archive,$destination,$asset){
     }finally{$zip.Dispose()}
     [IO.Compression.ZipFile]::ExtractToDirectory($archive,$destination)
 }
+function Invoke-PocketUpdateRead([scriptblock]$Action){
+    for($attempt=1;$attempt -le 3;$attempt++){
+        try{return (& $Action)}catch{
+            $status=0;try{$status=[int]$_.Exception.Response.StatusCode}catch{}
+            if($attempt -eq 3 -or ($status -ne 0 -and $status -ne 408 -and $status -ne 429 -and $status -lt 500)){throw}
+            Start-Sleep -Seconds ([Math]::Pow(2,$attempt-1))
+        }
+    }
+}
 if($FunctionsOnly){return}
 $installRoot=Join-Path $env:LOCALAPPDATA 'Pocket Code Desktop'
 $updates=Join-Path $Storage 'desktop-update'
 New-Item -ItemType Directory -Force -Path $updates|Out-Null
 $stateFile=Join-Path $updates 'state.json';$ack=Join-Path $updates 'apply.txt';$ticket=[guid]::NewGuid().ToString('N')
-function State($state,$message,$targetVersion='',$size=0){
-    $value=@{state=$state;message=$message;version=$targetVersion;size=$size;ticket=$ticket;parentId=$ParentId;at=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
+function State($state,$message,$targetVersion='',$size=0,$failureCode='',$httpStatus=0){
+    $value=@{state=$state;message=$message;version=$targetVersion;size=$size;ticket=$ticket;parentId=$ParentId;phase=$phase;failureCode=$failureCode;httpStatus=$httpStatus;at=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
     $temp=$stateFile+'.tmp';[IO.File]::WriteAllText($temp,($value|ConvertTo-Json -Compress));Move-Item -LiteralPath $temp -Destination $stateFile -Force
 }
-function Get-Public($url,$file){Invoke-WebRequest -UseBasicParsing -Uri $url -Headers @{'User-Agent'='Pocket-Code-Updater';Accept='application/vnd.github+json'} -TimeoutSec 120 -OutFile $file}
+function Get-Public($url,$file){Invoke-PocketUpdateRead {Invoke-WebRequest -UseBasicParsing -Uri $url -Headers @{'User-Agent'='Pocket-Code-Updater';Accept='application/vnd.github+json'} -TimeoutSec 120 -OutFile $file}}
 $mutex=[Threading.Mutex]::new($false,('Local\PocketCodeDesktopUpdate-'+[Security.Principal.WindowsIdentity]::GetCurrent().User.Value))
-$locked=$false;$handedOff=$false;$previousSource=$Source
+$locked=$false;$handedOff=$false;$previousSource=$Source;$phase='release';$targetVersion=''
 try{
     try{$locked=$mutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$locked=$true}
     if(-not $locked){exit 0}
     State 'checking' 'Checking GitHub'
-    $release=Invoke-RestMethod -Uri 'https://api.github.com/repos/Evgenie-Myasnikov/pocket-code/releases/latest' -Headers @{'User-Agent'='Pocket-Code-Updater'} -TimeoutSec 30
+    $release=Invoke-PocketUpdateRead {Invoke-RestMethod -Uri 'https://api.github.com/repos/Evgenie-Myasnikov/pocket-code/releases/latest' -Headers @{'User-Agent'='Pocket-Code-Updater'} -TimeoutSec 30}
     if($release.tag_name -notmatch '^v\d+\.\d+\.\d+$'){throw 'Invalid release tag'}
     if([version]$release.tag_name.Substring(1) -le [version]$Version){State 'current' 'Up to date';exit 0}
+    $targetVersion=$release.tag_name.Substring(1);$phase='manifest'
     $base='https://github.com/Evgenie-Myasnikov/pocket-code/releases/download/'+$release.tag_name+'/'
     $manifestPath=Join-Path $updates ($ticket+'.json');Get-Public ($base+'update.json') $manifestPath
     $manifest=Get-Content -LiteralPath $manifestPath -Raw|ConvertFrom-Json
     if(-not (Test-DesktopManifest $release $manifest $Version)){State 'current' 'Up to date';exit 0}
+    $phase='download'
     State 'downloading' 'Downloading Windows update' $manifest.version $manifest.desktop.size
     $archive=Join-Path $updates ($ticket+'.zip');Get-Public ($base+$manifest.desktop.asset) $archive
     $staged=Join-Path $installRoot ('versions/'+$manifest.version+'-'+$ticket)
+    $phase='verify'
     Expand-VerifiedDesktop $archive $staged $manifest.desktop
     $metadata=Get-Content -LiteralPath (Join-Path $staged 'desktop-version.json') -Raw|ConvertFrom-Json
     $hostRoot=Join-Path $staged 'host';$pkg=Get-Content -LiteralPath (Join-Path $hostRoot 'package.json') -Raw|ConvertFrom-Json
     if($metadata.version -cne $manifest.version -or $pkg.name -ne 'pocket-code' -or $pkg.version -cne $manifest.version -or -not (Test-Path -LiteralPath (Join-Path $staged 'Pocket Code.exe'))){throw 'Desktop package version mismatch'}
+    $phase='dependencies'
     State 'preparing' 'Preparing Windows update' $manifest.version
     . (Join-Path $hostRoot 'scripts/bootstrap.ps1')
     Ensure-PocketDependencies $hostRoot
+    $phase='waiting'
     State 'ready' 'Ready; waiting for active tasks to finish' $manifest.version
     $deadline=[DateTime]::UtcNow.AddHours(24)
     while(-not (Test-Path -LiteralPath $ack) -or (Get-Content -LiteralPath $ack -Raw).Trim() -cne $ticket){
@@ -67,11 +81,12 @@ try{
         if([DateTime]::UtcNow -gt $deadline){throw 'Update timed out waiting for idle application'}
         Start-Sleep -Seconds 1
     }
-    $handedOff=$true
+    $phase='handoff';$handedOff=$true
     $old=Get-Process -Id $ParentId -ErrorAction SilentlyContinue
     if($old -and -not $old.WaitForExit(30000)){throw 'Previous application did not exit'}
     $deadline=[DateTime]::UtcNow.AddSeconds(30)
     while(Get-NetTCPConnection -LocalPort 4318 -State Listen -ErrorAction SilentlyContinue){if([DateTime]::UtcNow -gt $deadline){throw 'Previous host did not release its port'};Start-Sleep -Milliseconds 500}
+    $phase='health'
     State 'restarting' 'Restarting Windows application' $manifest.version
     $newExe=Join-Path $staged 'Pocket Code.exe'
     [IO.File]::WriteAllText((Join-Path $installRoot 'current.txt'),$newExe)
@@ -97,5 +112,7 @@ try{
     State 'complete' 'Windows application updated' $manifest.version
 }catch{
     if($handedOff){[IO.File]::WriteAllText((Join-Path $installRoot 'current.txt'),$CurrentExe);Start-Process -FilePath $CurrentExe -ArgumentList ('--updated --background --source "'+$previousSource+'"') -WindowStyle Hidden}
-    State 'error' 'Update failed. The previous version is kept; check network and retry.'
+    $status=0;try{$status=[int]$_.Exception.Response.StatusCode}catch{}
+    $code=if($status){'http_error'}else{'update_error'}
+    State 'error' 'Update failed. The previous version is kept; check network and retry.' $targetVersion 0 $code $status
 }finally{if($locked){$mutex.ReleaseMutex()};$mutex.Dispose()}

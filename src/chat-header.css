@@ -1,6 +1,6 @@
 /* Shared header: context gets its own line; action sizing follows the available chat width. */
 .workspace{container-type:inline-size;container-name:chat-workspace}
-header.chat-header.chat-header-conversation{display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:16px;height:auto;min-height:72px;padding:8px 20px;flex-shrink:0}
+header.chat-header.chat-header-conversation{display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:16px;height:auto;min-height:60px;padding:6px 20px;flex-shrink:0}
 .chat-header-conversation .chat-header-main{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
 .chat-header-conversation .mobile-back{display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;min-height:48px;margin:0;padding:0;border:0;background:transparent}
 header.chat-header.chat-header-conversation .header-title{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;margin:0;padding:0;grid-area:auto}
@@ -13,8 +13,8 @@ header.chat-header.chat-header-conversation .header-title>h1{display:block;margi
 .chat-header-conversation .chat-header-actions>button:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 9%,transparent);color:var(--text)}
 .chat-start-context{display:flex;align-items:center;gap:12px;padding:8px 20px;border-bottom:1px solid var(--line)}.chat-start-context .project-picker{flex:1;min-width:0;margin:0;display:flex;align-items:center;gap:6px}.chat-start-context .project-picker select{min-width:0;width:100%;margin:0;min-height:48px}.chat-start-context .workspace-picker-header{display:flex;margin:0}.chat-start-context .workspace-picker-header select{min-height:48px}
 @container chat-workspace (max-width:620px){
-  header.chat-header.chat-header-conversation{flex-direction:column;align-items:stretch;gap:0;padding:4px 12px;min-height:56px}
-  .chat-header-conversation .chat-header-main{flex:none;min-height:48px}
+  header.chat-header.chat-header-conversation{flex-direction:row;align-items:center;gap:8px;padding:4px 12px;min-height:56px}
+  .chat-header-conversation .chat-header-main{flex:1;min-width:0;min-height:48px}
   .chat-header-conversation .chat-header-actions{justify-content:flex-end;gap:4px;padding-left:0}
   .chat-header-conversation .chat-header-actions>button{flex:0 1 auto;min-width:48px;padding:0 6px}
   .chat-context-branch{display:none}
@@ -78,3 +78,11 @@ header.chat-header-conversation .chat-title-button:focus-visible{outline:0}
 .chat-menu-inbox .board-notifications-trigger{width:100%;min-height:48px;justify-content:flex-start;padding:8px 12px;border:0;border-radius:8px;background:transparent;box-shadow:none;color:var(--text)}
 
 .chat-menu-button{position:relative}.chat-menu-badge{position:absolute;top:0;right:0;min-width:16px;padding:0 4px;border-radius:12px;background:var(--accent);color:var(--bg);font-size:var(--type-min);line-height:16px}
+
+/* Back and overflow share a row and equal targets; the context fills the space between them. */
+header.chat-header.chat-header-conversation{gap:8px}
+header.chat-header.chat-header-conversation .header-title{flex:1;min-width:0;margin-right:0}
+header.chat-header.chat-header-conversation .header-title:has(.chat-title-button){min-width:0}
+.chat-menu-branch{display:flex;align-items:center;gap:8px;padding:8px 12px;color:var(--muted);font-size:var(--type-min);border-top:1px solid var(--line)}
+.chat-menu-branch svg{flex:none}.chat-menu-branch span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-menu .review-button-stats{margin-left:auto;white-space:nowrap}.chat-menu .review-button-stats b{color:var(--success)}.chat-menu .review-button-stats i{color:var(--danger);font-style:normal}

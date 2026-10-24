@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.28.5 (unreleased)
+
+### Features
+- Conversation controls use one row: Back, a flexible context chip and overflow. Review, outputs, subagents and the Git branch live in the overflow menu; menu height stays within the viewport. Transcript edge opacity follows a sampled quadratic curve, including the existing strength and reading-mode overrides.
+
+### Bug Fixes
+- Remove the duplicate command/timer status above the composer; tool details remain in the transcript and lost-contact warnings remain visible.
+- Windows release and asset reads retry temporary network/HTTP 408, 429 and 5xx failures up to three times. Other HTTP failures stop immediately. Failed updates retain the target version, phase and sanitized failure/status codes without persisting exception text. The earlier reported failure cannot be attributed retrospectively because its details were not recorded; a later preparation of 0.28.4 reached the waiting-for-idle state.
+
+### Validation
+- Four Windows updater tests passed, covering unsafe archives, bounded retry, healthy handoff and failed-health rollback. Twelve browser checks passed for composer/inbox behavior, one-row headers at 320/390/1440 pixels and 60/130% scales, transcript geometry and reading-mode position. Final build and package verification pending; no physical-device validation.
+
 ## [0.28.4](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.3...v0.28.4) (2026-10-25)
 
 Published [v0.28.4](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.4) from [c04f358e1a1b5bc177d5fc4e16e8a62efa2b54f6](https://github.com/Evgenie-Myasnikov/pocket-code/commit/c04f358e1a1b5bc177d5fc4e16e8a62efa2b54f6) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

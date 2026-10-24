@@ -17,7 +17,7 @@ for(const width of [320,390,1280])test(`full-height chat behind controls at ${wi
   const chrome=(await bottom.boundingBox())!,end=(await page.locator('[data-message-id="last"]').boundingBox())!;
   expect(end.y+end.height).toBeLessThanOrEqual(chrome.y);expect(end.y+end.height).toBeGreaterThan(chrome.y-70);
   expect(await page.locator('.chat-header').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
-  expect(await chat.evaluate(el=>getComputedStyle(el).maskImage)).toContain('linear-gradient');
+  const mask=await chat.evaluate(el=>getComputedStyle(el).maskImage);expect(mask).toContain('linear-gradient');expect(mask).toContain('0.25)');
  };
  await assertGeometry();
  await page.screenshot({path:`.local/edge-chat-${width}.png`});
