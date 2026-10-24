@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.5 (unreleased)
+## [0.28.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.4...v0.28.5) (2026-10-25)
+
+Published [v0.28.5](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.5) from [5de9ebe9c7e26cc81be574ce77021fb247eb369f](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5de9ebe9c7e26cc81be574ce77021fb247eb369f) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - Conversation controls use one row: Back, a flexible context chip and overflow. Review, outputs, subagents and the Git branch live in the overflow menu; menu height stays within the viewport. Transcript edge opacity follows a sampled quadratic curve, including the existing strength and reading-mode overrides.
@@ -10,7 +12,7 @@
 - Windows release and asset reads retry temporary network/HTTP 408, 429 and 5xx failures up to three times. Other HTTP failures stop immediately. Failed updates retain the target version, phase and sanitized failure/status codes without persisting exception text. The earlier reported failure cannot be attributed retrospectively because its details were not recorded; a later preparation of 0.28.4 reached the waiting-for-idle state.
 
 ### Validation
-- Four Windows updater tests passed, covering unsafe archives, bounded retry, healthy handoff and failed-health rollback. Twelve browser checks passed for composer/inbox behavior, one-row headers at 320/390/1440 pixels and 60/130% scales, transcript geometry and reading-mode position. Final build and package verification pending; no physical-device validation.
+- Four Windows updater tests passed, covering unsafe archives, bounded retry, healthy handoff and failed-health rollback. Twelve browser checks passed for composer/inbox behavior, one-row headers at 320/390/1440 pixels and 60/130% scales, transcript geometry and reading-mode position. Web/Android/Windows/host builds passed; all 86 shared web files match. All 1,418 decoded package entries passed the privacy audit. APK signer compatibility, GitHub CI, exact source tag and hashes of all four downloaded assets passed. Packages published; no physical-device validation.
 
 ## [0.28.4](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.3...v0.28.4) (2026-10-25)
 
