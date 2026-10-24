@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.4 (unreleased)
+## [0.28.4](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.3...v0.28.4) (2026-10-25)
+
+Published [v0.28.4](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.4) from [c04f358e1a1b5bc177d5fc4e16e8a62efa2b54f6](https://github.com/Evgenie-Myasnikov/pocket-code/commit/c04f358e1a1b5bc177d5fc4e16e8a62efa2b54f6) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - Persist loaded chat pages and assembled history in a bounded 20 MB local cache, up to 5,000 messages per view. Revision sync transfers changed messages and preserves removals/order; unknown revisions and older hosts fall back to full pages. Access errors never fall back to cached responses. Reading positions retain a message ID, character and nearby text across reopening and wrapping changes.
@@ -12,7 +14,7 @@
 - Reading mode retains the measured header height while hidden, preventing scroll displacement on exit.
 
 ### Validation
-- Web build, 22 targeted geometry/schema/MCP/history/authentication/privacy checks and 22 distinct browser scenarios passed, including 250-message offline reopening, text anchors, delta sync, image refresh, connector detachment and 60/100/130% header layouts. Documentation links and the portable board schema passed; synthetic screenshots inspected. Final packaging and publication pending; no physical-device validation.
+- Web build, 22 targeted geometry/schema/MCP/history/authentication/privacy checks and 22 distinct browser scenarios passed, including 250-message offline reopening, text anchors, delta sync, image refresh, connector detachment and 60/100/130% header layouts. Documentation links and the portable board schema passed; synthetic screenshots inspected. Android, Windows and host packages published. All 86 shared web files match; 1,418 decoded package entries passed the privacy audit. APK signer compatibility, GitHub CI, exact source tag and hashes of all four downloaded assets passed. No physical-device validation.
 
 ## [0.28.3](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.2...v0.28.3) (2026-10-25)
 
