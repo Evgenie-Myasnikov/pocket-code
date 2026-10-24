@@ -2,7 +2,7 @@
 
 The board UI uses one canvas. Existing task records are shown as cards with their
 original IDs, text, status, versions, attachments and agent actions. Visual links
-remain separate from task dependency metadata. Click empty space (or right-click)
+remain separate from task dependency metadata. Right-click empty space (or use the keyboard context-menu key)
 to create a card, sticky, text or frame. Double-click an object to type in place;
 Ctrl+Enter or leaving the editor saves, Escape cancels. Drag an edge/corner to
 resize and a side port to connect objects. Undo, redo and fit are the persistent

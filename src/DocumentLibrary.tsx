@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useState,useRef} from 'react';
 import {BookOpen,FileText,FolderOpen,RefreshCw,ChevronRight} from 'lucide-react';
 import {request,type Connection} from './api';
 import {t,useLanguage} from './i18n';
@@ -25,6 +25,8 @@ export function projectLabels(projects:Project[]){
 export function DocumentLibrary({connection,kind,showHeading,onKind,onChat,onFolderChat}:{connection:Connection;kind:DocumentKind;showHeading?:boolean;onKind?(kind:DocumentKind):void;onChat?(root:string,prompt:string):void;onFolderChat?(path:string):void}){
  useLanguage();
  const [view,setView]=useState<DocumentKind>(kind);
+ const section=useRef<DocumentKind>(kind==='files'?'rules':kind);
+ if(kind!=='files')section.current=kind;
  useEffect(()=>{setView(kind);},[kind]);
  const [projects,setProjects]=useState<Project[]>([]),[root,setRoot]=useState(''),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0),[reading,setReading]=useState('');
  useEffect(()=>{let cancelled=false;setLoading(true);setError('');request<Project[]>(connection,'/document-projects?kind='+view).then(items=>{if(cancelled)return;setProjects(items);setRoot(old=>items.some(item=>item.root===old)?old:items.find(item=>!item.builtInOnly)?.root||items[0]?.root||'');}).catch(e=>{if(!cancelled)setError(e.message);}).finally(()=>{if(!cancelled)setLoading(false);});return()=>{cancelled=true;};},[connection.url,connection.token,view,revision]);
@@ -35,8 +37,9 @@ export function DocumentLibrary({connection,kind,showHeading,onKind,onChat,onFol
  const tabs:[DocumentKind,string,typeof BookOpen][]=[['rules',t('Правила'),BookOpen],['changelog',t('История изменений'),FileText],['files',t('Файлы'),FolderOpen]];
  return <section className={'document-library'+(reading?' reading':'')}>
   {showHeading&&!reading&&<header className="document-section-heading"><h1>{tabs.find(([id])=>id===view)![1]}</h1></header>}
-  <div className="document-library-tabs" role="tablist" aria-label={t('Документы проекта')}>{tabs.map(([id,title,Icon])=><button key={id} role="tab" aria-selected={view===id} className={view===id?'active':''} onClick={()=>choose(id)}><Icon size={16} aria-hidden="true"/>{title}</button>)}</div>
+
   <div className="document-library-context">
+   <button className="icon-button" aria-label={view==='files'?t('Назад'):t('Файлы')} onClick={()=>choose(view==='files'?section.current:'files')}><FolderOpen size={16}/></button>
    <label><span className="visually-hidden">{t('Git-проект')}</span><select aria-label={t('Git-проект')} disabled={!projects.length} value={root} onChange={e=>setRoot(e.target.value)}>{!projects.length&&<option value="">{loading?t('Ищем проекты…'):t('Нет подходящих проектов')}</option>}{builtInOnly.length&&authored.length?<><optgroup label={t('С правилами проекта')}>{authored.map(option)}</optgroup><optgroup label={t('Только встроенное правило')}>{builtInOnly.map(option)}</optgroup></>:projects.map(option)}</select></label>
    {reading&&<span className="document-library-crumb" aria-label={t('Открытый файл')}><ChevronRight size={16} aria-hidden="true"/><span>{reading}</span></span>}
    {view==='files'&&<button className="icon-button" aria-label={t('Обновить список проектов')} disabled={loading} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={20} className={loading?'project-docs-refreshing':''}/></button>}

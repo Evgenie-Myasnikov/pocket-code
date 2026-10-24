@@ -16,15 +16,17 @@
 .wb-card-meta button{font-size:calc(11px * var(--ui-scale,1));min-height:24px!important;padding:2px 6px!important;color:inherit!important;background:transparent!important;border:0!important}
 .wb-card-meta .board-task-meta{width:100%}
 .wb-resize{position:absolute;z-index:3;pointer-events:auto;touch-action:none}
-.wb-resize-n,.wb-resize-s{left:8px;right:8px;height:10px;cursor:ns-resize}
-.wb-resize-n{top:-6px}.wb-resize-s{bottom:-6px}
-.wb-resize-e,.wb-resize-w{top:8px;bottom:8px;width:10px;cursor:ew-resize}
-.wb-resize-e{right:-6px}.wb-resize-w{left:-6px}
-.wb-resize-ne,.wb-resize-se,.wb-resize-sw,.wb-resize-nw{width:14px;height:14px;background:var(--panel);border:1px solid var(--canvas-selection)}
-.wb-resize-ne{right:-8px;top:-8px;cursor:nesw-resize}.wb-resize-se{right:-8px;bottom:-8px;cursor:nwse-resize}.wb-resize-sw{left:-8px;bottom:-8px;cursor:nesw-resize}.wb-resize-nw{left:-8px;top:-8px;cursor:nwse-resize}
-.whiteboard .wb-port{position:absolute;z-index:4;width:24px;height:24px;min-height:0!important;min-width:0!important;padding:6px!important;background:transparent!important;border:0!important;border-radius:50%;pointer-events:auto;touch-action:none;cursor:crosshair}
-.wb-port:after{content:'';display:block;width:12px;height:12px;border:2px solid var(--panel);border-radius:50%;background:var(--canvas-selection)}
-.wb-port-n{left:calc(50% - 12px);top:-28px}.wb-port-s{left:calc(50% - 12px);bottom:-28px}.wb-port-e{top:calc(50% - 12px);right:-28px}.wb-port-w{top:calc(50% - 12px);left:-28px}
+.wb-resize-n,.wb-resize-s{left:0;right:0;height:calc(20px * var(--wb-handle-scale,1));cursor:ns-resize}
+.wb-resize-n{top:calc(-10px * var(--wb-handle-scale,1))}.wb-resize-s{bottom:calc(-10px * var(--wb-handle-scale,1))}
+.wb-resize-e,.wb-resize-w{top:0;bottom:0;width:calc(20px * var(--wb-handle-scale,1));cursor:ew-resize}
+.wb-resize-e{right:calc(-10px * var(--wb-handle-scale,1))}.wb-resize-w{left:calc(-10px * var(--wb-handle-scale,1))}
+.wb-resize-ne,.wb-resize-se,.wb-resize-sw,.wb-resize-nw{z-index:4;width:calc(28px * var(--wb-handle-scale,1));height:calc(28px * var(--wb-handle-scale,1));display:grid;place-items:center}
+.wb-resize-ne:after,.wb-resize-se:after,.wb-resize-sw:after,.wb-resize-nw:after{content:'';width:calc(8px * var(--wb-handle-scale,1));height:calc(8px * var(--wb-handle-scale,1));background:var(--panel);border:1px solid var(--canvas-selection)}
+.wb-resize-ne{right:calc(-14px * var(--wb-handle-scale,1));top:calc(-14px * var(--wb-handle-scale,1));cursor:nesw-resize}.wb-resize-se{right:calc(-14px * var(--wb-handle-scale,1));bottom:calc(-14px * var(--wb-handle-scale,1));cursor:nwse-resize}.wb-resize-sw{left:calc(-14px * var(--wb-handle-scale,1));bottom:calc(-14px * var(--wb-handle-scale,1));cursor:nesw-resize}.wb-resize-nw{left:calc(-14px * var(--wb-handle-scale,1));top:calc(-14px * var(--wb-handle-scale,1));cursor:nwse-resize}
+.whiteboard .wb-port{position:absolute;z-index:5;width:calc(28px * var(--wb-handle-scale,1));height:calc(28px * var(--wb-handle-scale,1));min-height:0!important;min-width:0!important;padding:0!important;background:transparent!important;border:0!important;border-radius:50%;pointer-events:auto;touch-action:none;cursor:crosshair;display:grid;place-items:center}
+.wb-port:after{content:'';display:block;width:calc(10px * var(--wb-handle-scale,1));height:calc(10px * var(--wb-handle-scale,1));border:1px solid var(--panel);border-radius:50%;background:var(--canvas-selection)}
+.wb-port-n{left:calc(50% - 14px * var(--wb-handle-scale,1));top:calc(-34px * var(--wb-handle-scale,1))}.wb-port-s{left:calc(50% - 14px * var(--wb-handle-scale,1));bottom:calc(-34px * var(--wb-handle-scale,1))}.wb-port-e{top:calc(50% - 14px * var(--wb-handle-scale,1));right:calc(-34px * var(--wb-handle-scale,1))}.wb-port-w{top:calc(50% - 14px * var(--wb-handle-scale,1));left:calc(-34px * var(--wb-handle-scale,1))}
+.whiteboard-item.wb-connect-target{outline:2px solid var(--canvas-selection);outline-offset:3px}
 .wb-colors{display:flex;gap:4px;padding:0 6px}.whiteboard-toolbar .wb-colors button{min-width:20px;min-height:20px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);padding:0}
 .wb-versions{position:relative;font-size:calc(12px * var(--ui-scale,1))}.wb-versions summary{cursor:pointer;padding:8px}.wb-versions[open]{background:var(--panel);max-height:200px;overflow:auto}.wb-versions button{font-size:calc(12px * var(--ui-scale,1))}
 .wb-frame .whiteboard-text{pointer-events:auto}

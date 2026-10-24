@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.28.2 (unreleased)
+
+### Bug Fixes
+- Canvas creation menus open on right-click or the keyboard context-menu key; left-click selects or clears selection. Links retain source/destination sides, preview from the chosen port and highlight the destination. Resize hit areas remain 20/28 screen pixels at every canvas zoom.
+- Removed duplicate Rules/Changelog tabs inside the document library; file browsing remains a compact action. Existing unanchored links still load; anchored links require the updated host schema.
+
+### Documentation
+- Repository board cards are grouped in version frames with 11 reviewed historical synthetic UI screenshots. Local scratch canvas objects are excluded from the public snapshot.
+
+### Validation
+- Web build, 14 targeted canvas/persistence/privacy/MCP tests, six browser checks and the desktop document navigation check passed. The reported loading failure was not reproduced in those checks and remains open pending the failing screen/error. No release or physical-device validation.
+
 ## [0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.0...v0.28.1) (2026-10-24)
 
 Published [v0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.1) from [b8e800f51c283eea196e721fec080801d79fa5cd](https://github.com/Evgenie-Myasnikov/pocket-code/commit/b8e800f51c283eea196e721fec080801d79fa5cd) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

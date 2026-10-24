@@ -77,7 +77,7 @@ test('relative links open project documents with Back to the source, anchors scr
  expect(state.calls.some(url=>url.pathname==='/api/file'&&/docs[\\/]notes\.md$/.test(url.searchParams.get('path')||''))).toBe(true);
 });
 test('Files is a document tab with a themed preview, raw view and find in file',async({page})=>{
- await host(page);await openRules(page);await page.getByRole('tab',{name:'Files'}).click();
+ await host(page);await openRules(page);await page.getByRole('button',{name:'Files',exact:true}).click();
  await page.getByRole('button',{name:'notes.md'}).click();const preview=page.getByRole('dialog',{name:'notes.md'});await expect(preview.getByRole('heading',{name:'Rendered file notes'})).toBeVisible();
  await preview.getByRole('button',{name:'Raw'}).click();await expect(preview.locator('pre')).toContainText('# Rendered file notes');await preview.getByRole('searchbox',{name:'Find in file'}).fill('readable');await expect(preview.getByRole('status')).toHaveText('1 of 1');
  const colors=await preview.evaluate(element=>{const style=getComputedStyle(element);return {background:style.backgroundColor,panel:getComputedStyle(document.documentElement).getPropertyValue('--panel').trim()};});expect(colors.background).not.toBe('rgb(27, 36, 24)');

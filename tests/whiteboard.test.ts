@@ -4,7 +4,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {whiteboardSchema,emptyWhiteboard,moveItems,removeItems,frameSelection,edgePoint,type WhiteboardItem} from '../src/whiteboard-model.js';
+import {whiteboardSchema,emptyWhiteboard,moveItems,removeItems,frameSelection,edgePoint,portPoint,type WhiteboardItem} from '../src/whiteboard-model.js';
 import {createProjectBoard,projectBoard,updateProjectBoard} from '../server/project-board.js';
 import {boardCanvas,canvasNotes,canvasMigrationIssues} from '../src/board-canvas.js';
 import {BoardStore} from '../server/boards.js';
@@ -33,4 +33,11 @@ test('canvas persists with legacy notes, omitted canvas preserves it, stale writ
 test('workspace board store retains canvas across reload and omitted updates',async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'canvas-store-'));
  try{const file=path.join(root,'boards.json'),store=await new BoardStore(file).load(),id=randomUUID();await store.mutate(data=>{data.boards.push({id,name:'Example',root,revision:0,versionSource:'planned',versions:[],notes:[]});});const canvas={...emptyWhiteboard(),items:[item()]};await store.save(id,0,[],[],canvas);await store.save(id,1,[]);assert.deepEqual((await new BoardStore(file).load()).getBoard(id)?.canvas,canvas);await assert.rejects(store.save(id,0,[],[],emptyWhiteboard()),/changed/);}finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('anchored links survive serialization and stay on chosen sides after movement',()=>{
+ const a=item(),b=item({x:600}),link={id:randomUUID(),from:a.id,to:b.id,fromSide:'n' as const,toSide:'w' as const};
+ const saved=whiteboardSchema.parse(JSON.parse(JSON.stringify({version:1,items:[a,b],links:[link]})));
+ const moved=moveItems(saved,[a.id],80,40);assert.deepEqual(moved.links,[link]);assert.deepEqual(portPoint(moved.items[0],link.fromSide),{x:a.x+80+a.width/2,y:a.y+40});
+ assert.equal(whiteboardSchema.safeParse({...saved,links:[{...link,fromSide:'invalid'}]}).success,false);
 });
