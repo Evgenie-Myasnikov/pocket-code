@@ -38,3 +38,8 @@
 .whiteboard-world{--ui-scale:1}
 .whiteboard-toolbar button{min-width:calc(32px * var(--ui-scale,1));min-height:calc(32px * var(--ui-scale,1));padding:calc(6px * var(--ui-scale,1))}
 @media(pointer:coarse){.whiteboard-toolbar button{min-width:44px;min-height:44px}}
+
+.whiteboard .wb-port{opacity:0;pointer-events:none}
+.whiteboard .wb-port-visible,.whiteboard .wb-port:focus-visible{opacity:1;pointer-events:auto}
+.wb-port-n{top:calc(-14px * var(--wb-handle-scale,1))}.wb-port-s{bottom:calc(-14px * var(--wb-handle-scale,1))}.wb-port-e{right:calc(-14px * var(--wb-handle-scale,1))}.wb-port-w{left:calc(-14px * var(--wb-handle-scale,1))}
+@media(pointer:coarse){.whiteboard-item.wb-selected .wb-port{opacity:1;pointer-events:auto}}

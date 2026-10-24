@@ -5,7 +5,7 @@ original IDs, text, status, versions, attachments and agent actions. Visual link
 remain separate from task dependency metadata. Right-click empty space (or use the keyboard context-menu key)
 to create a card, sticky, text or frame. Double-click an object to type in place;
 Ctrl+Enter or leaving the editor saves, Escape cancels. Drag an edge/corner to
-resize and a side port to connect objects. Undo, redo and fit are the persistent
+resize. Approach a side midpoint to reveal its connection port, then drag to another midpoint port. Dropping elsewhere cancels the connection. Lines use sharp orthogonal elbows; keyboard connections also require the destination port. Undo, redo and fit are the persistent
 canvas controls; pinch and Ctrl+wheel zoom the view. The chat entry is an icon.
 Malformed legacy references block editing rather than silently discarding links.
 Canvas card records require the updated host; older hosts reject the new kind.
