@@ -1,3 +1,5 @@
+import {CustomProviders,mountCustomProviders} from './custom-providers.js';
+import {WindowsJiraStore} from './jira-vault.js';
 import {messageAttachment} from './message-attachment.js';
 import {projectRuleSettings,saveProjectRuleSettings} from './project-rules.js';
 import {mountBoards,createWorkspaceAccess,workspaceRequest} from './boards.js';
@@ -363,6 +365,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
     res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
   });
+  mountCustomProviders(app,new CustomProviders(new WindowsJiraStore(path.join(config.uploads,'..','custom-providers.dat'))),()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can use custom providers');});
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
   app.post('/api/provider-connections/:provider/login/cancel',async(req,res)=>res.json(await providerConnections.cancel(providerSchema.parse(req.params.provider))));
   app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));

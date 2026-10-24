@@ -28,11 +28,11 @@ export async function createProjectBoard(root:string,names:string[],language:'en
   await saveBoardSnapshot(root,board,names,false);return (await projectBoard(root))!;
  });
 }
-export async function updateProjectBoard(root:string,revision:string,notes:ProjectBoard['notes'],versions:string[],names:string[]){
+export async function updateProjectBoard(root:string,revision:string,notes:ProjectBoard['notes'],versions:string[],names:string[],canvas?:ProjectBoard['canvas']){
  return serializeProjectBoard(root,async()=>{
   const current=await projectBoard(root);if(!current)throw new HttpError(404,'Project board not found');
   if(current.repositoryRevision!==revision)throw new HttpError(409,'The project board changed. Refresh before saving.');
-  await saveBoardSnapshot(root,{...current,notes,versions,versionBranches:await linkBoardVersions(root,versions,current.versionBranches)},names,false);return (await projectBoard(root))!;
+  await saveBoardSnapshot(root,{...current,notes,versions,...(canvas?{canvas}:{}),versionBranches:await linkBoardVersions(root,versions,current.versionBranches)},names,false);return (await projectBoard(root))!;
  });
 }
 export async function deleteProjectBoard(root:string,revision:string){

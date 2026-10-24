@@ -31,13 +31,13 @@ test('host bundle is verified before writing a separate installation',async()=>{
   }finally{await rm(dir,{recursive:true,force:true});}
 });
 
-test('the real host packager preserves Miro support and portable boards through verified installation',async()=>{
+test('the real host packager preserves MCP helpers without duplicating repository boards through verified installation',async()=>{
   const dir=await mkdtemp(path.join(os.tmpdir(),'host-packager-test-'));try{
     const root=path.join(dir,'source');
     const files:Record<string,string>={
       'package.json':JSON.stringify({name:'pocket-code',version:'1.2.3'}),'package-lock.json':'{}','tsconfig.json':'{}',
       'server/index.ts':'synthetic host','server/miro-auth.ts':'synthetic Miro adapter','src/App.tsx':'synthetic UI','dist/index.html':'synthetic built UI',
-      'scripts/host-update-worker.mjs':'synthetic updater','scripts/board-cli.mjs':'synthetic board helper','scripts/miro-cli.mjs':'synthetic Miro helper',
+      'scripts/host-update-worker.mjs':'synthetic updater','scripts/board-cli.mjs':'synthetic board helper','scripts/board-mcp.mjs':'synthetic MCP helper','scripts/miro-cli.mjs':'synthetic Miro helper',
       'project-boards/README.md':'Synthetic public product board','project-boards/board-fixture.json':JSON.stringify({format:'pocket-code-board',version:1,notes:[]}),
       ['project-boards/assets/'+ 'a'.repeat(64)+'.png']:'synthetic image bytes',
     };
@@ -45,8 +45,8 @@ test('the real host packager preserves Miro support and portable boards through 
     const built=await buildHostBundle(root);
     const asset={version:'1.2.3',asset:built.asset,size:built.bytes.length,sha256:createHash('sha256').update(built.bytes).digest('hex'),protocol:1,releaseId:7};
     const installed=await unpackHost(built.bytes,asset,path.join(dir,'install'));
-    assert.equal(built.fileCount,Object.keys(files).length);
-    for(const [name,content] of Object.entries(files))assert.equal(await readFile(path.join(installed,name),'utf8'),content,name);
+    assert.equal(built.fileCount,Object.keys(files).filter(name=>!name.startsWith('project-boards/')).length);
+    for(const [name,content] of Object.entries(files)){if(name.startsWith('project-boards/'))await assert.rejects(readFile(path.join(installed,name)),{code:'ENOENT'});else assert.equal(await readFile(path.join(installed,name),'utf8'),content,name);}
     await writeFile(path.join(root,'server','.env'),'synthetic private setting');
     await assert.rejects(buildHostBundle(root),/Private files cannot be packaged/);
   }finally{await rm(dir,{recursive:true,force:true});}

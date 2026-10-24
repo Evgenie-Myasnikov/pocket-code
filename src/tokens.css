@@ -73,3 +73,5 @@
 :root{--ease-standard:cubic-bezier(.2,0,0,1);--ease-emphasized-decelerate:cubic-bezier(.05,.7,.1,1);--ease-emphasized-accelerate:cubic-bezier(.3,0,.8,.15);--dur-short:100ms;--dur-medium:200ms;--dur-long:300ms}
 @media(prefers-reduced-motion:reduce){:root{--dur-medium:120ms;--dur-long:150ms}}
 
+
+:root{--canvas-grid:#8885;--sticky-sand:#f0dfa4;--sticky-ink:#302b21;--canvas-shadow:#0002;--sticky-mint:#b5dfce;--sticky-blue:#bdd7ee;--sticky-rose:#edc4c9;--sticky-violet:#d4c9ed;--canvas-frame:#93939a88;--canvas-selection:#4299e1;}

@@ -1,3 +1,5 @@
+import './compact-ui.css';
+import {ProviderPicker} from './ProviderPicker';
 import {MobileNavigation} from './MobileNavigation';
 import {watchWindowTheme} from './window-theme';
 import {ChatRunStatus,RunStatusDot,relativeTime,fullTime,dayGroup,dayGroupLabel,runStatusLabel,type RunStatus} from './run-status';
@@ -135,6 +137,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [providersLoaded,setProvidersLoaded]=useState(false);
   const canRun = !unreachable && !!connection && providerInfo?.available === true && providerInfo.authenticated !== false && !connection?.workspaceId;
   const [boardChat,setBoardChat]=useState<BoardChat|null>(embedded?.boardChat||null);
+  const boardContextFile=useRef<Attachment|null>(null);
+  useEffect(()=>{boardContextFile.current=null;},[boardChat?.boardId,boardChat?.prompt]);
   const [noticeTarget,setNoticeTarget]=useState<BoardNoticeTarget|null>(null);
   const [boardLaunch,setBoardLaunch]=useState<BoardChat|null>(null);
   const [taskPanel,setTaskPanel]=useState(false);
@@ -494,9 +498,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   }
   useEffect(()=>{if(embedded&&!embedded.session&&job?.sessionId)embedded.onCreated?.({sessionId:job.sessionId,cwd:job.cwd,summary:job.messages.find(m=>m.role==='user')?.blocks.find(b=>b.type==='text')?.text||'New',lastModified:job.startedAt},job);},[job?.sessionId]);
   const embeddedOpened=useRef(false);
-  useEffect(()=>{if(!embedded||!health||!connection||embeddedOpened.current)return;embeddedOpened.current=true;
+  useEffect(()=>{if(!embedded||!health||!connection||embeddedOpened.current)return;embeddedOpened.current=true;setBoardChat(embedded.boardChat||null);
     if(embedded.session){void (async()=>{try{const active=embedded.jobId?await request<JobView>(connection,'/jobs/'+embedded.jobId):undefined;await openSession(embedded.session!,active);if(embedded.boardChat?.followUp)appendDraft(embedded.boardChat.prompt);}catch(e){setError((e as Error).message);}})();}
-    else {newChat(embedded.cwd);if(embedded.boardChat)setDraft(embedded.boardChat.prompt);else if(embedded.draft)setDraft(embedded.draft);}
+    else {newChat(embedded.cwd);if(embedded.boardChat)setDraft(embedded.boardChat.context?t('Discuss this board with me.'):embedded.boardChat.prompt);else if(embedded.draft)setDraft(embedded.draft);}
   },[health,connection,embedded]);
   // The desktop keeps this chat mounted when the board opens the same task chat again: a later follow-up still reaches the draft.
   const lastBoardChat=useRef(embedded?.boardChat);
@@ -680,8 +684,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     } catch (e) {if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);} finally
     {if (epoch === navigation.current) setLoading(false);}
   }
-  useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch;if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});if(target.followUp)appendDraft(target.prompt);}else{newChat(target.root);setDraft(target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
-  useEffect(()=>{if(!boardChat||boardChat.taskRun||!job?.sessionId||!connection)return;const target=boardChat;setBoardChat(null);void (async()=>{try{const b=await request<any>(connection,'/boards/'+target.boardId);await request(connection,'/boards/'+b.id,{revision:b.revision,versions:b.versions,notes:b.notes.map((n:any)=>n.id===target.note.id?{...n,chat:{provider,sessionId:job.sessionId}}:n)});}catch(e){setError((e as Error).message);}})();},[job?.sessionId,boardChat,connection]);
+  useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch;if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});if(target.followUp)appendDraft(target.prompt);}else{newChat(target.root);setDraft(target.context?t('Discuss this board with me.'):target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
+  useEffect(()=>{if(!boardChat||boardChat.context||boardChat.taskRun||!job?.sessionId||!connection)return;const target=boardChat;setBoardChat(null);void (async()=>{try{const b=await request<any>(connection,'/boards/'+target.boardId);await request(connection,'/boards/'+b.id,{revision:b.revision,versions:b.versions,notes:b.notes.map((n:any)=>n.id===target.note.id?{...n,chat:{provider,sessionId:job.sessionId}}:n)});}catch(e){setError((e as Error).message);}})();},[job?.sessionId,boardChat,connection]);
   async function openSession(s: Session, activeJob?: Pick<JobView,'id'|'sessionId'>) {
     if (busy || uploading) return;
     rememberPosition();rememberDraft();releasePending(true);setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
@@ -751,6 +755,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const epoch = ++navigation.current;
     // The chat's access chip overrides the device default from Settings; Plan is a Claude mode of its own.
     const access=chatAccess,timeout=approvalTimeout(composerPreferences);
+    if(boardChat?.context&&!sessionId){
+      try{
+        if(ids.length>=10)throw new Error('Board context needs one attachment slot.');
+        if(!boardContextFile.current){const file=new File([boardChat.prompt],'Board context.txt',{type:'text/plain'});boardContextFile.current=await api<Attachment>('/uploads',{cwd,name:file.name,base64:await fileBase64(file)});}
+        ids.push(boardContextFile.current.id);
+      }catch(e){setError((e as Error).message);sending.current=false;setBusy(false);return;}
+      if(epoch!==navigation.current){sending.current=false;setBusy(false);return;}
+    }
     const data = { provider, cwd, sessionId, ...(taskRun?{taskRunId:taskRun.id}:{}), text, attachments: ids, model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: provider==='claude'&&access==='plan'?'plan':'default', ...(provider==='claude'?{maxBudgetUsd:clampBudget(budget),claudeAccess:access==='plan'?claudeAccess:access as ClaudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess:access as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), ...(timeout?{approvalTimeoutMinutes:timeout}:{}), takeoverConfirmed: confirmed };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
@@ -825,7 +837,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const waiting=activity.items.filter(item=>item.status==='needs_input'||item.status==='error');
   const sessionStatus=(sessionId:string):RunStatus|undefined=>{const active=jobs.find(j=>j.sessionId===sessionId&&j.status==='running');if(active)return active.approvals?.length?'needs_input':'running';return activity.items.find(item=>item.provider===provider&&item.sessionId===sessionId)?.status;};
   const providerAttention=(id:WorkspaceProvider)=>waiting.filter(item=>item.provider===id).length;
-  const providerChips=<div className="provider-chips" role="group" aria-label={t('Провайдер')}>{(['claude','codex','copilot'] as const).map(id=>{const count=providerAttention(id);return <button key={id} aria-pressed={provider===id} disabled={demo||busy||uploading} onClick={()=>setProvider(id)}>{providerName(id)}{count>0&&<b aria-label={t('Ждут вас: {0}',count)}>{count}</b>}</button>;})}</div>;
+  const providerChips=<ProviderPicker connection={connection||undefined} value={provider} onChange={setProvider} disabled={demo||busy||uploading} attention={providerAttention}/>;
   const grouped=visible.reduce<{group:'today'|'yesterday'|'earlier';items:Session[]}[]>((list,session)=>{const group=dayGroup(session.lastModified),last=list.at(-1);if(last?.group===group)last.items.push(session);else list.push({group,items:[session]});return list;},[]);
   const sessionRow=(s:Session)=>{const status=sessionStatus(s.sessionId);return <button className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} aria-current={selected?.sessionId===s.sessionId&&mobileChat?'true':undefined} disabled={busy || uploading} key={s.sessionId} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span aria-hidden="true">·</span>{status?<ChatRunStatus status={status}/>:<time dateTime={new Date(s.lastModified).toISOString()} title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}</small></div></button>;};
   return <div className={`app ${embedded?'embedded-chat':''} ${mobileChat||onboardingVisible ? 'show-chat' : ''} ${tabBar?'has-tabbar':''} ${tab==='chats'&&(mobileChat||embedded)?'chat-edge-to-edge':''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
@@ -859,7 +871,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
         <ChatHeader notifications={bell('icon')} title={selected?.customTitle||selected?.summary||(!job&&taskRun?.title)||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():setMobileChat(false)}
-          context={!selected&&!job&&!taskRun?<>{workspacePicker('header')}<span aria-hidden="true">·</span><label className="project-picker"><Folder size={14} aria-hidden="true"/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label></>:undefined}
+          context={!selected&&!job&&!taskRun?<>{workspacePicker('header')}{!boardChat?.context&&<><span aria-hidden="true">·</span><label className="project-picker"><Folder size={14} aria-hidden="true"/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label></>}</>:undefined}
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>{setReviewPaths(undefined);setReviewOpen(true);},stats:availableReview&&availableReview.files!==undefined?{added:availableReview.added||0,removed:availableReview.removed||0,files:availableReview.files}:undefined}:undefined}
           outputs={hasOutputs?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
           subagents={agentMap.size>0&&parentChatId?{count:agentMap.size,running:[...agentMap.values()].filter(agent=>agent.status==='running').length,disabled:!connection||demo,open:()=>setAgentPanel({})}:undefined}
@@ -900,7 +912,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <ChatOverlay edge="bottom">
         {/* Hosts without the queue view still report how many follow-ups wait. */}
         {Boolean(job?.pendingInputIds?.length)&&!job?.queued&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}
-        <div className="composer-area">{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}
+        <div className="composer-area">{boardChat?.context&&<div className="board-context-chip">{boardChat.context.name} / {boardChat.context.revision.slice(0,8)}</div>}{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}
           {!readingMode&&<OutboxShelf items={outbox} busy={busy}/>}
           {/* One status line above the composer; while a card asks for a decision, the card says it. */}
           {running&&job&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)&&!runUnknown} lostAt={runUnknown?runLost??jobContact.current.at:undefined}/>}{!error&&connection&&!demo&&!readingMode&&!job?.approvals.length&&<LimitAlert provider={provider} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}{error &&<div className="error-banner" role="alert">{t(error)}{!embedded&&t(error)===t(budgetRangeMessage)&&<button className="text-button" onClick={()=>{setError('');setSettingsSubpage('access');setSettingsPage('workspace');setTab('settings');setMobileChat(true);}}>{t('Открыть настройки бюджета')}</button>}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}

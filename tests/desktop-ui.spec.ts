@@ -2,6 +2,24 @@ import {readFileSync} from 'node:fs';
 const roadmap=JSON.parse(readFileSync(new URL('../project-boards/board-7b004a10-920c-4ba7-a070-254318083e90.json',import.meta.url),'utf8'));
 import {test,expect,type Page} from '@playwright/test';
 
+test('board discussion keeps canvas beside a context-bearing chat',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});
+ await desktop(page);
+ await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+ await page.locator('.project-board-row').first().getByRole('button').click();
+ await page.getByRole('button',{name:'Discuss board',exact:true}).click();
+ await expect(page.locator('.desktop-board-section')).toBeVisible();
+ await expect(page.locator('.desktop-chat-host')).toBeVisible();
+ await expect(page.locator('.board-context-chip')).toBeVisible();
+ await expect(page.getByRole('combobox',{name:'Project folder',exact:true})).toHaveCount(0);
+ const board=await page.locator('.desktop-board-section').boundingBox(),chat=await page.locator('.desktop-chat-host').boundingBox();
+ expect(board).not.toBeNull();expect(chat).not.toBeNull();expect(chat!.x).toBeGreaterThanOrEqual(board!.x+board!.width-1);
+ await page.screenshot({path:'.local/board-chat-split.png'});
+ await expect(page.locator('textarea')).toHaveValue('Discuss this board with me.');
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='write'&&c.endpoint==='/uploads'&&c.data.name==='Board context.txt'))).toBe(true);
+});
+
 for(const width of [390,1440])test('board images attach, reopen, zoom and detach at '+width,async({page})=>{
  await page.setViewportSize({width,height:850});
  await page.addInitScript(()=>{(window as any).projectBoardOverride={id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:'C:\\Demo\\Atlas',revision:0,repositoryRevision:'a'.repeat(64),repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',versionSource:'planned',branches:[],versions:['1.0.0'],versionBranches:{'1.0.0':'release/1.0.0'},notes:[{id:'33333333-3333-4333-8333-333333333333',title:'Visual idea',description:'Synthetic acceptance',branch:'',status:'idea',owner:'',dependencies:[],x:20,y:92}]};});
@@ -115,7 +133,7 @@ async function desktop(page:Page){
 }
 test('desktop shares editable chat, review and results with provider/project selection',async({page})=>{
  await page.setViewportSize({width:1366,height:900});await desktop(page);
- await page.getByRole('group',{name:'Provider'}).getByRole('button',{name:/^Codex/}).click();
+ await page.locator('.provider-picker-trigger').click();await page.getByRole('menuitemradio',{name:'Codex',exact:true}).click();
  await expect(page.getByRole('button',{name:/Documentation/})).toBeVisible();
  await page.getByRole('button',{name:/codex · Interface review/}).click();
  await expect(page.getByText('The responsive layout is ready.')).toBeVisible();await expect(page.locator('textarea')).toBeVisible();

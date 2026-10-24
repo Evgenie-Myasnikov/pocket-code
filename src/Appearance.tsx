@@ -13,19 +13,18 @@ import {EdgeFadeSettings} from './EdgeFadeSettings';
 import {useApplyEdgeFade} from './chat-edge-fade';
 
 type Swatch = { dark: [string, string]; light: [string, string] };
-/** Hue palettes are generated in OKLCH (appearance.css); hslHue only feeds the fallback for WebViews without OKLCH. Named palettes are fixed presets (neutral-themes.css). */
-const generated = (hue: number): Swatch => ({ dark: [`oklch(.18 .008 ${hue})`, `oklch(.84 .075 ${hue})`], light: [`oklch(.978 .005 ${hue})`, `oklch(.45 .1 ${hue})`] });
+/** Named palettes use Radix scales; previews match the applied tokens. */
 export const palettes: { id: string; name: string; hue: number; hslHue: number; swatch: Swatch }[] = [
-{ id: 'neutral', name: 'Нейтральная', hue: 0, hslHue: 0, swatch: { dark: ['#171614', '#ddd5c8'], light: ['#faf9f7', '#4a4238'] } },
-{ id: 'codex', name: 'Codex', hue: 0, hslHue: 0, swatch: { dark: ['#181818', '#e5e5e5'], light: ['#ffffff', '#252525'] } },
-{ id: 'claude', name: 'Claude', hue: 0, hslHue: 25, swatch: { dark: ['#242321', '#e2ac8b'], light: ['#faf9f5', '#9b472b'] } },
-{ id: 'copilot', name: 'Copilot', hue: 0, hslHue: 215, swatch: { dark: ['#0d1117', '#9bbcff'], light: ['#ffffff', '#1754bd'] } },
-{ id: 'sage', name: 'Шалфей', hue: 132, hslHue: 94, swatch: generated(132) },
-{ id: 'ocean', name: 'Океан', hue: 225, hslHue: 195, swatch: generated(225) },
-{ id: 'lilac', name: 'Сирень', hue: 306, hslHue: 267, swatch: generated(306) },
-{ id: 'rose', name: 'Роза', hue: 356, hslHue: 340, swatch: generated(356) },
-{ id: 'amber', name: 'Янтарь', hue: 81, hslHue: 38, swatch: generated(81) },
-{ id: 'mint', name: 'Мята', hue: 184, hslHue: 170, swatch: generated(184) }];
+{ id: 'neutral', name: 'Нейтральная', hue: 0, hslHue: 0, swatch: {"dark": ["#111110", "#b4b4b4"], "light": ["#fdfdfc", "#646464"]} },
+{ id: 'codex', name: 'Codex', hue: 0, hslHue: 0, swatch: {"dark": ["#111111", "#b4b4b4"], "light": ["#fcfcfc", "#646464"]} },
+{ id: 'claude', name: 'Claude', hue: 0, hslHue: 25, swatch: {"dark": ["#111110", "#d4b3a5"], "light": ["#fdfdfc", "#7d5e54"]} },
+{ id: 'copilot', name: 'Copilot', hue: 0, hslHue: 215, swatch: {"dark": ["#111113", "#70b8ff"], "light": ["#fcfcfd", "#0f6cbd"]} },
+{ id: 'sage', name: 'Шалфей', hue: 132, hslHue: 94, swatch: {"dark": ["#101211", "#1fd8a4"], "light": ["#fbfdfc", "#1f7961"]} },
+{ id: 'ocean', name: 'Океан', hue: 225, hslHue: 195, swatch: {"dark": ["#111113", "#4ccce6"], "light": ["#fcfcfd", "#11748c"]} },
+{ id: 'lilac', name: 'Сирень', hue: 306, hslHue: 267, swatch: {"dark": ["#121113", "#b1a9ff"], "light": ["#fdfcfd", "#5753c6"]} },
+{ id: 'rose', name: 'Роза', hue: 356, hslHue: 340, swatch: {"dark": ["#121113", "#ff949d"], "light": ["#fdfcfd", "#ca244d"]} },
+{ id: 'amber', name: 'Янтарь', hue: 81, hslHue: 38, swatch: {"dark": ["#111110", "#ffca16"], "light": ["#fdfdfc", "#9d5d03"]} },
+{ id: 'mint', name: 'Мята', hue: 184, hslHue: 170, swatch: {"dark": ["#101211", "#0bd8b6"], "light": ["#fbfdfc", "#037b6a"]} }];
 
 type Contrast = 'auto' | 'normal' | 'more';
 type Appearance = {palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;compact: boolean;contrast: Contrast;colorblind: boolean;};

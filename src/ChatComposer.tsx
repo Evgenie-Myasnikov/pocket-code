@@ -78,7 +78,6 @@ export function ChatComposer({text,label,placeholder,disabled,uploading,canSend,
       {usage}
     </div>
     {blockedReason&&<p className="composer-hint composer-blocked" role="status">{blockedReason}</p>}
-    {keyHint&&focused&&!blockedReason&&<p className="composer-hint" aria-hidden="true">{enterSends?t('Enter — отправить · Shift+Enter — новая строка'):t('Ctrl+Enter — отправить')}</p>}
     <div className="composer-tools">
       <input hidden ref={files} type="file" multiple onChange={event=>{const incoming=Array.from(event.target.files||[]);event.target.value='';if(incoming.length)onFiles(incoming);}}/>
       <button type="button" className="icon-button composer-attach" aria-label={t('Прикрепить файлы')} disabled={disabled} onClick={()=>files.current?.click()}>

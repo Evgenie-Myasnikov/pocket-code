@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {CustomProviders,providerUrl,parseModelCatalog} from '../server/custom-providers.js';
+test('custom providers validate URLs and use a real model catalog',async()=>{
+ for(const url of ['http://example.com/v1','https://user:pass@example.com','https://example.com/?key=x','file:///etc/passwd'])assert.throws(()=>providerUrl(url));
+ assert.equal(providerUrl('http://localhost:11434/v1/'),'http://localhost:11434/v1');assert.deepEqual(parseModelCatalog({data:[{id:'b'},{id:'a'},{id:'b'}]}),['a','b']);assert.throws(()=>parseModelCatalog({models:[]}));
+ let stored:any={},calls:string[]=[];const service=new CustomProviders({load:async()=>stored,save:async value=>{stored=structuredClone(value);}},async(url,options)=>{calls.push(String(url));assert.equal(options?.redirect,'error');return Response.json(String(url).endsWith('/models')?{data:[{id:'actual-model'}]}:{choices:[{message:{content:'Synthetic reply'}}]});});
+ const {id}=await service.save({name:'Example',url:'https://example.com/v1',key:'synthetic-test-key'});assert.equal('key' in (await service.list())[0],false);assert.deepEqual(await service.models(id),['actual-model']);await assert.rejects(service.chat(id,{model:'invented',text:'Hello'}),/catalog/);assert.equal((await service.chat(id,{model:'actual-model',text:'Hello'}))[1].content,'Synthetic reply');assert.equal((await service.history(id)).length,2);assert.ok(calls.includes('https://example.com/v1/chat/completions'));await service.remove(id);assert.deepEqual(await service.list(),[]);
+});
+test('provider errors never expose response bodies or credentials',async()=>{let stored:any={};const service=new CustomProviders({load:async()=>stored,save:async value=>{stored=value;}},async()=>new Response('secret upstream diagnostics',{status:401}));const {id}=await service.save({name:'Example',url:'https://example.com/v1',key:'synthetic'});await assert.rejects(service.models(id),e=>String(e).includes('401')&&!String(e).includes('secret'));});

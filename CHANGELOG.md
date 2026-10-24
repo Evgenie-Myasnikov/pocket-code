@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.28.0 (unreleased)
+
+### Features
+- Boards: optional free canvas with sticky notes, text, frames, resize, group movement, arrows and view-local undo/redo. Existing task cards and dependency metadata remain intact. Desktop board discussions keep the board beside the chat; a bounded context snapshot is attached on the first send.
+- Board MCP: scoped project aliases, reading, search and revision-checked card/canvas updates through the local host. The shared board skill documents the workflow. No cursor animation, realtime collaboration, deletion or publication tools are included.
+- Providers: compact keyboard-accessible picker; encrypted local profiles for OpenAI-compatible text API chat, with model catalogs fetched from the provider. Custom API chat does not run project file tools.
+- Appearance: ten paired light/dark palettes based on Radix Colors, consistent role mapping and verified text/button contrast. The composer keyboard hint is removed; board mode controls and desktop spacing are more compact.
+
+### Bug Fixes
+- Packaging: omit repository product boards from installed host bundles so an installation does not reappear as a duplicate project board. Board MCP is included in both host and Windows packages.
+
+### Documentation
+- Added board MCP usage, scope and limitations, shared board skill, palette sources and upstream license. Extracted `.stitch/DESIGN.md` from actual React/CSS using the Google skill. Updated the product roadmap with implementation and the remaining AI cursor stage.
+
+### Breaking Changes
+- Old hosts must be updated before opening files containing the optional canvas field. Existing task-only board files remain compatible.
+
+### Validation
+- TypeScript and web build passed. Targeted MCP stdio, board persistence/revision, provider catalog/error privacy, packaging and palette contrast checks passed. Live read-only MCP access was verified. Full unit run: 381/382 passed; the task-run concurrency timing case failed under load and passed when rerun alone. Browser regression: 41/41 passed; five focused grid/board checks and the context-attachment send check passed after compact-header changes. Documentation links passed. Release artifact validation is pending; this is not a published release or physical-device validation.
+
 ## [0.27.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.27.0...v0.27.1) (2026-10-19)
 
 Branch: codex/chat-grid-0.27.1 (from the published 0.27.0 source). Not released.
