@@ -48,6 +48,7 @@ export function appearanceSummary(value: Appearance) {
 }
 export function useAppearance() {
   useApplyEdgeFade();
+  useEffect(()=>{const wheel=(event:WheelEvent)=>{if(event.ctrlKey||event.metaKey)event.preventDefault();};document.addEventListener('wheel',wheel,{passive:false,capture:true});return()=>document.removeEventListener('wheel',wheel,true);},[]);
   const [appearance, setAppearance] = useState(load);
   const [saveError, setSaveError] = useState('');
   useEffect(() => {

@@ -186,6 +186,7 @@ public sealed class PocketDesktop:Form {
         web.AllowExternalDrop=true;
         var core=web.CoreWebView2;core.SetVirtualHostNameToFolderMapping("pocket-code.internal",ui,CoreWebView2HostResourceAccessKind.DenyCors);
         core.Settings.AreHostObjectsAllowed=false;core.Settings.AreDevToolsEnabled=false;core.Settings.AreDefaultContextMenusEnabled=false;core.Settings.IsStatusBarEnabled=false;core.Settings.IsPasswordAutosaveEnabled=false;core.Settings.IsGeneralAutofillEnabled=false;
+        core.Settings.IsZoomControlEnabled=false;core.Settings.IsPinchZoomEnabled=false;web.ZoomFactor=1;
         core.NavigationStarting+=(_,e)=>{Uri uri;if(!Uri.TryCreate(e.Uri,UriKind.Absolute,out uri)||uri.GetLeftPart(UriPartial.Authority)!=Origin||uri.AbsolutePath!="/index.html")e.Cancel=true;};
         core.NewWindowRequested+=(_,e)=>{e.Handled=true;Uri uri;if(e.IsUserInitiated&&Uri.TryCreate(e.Uri,UriKind.Absolute,out uri)&&(uri.Scheme=="https"||uri.Scheme=="http"))OpenUrl(e.Uri);};
         core.PermissionRequested+=(_,e)=>e.State=CoreWebView2PermissionState.Deny;

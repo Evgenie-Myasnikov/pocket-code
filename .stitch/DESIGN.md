@@ -57,9 +57,12 @@ Secondary metadata is subordinate; it must not replace readable labels.
 - Menus and dialogs: shared surfaces, subtle border and restrained shadow.
   Menus use the existing 12 px radius token; dialogs use 16 px.
 - Navigation: a compact provider dropdown, independent list/grid icons, soft
-  active background. The board header contains title, view switch and actions.
+  active background. The board header contains title, Chat and refresh.
 - Forms: 8–10 px padding, explicit labels, consistent input boundary and focus.
-- Canvas: spatial objects with distinct pastel sticky colors and visible selection.
+- Canvas: the single board view, with existing task cards and pastel sticky objects.
+  Edit text inside objects. Create through a blank-canvas click/context menu.
+  Resize at edges/corners; four side ports create connections. Keep only undo,
+  redo and fit in the persistent toolbar; colors and deletion belong in menus.
   Task dependencies are metadata, separate from user-drawn arrows.
 - Board chat: adjacent pane on desktop; project is inherited from the board.
   A small context chip replaces raw metadata in the composer.
@@ -80,8 +83,8 @@ Describe a quiet, dense desktop tool with neutral surfaces, restrained jade
 accents and clear typography. Preserve the user's selected theme.
 
 Example prompts:
-- Design a compact board toolbar with back, title, two view options, discuss,
-  add note and refresh. Keep the canvas prominent and avoid a second title row.
+- Design a compact board header with back, title, Chat and refresh. Keep the
+  canvas prominent and its undo, redo and fit controls compact.
 - Design a chat beside a board with inherited project context, a short context
   chip and a clean composer. Do not add another project picker.
 

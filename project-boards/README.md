@@ -1,5 +1,15 @@
 # Pocket Code product board
 
+The board UI uses one canvas. Existing task records are shown as cards with their
+original IDs, text, status, versions, attachments and agent actions. Visual links
+remain separate from task dependency metadata. Click empty space (or right-click)
+to create a card, sticky, text or frame. Double-click an object to type in place;
+Ctrl+Enter or leaving the editor saves, Escape cancels. Drag an edge/corner to
+resize and a side port to connect objects. Undo, redo and fit are the persistent
+canvas controls; pinch and Ctrl+wheel zoom the view. The chat entry is an icon.
+Malformed legacy references block editing rather than silently discarding links.
+Canvas card records require the updated host; older hosts reject the new kind.
+
 Open **Board** and select this project. Its board is read directly from `board-7b004a10-920c-4ba7-a070-254318083e90.json`, without importing a private copy.
 
 The board records delivered capabilities by version and explicit follow-up work. **Done** means the capability is recorded in a published changelog entry; **Review** identifies the current release's implementation awaiting final release validation. **Ready** and **Questions** remain unfinished. Follow-up is not a release commitment.

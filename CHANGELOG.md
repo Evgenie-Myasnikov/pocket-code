@@ -1,6 +1,21 @@
 # Changelog
 
-## 0.28.0 (unreleased)
+## 0.28.1 (unreleased)
+
+### Features
+- Boards use a single canvas; legacy tasks retain IDs, metadata, attachments and agent actions. Blank-canvas click/context menus create objects. Inline text editing replaces the object modal; edges/corners resize and four side ports create links. Persistent tools are undo, redo and fit; chat is an icon. Pinch and Ctrl+wheel zoom remain available.
+- Existing visual links and orphan canvas cards survive migration. Invalid legacy references block writes instead of silently dropping data. Workspace boards now persist canvas geometry too; MCP card edits update their canonical task records.
+
+### Bug Fixes
+- UI scale now reaches fixed-size compact typography and controls, including provider menus and dialogs; canvas geometry retains its independent zoom. Native Windows page zoom is disabled and modified wheel input no longer changes page scale; Shift scrolling remains unchanged.
+- Chat headers use the shared provider menu, rendered above the floating header so it is not clipped. Task undo restores metadata as well as geometry. Public snapshot checks include card descriptions, and chat context bounds their length.
+
+### Validation
+- TypeScript/web build and 13 targeted persistence, migration, revision, workspace, privacy and MCP checks passed. Seven browser checks passed for inline editing, corner resizing, port connections, undo, legacy card reopening, provider menu, pinch and 60/100/130% scale. Four design-token checks and documentation checks passed. Windows shell compiled successfully. Not packaged, published or checked on physical devices. Legacy Tasks-view browser cases still need conversion to the new UI.
+
+## [0.28.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.27.1...v0.28.0) (2026-10-24)
+
+Published [v0.28.0](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.0) from [188bf9081df9caa2716d8451779563976624c116](https://github.com/Evgenie-Myasnikov/pocket-code/commit/188bf9081df9caa2716d8451779563976624c116) on [feature/whiteboard-0.28.0](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/whiteboard-0.28.0). This publication record corrects the earlier unreleased label; it does not include subsequent 0.28.1 work.
 
 ### Features
 - Boards: optional free canvas with sticky notes, text, frames, resize, group movement, arrows and view-local undo/redo. Existing task cards and dependency metadata remain intact. Desktop board discussions keep the board beside the chat; a bounded context snapshot is attached on the first send.
@@ -18,7 +33,7 @@
 - Old hosts must be updated before opening files containing the optional canvas field. Existing task-only board files remain compatible.
 
 ### Validation
-- TypeScript and web build passed. Targeted MCP stdio, board persistence/revision, provider catalog/error privacy, packaging and palette contrast checks passed. Live read-only MCP access was verified. Full unit run: 381/382 passed; the task-run concurrency timing case failed under load and passed when rerun alone. Browser regression: 41/41 passed; five focused grid/board checks and the context-attachment send check passed after compact-header changes. Documentation links passed. Release artifact validation is pending; this is not a published release or physical-device validation.
+- TypeScript and web build passed. Targeted MCP stdio, board persistence/revision, provider catalog/error privacy, packaging and palette contrast checks passed. Live read-only MCP access was verified. Full unit run: 381/382 passed; the task-run concurrency timing case failed under load and passed when rerun alone. Browser regression: 41/41 passed; five focused grid/board checks and the context-attachment send check passed after compact-header changes. Documentation links passed. At source review time release artifact validation was pending. Publication followed as recorded above; physical-device validation remains unperformed.
 
 ## [0.27.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.27.0...v0.27.1) (2026-10-19)
 

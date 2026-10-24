@@ -13,5 +13,5 @@
 /* An empty board draws dashed columns instead of a blank frame that looks like a failed image. */
 .board-preview-empty{display:grid;grid-template-rows:1fr auto;gap:8px}.board-preview-empty-columns{display:flex;gap:10px;min-height:0}.board-preview-empty-columns span{flex:1;border:1.5px dashed color-mix(in srgb,var(--muted) 55%,transparent);border-radius:10px}.board-preview-empty small{text-align:center;color:var(--muted);font-size:.8em}
 /* Miro boards share the card surface, with a mark and a kind badge. */
-.board-preview-miro{display:grid;place-items:center;background:color-mix(in srgb,var(--brand-miro) 14%,var(--bg))}.board-miro-mark{display:grid;place-items:center;width:56px;height:56px;border-radius:14px;background:var(--brand-miro);color:var(--brand-miro-ink);font-weight:var(--fw-display);font-size:28px;font-family:var(--font-display)}
+.board-preview-miro{display:grid;place-items:center;background:color-mix(in srgb,var(--brand-miro) 14%,var(--bg))}.board-miro-mark{display:grid;place-items:center;width:56px;height:56px;border-radius:14px;background:var(--brand-miro);color:var(--brand-miro-ink);font-weight:var(--fw-display);font-size:calc(28px * var(--ui-scale,1));font-family:var(--font-display)}
 .board-kind-badge{display:inline-block;padding:1px 8px;border-radius:999px;border:1px solid var(--line);font-size:.9em}

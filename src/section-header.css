@@ -20,7 +20,7 @@
 .provider-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px}
 .provider-chips>button{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:var(--category-detail-size)}
 .provider-chips>button[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 12%,transparent)}
-.provider-chips>button>b{min-width:18px;padding:0 5px;border-radius:9px;background:var(--status-attention);color:var(--bg);font-size:11px;line-height:18px;text-align:center}
+.provider-chips>button>b{min-width:18px;padding:0 5px;border-radius:9px;background:var(--status-attention);color:var(--bg);font-size:calc(11px * var(--ui-scale,1));line-height:18px;text-align:center}
 .session-group{margin-bottom:12px}.session-list h2.list-label{margin:8px 0 0;font-weight:var(--fw-semibold)}
 .session-row small .run-status{font-size:inherit}.session-row small time{white-space:nowrap}
 @media(min-width:761px){.sidebar>.chat-list-actions{margin-bottom:12px}.sidebar>.chat-list-actions>h1{font-size:1.1rem}.new-chat-button{min-height:40px;padding:0 10px}}

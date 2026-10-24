@@ -35,5 +35,7 @@ test('board MCP protects revisions, privacy and old hosts over stdio',async()=>{
   assert.ok((await invoke('canvas_apply',{project:'demo',revision:'a'.repeat(64),items:[item]})).isError);assert.equal(writes,0);
   version='0.28.0';assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'a'.repeat(64),items:[item]})).isError);assert.equal(writes,1);assert.equal(board.canvas.items[0].id,item.id);
   assert.ok((await invoke('update_note',{project:'demo',revision:'a'.repeat(64),id:board.notes[0].id,patch:{title:'Stale edit'}})).isError);assert.equal(writes,1);
+  const task=board.notes[0];assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[{...item,id:task.id,kind:'card',text:'Updated task',description:'Updated criteria'}]})).isError);
+  assert.equal(board.notes[0].title,'Updated task');assert.equal(board.notes[0].description,'Updated criteria');assert.equal(board.notes[0].priority,task.priority);
  }finally{await client.close();await new Promise(resolve=>host.close(resolve));await rm(root,{recursive:true,force:true});}
 });

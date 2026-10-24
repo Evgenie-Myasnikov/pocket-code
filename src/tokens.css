@@ -57,6 +57,7 @@
 @media(min-width:761px) and (pointer:fine){:root{--type-min:12px}}
 
 /* Spacing, radii, elevation and layers. Compact mode steps the spacing scale down one notch instead of patching selectors. */
+.lucide[width][height]{zoom:var(--ui-scale,1)}
 :root{
  --space-unit:calc(4px * var(--ui-scale,1));
  --space-1:var(--space-unit);--space-2:calc(var(--space-unit) * 2);--space-3:calc(var(--space-unit) * 3);--space-4:calc(var(--space-unit) * 4);--space-5:calc(var(--space-unit) * 6);--space-6:calc(var(--space-unit) * 8);--space-7:calc(var(--space-unit) * 10);--space-8:calc(var(--space-unit) * 12);--space-9:calc(var(--space-unit) * 16);

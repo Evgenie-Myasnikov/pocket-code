@@ -1,7 +1,7 @@
 import {z} from 'zod';
 
 const point=z.number().finite().min(0).max(100000);
-export const whiteboardItem=z.object({id:z.string().uuid(),kind:z.enum(['sticky','text','frame']),text:z.string().max(4000),x:point,y:point,width:z.number().min(120).max(6000),height:z.number().min(80).max(6000),color:z.enum(['sand','mint','blue','rose','violet']).default('sand')}).strict();
+export const whiteboardItem=z.object({id:z.string().uuid(),kind:z.enum(['sticky','text','frame','card']),text:z.string().max(4000),description:z.string().max(20000).optional(),x:point,y:point,width:z.number().min(120).max(6000),height:z.number().min(80).max(6000),color:z.enum(['sand','mint','blue','rose','violet']).default('sand')}).strict();
 export const whiteboardSchema=z.object({version:z.literal(1),items:z.array(whiteboardItem).max(500),links:z.array(z.object({id:z.string().uuid(),from:z.string().uuid(),to:z.string().uuid()}).strict()).max(1000)}).strict().superRefine((value,ctx)=>{
  const ids=new Set(value.items.map(i=>i.id)),links=new Set<string>();
  if(ids.size!==value.items.length)ctx.addIssue({code:'custom',message:'Duplicate canvas item'});
@@ -15,7 +15,7 @@ export function edgePoint(a:WhiteboardItem,b:WhiteboardItem){const x=a.x+a.width
 export function removeItems(board:Whiteboard,ids:string[]):Whiteboard{return {...board,items:board.items.filter(i=>!ids.includes(i.id)),links:board.links.filter(l=>!ids.includes(l.from)&&!ids.includes(l.to))};}
 export function moveItems(board:Whiteboard,ids:string[],dx:number,dy:number):Whiteboard{
  const moving=board.items.filter(i=>ids.includes(i.id));if(!moving.length)return board;
- dx=Math.max(-Math.min(...moving.map(i=>i.x)),Math.min(dx,100000-Math.max(...moving.map(i=>i.x))));
- dy=Math.max(-Math.min(...moving.map(i=>i.y)),Math.min(dy,100000-Math.max(...moving.map(i=>i.y))));
+ dx=Math.max(-Math.min(...moving.map(i=>i.x)),Math.min(dx,Math.min(...moving.map(i=>(i.kind==='card'?20000:100000)-i.x))));
+ dy=Math.max(-Math.min(...moving.map(i=>i.y)),Math.min(dy,Math.min(...moving.map(i=>(i.kind==='card'?20000:100000)-i.y))));
  return {...board,items:board.items.map(i=>ids.includes(i.id)?{...i,x:i.x+dx,y:i.y+dy}:i)};
 }
