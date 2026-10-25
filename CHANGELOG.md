@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased (0.28.11)
+## [0.28.11](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.10...v0.28.11) (2026-10-25)
 
-Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Not published.
+Published [v0.28.11](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.11) from [942324eda501807ea3561c3bb921af02ed8a234d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/942324eda501807ea3561c3bb921af02ed8a234d) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - Open canvases show one cursor and affected-object highlights for actual MCP inspection, creation, movement, connections and save outcomes. The camera follows the latest target; pointer, wheel and keyboard interaction pause it, and a compact AI control resumes. Hidden/local-editing states suspend camera motion and reduced-motion focuses immediately.
@@ -12,7 +12,7 @@ Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-
 - Bounded, expiring activity history and waiting live reads deliver fast MCP phases to independent viewers. Windows and workspace read policies permit the live endpoint. Saved snapshots still wait for local drafts; generic file changes are never attributed to AI. Old hosts retain snapshot/legacy-marker compatibility.
 
 ### Validation
-- Twenty browser scenarios and seven unit/integration checks passed, including real stdio MCP → authenticated host → two viewers, sparse-patch preservation, conflicts and failed saves, executed C# route policy, draft protection, manual camera pause/resume, reduced motion, gallery drag, selection and connector gestures. The Windows route failure was reproduced on 0.28.10. The 400-card drag retained 400 metadata renders. TypeScript/Vite, links in 27 documents and portable-board schema/dependencies passed; synthetic UI capture inspected. Packaging/publication pending. Physical devices and shared unsaved editing/remote undo are not validated or implemented by this change.
+- Twenty browser scenarios and seven unit/integration checks passed, including real stdio MCP → authenticated host → two viewers, sparse-patch preservation, conflicts and failed saves, executed C# route policy, draft protection, manual camera pause/resume, reduced motion, gallery drag, selection and connector gestures. The Windows route failure was reproduced on 0.28.10. The 400-card drag retained 400 metadata renders. TypeScript/Vite, links in 27 documents and portable-board schema/dependencies passed; synthetic UI capture inspected. Android/Windows/host packages passed: 86 shared web files and 327 host source files match; 1,446 decoded archive entries passed privacy review; APK signer matches 0.28.10. GitHub CI, exact source tag and all four downloaded asset hashes verified. Published. Physical devices were not tested; shared unsaved editing/remote undo remain unimplemented.
 
 ## [0.28.10](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.9...v0.28.10) (2026-10-25)
 
