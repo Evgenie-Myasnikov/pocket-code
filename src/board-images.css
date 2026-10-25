@@ -13,3 +13,12 @@
 .board-images p{font-size:calc(12px * var(--ui-scale,1));overflow-wrap:anywhere}
 .board-dialog .board-images{padding:0;max-height:300px}
 .board-note:has(.board-images){max-height:300px;overflow:auto}
+
+.board-canvas-stage{display:flex;flex:1;min-height:0;min-width:0}.board-canvas-stage[hidden]{display:none}
+.board-gallery{flex:1;min-height:0;overflow:auto;padding:calc(12px * var(--ui-scale,1))}
+.board-gallery .board-images{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:calc(12px * var(--ui-scale,1));padding:0;max-height:none;overflow:visible}
+.board-gallery .board-image-item{width:auto}.board-gallery .board-image-thumb{padding:0;overflow:hidden;border-radius:var(--control-radius,8px);cursor:grab}.board-gallery .board-image-thumb:active{cursor:grabbing}
+.board-gallery .board-image-thumb img{height:calc(160px * var(--ui-scale,1));object-fit:contain;background:var(--surface);border-radius:0}.board-gallery .board-image-thumb small{padding:4px 8px;color:var(--muted)}
+.board-image-attach{position:absolute;right:4px;top:4px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;width:28px;height:28px;min-height:28px;opacity:0}
+.board-image-item:hover .board-image-attach,.board-image-item:focus-within .board-image-attach{opacity:1}.board-gallery-empty{margin:auto;padding:24px;color:var(--muted);text-align:center}
+@media(pointer:coarse){.board-image-attach{opacity:1;min-width:44px;min-height:44px}}

@@ -86,3 +86,9 @@
 @media(max-height:540px){.welcome{display:none}.prompt-composer .composer-tools{position:sticky;bottom:0;background:inherit}}
 @media(min-width:761px){.chat-context-picker .project-picker{flex:0 1 auto;max-width:320px}}
 .composer-settings{margin:var(--space-3) 0}.composer-settings .desktop-toggle{display:flex;align-items:center;gap:var(--space-3);min-height:48px;margin:0;color:var(--text);font-size:clamp(13px,calc(14px * var(--ui-scale,1)),18px)}.composer-settings .desktop-toggle input{width:20px;height:20px;margin:0;accent-color:var(--accent)}.composer-settings select{width:100%;min-height:48px}
+
+.composer-board-selection{display:flex;align-items:center;gap:6px;max-width:100%;padding:6px 8px;margin-bottom:6px;border:1px solid var(--line);border-radius:var(--control-radius,6px);font-size:calc(12px * var(--ui-scale,1));color:var(--text);background:var(--surface)}.composer-board-selection span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.composer-board-selection small{color:var(--muted);font-size:inherit;margin-left:auto;white-space:nowrap}
+
+.prompt-composer[data-pulsing=true] .stop-button::after{content:"";position:absolute;inset:2px;pointer-events:none;border-radius:50%;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);box-shadow:inset 0 0 5px color-mix(in srgb,var(--accent) 18%,transparent);animation:composer-active-halo 1.6s ease-in-out infinite alternate}
+@keyframes composer-active-halo{from{opacity:.25}to{opacity:.85}}
+@media(prefers-reduced-motion:reduce),(forced-colors:active){.prompt-composer[data-pulsing=true] .stop-button::after{animation:none;display:none}}

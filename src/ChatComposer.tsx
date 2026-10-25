@@ -1,5 +1,7 @@
+import type {BoardSelection} from './board-selection-context';
+import {boardImageMime} from './board-image-drag';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
-import {ArrowUp,Paperclip,Square,LoaderCircle,ListPlus,CornerDownRight,Clock,RefreshCw} from 'lucide-react';
+import {ArrowUp,Paperclip,Square,LoaderCircle,ListPlus,CornerDownRight,Clock,RefreshCw,Scan} from 'lucide-react';
 import {AttachmentTray,type DraftAttachment} from './AttachmentTray';
 import {t} from './i18n';
 import './composer-controls.css';
@@ -7,6 +9,7 @@ import './composer-controls.css';
 /** A paste this long becomes a text attachment that can be put back into the message. */
 export const LONG_PASTE=10000;
 type Props={
+  boardSelection?:BoardSelection|null;
   text:string;label:string;placeholder:string;disabled?:boolean;uploading:boolean;canSend:boolean;
   attachments:DraftAttachment[];controls:ReactNode;usage?:ReactNode;stopLabel:string;
   /** A send is in flight: Send waits, the field keeps focus and the keyboard stays open. */
@@ -19,6 +22,7 @@ type Props={
   stopRetry?:boolean;
   enterSends?:boolean;keyHint?:boolean;
   onText(value:string):void;onRemove(id:string):void;onFiles(files:File[],options?:{pastedText?:boolean}):void;
+  onBoardImage?(data:DataTransfer):void;
   onRetry?(id:string):void;onInsertText?(id:string):void;onRecall?():string|undefined;
   onSend():void;onStop?:()=>void;
 };
@@ -29,7 +33,7 @@ function useShortScreen(){
 }
 
 /** Shared Windows/Android input. Resizing never changes the draft or selection. */
-export function ChatComposer({text,label,placeholder,disabled,uploading,canSend,attachments,controls,usage,stopLabel,busy=false,stopping=false,mode='send',blockedReason,stopRetry=false,enterSends=false,keyHint=false,onText,onRemove,onFiles,onRetry,onInsertText,onRecall,onSend,onStop}:Props){
+export function ChatComposer({boardSelection,text,label,placeholder,disabled,uploading,canSend,attachments,controls,usage,stopLabel,busy=false,stopping=false,mode='send',blockedReason,stopRetry=false,enterSends=false,keyHint=false,onText,onRemove,onFiles,onBoardImage,onRetry,onInsertText,onRecall,onSend,onStop}:Props){
   const input=useRef<HTMLTextAreaElement>(null),files=useRef<HTMLInputElement>(null),hadFocus=useRef(false),focusAtPress=useRef(false);
   const [focused,setFocused]=useState(false),[dragging,setDragging]=useState(false),short=useShortScreen();
   const fit=useCallback(()=>{const element=input.current;if(element){element.style.height='auto';element.style.height=element.scrollHeight+'px';}},[]);
@@ -50,13 +54,14 @@ export function ChatComposer({text,label,placeholder,disabled,uploading,canSend,
   const empty=!text.trim()&&!attachments.length,stopOnly=Boolean(onStop)&&empty;
   const sendLabel=mode==='later'?t('Отправить, когда ПК будет на связи'):mode==='queue'?t('В очередь'):mode==='steer'?t('Направить'):t('Отправить сообщение');
   const shortcut=enterSends?'Enter':'Ctrl+Enter';
-  const hasFiles=(event:React.DragEvent)=>Array.from(event.dataTransfer?.types||[]).includes('Files');
-  return <div className={'composer prompt-composer'+(dragging?' composer-drop':'')} data-stopping={stopping||undefined} data-running={onStop?true:undefined}
+  const hasFiles=(event:React.DragEvent)=>Array.from(event.dataTransfer?.types||[]).includes('Files')||!!onBoardImage&&Array.from(event.dataTransfer?.types||[]).includes(boardImageMime);
+  return <div className={'composer prompt-composer'+(dragging?' composer-drop':'')} data-pulsing={!!onStop&&!stopRetry&&!stopping||undefined} data-stopping={stopping||undefined} data-running={onStop?true:undefined}
     onDragEnter={event=>{if(!disabled&&hasFiles(event)){event.preventDefault();setDragging(true);}}}
     onDragOver={event=>{if(!disabled&&hasFiles(event)){event.preventDefault();event.dataTransfer.dropEffect='copy';}}}
     onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))setDragging(false);}}
-    onDrop={event=>{if(!hasFiles(event))return;event.preventDefault();setDragging(false);const incoming=Array.from(event.dataTransfer.files);if(incoming.length&&!disabled)onFiles(incoming);}}>
+    onDrop={event=>{if(!hasFiles(event))return;event.preventDefault();event.stopPropagation();setDragging(false);if(disabled)return;if(event.dataTransfer.types.includes(boardImageMime)&&onBoardImage){onBoardImage(event.dataTransfer);return;}const incoming=Array.from(event.dataTransfer.files);if(incoming.length)onFiles(incoming);}}>
     {dragging&&<div className="composer-drop-zone" aria-hidden="true">{t('Отпустите, чтобы прикрепить')}</div>}
+    {boardSelection&&<div className="composer-board-selection" role="note" title={boardSelection.titles.join(' · ')}><Scan size={16} aria-hidden="true"/><span>{t('Выделение доски')} · {boardSelection.ids.length}</span><small>{t('К каждому сообщению')}</small></div>}
     {attachments.length>0&&<AttachmentTray attachments={attachments} disabled={!!disabled} compact={short} onRemove={onRemove} onRetry={onRetry} onInsertText={onInsertText}/>}
     <div className="composer-input">
       <textarea ref={input} rows={1} aria-label={label} placeholder={placeholder} value={text} disabled={disabled} aria-keyshortcuts={enterSends?'Enter':'Control+Enter'}

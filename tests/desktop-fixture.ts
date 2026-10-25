@@ -18,7 +18,7 @@ export async function desktop(page:Page){
    if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:(window as any).testBoards||[]});return;}
    if(p==='/board-notifications'){reply(id,{items:(window as any).testBoardNotices||[]});return;}if(p==='/board-notifications/read'){(window as any).testBoardNotices=((window as any).testBoardNotices||[]).map((n:any)=>({...n,readAt:Date.now()}));reply(id,{ok:true});return;}
    if(p==='/project-board/miro'){(window as any).miroBoard=message.data.url?{root:message.data.root,url:message.data.url}:null;reply(id,{miro:(window as any).miroBoard});return;}
-   if(p==='/project-board/image'){if(message.data){(window as any).boardImageData=message.data.data;reply(id,{path:'project-boards/assets/'+'a'.repeat(64)+'.png',caption:message.data.caption});}else reply(id,{mimeType:'image/png',data:(window as any).boardImageData||sampleImage});return;}
+   if(p==='/project-board/image'){if(message.data){(window as any).boardImageData=message.data.data;reply(id,{path:'project-boards/assets/'+'a'.repeat(64)+'.png',caption:message.data.caption});}else reply(id,{mimeType:(window as any).boardImageMimeType||'image/png',data:(window as any).boardImageData||sampleImage});return;}
    if(p==='/project-board/delete'){(window as any).deletedRoot=message.data.root;reply(id,{ok:true});return;}
    if(p==='/project-board/create'){(window as any).createdProjectBoard={id:'22222222-2222-4222-8222-222222222222',name:'Project board',root:message.data.root,repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'b'.repeat(64),revision:0,versionSource:'planned',notes:[],versions:[],branches:[]};reply(id,(window as any).createdProjectBoard);return;}
    if(p==='/project-board/live'){const board=(window as any).projectBoardOverride,version=board?.repositoryRevision||'a'.repeat(64);reply(id,{version,activity:(window as any).testBoardActivity||null,...(board&&url.searchParams.get('known')!==version?{board}:{unchanged:true})});return;}
@@ -29,7 +29,7 @@ export async function desktop(page:Page){
    if(/^\/boards\/[^/]+\/snapshot$/.test(p)){reply(id,{path:'project-boards/board-22222222-2222-4222-8222-222222222222.json'});return;}
    if(/^\/boards\/[^/]+\/delete$/.test(p)){(window as any).testBoards=[];reply(id,{ok:true});return;}
    if(/^\/boards\/[^/]+$/.test(p)){reply(id,(window as any).testBoards?.find((b:any)=>b.id===p.split('/')[2]));return;}
-   if(p==='/uploads'){reply(id,{id:'pasted-image',name:message.data.name,size:100});return;}
+   if(p==='/uploads'){reply(id,{id:(window as any).uniqueUploads?crypto.randomUUID():'pasted-image',name:message.data.name,size:atob(message.data.base64||'').length||100});return;}
    if(p==='/activity'){reply(id,(window as any).testActivity||[]);return;}
    if(p==='/task-notifications'){reply(id,{items:[],unread:0});return;}
    if(p==='/jobs'&&action==='write'){const run={...message.data,provider:message.data.provider||'claude',sessionId:'alpha',status:'running',messages:[],partial:'Working on your request',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0};(window as any).testRuns=[run];reply(id,run);return;}
@@ -44,6 +44,7 @@ export async function desktop(page:Page){
    if(p==='/file'){reply(id,{name:'README.md',text:'Synthetic readme'});return;}
    if(p==='/projects'){reply(id,['C:\\Demo\\Atlas','C:\\Demo\\Garden']);return;}
    if(p==='/jobs'){reply(id,(window as any).testRuns||[]);return;}
+   if(/^\/jobs\/[^/]+\/messages$/.test(p)&&action==='write'){if((window as any).rejectNextFollowup){(window as any).rejectNextFollowup=false;queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,error:'Synthetic turn closing',status:409}})));return;}const run=(window as any).testRuns.find((r:any)=>r.id===p.split('/')[2]);run.revision++;reply(id,run);return;}
    if(p.startsWith('/jobs/')){reply(id,((window as any).testRuns||[]).find((run:any)=>run.id===p.split('/').pop()));return;}
    if(p==='/review/availability'){reply(id,{available:true,mode:'working'});return;}
    if(p.endsWith('/messages')){const earlier=url.searchParams.has('end'),start=url.searchParams.has('offset');reply(id,{messages:earlier?[messageBlock('older','Earlier project context')]:[messageBlock('answer',p.includes('/beta/')?'Garden documentation':'## Interface review\n\nThe responsive layout is ready.\n\n```ts\nconst layout = "adaptive";\n```'),{id:'picture',role:'assistant',blocks:[{type:'image',source:{type:'base64',media_type:'image/png',data:sampleImage}}]}],previous:earlier||start?null:5,next:null});return;}
@@ -53,4 +54,8 @@ export async function desktop(page:Page){
  });
  await page.goto((test.info().project.use.baseURL||'http://127.0.0.1:5173')+'/?desktop=1');
  await expect(page.getByRole('button',{name:/claude · Interface review/})).toBeVisible();
+}
+
+export async function desktopSection(page:Page,name:string){
+ const button=page.locator('.desktop-rail').getByRole('button',{name,exact:true});if(await button.count()){await button.click();return;}await page.locator('.desktop-rail').getByRole('button',{name:'More',exact:true}).click();await page.getByRole('menuitem',{name,exact:true}).click();
 }

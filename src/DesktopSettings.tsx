@@ -3,7 +3,7 @@ import {CodexAccessSettings,codexAccessLabel} from './CodexAccessSettings';
 import {ComposerSettings} from './ComposerSettings';
 import {MiroSettings} from './MiroSettings';
 import {useEffect,useState,useSyncExternalStore,type ReactNode} from 'react';
-import {ArrowLeft,ChevronRight} from 'lucide-react';
+import {ArrowLeft,ChevronRight,Keyboard} from 'lucide-react';
 import {t,useLanguage} from './i18n';
 import {AppearanceSettings,appearanceSummary,type useAppearance} from './Appearance';
 import {LanguageSelector} from './Language';
@@ -35,7 +35,7 @@ function useDevicePreferences(){
   return {codexAccess,budget,setCodexAccess:(value:CodexAccess)=>{setCodexAccess(value);updatePreferences({provider:'codex',codexAccess:value});},setBudget:(value:number)=>{setBudget(value);updatePreferences({provider:'claude',budget:value});}};
 }
 /** List-detail on wide windows (sections stay visible on the left); level-by-level below 1100 px. */
-export function DesktopSettings({state,connection,appearance,action,connectionPanel,initialPage='index',roots=[],onConnection}:{roots?:string[];connectionPanel:ReactNode;initialPage?:string;state:DesktopState;connection:Connection;appearance:ReturnType<typeof useAppearance>;action(command:string,args?:Record<string,unknown>):Promise<void>;onConnection?:()=>void}){
+export function DesktopSettings({state,connection,appearance,action,connectionPanel,initialPage='index',roots=[],onConnection,onShortcuts}:{onShortcuts?():void;roots?:string[];connectionPanel:ReactNode;initialPage?:string;state:DesktopState;connection:Connection;appearance:ReturnType<typeof useAppearance>;action(command:string,args?:Record<string,unknown>):Promise<void>;onConnection?:()=>void}){
   useLanguage();
   const wide=useWide(),[page,setPage]=useState<SettingsCategoryId|'index'>(initialPage==='providers'?'workspace':initialPage as SettingsCategoryId|'index'),[provider,setProvider]=useState<Provider|null>(null);
   const live=useLiveSettings(),claudeAccess=useClaudeAccess(),alerts=useRunAlertsPreference(),limitAlerts=useLimitAlertsPreference(),device=useDevicePreferences();
@@ -66,7 +66,7 @@ export function DesktopSettings({state,connection,appearance,action,connectionPa
     {provider?<button className="settings-back" onClick={()=>setProvider(null)}><ArrowLeft size={20}/>{t('Все провайдеры')}</button>:<button className="settings-back settings-back-root" onClick={()=>setPage('index')}><ArrowLeft size={20}/>{t('Все настройки')}</button>}
     <h2>{title}</h2>{scope&&<p className="settings-scope">{scope}</p>}
     {current==='connection'&&connectionPanel}{current==='miro'&&<MiroSettings connection={state.online?connection:null} roots={roots}/>}
-    {current==='system'&&<><label className="desktop-toggle"><input type="checkbox" role="switch" checked={state.startup} onChange={e=>void action('settings',{startup:e.target.checked})}/><span>{t('Запускать с Windows')}</span></label><label className="desktop-toggle"><input type="checkbox" role="switch" checked={state.autoReconnect} onChange={e=>void action('settings',{autoReconnect:e.target.checked})}/><span>{t('Восстанавливать последнее подключение')}</span></label><p className="muted">{t('Закрытие окна оставляет Pocket Code в трее. Для выхода используйте меню трея → Выход.')}</p><ComposerSettings desktop/></>}
+    {current==='system'&&<><label className="desktop-toggle"><input type="checkbox" role="switch" checked={state.startup} onChange={e=>void action('settings',{startup:e.target.checked})}/><span>{t('Запускать с Windows')}</span></label><label className="desktop-toggle"><input type="checkbox" role="switch" checked={state.autoReconnect} onChange={e=>void action('settings',{autoReconnect:e.target.checked})}/><span>{t('Восстанавливать последнее подключение')}</span></label><p className="muted">{t('Закрытие окна оставляет Pocket Code в трее. Для выхода используйте меню трея → Выход.')}</p><ComposerSettings desktop/>{onShortcuts&&<button className="secondary settings-shortcuts" aria-label={t('Сочетания клавиш')} onClick={onShortcuts}><Keyboard size={16}/>{t('Сочетания клавиш')}<kbd>Ctrl+/</kbd></button>}</>}
     {current==='notifications'&&<><RunAlertsToggle desktop/><LimitAlertsToggle desktop/></>}
     {current==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance}/></>}
     {current==='workspace'&&(provider?<><ProviderConnections connection={connection} online={state.online} only={provider}/>{provider==='claude'&&<><ClaudeAccessSettings/><BudgetSettings value={device.budget} onChange={device.setBudget}/></>}{provider==='codex'&&<CodexAccessSettings value={device.codexAccess} onChange={device.setCodexAccess}/>}{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}</>:<nav className="settings-index" aria-label={t('Провайдеры AI')}>{(['claude','codex','copilot'] as const).map(id=><button className="settings-category" key={id} aria-labelledby={'desktop-provider-'+id} aria-describedby={'desktop-provider-'+id+'-summary'} onClick={()=>setProvider(id)}><span><strong id={'desktop-provider-'+id}>{providerNames[id]}</strong><small id={'desktop-provider-'+id+'-summary'}>{providerSummary(id)}</small></span><ChevronRight size={20} aria-hidden="true"/></button>)}</nav>)}

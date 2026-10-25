@@ -11,10 +11,11 @@ import {WhiteboardNode,type NodeActions} from './WhiteboardNode';
 import {WhiteboardLink} from './WhiteboardLink';
 import './whiteboard.css';
 
-export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions,cards=[],onInteraction,liveActivity,remoteIds=[]}:{onInteraction?(active:boolean):void;liveActivity?:BoardEditActivity|null;remoteIds?:string[];cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
+export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions,cards=[],onSelection,onInteraction,liveActivity,remoteIds=[]}:{onSelection?(ids:string[]):void;onInteraction?(active:boolean):void;liveActivity?:BoardEditActivity|null;remoteIds?:string[];cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
  const ru=useLanguage()==='ru',l=(en:string,ruText:string)=>ru?ruText:en;
  const board=value||emptyWhiteboard(),[selected,setSelected]=useState<string[]>([]),[zoom,setZoom]=useState(1),[pan,setPan]=useState({x:40,y:40}),[preview,setPreview]=useState<Canvas|null>(null),[connecting,setConnecting]=useState<{id:string;side:PortSide}|null>(null),[wire,setWire]=useState<{link:Link;moving:'from'|'to';target?:string;targetSide?:PortSide}|null>(null),[editing,setEditing]=useState<Item|null>(null),[history,setHistory]=useState<Canvas[]>([]),[future,setFuture]=useState<Canvas[]>([]);
  const [interacting,setInteracting]=useState(false);
+ const selectionListener=useRef(onSelection);selectionListener.current=onSelection;
  useEffect(()=>{onInteraction?.(interacting||Boolean(editing));return()=>onInteraction?.(false);},[onInteraction,interacting,Boolean(editing)]);
  const [marquee,setMarquee]=useState<SelectionRect|null>(null),[notice,setNotice]=useState('');
  const clipboard=useRef<{canvas:Canvas;cards:CanvasCardCopy[];count:number}|null>(null),surfaceCancel=useRef<(()=>void)|null>(null);
@@ -27,6 +28,7 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  const connectionCancel=useRef<(()=>void)|null>(null);
  useEffect(()=>()=>connectionCancel.current?.(),[]);
  const stamp=useMemo(()=>JSON.stringify(board),[board]),seen=useRef(stamp),expected=useRef<string|null>(null);
+ useEffect(()=>{if(!interacting)selectionListener.current?.(frameSelection(board,selected).filter(id=>board.items.some(item=>item.id===id)));},[selected,stamp,interacting]);
  useEffect(()=>{if(seen.current!==stamp){if(expected.current!==stamp){setHistory([]);setFuture([]);}seen.current=stamp;expected.current=null;}},[stamp]);
  const [menu,setMenu]=useState<{x:number;y:number;item?:Item}|null>(null);
  const touches=useRef(new Map<number,{x:number;y:number}>()),pinch=useRef<{distance:number;zoom:number;pan:{x:number;y:number};center:{x:number;y:number}}|null>(null);

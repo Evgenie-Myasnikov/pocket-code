@@ -16,7 +16,7 @@ Results offers Images, Documents and Links, with source/assistant filtering. It 
 <a id="activity"></a>
 ## Activity
 
-Use the bell for running, waiting, failed and completed chats, alongside board notifications. Filter All, Processes or Notifications. Read the final result to acknowledge completion; answer questions explicitly. This unified inbox replaces the right-edge drawer in 0.26.8. [Notifications and saved state](USER_GUIDE.md#activity-notifications-and-usage)
+Use the searchable chat list to find running, waiting, failed and completed chats, and open a chat to read its result or answer a request. The in-app Inbox and tile view are removed. [Notifications and saved state](USER_GUIDE.md#activity-notifications-and-usage)
 
 <a id="tasks"></a>
 ## Product tasks

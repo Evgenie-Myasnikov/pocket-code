@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.28.9 (unreleased)
+
+### Features
+- An image icon before Board Chat opens a gallery containing only the current board's unique image assets. Preview originals, drag them into the chat as unsent attachments, or use the keyboard/touch add action. Back restores the mounted canvas view. Thumbnails reuse the bounded loader/cache; image transfers retain connection/project access checks and the existing attachment limit.
+- Current single-card or area selection appears as a separate composer context attachment. Each new message includes a bounded Board selection.txt snapshot; changed/cleared selection affects later messages, while delayed sends keep their captured snapshot. Account scope and private assignments are excluded from file contents. Shared board skill/provider guidance explains how to read selection context and request full current details through MCP.
+
+- The compact desktop sidebar collapses to an icon rail and remembers its device preference. New chat and search sit above history; Rules, Changelog and Settings move into More. Collapse preserves the current chat/provider/draft. Keyboard shortcuts move to Settings → Windows application, with Ctrl+/ retained; PC connection controls remain in Settings.
+- Active chat turns gain a subtle, fixed-size Stop halo inspired by AionUi's interaction pattern. It pauses for stopping/unknown connection states and is disabled by reduced-motion/forced-colors preferences; history and text reveal behavior are unchanged.
+
+### Breaking Changes
+- Retired the in-app Inbox from desktop/mobile navigation, chat overflow and keyboard shortcuts, including board-notice polling. Chats always use the searchable list; the tile view and its switch are removed, and old grid preferences are ignored. Existing host records and compatibility APIs remain. Native chat notifications are separate.
+
+### Validation
+- TypeScript/Vite, three targeted unit/provider-guidance checks and twenty-three distinct browser scenarios passed across focused runs. Coverage includes desktop image drag/original preview/retry, phone gallery/add action, canvas view restoration, single/area selection, repeated sends, clearing, delayed follow-up snapshots, existing composer uploads, board chat persistence/live refresh and the 400-card drag profile (400 metadata renders). Sidebar collapse/search/menu/settings shortcuts and narrow/wide motion accessibility passed. Synthetic desktop/phone captures inspected. Physical devices and release packages not tested; not published.
+
 ## [0.28.8](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.7...v0.28.8) (2026-10-25)
 
 Published [v0.28.8](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.8) from [85992202b853dd0f5b9a651dc8b6c6f3a4f9d36a](https://github.com/Evgenie-Myasnikov/pocket-code/commit/85992202b853dd0f5b9a651dc8b6c6f3a4f9d36a) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

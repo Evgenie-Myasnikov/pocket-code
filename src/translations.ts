@@ -1,5 +1,11 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Сочетания клавиш':'Keyboard shortcuts',
+  'Выделение доски':'Board selection',
+  'К каждому сообщению':'With each message',
+  'Выделению доски нужно одно свободное место для вложения.':'Board selection needs one free attachment slot.',
+  'Это изображение относится к другой доске или подключению.':'This image belongs to another board or connection.',
+
   'Новый чат доски':'New board chat',
   'Не удалось сохранить привязку чата доски.':'Could not save the board chat association.',
   'Ждёт вашего ответа':'Waiting for your response',
