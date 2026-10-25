@@ -1,0 +1,28 @@
+# Chat interaction motion
+
+The implementation was compared with 48 chat/message files in
+[AionUi at 11cd2a9](https://github.com/iOfficeAI/AionUi/tree/11cd2a9a20d1e033157636efc570b41384c66d85/packages/desktop/src/renderer).
+These are independently implemented interaction patterns using Pocket Code tokens;
+no AionUi runtime or animation library is bundled.
+
+| Reference behavior | Pocket Code implementation | Verification |
+| --- | --- | --- |
+| Incremental response text, `hooks/chat/useTypingAnimation.ts` | Existing grapheme-safe pacing and new-character fading retained. Loaded history and reopened active snapshots appear immediately. | Streaming reveal and transcript-follow checks. |
+| History skeleton shimmer, `Messages/MessageList.tsx` | `ChatHistorySkeleton` appears during an empty history read. Cached content keeps its own layout and a small loading status. | Narrow/wide skeleton and reduced-motion checks. |
+| Smooth following and jump to latest, `Messages/useAutoScroll.ts` | One retargetable animation follows rendered height; explicit latest uses the same controller. Initial entry snaps. Wheel up, touch reading and keyboard navigation cancel following. | Intermediate positions, manual interruption, late image size and reduced-motion checks. |
+| Thinking/tool disclosure arrows and hover feedback | Fixed-size chevrons rotate; expanded content fades in. Lazy materialization remains. | Tool disclosure and keyboard-focus checks. |
+| Active tool breathing, `MessageToolGroupSummary.css` | Active grouped tools pulse gently. Completed groups and unknown connection state do not pulse. | Active/completed and reduced-motion checks. |
+| Message action hover, `MessageText.tsx` | Desktop assistant Copy fades in on hover/focus. Touch actions remain visible; copying confirms with the existing check mark and a small icon effect. | Clipboard contents, focus visibility and reduced-motion checks. |
+| Send-box focus/drag colors and Stop glow, `chat/SendBox` | Existing focus/drag transitions plus a fixed-size Stop halo; retry/stopping states remain static. Latest-button hover/press feedback uses transforms without layout changes. | Composer geometry and state checks. |
+| Newly arriving live content | A short entrance fade for new live messages. History pagination and reentry do not replay it. | Snapshot/live distinction and transcript regression checks. |
+
+Reduced-motion and forced-colors preferences suppress decorative animations.
+Animations do not change provider text, tool execution, approval semantics or saved
+chat positions. Infinite feedback applies only to visible loading/active states;
+scroll frames stop when idle, hidden, detached or manually interrupted.
+
+AionUi's voice waveform, microphone spinner, conversation-fork controls and session
+mention chips belong to features that Pocket Code does not provide in this chat.
+They do not introduce those features through this motion update. This is a complete
+mapping of the applicable audited chat patterns, rather than a copy of the whole
+AionUi application.

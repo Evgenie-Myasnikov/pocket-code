@@ -43,15 +43,15 @@ for(const width of [320,390,1280])test(`full-height chat behind controls at ${wi
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
-test('real chat overlays preserve menus, notifications and section navigation',async({page})=>{
+test('real chat overlays preserve menus and section navigation after inbox removal',async({page})=>{
  await page.setViewportSize({width:390,height:844});
  await page.addInitScript(()=>sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)})));
  await page.goto('http://127.0.0.1:5173');await newChat(page);
  const canvas=page.locator('.chat-canvas'),chat=page.locator('.conversation');
  expect(await chat.boundingBox()).toEqual(await canvas.boundingBox());
  await page.locator('.composer textarea').fill('Keep this draft while changing sections');
- await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitem',{name:'Inbox',exact:true}).click();await expect(page.getByRole('dialog',{name:'Inbox'})).toBeVisible();
- await page.keyboard.press('Escape');await expect(page.getByRole('dialog',{name:'Inbox'})).toHaveCount(0);
+ await page.getByRole('button',{name:'More actions',exact:true}).click();await expect(page.getByRole('menuitem',{name:'Inbox',exact:true})).toHaveCount(0);await expect(page.getByRole('menuitemradio',{name:'Detailed',exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(page.getByRole('menu',{name:'More actions',exact:true})).toHaveCount(0);
  await openSection(page,'Settings');
  await expect(page.locator('.chat-overlay')).toHaveCount(0);await expect(page.locator('.workspace>header')).toBeVisible();
  await openSection(page,'Chats');await expect(page.locator('.mobile-tabbar')).toBeVisible();await newChat(page);

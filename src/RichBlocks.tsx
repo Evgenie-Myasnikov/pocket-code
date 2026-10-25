@@ -34,7 +34,7 @@ function Picture({src,alt}:{src:string;alt:string}) {
 /** A labelled copy action; the text is read when pressed, so streamed or revealed content is copied in full. */
 export function CopyAction({text,label}:{text:string|(()=>string);label:string}){
   const [copied,setCopied]=useState(false);
-  return <button type="button" className="copy-action" aria-label={label} title={label} onClick={async()=>{try{await navigator.clipboard.writeText(typeof text==='function'?text():text);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{setCopied(false);}}}>{copied?<Check size={14}/>:<Copy size={14}/>}<span>{copied?t('Скопировано'):label}</span></button>;
+  return <button type="button" className="copy-action" data-copied={copied||undefined} aria-label={label} title={label} onClick={async()=>{try{await navigator.clipboard.writeText(typeof text==='function'?text():text);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{setCopied(false);}}}>{copied?<Check size={14}/>:<Copy size={14}/>}<span>{copied?t('Скопировано'):label}</span></button>;
 }
 /** Fenced code keeps its language visible and has its own copy action. */
 function CodeBlock({language,children}:{language?:string;children:ReactNode}){
@@ -57,7 +57,7 @@ function Disclosure({className,summary,children,defaultOpen=false}:{className:st
   const [open,setOpen]=useState(false),element=useRef<HTMLDetailsElement|null>(null);
   // Opened once on mount; afterwards the person alone decides.
   useEffect(()=>{if(defaultOpen&&element.current)element.current.open=true;},[]);
-  return <details ref={element} className={className} onToggle={event=>setOpen(event.currentTarget.open)}><summary>{summary}</summary>{open&&children()}</details>;
+  return <details ref={element} className={className} onToggle={event=>setOpen(event.currentTarget.open)}><summary>{summary}<ChevronRight size={12} className="chat-disclosure-chevron" aria-hidden="true"/></summary>{open&&children()}</details>;
 }
 function Document({block}:{block:Block}) {
   const [error,setError]=useState(''); const source=block.source;

@@ -20,3 +20,5 @@ The guide covers the current repository interface. Features specifically marked 
 | Release history and current product plan | [Changelog](../CHANGELOG.md), [portable board](../project-boards/README.md) |
 
 Mobile navigation is **Board, Chats, Rules, Changelog, Settings**. Windows keeps conversations in its side rail alongside Board, Rules, Changelog and Settings. Connection is in settings. The older Tasks, Project, WorkSpace and Live terminal navigation is retired; compatible server endpoints and local data remain.
+
+- [Chat interaction motion](CHAT-MOTION.md): audited source mapping, behavior and accessibility checks.
