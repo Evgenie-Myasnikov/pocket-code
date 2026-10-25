@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased (0.28.13)
+## [0.28.13](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.12...v0.28.13) (2026-10-25)
 
-Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Not published.
+Published [v0.28.13](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.13) from [9ccb279e068b2aca074ad0dd40e21db57298d46d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/9ccb279e068b2aca074ad0dd40e21db57298d46d) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - Board MCP can read open view state and immediately control AI following, camera, focus, selection and fit. No user confirmation dialog: success requires the UI to report the resulting state. Commands target one current view/revision, expire without replay, and reject hidden, busy or disconnected canvases. Focus/selection show the real AI cursor; selected cards remain attached to board chat. These controls do not edit the board file.
@@ -13,7 +13,7 @@ Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-
 - Removed repeated provider names/icons and empty reply header rows; accessible authorship and compact copy actions remain. Reserved space for rotating disclosure arrows to prevent narrow-chat overflow at large text sizes.
 
 ### Validation
-- 37 targeted unit/integration checks and 17 distinct browser scenarios passed, including real stdio MCP/host/rendered-view control, result acknowledgement, stale/busy/hidden rejection, project isolation, exact saved history, compiled Windows route policy, two-viewer writes, mobile chat at 320/360/390/412 px, 8-22 px text and reduced motion. The 400-card drag retained 400 metadata renders. The installed Codex reconnect probe used a local synthetic model server only. TypeScript/Vite, portable-board schema/dependencies and links in 27 documents passed; synthetic captures inspected. Existing Review/attachment expectations were updated for their previously shipped menu/viewer behavior; disclosure overflow was reproduced against the prior source and fixed. Packaging pending; physical devices and live Claude/Copilot model turns were not tested.
+- 37 targeted unit/integration checks and 17 distinct browser scenarios passed, including real stdio MCP/host/rendered-view control, result acknowledgement, stale/busy/hidden rejection, project isolation, exact saved history, compiled Windows route policy, two-viewer writes, mobile chat at 320/360/390/412 px, 8-22 px text and reduced motion. The 400-card drag retained 400 metadata renders. The installed Codex reconnect probe used a local synthetic model server only. TypeScript/Vite, portable-board schema/dependencies and links in 27 documents passed; synthetic captures inspected. Existing Review/attachment expectations were updated for their previously shipped menu/viewer behavior; disclosure overflow was reproduced against the prior source and fixed. Android/Windows/host packages passed: 86 shared web files and 334 source files match, 1,460 decoded artifact entries passed privacy review, and APK signer matches 0.28.12. GitHub CI, exact tag and all four downloaded asset hashes verified. Physical devices and live Claude/Copilot model turns were not tested.
 
 ## [0.28.12](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.11...v0.28.12) (2026-10-25)
 
