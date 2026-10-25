@@ -1,15 +1,15 @@
 # Changelog
 
-## Unreleased (0.28.12)
+## [0.28.12](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.11...v0.28.12) (2026-10-25)
 
-Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Not published.
+Published [v0.28.12](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.12) from [58c9bbf50d4061a7a98021dc768969d87af71c7e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/58c9bbf50d4061a7a98021dc768969d87af71c7e) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Bug Fixes
 - Opening or revisiting a project board refreshes its managed MCP worker and tool catalog from the current host package. Active calls finish before replacement; chat transport remains connected and uncertain writes are never replayed. Duplicate entry requests are idempotent; snapshot refresh and gallery navigation do not restart MCP. Failed replacement preserves the previous worker.
 - New/resumed Claude, Codex and Copilot runs receive the managed board connection without rewriting saved provider settings. Windows permits the lifecycle endpoint; project scope and owner access remain enforced. Legacy sessions acquire the proxy on their next new/resumed run.
 
 ### Validation
-- 49 unit/integration checks and four browser scenarios passed, including real MCP/host catalog notifications, operation draining, failed replacement, duplicate entries, project isolation, provider configuration and compiled Windows route policy. An isolated installed Codex client discovered and called MCP before/after board entry without a model turn or chat restart. TypeScript/Vite, portable-board schema/dependencies and links in 27 documents passed. Packaging pending; physical devices and live Claude/Copilot model turns were not tested.
+- 49 unit/integration checks and four browser scenarios passed, including real MCP/host catalog notifications, operation draining, failed replacement, duplicate entries, project isolation, provider configuration and compiled Windows route policy. An isolated installed Codex client discovered and called MCP before/after board entry without a model turn or chat restart. TypeScript/Vite, portable-board schema/dependencies and links in 27 documents passed. Android/Windows/host packages passed: 86 shared web files and 330 source files match, 1,452 decoded artifact entries passed privacy review, and APK signer matches 0.28.11. GitHub CI, exact tag and all four downloaded asset hashes verified. Physical devices and live Claude/Copilot model turns were not tested.
 
 ## [0.28.11](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.10...v0.28.11) (2026-10-25)
 
