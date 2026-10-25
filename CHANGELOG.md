@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased (0.28.11)
+
+Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Not published.
+
+### Features
+- Open canvases show one cursor and affected-object highlights for actual MCP inspection, creation, movement, connections and save outcomes. The camera follows the latest target; pointer, wheel and keyboard interaction pause it, and a compact AI control resumes. Hidden/local-editing states suspend camera motion and reduced-motion focuses immediately.
+- Board MCP adds a section overview, scoped object reads, explicit focus and sparse existing-object patches. Stable IDs, omitted fields, current revisions and creation context retain their existing protections. The workflow follows Miro's scoped search/read/patch pattern without connecting to Miro or replacing the portable JSON format.
+
+### Bug Fixes
+- Bounded, expiring activity history and waiting live reads deliver fast MCP phases to independent viewers. Windows and workspace read policies permit the live endpoint. Saved snapshots still wait for local drafts; generic file changes are never attributed to AI. Old hosts retain snapshot/legacy-marker compatibility.
+
+### Validation
+- Twenty browser scenarios and seven unit/integration checks passed, including real stdio MCP → authenticated host → two viewers, sparse-patch preservation, conflicts and failed saves, executed C# route policy, draft protection, manual camera pause/resume, reduced motion, gallery drag, selection and connector gestures. The Windows route failure was reproduced on 0.28.10. The 400-card drag retained 400 metadata renders. TypeScript/Vite, links in 27 documents and portable-board schema/dependencies passed; synthetic UI capture inspected. Packaging/publication pending. Physical devices and shared unsaved editing/remote undo are not validated or implemented by this change.
+
 ## [0.28.10](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.9...v0.28.10) (2026-10-25)
 
 Published [v0.28.10](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.10) from [511474afa033c5cfdc18f9df164525190bcf1db8](https://github.com/Evgenie-Myasnikov/pocket-code/commit/511474afa033c5cfdc18f9df164525190bcf1db8) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

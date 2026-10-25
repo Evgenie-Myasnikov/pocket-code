@@ -52,4 +52,12 @@
 
 .wb-remote-updated{outline:calc(2px * var(--wb-handle-scale,1)) solid var(--accent);outline-offset:calc(4px * var(--wb-handle-scale,1))}
 .wb-ai-cursor{position:absolute;z-index:25;display:flex;align-items:flex-start;gap:3px;pointer-events:none;color:var(--accent);transform:scale(var(--wb-handle-scale,1));transform-origin:0 0;white-space:nowrap}
-.wb-ai-cursor span{margin-top:18px;padding:3px 6px;border-radius:4px;background:var(--accent);color:var(--bg);font-size:12px}
+.wb-ai-cursor span{margin-top:18px;padding:3px 6px;border-radius:4px;background:var(--accent);color:var(--bg);font-size:calc(12px * var(--ui-scale,1))}
+
+.whiteboard-toolbar .wb-follow{width:auto;gap:3px;padding-inline:7px;font-size:calc(11px * var(--ui-scale,1))}
+.whiteboard-toolbar button.wb-follow[aria-pressed=true]{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.wb-ai-active{box-shadow:0 0 0 calc(3px * var(--wb-handle-scale,1)) color-mix(in srgb,var(--accent) 65%,transparent)}
+.wb-ai-cursor{transition:left 180ms ease-out,top 180ms ease-out}
+.wb-ai-cursor[data-phase=failed]{color:var(--danger,var(--accent))}
+.wb-ai-cursor[data-phase=failed] span{background:var(--danger,var(--accent))}
+@media(prefers-reduced-motion:reduce){.wb-ai-cursor{transition:none}}

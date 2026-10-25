@@ -11,15 +11,15 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 test('board MCP protects revisions, privacy and old hosts over stdio',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'board-mcp-')),token=randomUUID();
  await writeFile(path.join(root,'connection-key.txt'),token);
- const signals=[];let writes=0,version='0.27.1',board={repositoryFile:'board-'+randomUUID()+'.json',name:'Synthetic board',repositoryRevision:'a'.repeat(64),versions:['Next'],notes:[{id:randomUUID(),title:'Canvas idea',description:'Synthetic example',branch:'Next',status:'idea',priority:'normal',x:0,y:0,dependencies:[],owner:'Private owner',assigneeIds:['private-member']}]};
+ const signals=[];let rejectSave=false,rejectedSignals=0,writes=0,version='0.27.1',board={repositoryFile:'board-'+randomUUID()+'.json',name:'Synthetic board',repositoryRevision:'a'.repeat(64),versions:['Next'],notes:[{id:randomUUID(),title:'Canvas idea',description:'Synthetic example',branch:'Next',status:'idea',priority:'normal',x:0,y:0,dependencies:[],owner:'Private owner',assigneeIds:['private-member']}]};
  const host=createServer(async(req,res)=>{
   res.setHeader('Content-Type','application/json');
   if(req.headers.authorization!==`Bearer ${token}`){res.writeHead(401);res.end('{}');return;}
   if(req.url==='/api/health'){res.end(JSON.stringify({version}));return;}
   if(req.method==='GET'){res.end(JSON.stringify({board}));return;}
   const chunks=[];for await(const chunk of req)chunks.push(chunk);const data=JSON.parse(Buffer.concat(chunks));
-  if(req.url==='/api/project-board/activity'){signals.push(data);res.end('{}');return;}
-  if(data.repositoryRevision!==board.repositoryRevision){res.writeHead(409);res.end('{}');return;}
+  if(req.url==='/api/project-board/activity'){if(version!=='0.28.11'&&(data.action||data.targets||data.phase==='reading')){rejectedSignals++;res.writeHead(400);res.end('{}');return;}signals.push(data);res.end('{}');return;}
+  if(rejectSave||data.repositoryRevision!==board.repositoryRevision){res.writeHead(409);res.end('{}');return;}
   writes++;board={...board,...data,repositoryRevision:'b'.repeat(64)};res.end(JSON.stringify(board));
  });
  await new Promise(resolve=>host.listen(0,'127.0.0.1',resolve));
@@ -45,7 +45,12 @@ test('board MCP protects revisions, privacy and old hosts over stdio',async()=>{
   const before=writes;assert.ok((await invoke('create_note',{project:'demo',revision:'b'.repeat(64),note:newNote})).isError);assert.equal(writes,before);
   assert.ok(!(await invoke('create_note',{project:'demo',revision:'b'.repeat(64),note:newNote,context})).isError);
   const created=board.notes.find(n=>n.title===newNote.title);assert.match(created.description,/Creation context/);assert.match(created.description,/docs\/BOARD.md/);
-  const details=JSON.parse((await invoke('read_note_context',{project:'demo',id:created.id})).content[0].text);assert.equal(details.note.id,created.id);assert.equal(details.dependencies[0].id,task.id);assert.ok(!JSON.stringify(details).includes('Private owner'));assert.ok(!JSON.stringify(details).includes('private-member'));
+  assert.ok(rejectedSignals>0);const oldFocus=JSON.parse((await invoke('focus_objects',{project:'demo',revision:'b'.repeat(64),ids:[created.id]})).content[0].text);assert.equal(oldFocus.activityDelivered,false);
+  version='0.28.11';const details=JSON.parse((await invoke('read_note_context',{project:'demo',id:created.id})).content[0].text);assert.equal(details.note.id,created.id);assert.equal(signals.at(-1).phase,'reading');assert.equal(signals.at(-1).action,'inspect');assert.equal(signals.at(-1).targets[0].id,created.id);assert.equal(details.dependencies[0].id,task.id);assert.ok(!JSON.stringify(details).includes('Private owner'));assert.ok(!JSON.stringify(details).includes('private-member'));
+
+  const changes=writes;rejectSave=true;const failed=await invoke('canvas_patch',{project:'demo',revision:'b'.repeat(64),items:[{id:item.id,x:900}]});assert.ok(failed.isError);assert.equal(writes,changes);assert.deepEqual(signals.slice(-2).map(s=>s.phase),['editing','failed']);assert.equal(signals.at(-1).targets[0].x,0);rejectSave=false;
+  board.notes[0].title='Latest card title';board.notes[0].description='Latest criteria';
+  const patch=await invoke('canvas_patch',{project:'demo',revision:'b'.repeat(64),items:[{id:task.id,x:1000}]});assert.ok(!patch.isError);assert.equal(board.notes[0].title,'Latest card title');assert.equal(board.canvas.items.find(i=>i.id===task.id).text,'Latest card title');assert.equal(board.notes[0].description,'Latest criteria');
 
  }finally{await client.close();await new Promise(resolve=>host.close(resolve));await rm(root,{recursive:true,force:true});}
 });

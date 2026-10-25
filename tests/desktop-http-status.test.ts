@@ -1,4 +1,4 @@
-﻿import {test} from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -24,3 +24,16 @@ public static int Main(string[] args){var probe=new Probe(args[0]);foreach(int s
  }finally{rmSync(root,{recursive:true,force:true});}
 });
 
+
+test('Windows read policy permits live board events but not activity writes',{skip:process.platform!=='win32'},()=>{
+ const source=readFileSync('desktop/DesktopWindow.cs','utf8'),begin=source.indexOf('public static class DesktopReadPolicy'),end=source.indexOf('public sealed class DesktopBridgeFailure:');
+ const root=mkdtempSync(path.join(tmpdir(),'pocket-policy-test-'));
+ try{
+  const code=`using System;using System.Text.RegularExpressions;
+${source.slice(begin,end)}
+class Probe {public static int Main(){if(!DesktopReadPolicy.Allows("/project-board/live?root=synthetic&after=synthetic&wait=1000"))throw new Exception("Live reads denied");foreach(var route in new[]{"/project-board/activity","/project-board/live/extra","/project-board/live#fragment"})if(DesktopReadPolicy.Allows(route))throw new Exception("Unexpected read route");if(DesktopReadPolicy.AllowsWrite("/project-board/live")||DesktopReadPolicy.AllowsWrite("/project-board/activity"))throw new Exception("Unexpected write route");Console.WriteLine("Live route policy passed");return 0;}}`;
+  const file=path.join(root,'Probe.cs'),exe=path.join(root,'Probe.exe');writeFileSync(file,code);
+  try{execFileSync(path.join(process.env.WINDIR!,'Microsoft.NET/Framework64/v4.0.30319/csc.exe'),['/nologo','/out:'+exe,file]);}catch(error){throw new Error(String((error as any).stdout));}
+  assert.match(execFileSync(exe,{encoding:'utf8'}),/Live route policy passed/);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

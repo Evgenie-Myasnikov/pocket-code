@@ -17,6 +17,21 @@ test('change detection keeps note and canvas namespaces distinct and ignores pri
  assert.deepEqual(changedBoardObjects(before,{...before,notes:[{...note,assigneeIds:['synthetic-id']}]}),[]);
 });
 
+test('activity keeps ordered bounded events, wakes every viewer and cancels disconnected waits',async()=>{
+ const events=new BoardLiveActivity(),empty=events.since('a').activityCursor,other=events.since('b').activityCursor;
+ const first=events.wait('a',empty,1000,new AbortController().signal),second=events.wait('a',empty,1000,new AbortController().signal);
+ const editing=events.set('a',[randomUUID()],'editing'),saved=events.set('a',editing.ids,'saved');await Promise.all([first,second]);
+ assert.deepEqual(events.since('a',empty).activities.map(e=>e.phase),['editing','saved']);
+ assert.deepEqual(events.since('a',editing.id).activities.map(e=>e.phase),['saved']);
+ assert.equal(events.since('b',other).activities.length,0);
+ let previous=saved.id;for(let i=0;i<70;i++)events.set('a',editing.ids,'editing');
+ assert.equal(events.since('a',previous).activities.length,1);
+ previous=events.get('a')!.id;events.set('a',editing.ids,'reading');events.set('a',editing.ids,'saved');
+ assert.deepEqual(events.since('a',previous).activities.map(e=>e.phase),['reading','saved']);
+ const abort=new AbortController(),waiting=events.wait('b',other,1000,abort.signal);abort.abort();await waiting;
+ const expired=events.get('a')!;expired.expiresAt=0;assert.equal(events.get('a'),null);assert.ok(!events.since('a',previous).activities.includes(expired));
+});
+
 test('live activity expires and metadata polling observes changes without replacing unchanged snapshots',async()=>{
  const events=new BoardLiveActivity(),item=randomUUID();events.set('board',[item,item],'editing');assert.deepEqual(events.get('board')?.ids,[item]);events.get('board')!.expiresAt=0;assert.equal(events.get('board'),null);
  const temporary=await mkdtemp(path.join(tmpdir(),'board-live-')),root=path.join(temporary,'project'),dataDir=path.join(temporary,'data'),token=randomUUID();

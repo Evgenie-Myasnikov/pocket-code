@@ -159,13 +159,18 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   const liveFile=z.string().regex(/^board-[a-f0-9-]+\.json$/);
   app.get('/api/project-board/live',async(req,res)=>{
     const root=await projectRoot(req.query.root),file=liveFile.parse(req.query.file),known=req.query.known===undefined?undefined:z.string().regex(/^[a-f0-9]{64}$/).parse(req.query.known);
-    const version=await boardSnapshotStamp(root,file),activity=liveActivity.get(root+'|'+file);
-    if(known===version){res.json({version,unchanged:true,activity});return;}
-    const board=await projectBoard(root);if(board)validateDependencies(board.notes);res.json({version,board,activity});
+    const after=req.query.after===undefined?undefined:id.parse(req.query.after),wait=req.query.wait===undefined?0:z.coerce.number().int().min(0).max(1000).parse(req.query.wait),key=root+'|'+file;
+    let version=await boardSnapshotStamp(root,file);
+    if(known===version&&after&&wait){const cancel=new AbortController(),close=()=>cancel.abort();res.once('close',close);try{await liveActivity.wait(key,after,wait,cancel.signal);}finally{res.off('close',close);}if(res.destroyed)return;version=await boardSnapshotStamp(root,file);}
+    const activity=liveActivity.get(key),events=liveActivity.since(key,after);
+    if(known===version){res.json({version,unchanged:true,activity,...events});return;}
+    const board=await projectBoard(root);if(board)validateDependencies(board.notes);res.json({version,board,activity,...events});
   });
   app.post('/api/project-board/activity',async(req,res)=>{
-    const input=z.object({root:z.string(),file:liveFile,ids:z.array(id).min(1).max(100),phase:z.enum(['editing','saved','failed'])}).strict().parse(req.body),root=await projectRoot(input.root,true);
-    await boardSnapshotStamp(root,input.file);res.json(liveActivity.set(root+'|'+input.file,input.ids,input.phase));
+    const target=z.object({id,x:z.number().min(0).max(106000),y:z.number().min(0).max(106000),width:z.number().min(0).max(6000),height:z.number().min(0).max(6000)}).strict();
+    const input=z.object({root:z.string(),file:liveFile,ids:z.array(id).min(1).max(100),phase:z.enum(['reading','editing','saved','failed']),action:z.enum(['inspect','create','move','connect','update']).optional(),targets:z.array(target).max(100).optional()}).strict().parse(req.body),root=await projectRoot(input.root,true);
+    if(input.targets?.some(target=>!input.ids.includes(target.id)))throw new HttpError(400,'Activity target is outside the operation.');
+    await boardSnapshotStamp(root,input.file);res.json(liveActivity.set(root+'|'+input.file,input.ids,input.phase,{action:input.action,targets:input.targets}));
   });
   const privateNames=()=>store.workspaces().flatMap(w=>[...w.hostPeople,...w.members].map(p=>p.name));
   app.get('/api/project-board',async(req,res)=>{const root=await projectRoot(req.query.root),result=await projectBoard(root);if(result)validateDependencies(result.notes);res.json({board:result,miro:store.snapshot().miroBoards.find(b=>b.root===root)||null,canEdit:current()?.person.role!=='viewer'});});
