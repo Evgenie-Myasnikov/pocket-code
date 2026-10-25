@@ -1,13 +1,15 @@
 # Changelog
 
-## 0.28.10 (unreleased)
+## [0.28.10](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.9...v0.28.10) (2026-10-25)
+
+Published [v0.28.10](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.10) from [511474afa033c5cfdc18f9df164525190bcf1db8](https://github.com/Evgenie-Myasnikov/pocket-code/commit/511474afa033c5cfdc18f9df164525190bcf1db8) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Bug Fixes
 - Windows host replies preserve HTTP status separately from transport failures. An expired launch record falls back to the existing saved board conversation; HTTP rejections no longer mark a responsive host offline. Initialize the embedded project before launch lookup so unavailable sessions retain the correct board selection context. Keep unavailable conversation associations until explicit replacement.
 - Board chat shows the board name without its technical revision. Regression coverage uses a real mouse drag from the gallery image into the restored chat and verifies selected-card context in the outgoing message.
 
 ### Validation
-- Thirteen browser scenarios and seven unit/contract checks passed, including seven HTTP/transport outcomes executed through the actual C# Send implementation. TypeScript/Vite and links in 27 documents passed. Package verification and publication pending; physical devices not tested.
+- Thirteen browser scenarios and seven unit/contract checks passed, including seven HTTP/transport outcomes executed through the actual C# Send implementation. TypeScript/Vite and links in 27 documents passed. The selection regression was reproduced against 0.28.9 and passed with the correction. Web/Android/Windows/host packages passed; 86 shared web files and 325 host source files match, all 1,442 decoded archive entries passed privacy review, APK signer matches 0.28.9. GitHub CI, exact tag and all four downloaded asset hashes verified. Published; physical devices not tested.
 
 ## [0.28.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.8...v0.28.9) (2026-10-25)
 
