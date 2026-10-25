@@ -1,3 +1,4 @@
+import {BoardMcpRuntime} from './board-mcp-runtime.js';
 import {ChatPageSync} from './chat-page-sync.js';
 import {CustomProviders,mountCustomProviders} from './custom-providers.js';
 import {WindowsJiraStore} from './jira-vault.js';
@@ -49,7 +50,7 @@ import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 
-export type Config = { claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { port?:number; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -57,6 +58,8 @@ const providerSchema = z.enum(['claude', 'codex','copilot']).default('claude');
 export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages }, terminals = new Terminals()) {
   const roots = await Promise.all(config.roots.map(p => realpath(p)));
   const claudeCatalog = config.claudeModels || new ClaudeModelCatalog();
+  const boardMcp=new BoardMcpRuntime(path.dirname(config.uploads),config.port);
+  jobs.setBoardMcpConfiguration(boardMcp.configuration);config.codex?.setBoardMcpConfiguration?.(boardMcp.configuration);config.copilot?.setBoardMcpConfiguration?.(boardMcp.configuration);
   const workspaceAccess=await createWorkspaceAccess(path.join(config.uploads,'.boards','workspaces.json'));
   let taskRuntime:TaskRuntime|undefined;
   const accessRoots=()=>workspaceAccess.current()?.ws.roots||[...roots,...(taskRuntime?.roots()||[])];
@@ -154,7 +157,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.end = function (this: express.Response, ...args: any[]) { try { return (end as any).apply(this, args); } finally { release(); } } as typeof res.end;
     res.once('finish', release); next();
   });
-  await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}});
+  await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}},boardMcp);
   mountMiro(app,{integration:new MiroIntegration(new WindowsMiroStore(path.join(config.uploads,'.miro','credentials.vault'))),roots,access:workspaceAccess});
   taskRuntime=new TaskRuntime({directory:path.join(config.uploads,'.tasks'),roots,access:workspaceAccess,jobs:()=>allJobs().map(job=>jobView(job.id)),managedRoots:managed=>{config.codex?.setManagedTaskRoots?.(managed);config.copilot?.setManagedTaskRoots?.(managed);}});
   await taskRuntime.initialize();taskRuntime.mount(app);

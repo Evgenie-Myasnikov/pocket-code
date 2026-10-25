@@ -34,8 +34,11 @@ following. `focus_objects` can direct attention to existing objects without
 editing; use it for a real inspection, never to simulate work. Manual navigation
 pauses following. `activityDelivered` confirms host acceptance, not viewer presence.
 File edits refresh without AI attribution. Older clients/hosts retain their
-available tools and legacy markers; reload the MCP client after upgrading for
-new tools. MCP does not commit, push, publish, notify participants or expose an
+available tools and legacy markers. Host 0.28.12+ requests a fresh managed MCP
+worker on board entry, after active calls finish, and announces catalog changes
+without restarting the chat. Legacy sessions acquire the proxy on their next
+new/resumed run; discover available tools rather than assuming a reload succeeded.
+MCP does not commit, push, publish, notify participants or expose an
 unsaved live canvas. Follow the repository's board and changelog workflow.
 
 ## Card creation context

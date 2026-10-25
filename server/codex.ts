@@ -1,3 +1,4 @@
+import type {BoardMcpConfiguration} from './board-mcp-runtime.js';
 import { userInputBlocks } from './user-input-blocks.js';
 import { randomUUID } from 'node:crypto';
 import {projectBoardInstructions} from './project-rules.js';
@@ -23,6 +24,8 @@ export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexR
 export class CodexService {
   async refreshAuthentication(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');const old=this.rpc;this.rpc=undefined;this.ready=undefined;old?.close();}
   async usage() { return normalizeCodexUsage(await (await this.connect()).request('account/rateLimits/read', {})); }
+  private boardMcp:BoardMcpConfiguration=()=>({});
+  setBoardMcpConfiguration(config:BoardMcpConfiguration){this.boardMcp=config;}
   private rpc?: CodexRpc;
   private ready?: Promise<CodexRpc>;
   private jobs = new Map<string, CodexJob>();
@@ -291,7 +294,8 @@ export class CodexService {
       }
       const permissions = codexPermissions(input.codexAccess, input.mode, cwd);
       const { sandbox, approvalPolicy, approvalsReviewer, sandboxPolicy } = permissions;
-      const startParams = { cwd, ...(input.model ? { model: input.model } : {}), sandbox, approvalPolicy, approvalsReviewer, developerInstructions: await projectBoardInstructions(cwd) };
+      const boardServers=this.boardMcp(cwd);
+      const startParams = { cwd, ...(Object.keys(boardServers).length?{config:Object.fromEntries(Object.entries(boardServers).map(([name,value])=>["mcp_servers."+name,value]))}:{}), ...(input.model ? { model: input.model } : {}), sandbox, approvalPolicy, approvalsReviewer, developerInstructions: await projectBoardInstructions(cwd) };
       if (job.cancelled) return;
       const session = await rpc.request(input.sessionId ? 'thread/resume' : 'thread/start', input.sessionId ? { ...startParams, threadId: input.sessionId, excludeTurns: true } : startParams);
       verifyCodexPermissions(session, permissions);

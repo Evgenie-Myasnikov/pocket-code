@@ -14,7 +14,7 @@ export async function buildHostBundle(root) {
     if (!info.isFile() || info.size > 20_000_000) throw new Error('Invalid host file');
     const bytes = await readFile(file); files.push({ path: name, content: bytes.toString('base64'), sha256: createHash('sha256').update(bytes).digest('hex') });
   }
-  for (const name of ['package.json', 'package-lock.json', 'tsconfig.json', 'server', 'src', 'dist', 'scripts/host-update-worker.mjs', 'scripts/board-cli.mjs', 'scripts/board-mcp.mjs', 'scripts/board-presence.mjs', 'scripts/miro-cli.mjs']) await add(name);
+  for (const name of ['package.json', 'package-lock.json', 'tsconfig.json', 'server', 'src', 'dist', 'scripts/host-update-worker.mjs', 'scripts/board-cli.mjs', 'scripts/board-mcp.mjs', 'scripts/board-presence.mjs', 'scripts/board-mcp-worker.mjs', 'scripts/board-mcp-proxy.mjs', 'scripts/miro-cli.mjs']) await add(name);
   const asset = `Pocket-Code-Host-${pkg.version}.json.gz`;
   const bytes = gzipSync(Buffer.from(JSON.stringify({ format: 1, version: pkg.version, files })));
   return { asset, bytes, fileCount: files.length };

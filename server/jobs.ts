@@ -1,3 +1,4 @@
+import type {BoardMcpConfiguration} from './board-mcp-runtime.js';
 import { userInputBlocks } from './user-input-blocks.js';
 import { randomUUID } from 'node:crypto';
 import { query, type PermissionResult, type PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
@@ -14,6 +15,8 @@ type Job = JobView & { controller: AbortController; pending: Map<string, (result
 export const deniedMessage=(comment?:string)=>'The user denied this action.'+(comment?.trim()?' The user said: '+comment.trim():'');
 const queueView=(job:Job)=>{job.pendingInputIds=job.waiting.map(message=>message.id);job.queued=job.waiting.map(message=>({id:message.id,text:message.displayText??message.text,attachments:message.attachmentPaths?.length||0}));};
 export class Jobs {
+  private boardMcp:BoardMcpConfiguration=()=>({});
+  setBoardMcpConfiguration(config:BoardMcpConfiguration){this.boardMcp=config;}
   private jobs = new Map<string, Job>();
   constructor(private run: Run = query) {}
   view(job: Job): JobView {
@@ -78,12 +81,13 @@ export class Jobs {
     let historySize = JSON.stringify(job.messages).length;
     let historyCount = job.messages.length;
     try {
+      const mcpServers=this.boardMcp(input.cwd);
       stream = this.run({ prompt: job.inputs, options: {
         cwd: input.cwd, resume: input.sessionId, model: input.model || undefined, effort:input.claudeEffort,
         permissionMode: input.mode==='plan'?'plan':input.claudeAccess||'default',
         allowDangerouslySkipPermissions: input.mode!=='plan'&&input.claudeAccess==='bypassPermissions', maxBudgetUsd: input.maxBudgetUsd,
         abortController: job.controller, includePartialMessages: true,
-        settingSources: ['user', 'project', 'local'],
+        settingSources: ['user', 'project', 'local'],...(Object.keys(mcpServers).length?{mcpServers}:{}),
         systemPrompt: { type: 'preset', preset: 'claude_code', append: await projectBoardInstructions(input.cwd) },
         ...(process.env.CLAUDE_EXECUTABLE ? { pathToClaudeCodeExecutable: process.env.CLAUDE_EXECUTABLE } : {}),
         canUseTool: async (tool, toolInput, options) => this.ask(job, tool, toolInput, options.signal, options.suggestions),

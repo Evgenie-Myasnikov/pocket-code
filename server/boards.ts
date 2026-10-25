@@ -1,3 +1,4 @@
+import type {BoardMcpRuntime} from './board-mcp-runtime.js';
 import {whiteboardSchema} from '../src/whiteboard-model.js';
 import {miroLink} from '../src/miro-link.js';
 import {boardImages,saveBoardImage,readBoardImage} from './board-images.js';
@@ -92,7 +93,7 @@ export async function createWorkspaceAccess(file:string){
   }
   return {store,identity,current,catalog,publicLogin,pairMember,parseInvitation,invitationIdentity,joinInvitation,verifyInvitationPassword};
 }
-export async function mountBoards(app:Express,roots:string[],access:Awaited<ReturnType<typeof createWorkspaceAccess>>,onWorkspaceCreated?:()=>Promise<void>){
+export async function mountBoards(app:Express,roots:string[],access:Awaited<ReturnType<typeof createWorkspaceAccess>>,onWorkspaceCreated?:()=>Promise<void>,boardMcp?:BoardMcpRuntime){
   const {store,current,catalog}=access;
   // Only seed this app's own repository; do not inspect unrelated project content.
   for(const root of roots){let appRoot=false;try{appRoot=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).name==='pocket-code';}catch{}if(!appRoot||store.snapshot().hiddenSourceRoots.includes(root))continue;
@@ -155,6 +156,15 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   async function projectRoot(value:unknown,write=false){const root=await allowedPath(roots,z.string().parse(value),true),ctx=current();if(ctx&&(!ctx.ws.roots.includes(root)||write&&ctx.person.role==='viewer'))throw new HttpError(403,'Project access denied');return root;}
   app.post('/api/project-board/image',async(req,res)=>{const input=z.object({root:z.string(),data:z.string().max(13981016),caption:z.string().max(160).default('')}).parse(req.body),root=await projectRoot(input.root,true);res.json(await saveBoardImage(root,input.data,input.caption));});
   app.get('/api/project-board/image',async(req,res)=>{const root=await projectRoot(req.query.root);res.json(await readBoardImage(root,z.string().parse(req.query.path)));});
+  if(boardMcp){
+    app.get('/api/project-board/mcp',async(req,res)=>{if(current())throw new HttpError(403,'Board runtime belongs to the host');const root=await projectRoot(req.query.root);res.json(boardMcp.read(root));});
+    app.post('/api/project-board/mcp',async(req,res)=>{
+      if(current())throw new HttpError(403,'Board runtime belongs to the host');
+      const input=z.object({root:z.string(),opening:id}).strict().parse(req.body),root=await projectRoot(input.root);
+      if(!await projectBoard(root))throw new HttpError(404,'Project board not found');
+      const state=boardMcp.open(root,input.opening);res.json({generation:state.generation,queued:true});
+    });
+  }
   const liveActivity=new BoardLiveActivity();
   const liveFile=z.string().regex(/^board-[a-f0-9-]+\.json$/);
   app.get('/api/project-board/live',async(req,res)=>{

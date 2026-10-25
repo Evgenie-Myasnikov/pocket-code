@@ -50,6 +50,18 @@ async function until(predicate: () => boolean) {
   assert.fail('Condition was not reached');
 }
 
+test('Codex attaches managed board MCP to new and resumed threads without replacing other settings',async t=>{
+ for(const sessionId of [undefined,'session-1']){
+  const {rpc,service,input,root}=await setup(t),server={command:'node',args:['board-proxy.mjs'],env:{POCKET_PORT:'4318'}};
+  service.setBoardMcpConfiguration(cwd=>{assert.equal(cwd,root);return {'pocket-code-boards':server};});
+  service.start({...input,sessionId});await until(()=>rpc.requests.some(r=>r.method==='turn/start'));
+  const thread=rpc.requests.find(r=>r.method===(sessionId?'thread/resume':'thread/start'))!;
+  assert.deepEqual(thread.params.config,{'mcp_servers.pocket-code-boards':server});service.stop(input.id);
+ }
+ const {rpc,service,input}=await setup(t);service.start(input);await until(()=>rpc.requests.some(r=>r.method==='turn/start'));
+ assert.equal(rpc.requests.find(r=>r.method==='thread/start')!.params.config,undefined);service.stop(input.id);
+});
+
 test('active Codex follow-ups steer the exact turn once and reject a finished run',async t=>{
   const {service,rpc,input}=await setup(t);service.start(input);
   await until(()=>Boolean(service.get(input.id).turnId));

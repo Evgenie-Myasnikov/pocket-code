@@ -11,6 +11,14 @@ function fixture(){let config:any,handler:(event:any)=>void=()=>{},finish:()=>vo
  const service=new CopilotService([process.cwd()],client as any);return{service,session,config:()=>config,emit:(e:any)=>handler(e),finish:()=>finish(),disconnected:()=>disconnected};}
 const input=()=>({id:randomUUID(),cwd:process.cwd(),text:'Fixture',mode:'default' as const,maxBudgetUsd:5});
 
+test('Copilot attaches managed board MCP to new and resumed sessions',async()=>{
+ for(const resume of [false,true]){const f=fixture(),i={...input(),...(resume?{sessionId:f.session.sessionId}:{})},server={command:'node',args:['board-proxy.mjs'],env:{POCKET_PORT:'4318'}};
+  f.service.setBoardMcpConfiguration(cwd=>{assert.equal(cwd,i.cwd);return {'pocket-code-boards':server};});
+  try{f.service.start(i);await waitFor(()=>!!f.config());assert.deepEqual(f.config().mcpServers,{'pocket-code-boards':server});f.service.stop(i.id);await tick();}finally{await f.service.close();}
+ }
+ const f=fixture(),i=input();try{f.service.start(i);await waitFor(()=>!!f.config());assert.equal(f.config().mcpServers,undefined);f.service.stop(i.id);await tick();}finally{await f.service.close();}
+});
+
 test('Copilot fresh and resumed sessions use the shared rules, skills, board and changelog contract',async()=>{
  for(const resume of [false,true]){const f=fixture(),i={...input(),...(resume?{sessionId:f.session.sessionId}:{})};try{f.service.start(i);await waitFor(()=>!!f.config());assert.equal(f.config().systemMessage.content,boardInstructions);f.service.stop(i.id);await tick();}finally{await f.service.close();}}
 });

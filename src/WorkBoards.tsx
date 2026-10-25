@@ -47,6 +47,15 @@ export function WorkBoards({connection,roots,workspaces,onChat,local=false,compa
   const [branchAction,setBranchAction]=useState<{previous?:string;name:string}|null>(null);
   const migrationIssues=board?canvasMigrationIssues(board.notes,board.canvas):[];
   const host=workspaces.catalog.host;const canEdit=!migrationIssues.length&&!board?.repositoryUnavailable&&!board?.source&&!workspaces.offline&&(host||!!workspaces.workspace&&workspaces.workspace.role!=='viewer');
+  const opening=useRef<{key:string;id:string}|null>(null);
+  const [mcpError,setMcpError]=useState(false);
+  useEffect(()=>{
+    setMcpError(false);if(!board?.repositoryFile||!host||board.source){opening.current=null;return;}
+    const key=[connection.url,connection.token,board.root,board.id].join('|');
+    if(opening.current?.key!==key)opening.current={key,id:crypto.randomUUID()};
+    let active=true;void request(connection,'/project-board/mcp',{root:board.root,opening:opening.current.id}).catch(()=>{if(active)setMcpError(true);});
+    return()=>{active=false;};
+  },[board?.id,board?.root,board?.repositoryFile,host,connection.url,connection.token]);
   const agentAvailable=!!board&&host&&!board.repositoryUnavailable&&!board.source;
   const lock=useRef(false),navigation=useRef(0),canvas=useRef<HTMLDivElement>(null),boardRef=useRef(board);boardRef.current=board;
   const noteArchive=useRef(new Map<string,BoardNote[]>()),archiveScope=useRef('');if(archiveScope.current!==board?.root+':'+board?.id){noteArchive.current.clear();archiveScope.current=board?.root+':'+board?.id;}
@@ -84,6 +93,7 @@ export function WorkBoards({connection,roots,workspaces,onChat,local=false,compa
   const detailNote=taskDetail&&board?.notes.find(n=>n.id===taskDetail.noteId);
   if(workspaces.workspace?.me?.approval&&workspaces.workspace.me.approval!=='approved')return <section className="workspace-waiting" role="status"><h2>{workspaces.workspace.me.approval==='rejected'?l('Request declined','Заявка отклонена'):l('Waiting for host approval','Ожидание подтверждения хоста')}</h2><p>{workspaces.workspace.me.approval==='rejected'?l('Contact the host to discuss access.','Свяжитесь с хостом, чтобы обсудить доступ.'):l('Your request has been sent. The board will open automatically after approval on the PC.','Заявка отправлена. Доска откроется автоматически после подтверждения на ПК.')}</p><button onClick={()=>void workspaces.refresh()}>{l('Check status','Проверить статус')}</button></section>;
   return <section className="work-boards" aria-busy={busy}>
+    {mcpError&&<div className="board-error" role="status">{l('Board MCP could not refresh. Reopen the board to retry.','Не удалось обновить MCP доски. Откройте доску повторно.')}</div>}
     <header className="board-header" hidden={compactContext&&!board}>
       {!compactContext&&<div className={'board-header-context'+(board?' board-heading-hidden':'')}><h1>{(local?l('Board','Доска'):workspaces.workspace?.name)||l('Board','Доска')}</h1></div>}
       {board?<div className="board-header-navigation"><button className="icon-button" aria-label={gallery?l('Back to board','Назад к доске'):l('Back to boards','К доскам')} onClick={()=>{if(gallery){setGallery(false);return;}navigation.current++;setBoard(null);}}><ArrowLeft/></button><div className="board-title"><h2 title={board.name}>{board.name}</h2><small>{[project,board.source?l('Project roadmap · refresh to update','Доска проекта · обновляется по кнопке'):!Object.keys(board.versionBranches||{}).length&&board.versionSource==='planned'?l('Planned · Git not linked','План · Git не привязан'):''].filter(Boolean).join(' · ')}</small></div><button className="icon-button board-gallery-toggle" aria-label={l('Board images','Изображения доски')} title={l('Board images','Изображения доски')} aria-pressed={gallery} onClick={()=>{setGallery(!gallery);if(!gallery&&connection.desktop)discussBoard();}}><Images size={16}/></button><button className="board-discuss icon-button" aria-label="Chat" title="Chat" onClick={()=>discussBoard()}><MessageSquare size={16}/></button>{!board.repositoryFile&&connection.desktop&&workspaces.catalog.canManageWorkspaces&&<BoardRepository connection={connection} boardId={board.id} roots={[board.root]} onImported={workspaces.refresh}/>}{!board.repositoryFile&&connection.desktop&&workspaces.catalog.canManageWorkspaces&&<DeleteWorkspaceItem connection={connection} kind="boards" id={board.id} name={board.name} onDeleted={async()=>{navigation.current++;setBoard(null);await workspaces.refresh();}}/>}<button className="icon-button" disabled={busy} aria-label={l('Refresh board','Обновить доску')} onClick={()=>void open(board.id)}><RefreshCw size={20}/></button></div>:null}

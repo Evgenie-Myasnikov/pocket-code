@@ -60,9 +60,26 @@ bounded to 64 events per board and expires after eight seconds. Ordinary file
 changes refresh within roughly one second without AI attribution. Local drafts
 block snapshot application, and stale saves remain protected by revisions.
 Disconnected/older hosts fall back to snapshot reads. Old hosts may accept legacy
-write markers but cannot display the new inspection signals. Restart the MCP
-client session after upgrading to load the new tool catalog; active sessions are
-not restarted by a release.
+write markers but cannot display the new inspection signals.
+
+## Automatic refresh on board entry (0.28.12)
+
+Opening or revisiting a local project board requests a fresh MCP worker. Ordinary
+snapshot refreshes and gallery navigation do not restart it. Repeated delivery
+of the same opening is idempotent. The stable stdio connection waits for an active
+tool call to finish, loads the worker from the running host package, validates its
+catalog and announces `notifications/tools/list_changed`. A failed replacement
+keeps the previous worker and retries discovery; writes are never replayed.
+Polling takes roughly one second, plus any already running operation.
+
+New and resumed Claude, Codex and Copilot runs receive the managed server for
+opened projects without changing saved provider settings. Existing conversations
+and active turns are not stopped. Clients launched before the proxy was introduced
+acquire it on their next new/resumed run; reopening a board cannot replace an
+already running legacy provider transport. External clients must register the
+proxy entry point above and support catalog-change notifications for new tools.
+Disconnected hosts retain the current worker. An unsuccessful board-entry request
+is shown in the board; workspace guests cannot restart the owner's MCP workers.
 
 This is operation presence and saved-state synchronization. Shared unsaved edits,
 per-character remote typing and undo of another participant's changes are not
