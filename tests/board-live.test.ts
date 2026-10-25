@@ -24,7 +24,7 @@ test('activity keeps ordered bounded events, wakes every viewer and cancels disc
  assert.deepEqual(events.since('a',empty).activities.map(e=>e.phase),['editing','saved']);
  assert.deepEqual(events.since('a',editing.id).activities.map(e=>e.phase),['saved']);
  assert.equal(events.since('b',other).activities.length,0);
- let previous=saved.id;for(let i=0;i<70;i++)events.set('a',editing.ids,'editing');
+ let previous:string=saved.id;for(let i=0;i<70;i++)events.set('a',editing.ids,'editing');
  assert.equal(events.since('a',previous).activities.length,1);
  previous=events.get('a')!.id;events.set('a',editing.ids,'reading');events.set('a',editing.ids,'saved');
  assert.deepEqual(events.since('a',previous).activities.map(e=>e.phase),['reading','saved']);
