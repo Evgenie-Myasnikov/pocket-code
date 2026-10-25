@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.8 (unreleased)
+## [0.28.8](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.7...v0.28.8) (2026-10-25)
+
+Published [v0.28.8](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.8) from [85992202b853dd0f5b9a651dc8b6c6f3a4f9d36a](https://github.com/Evgenie-Myasnikov/pocket-code/commit/85992202b853dd0f5b9a651dc8b6c6f3a4f9d36a) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - Board Chat resumes the conversation saved for that board after navigation or an app restart. More actions → New board chat explicitly replaces its generation; stale jobs cannot repin an older session. Private device storage is isolated by connection/account, project and board and never copied into Git boards. Pending jobs can resume; missing sessions remain pinned and block sending until an explicit replacement. Associations are installation-local, without cross-device synchronization.
@@ -12,7 +14,7 @@
 - Board MCP create_note requires context (summary, sources, optional questions); canvas_apply requires it when creating cards or sticky notes. Existing cards remain readable without invented retrospective provenance. Reload the updated MCP tool catalog.
 
 ### Validation
-- Web build, seven persistence/live-API/MCP/provider-guidance tests and ten browser scenarios passed. Coverage includes mobile/desktop navigation and reload, explicit replacement, unavailable sessions, late-job protection, storage errors, host/project/account isolation and compact header regression. External updates, genuine MCP activity and deferred draft handling passed; the 400-card drag retained 400 metadata renders. Documentation links passed. Packaging and publication pending; physical devices not tested.
+- Web build, seven persistence/live-API/MCP/provider-guidance tests and ten browser scenarios passed. Coverage includes mobile/desktop navigation and reload, explicit replacement, unavailable sessions, late-job protection, storage errors, host/project/account isolation and compact header regression. External updates, genuine MCP activity and deferred draft handling passed; the 400-card drag retained 400 metadata renders. Documentation links passed. Web/Android/Windows/host packages passed; 86 shared web files match and 1,430 decoded archive entries passed the privacy audit. APK signer compatibility, GitHub CI, exact tag and all four downloaded asset hashes verified. Packages published; physical devices not tested.
 
 ## [0.28.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.6...v0.28.7) (2026-10-25)
 
