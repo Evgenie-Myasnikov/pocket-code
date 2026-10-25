@@ -1,4 +1,5 @@
 import {useAiFollow} from './use-ai-follow';
+import {useBoardView,type BoardViewConnection} from './use-board-view';
 import type {BoardEditActivity} from '../server/board-live';
 import {copySelection,pasteSelection,itemsInRect,selectionRect,type SelectionRect} from './whiteboard-selection';
 import type {CanvasCardCopy,CanvasCopies} from './board-canvas';
@@ -12,7 +13,7 @@ import {WhiteboardNode,type NodeActions} from './WhiteboardNode';
 import {WhiteboardLink} from './WhiteboardLink';
 import './whiteboard.css';
 
-export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions,cards=[],onSelection,onInteraction,liveActivity,remoteIds=[],active=true}:{active?:boolean;onSelection?(ids:string[]):void;onInteraction?(active:boolean):void;liveActivity?:BoardEditActivity|null;remoteIds?:string[];cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
+export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions,cards=[],onSelection,onInteraction,liveActivity:externalActivity,remoteIds=[],active=true,viewConnection}:{viewConnection?:BoardViewConnection;active?:boolean;onSelection?(ids:string[]):void;onInteraction?(active:boolean):void;liveActivity?:BoardEditActivity|null;remoteIds?:string[];cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
  const ru=useLanguage()==='ru',l=(en:string,ruText:string)=>ru?ruText:en;
  const board=value||emptyWhiteboard(),[selected,setSelected]=useState<string[]>([]),[zoom,setZoom]=useState(1),[pan,setPan]=useState({x:40,y:40}),[preview,setPreview]=useState<Canvas|null>(null),[connecting,setConnecting]=useState<{id:string;side:PortSide}|null>(null),[wire,setWire]=useState<{link:Link;moving:'from'|'to';target?:string;targetSide?:PortSide}|null>(null),[editing,setEditing]=useState<Item|null>(null),[history,setHistory]=useState<Canvas[]>([]),[future,setFuture]=useState<Canvas[]>([]);
  const [interacting,setInteracting]=useState(false);
@@ -39,9 +40,30 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  const shown=preview||board;
  const orderedItems=useMemo(()=>[...shown.items].sort((a,b)=>Number(b.kind==='frame')-Number(a.kind==='frame')),[shown.items]);
  const itemsById=useMemo(()=>new Map(shown.items.map(i=>[i.id,i])),[shown.items]);
+ const [commandActivity,setCommandActivity]=useState<BoardEditActivity|null>(null);
+ useEffect(()=>{if(!commandActivity)return;const timer=setTimeout(()=>setCommandActivity(null),Math.max(0,commandActivity.expiresAt-Date.now()));return()=>clearTimeout(timer);},[commandActivity]);
+ const liveActivity=commandActivity&&(!externalActivity||commandActivity.expiresAt>externalActivity.expiresAt)?commandActivity:externalActivity;
  const aiIds=useMemo(()=>new Set(liveActivity?.ids||[]),[liveActivity]);
  const aiTarget=liveActivity?.targets?.[0]||liveActivity?.ids.map(id=>itemsById.get(id)).find(Boolean);
  const ai=useAiFollow(aiTarget,liveActivity?.id,liveActivity?.expiresAt||0,viewport,{zoom,pan},v=>{setZoom(v.zoom);setPan(v.pan);},!active||interacting||!!editing||!!menu||busy);
+ useBoardView(viewConnection,()=>{
+  const element=viewport.current,rect=element?.getBoundingClientRect(),world=element?.querySelector('.whiteboard-world'),matrix=world?new DOMMatrixReadOnly(getComputedStyle(world).transform):null;
+  const visible=active&&document.visibilityState!=='hidden'&&!!rect&&rect.width>0&&rect.height>0;
+  const z=matrix?.a||zoom,px=matrix?.e??pan.x,py=matrix?.f??pan.y;
+  const inView=visible?board.items.filter(item=>(item.x+item.width)*z+px>0&&item.x*z+px<rect!.width&&(item.y+item.height)*z+py>0&&item.y*z+py<rect!.height).map(item=>item.id):[];
+  return {revision:viewConnection?.revision||'0'.repeat(64),visible,busy:busy||interacting||!!editing||!!menu||locked.current,following:ai.following,zoom:matrix?.a||zoom,pan:{x:matrix?.e??pan.x,y:matrix?.f??pan.y},width:rect?.width||0,height:rect?.height||0,selected:selected.filter(id=>itemsById.has(id)),inView};
+ },command=>{
+  const action=command.action;
+  if(action.type==='follow'){ai.setFollowing(action.enabled);return;}
+  ai.pause();
+  if(action.type==='fit'){fit();return;}
+  const rect=viewport.current!.getBoundingClientRect();
+  if(action.type==='camera'){setZoom(action.zoom);setPan({x:rect.width/2-action.x*action.zoom,y:rect.height/2-action.y*action.zoom});return;}
+  const items=action.ids.map(id=>itemsById.get(id));if(items.some(item=>!item))throw Error('object_missing');
+  if(action.type==='select'){setSelected([...new Set(action.ids)]);setSelectedLink(null);}
+  else{const x=Math.min(...items.map(i=>i!.x)),y=Math.min(...items.map(i=>i!.y)),width=Math.max(...items.map(i=>i!.x+i!.width))-x,height=Math.max(...items.map(i=>i!.y+i!.height))-y,z=Math.max(.1,Math.min(1,(rect.width-80)/width,(rect.height-80)/height));setZoom(z);setPan({x:rect.width/2-(x+width/2)*z,y:rect.height/2-(y+height/2)*z});}
+  if(items.length)setCommandActivity({id:command.id,ids:action.ids,phase:'reading',action:'inspect',expiresAt:Date.now()+8000,targets:items.map(i=>({id:i!.id,x:i!.x,y:i!.y,width:i!.width,height:i!.height}))});
+ });
  const aiLabel=liveActivity?.phase==='failed'?l('AI · failed','AI · ошибка'):liveActivity?.phase==='reading'?l('AI · reading','AI · читает'):liveActivity?.phase==='saved'?l('AI · updated','AI · обновил'):liveActivity?.action==='create'?l('AI · creating','AI · создаёт'):liveActivity?.action==='move'?l('AI · moving','AI · перемещает'):liveActivity?.action==='connect'?l('AI · connecting','AI · связывает'):l('AI · editing','AI · редактирует');
  const nodeActions=useRef<NodeActions>(null!);
  const pendingDraw=useRef<(()=>void)|null>(null),drawFrame=useRef(0);

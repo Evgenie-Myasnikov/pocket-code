@@ -40,7 +40,8 @@ for(const profile of [{width:320,language:'en',textSize:8},{width:360,language:'
     const header=page.locator('.chat-header');const titleBox=await header.locator('.header-title h1').evaluate(h=>{const walker=document.createTreeWalker(h,NodeFilter.SHOW_TEXT),range=document.createRange(),text=walker.nextNode();if(text)range.selectNodeContents(text);else range.selectNodeContents(h);const b=range.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height};}),contextBox=await header.locator('.chat-context').boundingBox();expect(contextBox!.y).toBeGreaterThanOrEqual(titleBox!.y+titleBox!.height-1);
     expect((await header.boundingBox())!.height).toBeLessThanOrEqual(110);
     for(const control of await header.locator('button').all()){const rect=await control.boundingBox();expect(rect!.x).toBeGreaterThanOrEqual(0);expect(rect!.x+rect!.width).toBeLessThanOrEqual(profile.width);expect(rect!.height).toBeGreaterThanOrEqual(48);}
-    await expect(header.getByRole('button',{name:'Review',exact:true})).toBeVisible();
+    await expect(header.getByRole('button',{name:'Review',exact:true})).toHaveCount(0);
+    await header.locator('.chat-menu-button').click();await expect(page.getByRole('menuitem',{name:'Review',exact:true})).toBeVisible();await page.keyboard.press('Escape');
     const user=page.locator('[data-message-id="user-short"]'),agents=page.locator('[data-message-id="agents-only"]');
     await expect(user.locator('.message-label')).toHaveCount(0);await expect(agents.locator('.message-label')).toHaveCount(0);
     await user.locator('.copy-button').click();await expect.poll(()=>page.evaluate(()=>(window as any).__copied)).toBe('Thanks!');
@@ -55,7 +56,7 @@ for(const profile of [{width:320,language:'en',textSize:8},{width:360,language:'
     expect(metrics.bubble).toBeLessThan(profile.width*.7);
     expect(metrics.rows.every(row=>row.border==='0px'&&row.bg==='rgba(0, 0, 0, 0)')).toBeTruthy();
     expect(metrics.targets.every(height=>height>=48)).toBeTruthy();
-    await expect(page.locator('[data-message-id="user-rich"]')).toContainText('Keep the navigation simple.');
+    await page.locator('[data-message-id="user-rich"] .message-attachment').click();await expect(page.getByRole('dialog',{name:'Notes.md',exact:true})).toContainText('Keep the navigation simple.');await page.keyboard.press('Escape');
     await agents.locator('.subagent-card').click();await expect(page.locator('.subagents-panel')).toContainText('The compact controls are reachable.');
     await page.getByRole('button',{name:profile.language==='ru'?'Вернуться в чат':'Back to chat',exact:true}).click();
     await expect(agents.locator('.subagent-card')).toBeFocused();

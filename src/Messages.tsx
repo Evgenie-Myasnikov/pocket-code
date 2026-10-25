@@ -1,6 +1,5 @@
 import './chat-motion.css';
 import {MessageAttachment} from './MessageAttachment';
-import {ProviderMark} from './ProviderMark';
 import {userAttachmentBlocks} from './user-attachments';
 import type {Connection} from './api';
 import { RichBlock, TaskNotificationEvent } from './RichBlocks';
@@ -60,10 +59,12 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
       if(activityGroupKey(run.items[0],mode))return <ActivityGroup key={run.key} items={run.items}/>;
       return <RichBlock key={run.key} running={running} streaming={streaming&&message.role==='assistant'} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
-  return <article data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
+  if(!content.length&&!attachments.length)return null;
+  return <article data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):message.role==='assistant'?provider:undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{attachments.length>0&&<div className="message-attachments">{attachments.map((block,index)=><MessageAttachment key={block.attachmentPath||index} block={block} connection={connection} cwd={cwd}/>)}</div>}{content}</div></> : <>
-      {!toolOnly && <div className="message-label">{message.role === 'assistant' ? <><span className="claude-mark"><ProviderMark provider={provider}/></span> {provider.toUpperCase()}</> : t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
+      {!toolOnly && message.role!=='assistant' && <div className="message-label">{t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
       {content}
+      {!toolOnly && message.role==='assistant' && plain && <div className="message-actions"><CopyButton text={plain}/></div>}
     </>}
   </article>;
 },(before,after)=>{

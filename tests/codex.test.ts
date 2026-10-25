@@ -74,6 +74,15 @@ test('active Codex follow-ups steer the exact turn once and reject a finished ru
   await assert.rejects(service.followup(input.id,{id:'late',text:'Late'}),/ended/);
 });
 
+test('board reopening refreshes the Codex tool cache only after active work finishes and preserves the conversation',async t=>{
+ const {service,rpc,input,root,outside}=await setup(t);service.start(input);await until(()=>Boolean(service.get(input.id).turnId));
+ service.refreshBoardMcp(outside);assert.equal(rpc.closed,false);service.refreshBoardMcp(root);service.refreshBoardMcp(root);
+ assert.equal(rpc.closed,false);assert.equal(service.get(input.id).status,'running');
+ rpc.notification('turn/completed',{turn:{id:'turn-1',status:'completed'}});await until(()=>service.get(input.id).status==='done');
+ assert.equal(rpc.closed,true);assert.equal(service.get(input.id).sessionId,'session-1');assert.equal(service.get(input.id).messages[0].blocks[0].text,input.text);
+ assert.equal(rpc.requests.some(r=>r.method==='turn/interrupt'),false);assert.equal(service.get(input.id).error,undefined);
+});
+
 test('Codex status uses existing sign-in and exposes model capabilities without account details', async t => {
   const { rpc, service } = await setup(t);
   assert.deepEqual(await service.status(), { available: true, authenticated: true, models: [{ id: 'test-model', name: 'Test model', reasoningEfforts: [], isDefault: false }] });

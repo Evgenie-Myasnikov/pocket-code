@@ -40,7 +40,7 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
   test(`${provider} ${language}: chat labels, commands, changes and rich content scale with 8–22px body`, async ({ page }) => {
     await openChat(page, provider, language);
     const selectors = [
-      '.markdown>p', '.message-label', '.claude-mark', '.tool-card.combined summary', '.tool-card.combined .tool-command',
+      '.markdown>p', '.tool-card.combined summary', '.tool-card.combined .tool-command',
       '.tool-card.combined summary span', '.tool-card.combined .tool-output', '.tool-result-content .copy-action',
       '.tool-card:not(.combined)>summary', '.tool-card:not(.combined) .tool-diff', '.markdown .code-block pre code', '.code-block-bar>span', '.markdown table',
       '.document-card>strong', '.document-card>pre', '.thinking summary', '.thinking p', '.subagent-card strong', '.subagent-card small',
@@ -54,10 +54,11 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
         return {
           fonts: elements.map(element => parseFloat(getComputedStyle(element!).fontSize)),
           navigationFont: parseFloat(getComputedStyle(document.querySelector('.mobile-tabbar button,.desktop-tabs button')!).fontSize),
-          taps: [...message.querySelectorAll('summary,button')].map(element => element.getBoundingClientRect().height),
+          taps: [...message.querySelectorAll('summary,button')].filter(element => !element.closest('.message-actions')).map(element => element.getBoundingClientRect().height),
           width: message.getBoundingClientRect().width, scroll: message.scrollWidth,
           overflow:[...message.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>message.getBoundingClientRect().right+1).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width,scroll:e.scrollWidth})),
-          labelHeight: message.querySelector('.message-label')!.getBoundingClientRect().height,
+          copyHeight: message.querySelector('.message-actions .copy-button')!.getBoundingClientRect().height,
+          labels: message.querySelectorAll('.message-label,.claude-mark').length,
         };
       }, selectors);
       expect(result.fonts[0]).toBeCloseTo(size, 2);
@@ -66,12 +67,13 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
       expect(result.navigationFont).toBe(navigationFont);
       result.taps.forEach(height => expect(height).toBeGreaterThanOrEqual(48));
       expect(result.scroll,JSON.stringify(result.overflow)).toBeLessThanOrEqual(Math.ceil(result.width) + 1);
-      expect(result.labelHeight).toBeGreaterThanOrEqual(48);
+      expect(result.copyHeight).toBeGreaterThanOrEqual(28);
+      expect(result.labels).toBe(0);
     }
     if (provider === 'codex' && language === 'en') {
       await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; document.documentElement.style.setProperty('--chat-font-size', '14px'); });
       await page.setViewportSize({ width: 844, height: 900 });
-      await page.locator('.desktop-tabs').getByRole('button', { name: 'Settings', exact: true }).click();
+      await openSection(page,'Settings');
       await expect(page.locator('.settings-index')).toBeVisible();
       await page.screenshot({ path: 'artifacts/settings-typography-844.png', fullPage: true, animations: 'disabled' });
       await page.setViewportSize({ width: 320, height: 740 });

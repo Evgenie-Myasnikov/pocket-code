@@ -26,6 +26,15 @@ export class CodexService {
   async usage() { return normalizeCodexUsage(await (await this.connect()).request('account/rateLimits/read', {})); }
   private boardMcp:BoardMcpConfiguration=()=>({});
   setBoardMcpConfiguration(config:BoardMcpConfiguration){this.boardMcp=config;}
+  private boardMcpRefresh=false;
+  refreshBoardMcp(root:string){
+    if(!this.rpc||![...this.jobs.values()].some(job=>path.resolve(job.cwd).toLowerCase()===path.resolve(root).toLowerCase()))return;
+    this.boardMcpRefresh=true;this.refreshIdleBoardMcp();
+  }
+  private refreshIdleBoardMcp(){
+    if(!this.boardMcpRefresh||this.closed||[...this.jobs.values()].some(job=>job.status==='running'))return;
+    this.boardMcpRefresh=false;const rpc=this.rpc;this.rpc=undefined;this.ready=undefined;rpc?.close();
+  }
   private rpc?: CodexRpc;
   private ready?: Promise<CodexRpc>;
   private jobs = new Map<string, CodexJob>();
@@ -355,6 +364,7 @@ export class CodexService {
     if (status === 'error') job.error = error || 'Codex stopped with an error.';
     for (const pending of [...job.pending.values()]) pending.finish(false);
     job.revision++;
+    this.refreshIdleBoardMcp();
   }
   private serverRequest(rpc: CodexRpc, request: RpcEnvelope) {
     if (request.id === undefined) return;

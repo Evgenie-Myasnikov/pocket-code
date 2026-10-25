@@ -7,6 +7,7 @@ import {readFile,realpath} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {randomUUID} from 'node:crypto';
 import {BoardMcpProxy} from './board-mcp-proxy.mjs';
 
 const args=process.argv.slice(2),roots=[],aliases=new Set();
@@ -18,9 +19,9 @@ const server=new Server({name:'pocket-code-boards',version:'2'},{capabilities:{t
 const proxy=new BoardMcpProxy(async spec=>{
  const {worker}=JSON.parse(spec),client=new Client({name:'pocket_code_board_proxy',version:'1'});
  const transport=new StdioClientTransport({command:process.execPath,args:[worker,...args],env:process.env,stderr:'pipe'});
- try{await client.connect(transport);transport.stderr?.on('data',()=>{});await client.listTools();return client;}catch(error){await client.close().catch(()=>{});throw error;}
+ try{await client.connect(transport);transport.stderr?.on('data',()=>{});client.boardTools=(await client.listTools()).tools.map(tool=>tool.name);return client;}catch(error){await client.close().catch(()=>{});throw error;}
 },()=>{void server.notification({method:'notifications/tools/list_changed'}).catch(()=>{});});
-let stopped=false,polling=false,lastSpec;
+let stopped=false,polling=false,lastSpec,failedSpec;const instance=randomUUID();
 const localWorker=fileURLToPath(new URL('./board-mcp-worker.mjs',import.meta.url));
 async function latest(){
  const states=await Promise.all(roots.map(async root=>{
@@ -36,6 +37,9 @@ await proxy.refresh(lastSpec);
 server.setRequestHandler(ListToolsRequestSchema,()=>proxy.call('listTools',{}));
 server.setRequestHandler(CallToolRequestSchema,request=>proxy.call('callTool',request.params));
 await server.connect(new StdioServerTransport());
-const timer=setInterval(async()=>{if(stopped||polling)return;polling=true;try{const spec=await latest();if(spec!==lastSpec){await proxy.refresh(spec);lastSpec=spec;}}catch{/* Keep the current worker; retry only discovery, never a tool call. */}finally{polling=false;}},1000);
-const close=async()=>{if(stopped)return;stopped=true;clearInterval(timer);await proxy.close();await server.close();};
+let reporting=false;
+async function report(){if(stopped||reporting)return;reporting=true;try{const spec=JSON.parse(failedSpec||lastSpec);await Promise.all(roots.map(async(root,i)=>{if(!spec.generations[i])return;await fetch(`http://127.0.0.1:${port}/api/project-board/mcp/status`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},redirect:'error',signal:AbortSignal.timeout(3000),body:JSON.stringify({root,instance,generation:spec.generations[i],state:failedSpec?'error':'ready',tools:proxy.client?.boardTools||[]})});}));}catch{/* Optional on older hosts. */}finally{reporting=false;}}
+void report();const statusTimer=setInterval(()=>void report(),2000);
+const timer=setInterval(async()=>{if(stopped||polling)return;polling=true;try{const spec=await latest();if(spec!==lastSpec){try{await proxy.refresh(spec);lastSpec=spec;failedSpec=undefined;}catch(error){failedSpec=spec;throw error;}void report();}}catch{/* Keep the current worker; retry only discovery, never a tool call. */}finally{polling=false;}},1000);
+const close=async()=>{if(stopped)return;stopped=true;clearInterval(timer);clearInterval(statusTimer);await proxy.close();await server.close();};
 server.onclose=()=>{void close();};process.stdin.on('end',()=>{void close();});process.on('SIGTERM',()=>{void close();});

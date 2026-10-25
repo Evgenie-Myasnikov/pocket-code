@@ -1,4 +1,5 @@
 import type {BoardMcpRuntime} from './board-mcp-runtime.js';
+import {BoardViewControl,boardViewState,boardViewAction} from './board-view-control.js';
 import {whiteboardSchema} from '../src/whiteboard-model.js';
 import {miroLink} from '../src/miro-link.js';
 import {boardImages,saveBoardImage,readBoardImage} from './board-images.js';
@@ -157,6 +158,8 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   app.post('/api/project-board/image',async(req,res)=>{const input=z.object({root:z.string(),data:z.string().max(13981016),caption:z.string().max(160).default('')}).parse(req.body),root=await projectRoot(input.root,true);res.json(await saveBoardImage(root,input.data,input.caption));});
   app.get('/api/project-board/image',async(req,res)=>{const root=await projectRoot(req.query.root);res.json(await readBoardImage(root,z.string().parse(req.query.path)));});
   if(boardMcp){
+    app.get('/api/project-board/mcp/status',async(req,res)=>{if(current())throw new HttpError(403,'Board runtime belongs to the host');res.json(boardMcp.status(await projectRoot(req.query.root)));});
+    app.post('/api/project-board/mcp/status',async(req,res)=>{if(current())throw new HttpError(403,'Board runtime belongs to the host');const input=z.object({root:z.string(),instance:id,generation:id,state:z.enum(['ready','error']),tools:z.array(z.string().regex(/^[a-z_]{1,80}$/)).max(80)}).strict().parse(req.body);boardMcp.report(await projectRoot(input.root),input.instance,input.generation,input.state,input.tools);res.json({ok:true});});
     app.get('/api/project-board/mcp',async(req,res)=>{if(current())throw new HttpError(403,'Board runtime belongs to the host');const root=await projectRoot(req.query.root);res.json(boardMcp.read(root));});
     app.post('/api/project-board/mcp',async(req,res)=>{
       if(current())throw new HttpError(403,'Board runtime belongs to the host');
@@ -167,6 +170,20 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   }
   const liveActivity=new BoardLiveActivity();
   const liveFile=z.string().regex(/^board-[a-f0-9-]+\.json$/);
+  const views=new BoardViewControl();
+  const hostView=async(root:unknown,file:unknown)=>{if(current())throw new HttpError(403,'Board view control belongs to the host');return {root:await projectRoot(root),file:liveFile.parse(file)};};
+  app.get('/api/project-board/views',async(req,res)=>{const {root,file}=await hostView(req.query.root,req.query.file);res.json({views:views.list(root+'|'+file)});});
+  app.post('/api/project-board/view',async(req,res)=>{
+    const input=z.object({root:z.string(),file:liveFile,viewId:id,sequence:z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),state:boardViewState.nullable(),ack:z.object({id,status:z.enum(['applied','rejected']),reason:z.string().regex(/^[a-z_]{1,80}$/).optional()}).strict().optional()}).strict().parse(req.body);
+    const {root,file}=await hostView(input.root,input.file);res.json(views.report(root+'|'+file,input.viewId,input.sequence,input.state,input.ack));
+  });
+  app.post('/api/project-board/view/command',async(req,res)=>{
+    const input=z.object({root:z.string(),file:liveFile,viewId:id,requestId:id,revision:z.string().regex(/^[a-f0-9]{64}$/),action:boardViewAction}).strict().parse(req.body);
+    const {root,file}=await hostView(input.root,input.file),snapshot=await projectBoard(root);
+    if(!snapshot||snapshot.repositoryFile!==file||snapshot.repositoryRevision!==input.revision)throw new HttpError(409,'Board revision changed; read again');
+    if('ids' in input.action){const ids=new Set([...(snapshot.canvas?.items||[]).map(i=>i.id),...snapshot.notes.map(n=>n.id)]);if(input.action.ids.some(id=>!ids.has(id)))throw new HttpError(400,'Board object not found');}
+    res.json(await views.execute(root+'|'+file,input.viewId,input.requestId,input.revision,input.action));
+  });
   app.get('/api/project-board/live',async(req,res)=>{
     const root=await projectRoot(req.query.root),file=liveFile.parse(req.query.file),known=req.query.known===undefined?undefined:z.string().regex(/^[a-f0-9]{64}$/).parse(req.query.known);
     const after=req.query.after===undefined?undefined:id.parse(req.query.after),wait=req.query.wait===undefined?0:z.coerce.number().int().min(0).max(1000).parse(req.query.wait),key=root+'|'+file;

@@ -8,7 +8,7 @@ the local host connection internally; never put connection keys in MCP arguments
 
 Tools: `list_boards`, `board_overview`, `search_board`, `read_board`,
 `read_objects`, `read_note_context`, `focus_objects`, `create_note`, `update_note`,
-`canvas_apply`, `canvas_patch`. Mutations require the current repository revision and go through
+`canvas_apply`, `canvas_patch`, `read_view_state`, `control_view`, `board_mcp_status`. Mutations require the current repository revision and go through
 the same host validation and write lock as the UI. There are no deletion,
 publication or notification tools. Canvas writes refuse hosts older than 0.28.0.
 
@@ -80,6 +80,32 @@ already running legacy provider transport. External clients must register the
 proxy entry point above and support catalog-change notifications for new tools.
 Disconnected hosts retain the current worker. An unsuccessful board-entry request
 is shown in the board; workspace guests cannot restart the owner's MCP workers.
+
+## Open-view control (0.28.13)
+
+`read_view_state` discovers the current ephemeral view IDs, rendered camera
+transform, selection, visible object IDs and following/busy/visible flags.
+`control_view` executes `focus`, `select`, `camera`, `fit` or `follow` for one
+explicit view at its current board revision. It acts immediately without a new
+confirmation dialog. The interface automatically reports the resulting state;
+only that report can produce `applied`. This is state verification, not screenshot
+or pixel inspection. Hidden, editing, disconnected and stale views cannot report
+success. Commands expire after five seconds and do not replay on board reentry.
+Reuse a request ID only to retrieve the result of the exact same command; an
+unconfirmed outcome requires rereading the view before deciding the next action.
+Selection affects the existing per-message board attachment. View commands never
+write the board file, execute arbitrary UI selectors or control desktop windows.
+
+The small MCP status indicator reports the worker's live server catalog. Waiting
+means no managed agent connection has reported yet; new/resumed board chats
+acquire it. Server readiness does not establish that every provider refreshed its
+cached catalog. A native Codex probe reproduced that list-change notifications
+and a queued configuration reload did not refresh its loaded catalog. Board entry
+therefore requests a fresh Codex client after all its active turns finish; the
+next run resumes the same saved thread with a fresh MCP catalog. No active turn
+is interrupted, and unrelated project entries do not request this refresh.
+See the [Codex app-server protocol](https://learn.chatgpt.com/docs/app-server).
+External clients remain responsible for their own transport/catalog lifecycle.
 
 This is operation presence and saved-state synchronization. Shared unsaved edits,
 per-character remote typing and undo of another participant's changes are not

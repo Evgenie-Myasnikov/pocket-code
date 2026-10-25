@@ -27,6 +27,16 @@ aliases; select the task's project from `list_boards`, never another project.
   persistence evidence, not visual validation; inspect the UI for layout claims.
 - A chat's board context is a bounded snapshot. Refresh before later edits.
   Do not infer that omitted objects were deleted.
+- For open-canvas navigation, call `read_view_state`, choose a visible view of the
+  intended board and use `control_view` with its ID, current revision and a fresh
+  request ID. Focus, camera, selection and following execute immediately; the
+  automatic UI response must say `applied` before claiming success. This does not
+  ask the user to approve each command. Hidden/busy/stale views fail. An
+  unconfirmed result requires rereading, never replaying blindly. There is no
+  desktop-window control or screenshot evidence in these tools.
+- `board_mcp_status` reports the worker catalog; it cannot prove an external
+  client's cached tool list is current. Codex refresh waits for active work to
+  finish and resumes the saved conversation on its next run.
 
 Canvas writes require host 0.28.0+. Host 0.28.11+ displays actual MCP read/write
 activity with one AI cursor, affected-object highlights and optional camera

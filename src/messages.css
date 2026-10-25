@@ -1,4 +1,9 @@
 /* User messages have one quiet surface, without a redundant author toolbar. */
+.message.assistant>.message-actions{display:flex;align-items:center;min-height:28px;margin-top:4px}
+.message.assistant>.message-actions>.copy-button{width:28px;height:28px;min-height:28px;margin:0;color:var(--muted)}
+.message.assistant>.markdown:first-child>:first-child{margin-top:0}
+.reading-mode .message-actions{display:none}
+@media(pointer:coarse){.message.assistant>.message-actions>.copy-button{width:44px;height:44px}}
 :root[data-theme] article.message.user,
 :root[data-compact=true] .message.user {
   display:flex;align-items:flex-end;gap:var(--space-1);width:fit-content;max-width:100%;

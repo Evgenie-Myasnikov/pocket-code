@@ -24,5 +24,5 @@ export function useAiFollow(target:BoardActivityTarget|undefined,eventId:string|
   focus();const observer=new ResizeObserver(focus);observer.observe(element);
   return()=>{cancel();observer.disconnect();};
  },[eventId,target?.x,target?.y,target?.width,target?.height,following,visible,suspended,expiresAt]);
- return {following,pause,toggle:()=>{if(following)pause();else setFollowing(true);}};
+ return {following,pause,setFollowing:(enabled:boolean)=>{if(enabled)setFollowing(true);else pause();},toggle:()=>{if(following)pause();else setFollowing(true);}};
 }

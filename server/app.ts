@@ -58,7 +58,7 @@ const providerSchema = z.enum(['claude', 'codex','copilot']).default('claude');
 export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages }, terminals = new Terminals()) {
   const roots = await Promise.all(config.roots.map(p => realpath(p)));
   const claudeCatalog = config.claudeModels || new ClaudeModelCatalog();
-  const boardMcp=new BoardMcpRuntime(path.dirname(config.uploads),config.port);
+  const boardMcp=new BoardMcpRuntime(path.dirname(config.uploads),config.port,root=>config.codex?.refreshBoardMcp?.(root));
   jobs.setBoardMcpConfiguration(boardMcp.configuration);config.codex?.setBoardMcpConfiguration?.(boardMcp.configuration);config.copilot?.setBoardMcpConfiguration?.(boardMcp.configuration);
   const workspaceAccess=await createWorkspaceAccess(path.join(config.uploads,'.boards','workspaces.json'));
   let taskRuntime:TaskRuntime|undefined;

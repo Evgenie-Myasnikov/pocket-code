@@ -10,7 +10,7 @@
 .activity-details,.activity-group-items,.thinking[open]>.markdown{animation:chat-detail-enter .14s ease-out}
 @keyframes chat-content-enter{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 @keyframes chat-detail-enter{from{opacity:.15}to{opacity:1}}
-.chat-disclosure-chevron{flex:none;margin-inline-start:auto;transition:transform .18s ease;color:var(--muted)}
+.chat-disclosure-chevron{flex:none;margin-inline-start:auto;margin-inline-end:.25em;transition:transform .18s ease;color:var(--muted)}
 details[open]>summary>.chat-disclosure-chevron{transform:rotate(90deg)}
 .thinking>summary,.activity-row>summary{list-style:none}.thinking>summary::-webkit-details-marker,.activity-row>summary::-webkit-details-marker{display:none}
 .activity-group[data-running=true]>summary>svg:first-child{animation:chat-tool-breathe 1.5s ease-in-out infinite}
@@ -19,10 +19,10 @@ details[open]>summary>.chat-disclosure-chevron{transform:rotate(90deg)}
 .message :is(.copy-button,.copy-action)[data-copied=true] svg{animation:chat-copy-confirm .18s ease-out}
 @keyframes chat-copy-confirm{from{opacity:.3;transform:scale(.8)}to{opacity:1;transform:none}}
 .chat-canvas .scroll-latest{transition:opacity .16s ease,background-color .16s ease,transform .16s ease}.chat-canvas .scroll-latest:hover{transform:scale(1.04);background:var(--surface)}.chat-canvas .scroll-latest:active{transform:translateY(1px)}
-@media(hover:hover) and (pointer:fine){.message.assistant>.message-label>.copy-button{opacity:0}.message.assistant:hover>.message-label>.copy-button,.message.assistant:focus-within>.message-label>.copy-button{opacity:1}}
+@media(hover:hover) and (pointer:fine){.message.assistant>.message-actions>.copy-button{opacity:0}.message.assistant:hover>.message-actions>.copy-button,.message.assistant:focus-within>.message-actions>.copy-button{opacity:1}}
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.chat-history-skeleton *,.message[data-enter=true],.activity-details,.activity-group-items,.thinking[open]>.markdown,.activity-group[data-running=true]>summary>svg:first-child,.message :is(.copy-button,.copy-action)[data-copied=true] svg{animation:none!important;transform:none!important}.chat-disclosure-chevron,.message :is(.copy-button,.copy-action),.conversation :is(.tool-card,.thinking)>summary,.chat-canvas .scroll-latest{transition:none!important}}
 
-@media(forced-colors:active){.message.assistant>.message-label>.copy-button{opacity:1}}
+@media(forced-colors:active){.message.assistant>.message-actions>.copy-button{opacity:1}}
 
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.chat-canvas .scroll-latest{transform:none!important}}
 

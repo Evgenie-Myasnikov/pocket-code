@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased (0.28.13)
+
+Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Not published.
+
+### Features
+- Board MCP can read open view state and immediately control AI following, camera, focus, selection and fit. No user confirmation dialog: success requires the UI to report the resulting state. Commands target one current view/revision, expire without replay, and reject hidden, busy or disconnected canvases. Focus/selection show the real AI cursor; selected cards remain attached to board chat. These controls do not edit the board file.
+- A compact MCP indicator reports the actual managed worker catalog and connection state. Shared board guidance documents the commands and distinguishes server readiness from a provider's cached tool list.
+
+### Bug Fixes
+- Reopening a board refreshes the native Codex client after all active turns finish, then resumes the same saved conversation on the next run. Correction to the 0.28.12 evidence: calling an existing tool after worker rotation did not prove discovery of newly added tools; an isolated native-client probe reproduced that cache limitation and verified reconnect with retained history. Active work is not interrupted.
+- Removed repeated provider names/icons and empty reply header rows; accessible authorship and compact copy actions remain. Reserved space for rotating disclosure arrows to prevent narrow-chat overflow at large text sizes.
+
+### Validation
+- 37 targeted unit/integration checks and 17 distinct browser scenarios passed, including real stdio MCP/host/rendered-view control, result acknowledgement, stale/busy/hidden rejection, project isolation, exact saved history, compiled Windows route policy, two-viewer writes, mobile chat at 320/360/390/412 px, 8-22 px text and reduced motion. The 400-card drag retained 400 metadata renders. The installed Codex reconnect probe used a local synthetic model server only. TypeScript/Vite, portable-board schema/dependencies and links in 27 documents passed; synthetic captures inspected. Existing Review/attachment expectations were updated for their previously shipped menu/viewer behavior; disclosure overflow was reproduced against the prior source and fixed. Packaging pending; physical devices and live Claude/Copilot model turns were not tested.
+
 ## [0.28.12](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.11...v0.28.12) (2026-10-25)
 
 Published [v0.28.12](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.12) from [58c9bbf50d4061a7a98021dc768969d87af71c7e](https://github.com/Evgenie-Myasnikov/pocket-code/commit/58c9bbf50d4061a7a98021dc768969d87af71c7e) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
