@@ -2,15 +2,15 @@ import {openSection} from './chat-navigation';
 import {test,expect,type Page} from '@playwright/test';
 import {desktop} from './desktop-fixture';
 const one='11111111-1111-4111-8111-111111111111',two='33333333-3333-4333-8333-333333333333';
-async function openBoard(page:Page,images=true){
+async function openBoard(page:Page,images=true,root='C:\\Demo\\Atlas'){
  await page.setViewportSize({width:1440,height:900});await desktop(page);
- await page.evaluate(({one,two,images})=>{
+ await page.evaluate(({one,two,images,root})=>{
   const w=window as any;w.uniqueUploads=true;
   const image=(digit:string,caption:string)=>({path:'project-boards/assets/'+digit.repeat(64)+'.png',caption});
   const notes=[{id:one,title:'First synthetic card',description:'First criteria',images:images?[image('a','First concept')]:[]},{id:two,title:'Second synthetic card',description:'Second criteria',images:images?[image('a','First concept'),image('b','Second concept')]:[]}].map((n,i)=>({...n,branch:'',status:'idea',priority:'normal',x:i*330,y:0,dependencies:[]}));
-  w.projectBoardOverride={id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root:'C:\\Demo\\Atlas',repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'a'.repeat(64),revision:0,versionSource:'planned',versions:[],branches:[],notes,canvas:{version:1,items:notes.map(n=>({id:n.id,kind:'card',text:n.title,description:n.description,color:'sand',x:n.x,y:n.y,width:280,height:280})),links:[]}};
- },{one,two,images});
- await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.board-index-item').filter({has:page.locator('small').filter({hasText:/^Atlas$/})}).click();await expect(page.locator('.whiteboard-item')).toHaveCount(2);
+  w.projectBoardOverride={id:'22222222-2222-4222-8222-222222222222',name:'Atlas',root,repositoryFile:'board-22222222-2222-4222-8222-222222222222.json',repositoryRevision:'a'.repeat(64),revision:0,versionSource:'planned',versions:[],branches:[],notes,canvas:{version:1,items:notes.map(n=>({id:n.id,kind:'card',text:n.title,description:n.description,color:'sand',x:n.x,y:n.y,width:280,height:280})),links:[]}};
+ },{one,two,images,root});
+ await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();await page.locator('.board-index-item').filter({has:page.locator('small').filter({hasText:new RegExp('^'+root.split(/[\\/]/).pop()+'$')})}).click();await expect(page.locator('.whiteboard-item')).toHaveCount(2);
 }
 const calls=(page:Page)=>page.evaluate(()=>(window as any).desktopCalls.filter((m:any)=>m.action==='write'&&(m.endpoint==='/jobs'||/^\/jobs\/[^/]+\/messages$/.test(m.endpoint))));
 
@@ -70,4 +70,40 @@ test('phone gallery stays compact and its add action attaches an original to the
  });
  await page.goto('http://127.0.0.1:5173');image=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;canvas.getContext('2d')!.fillRect(0,0,320,180);return canvas.toDataURL().split(',')[1];});await expect(page.getByRole('button',{name:/Inbox|Входящие/i})).toHaveCount(0);await expect(page.locator('.mobile-tabbar>button')).toHaveCount(3);await expect(page.locator('.chat-view-controls,.chat-grid-view')).toHaveCount(0);await openSection(page,'Board');const button=page.locator('.board-index-item');if(await button.count())await button.first().click();await page.getByRole('button',{name:'Board images',exact:true}).click();await expect(page.locator('.board-gallery .board-image-thumb img')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'.local/board-images-phone.png'});
  await page.getByRole('button',{name:'Back to board',exact:true}).click();await expect(page.locator('.whiteboard-viewport')).toBeVisible();await page.getByRole('button',{name:'Board images',exact:true}).click();await page.getByRole('button',{name:'Attach to chat: Phone concept',exact:true}).click();await expect(page.getByLabel('Message Claude',{exact:true})).toBeVisible();await expect(page.locator('.draft-attachment-image img')).toHaveAttribute('alt','Phone concept.png');expect(jobs).toBe(0);
+});
+
+
+test('expired launch restores the board session, native image drag and per-message selection',async({page})=>{
+ await openBoard(page);
+ await page.locator('.board-header').getByRole('button',{name:'Chat',exact:true}).click();
+ await page.getByLabel('Message Claude',{exact:true}).fill('Start board session');await page.locator('.send-button').click();await expect.poll(async()=>(await calls(page)).length).toBe(1);
+ await page.evaluate(()=>{(window as any).expiredBoardJobs=true;});
+ await page.locator('.desktop-rail .desktop-sessions button').first().click();
+ await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+ const entry=page.locator('.board-index-item').filter({has:page.locator('small').filter({hasText:/^Atlas$/})});if(await entry.count())await entry.click();
+ await page.locator('.board-discuss').click();
+ await expect(page.getByLabel('Message Claude',{exact:true})).toBeEnabled();
+ await expect(page.locator('.error-banner')).toHaveCount(0);
+ await page.locator(`[data-canvas-id="${one}"] .whiteboard-text`).click();
+ await expect(page.locator('.composer-board-selection')).toContainText('Board selection');
+ await page.getByRole('button',{name:'Board images',exact:true}).click();
+ const img=page.locator('.board-gallery .board-image-thumb img').first();await expect(img).toBeVisible();const from=(await img.boundingBox())!,to=(await page.getByLabel('Message Claude',{exact:true}).boundingBox())!;
+ await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(from.x+from.width/2+15,from.y+from.height/2,{steps:5});await page.mouse.move(to.x+to.width/2,to.y+to.height/2,{steps:15});await page.mouse.up();
+ await expect(page.locator('.draft-attachment-image img')).toHaveAttribute('alt','First concept.png');
+ await expect(page.locator('.board-context-chip')).toHaveText('Atlas');
+ await page.getByLabel('Message Claude',{exact:true}).fill('Discuss restored selection');await page.locator('.send-button').click();await page.getByRole('dialog').getByRole('button',{name:/continue|Продолжить/i}).click();await expect.poll(async()=>(await calls(page)).length).toBe(2);
+ const names=await page.evaluate(()=>(window as any).desktopCalls.filter((m:any)=>m.endpoint?.startsWith('/uploads')&&m.action==='write').map((m:any)=>m.data.name));expect(names).toContain('Board selection.txt');
+});
+
+
+test('unavailable pending launch keeps selection and the correct project visible without replacing its binding',async({page})=>{
+ await openBoard(page,false,'C:\\Demo\\Garden');
+ await page.locator('.board-header').getByRole('button',{name:'Chat',exact:true}).click();
+ const original=await page.evaluate(()=>{const key=Object.keys(localStorage).find(k=>k.startsWith('pocket-board-conversation-v1:'))!,value=JSON.parse(localStorage.getItem(key)!);value.jobId='missing-synthetic-job';localStorage.setItem(key,JSON.stringify(value));(window as any).expiredBoardJobs=true;return value;});
+ await page.locator('.desktop-rail .desktop-sessions button').first().click();await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
+ const entry=page.locator('.board-index-item').filter({has:page.locator('small').filter({hasText:/^Garden$/})});if(await entry.count())await entry.click();await page.locator('.board-discuss').click();
+ await expect(page.locator('.error-banner')).toContainText('Synthetic expired job');
+ await page.locator(`[data-canvas-id="${one}"] .whiteboard-text`).click();await expect(page.locator('.composer-board-selection')).toHaveAttribute('title','First synthetic card');
+ const binding=await page.evaluate(()=>JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith('pocket-board-conversation-v1:'))!)!));expect(binding).toEqual(original);
+ await expect(page.getByLabel('Message Claude',{exact:true})).toBeDisabled();
 });

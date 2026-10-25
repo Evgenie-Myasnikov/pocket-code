@@ -45,6 +45,7 @@ export async function desktop(page:Page){
    if(p==='/projects'){reply(id,['C:\\Demo\\Atlas','C:\\Demo\\Garden']);return;}
    if(p==='/jobs'){reply(id,(window as any).testRuns||[]);return;}
    if(/^\/jobs\/[^/]+\/messages$/.test(p)&&action==='write'){if((window as any).rejectNextFollowup){(window as any).rejectNextFollowup=false;queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,error:'Synthetic turn closing',status:409}})));return;}const run=(window as any).testRuns.find((r:any)=>r.id===p.split('/')[2]);run.revision++;reply(id,run);return;}
+   if(p.startsWith('/jobs/')&&(window as any).expiredBoardJobs){queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,error:'Synthetic expired job',code:'host_response',status:404}})));return;}
    if(p.startsWith('/jobs/')){reply(id,((window as any).testRuns||[]).find((run:any)=>run.id===p.split('/').pop()));return;}
    if(p==='/review/availability'){reply(id,{available:true,mode:'working'});return;}
    if(p.endsWith('/messages')){const earlier=url.searchParams.has('end'),start=url.searchParams.has('offset');reply(id,{messages:earlier?[messageBlock('older','Earlier project context')]:[messageBlock('answer',p.includes('/beta/')?'Garden documentation':'## Interface review\n\nThe responsive layout is ready.\n\n```ts\nconst layout = "adaptive";\n```'),{id:'picture',role:'assistant',blocks:[{type:'image',source:{type:'base64',media_type:'image/png',data:sampleImage}}]}],previous:earlier||start?null:5,next:null});return;}

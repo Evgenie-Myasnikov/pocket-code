@@ -69,10 +69,11 @@ public static class DesktopReadPolicy {
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");
     }
 }
-/// <summary>A host request that never reached the host: the window reports a code, never .NET exception text.</summary>
+/// <summary>A host or transport failure: preserve HTTP status without exposing transport exception text.</summary>
 public sealed class DesktopBridgeFailure:Exception {
     public readonly string Code;
-    public DesktopBridgeFailure(string code,string message):base(message){Code=code;}
+    public readonly int? Status;
+    public DesktopBridgeFailure(string code,string message,int? status=null):base(message){Code=code;Status=status;}
 }
 public sealed class PocketDesktop:Form {
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
@@ -288,7 +289,7 @@ public sealed class PocketDesktop:Form {
                     Save();
                 }else if(action!="state")throw new InvalidOperationException("Unknown desktop action.");result=Snapshot();
             }Reply(new{id=id,value=result});
-        }catch(DesktopBridgeFailure error){Reply(new{id=id,error=error.Message,code=error.Code});}
+        }catch(DesktopBridgeFailure error){Reply(new{id=id,error=error.Message,code=error.Code,status=error.Status});}
         catch(Exception error){Reply(new{id=id,error=error.Message});}
     }
     void Reply(object message){if(exiting||IsDisposed)return;try{if(web.CoreWebView2!=null)web.CoreWebView2.PostWebMessageAsJson(json.Serialize(message));}catch(InvalidOperationException){}}
@@ -343,7 +344,7 @@ public sealed class PocketDesktop:Form {
             catch(TaskCanceledException){throw new DesktopBridgeFailure("host_timeout","The PC host did not answer in time.");}
             using(var response=sent){
                 string body=await response.Content.ReadAsStringAsync();object parsed=null;try{parsed=json.DeserializeObject(body);}catch{}
-                if(!response.IsSuccessStatusCode){var fields=parsed as Dictionary<string,object>;throw new InvalidOperationException(fields!=null&&fields.ContainsKey("error")?Convert.ToString(fields["error"]):"Host request failed: "+(int)response.StatusCode);}return parsed;
+                if(!response.IsSuccessStatusCode){var fields=parsed as Dictionary<string,object>;throw new DesktopBridgeFailure("host_response",fields!=null&&fields.ContainsKey("error")?Convert.ToString(fields["error"]):"Host request failed: "+(int)response.StatusCode,(int)response.StatusCode);}return parsed;
             }
         }
     }

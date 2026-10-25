@@ -12,7 +12,7 @@ function attach(){if(attached)return;const bridge=view();if(!bridge)throw Error(
   if(data.state)for(const listener of listeners)listener(data.state);
   if(data.chatNotification)window.dispatchEvent(new Event('pocket-code-notification'));
   if(data.id===undefined)return;const task=pending.get(data.id);if(!task)return;clearTimeout(task.timer);pending.delete(data.id);
-  if(data.error)task.reject(Object.assign(Error(bridgeMessage(data.code)||data.error),{status:data.status,...(data.code?{code:data.code,problem:data.code.startsWith('host_')?'unreachable':undefined}:{})}));else task.resolve(data.value);
+  if(data.error)task.reject(Object.assign(Error(bridgeMessage(data.code)||data.error),{status:data.status,...(data.code?{code:data.code,problem:!data.status&&data.code.startsWith('host_')?'unreachable':undefined}:{})}));else task.resolve(data.value);
 });}
 /** The window never shows .NET exception text for a host that does not answer; the code is translated here. */
 export function bridgeMessage(code?:string){return code==='host_unreachable'?t('Сервер ПК не отвечает. Переподключаемся…'):code==='host_timeout'?t('Сервер ПК не ответил вовремя. Повторите.'):'';}
