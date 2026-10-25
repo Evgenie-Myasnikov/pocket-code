@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.9 (unreleased)
+## [0.28.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.8...v0.28.9) (2026-10-25)
+
+Published [v0.28.9](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.9) from [ee17e713a73f317700accccbdf968bb2642d0e58](https://github.com/Evgenie-Myasnikov/pocket-code/commit/ee17e713a73f317700accccbdf968bb2642d0e58) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - An image icon before Board Chat opens a gallery containing only the current board's unique image assets. Preview originals, drag them into the chat as unsent attachments, or use the keyboard/touch add action. Back restores the mounted canvas view. Thumbnails reuse the bounded loader/cache; image transfers retain connection/project access checks and the existing attachment limit.
@@ -15,7 +17,7 @@
 - Retired the in-app Inbox from desktop/mobile navigation, chat overflow and keyboard shortcuts, including board-notice polling. Chats always use the searchable list; the tile view and its switch are removed, and old grid preferences are ignored. Existing host records and compatibility APIs remain. Native chat notifications are separate.
 
 ### Validation
-- TypeScript/Vite, eleven targeted unit/API/MCP checks and thirty-two browser scenarios passed in the release checkout. Motion checks cover clipboard contents, live versus loaded text, disclosure directions, intermediate scroll positions, manual interruption and reduced-motion at phone/desktop widths. Existing gallery/selection/sidebar/composer/header/persistence/live-board checks passed; the 400-card drag retained 400 metadata renders. Synthetic captures inspected. An obsolete Inbox expectation was updated for its intentional removal; a visual CSS name collision in disclosure arrows was corrected and its exact directions rechecked. Package verification and publication pending; physical devices and live model turns not tested.
+- TypeScript/Vite, eleven targeted unit/API/MCP checks and thirty-two browser scenarios passed in the release checkout. Motion checks cover clipboard contents, live versus loaded text, disclosure directions, intermediate scroll positions, manual interruption and reduced-motion at phone/desktop widths. Existing gallery/selection/sidebar/composer/header/persistence/live-board checks passed; the 400-card drag retained 400 metadata renders. Synthetic captures inspected. An obsolete Inbox expectation was updated for its intentional removal; a visual CSS name collision in disclosure arrows was corrected and its exact directions rechecked. Web/Android/Windows/host packages passed; 86 shared web files and 325 host/Windows source files match the reviewed inputs. All 1,442 decoded archive entries passed privacy review; APK signer matches 0.28.8. GitHub CI, exact source tag and hashes of all four downloaded assets verified. Published; physical devices and live model turns not tested.
 
 ## [0.28.8](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.7...v0.28.8) (2026-10-25)
 
