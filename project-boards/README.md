@@ -43,6 +43,8 @@ shared files. Existing notes without images remain valid. Review captions and
 image contents before sharing a repository; pixel privacy cannot be inferred
 from a filename. Old hosts need updating to read this extended format.
 
+Board image cards show client-generated thumbnails up to 256 px. Initial reads still download originals through a shared two-task queue; repeated references share a bounded thumbnail cache, and off-screen URLs are released. The viewer loads full resolution separately.
+
 `versionBranches` maps version labels to real Git branch names. Branches recorded
 in the changelog are resolved against local and remote Git refs automatically and
 retained on the next board save. Missing branches remain explicitly unlinked.

@@ -697,7 +697,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if (busy || uploading) return;
     rememberPosition();rememberDraft();releasePending(true);setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
-    const savedPosition=positionOnOpen(positionKey(cacheScope,provider,s.sessionId));pendingPosition.current=savedPosition;
+    const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
+    const savedPosition=positionOnOpen(positionKey(cacheScope,provider,s.sessionId),Boolean(active)||activity.items.some(item=>item.provider===provider&&item.sessionId===s.sessionId&&(item.status==='running'||item.status==='needs_input')));pendingPosition.current=savedPosition;
     historyWindow.current = savedPosition?.window||100;setHistoryError('');setFromStart(savedPosition?.fromStart||false);setShowScrollActions(savedPosition?!savedPosition.bottom:false);lastScrollTop.current = savedPosition?.top||0;
     const cached=cacheScope&&!demo?readChatCache<ChatMessage[]>(cacheScope,provider,'chat:'+s.sessionId):null;
     setHistory(Array.isArray(cached)?cached:[]);setJob(null);restoreDraft(activeJob?.sessionId||s.sessionId);setError('');setTakeover(false);setHasMore(null);nearBottom.current = savedPosition?.bottom??true;
@@ -707,7 +708,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       const view=cacheScope?await readHistoryView(cacheScope,provider,s.sessionId):undefined;
       if(epoch!==navigation.current)return;
       if(view&&view.fromStart===(savedPosition?.fromStart||false)&&Array.isArray(view.messages)){historyWindow.current=Math.max(historyWindow.current,view.window);setHistory(view.messages);setHasMore(view.hasMore);}
-      const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
       const full = active ? await api<JobView>(`/jobs/${active.id}`) : null;
       if (epoch !== navigation.current) return;
       if(full&&(full.provider||'claude')!==provider)throw new Error(t('Чат относится к другому рабочему пространству.'));

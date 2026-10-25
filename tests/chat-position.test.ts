@@ -8,3 +8,7 @@ test('working chat departure resumes latest messages once; idle chat retains its
  assert.deepEqual(positionOnOpen(a),{top:0,window:100,fromStart:false,bottom:true});assert.equal(readPosition(a)?.followOnReturn,undefined);assert.deepEqual(positionOnOpen(b),anchor);
  savePosition(a,anchor);markRunningOnLeave(a,false);assert.deepEqual(positionOnOpen(a),{...anchor,followOnReturn:false});flushPositions();
 });
+
+test('a currently running chat overrides a stored history anchor on every open',()=>{
+ const key=positionKey('synthetic-live-host','claude','live');savePosition(key,{top:1800,window:700,fromStart:true,bottom:false,messageId:'old'});assert.deepEqual(positionOnOpen(key,true),{top:0,window:100,fromStart:false,bottom:true});
+});

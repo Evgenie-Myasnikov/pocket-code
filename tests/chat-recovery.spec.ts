@@ -146,6 +146,17 @@ test('cached list and transcript appear before delayed refresh after reload',asy
  await expect(page.getByText('History message 1',{exact:true})).toHaveCount(0);
 });
 
+test('opening a running chat follows its current answer instead of the old bookmark',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await host(page);let live=false,seen=false;
+ const job={id:'live-answer',provider:'claude',sessionId:'saved-chat',cwd:root,status:'running',messages:[],partial:'Current answer is being written here',approvals:[],startedAt:Date.now(),revision:1,baseMessageCount:100};
+ await page.route('**/api/jobs?*',route=>{if(live)seen=true;return route.fulfill({json:live?[job]:[]});});
+ await page.route('**/api/jobs/live-answer*',route=>route.fulfill({json:job}));
+ await page.route('**/api/sessions/saved-chat/messages?*',route=>route.fulfill({json:{messages:Array.from({length:100},(_,i)=>message(i+1)),previous:null,next:null}}));
+ await connect(page,'claude');const scroller=page.locator('.conversation');await scroller.evaluate(el=>{el.scrollTop=1600;el.dispatchEvent(new Event('scroll'));});await page.getByRole('button',{name:'Back to chats',exact:true}).click();
+ live=true;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect.poll(()=>seen,{timeout:8000}).toBe(true);
+ await page.getByRole('button',{name:'Saved claude chat'}).click();await expect(page.getByText('Current answer is being written here',{exact:true})).toBeVisible();await expect.poll(()=>scroller.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(80);
+});
+
 test('chat position and jump controls survive downward scrolling, tab changes and reload',async({page})=>{
  await page.setViewportSize({width:390,height:844});await host(page);
  await page.route('**/api/sessions/saved-chat/messages?*',route=>route.fulfill({json:{messages:Array.from({length:100},(_,i)=>message(i+1)),previous:null,next:null}}));
