@@ -25,9 +25,10 @@ aliases; select the task's project from `list_boards`, never another project.
   Do not infer that omitted objects were deleted.
 
 Canvas writes require host 0.28.0+. MCP edits do not commit, push, publish,
-notify participants or animate a cursor. Do not report any of these as a side
-effect. Saved repository files refresh in the board UI; no unsaved live canvas
-is exposed. Follow the repository's board and changelog workflow.
+notify participants or simulate pointer motion. Host 0.28.8+ displays a temporary
+AI marker on objects changed through MCP and refreshes the visible board automatically.
+Older hosts have no activity marker. File edits refresh without AI attribution;
+no unsaved live canvas is exposed. Follow the repository's board and changelog workflow.
 
 ## Card creation context
 

@@ -11,13 +11,14 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 test('board MCP protects revisions, privacy and old hosts over stdio',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'board-mcp-')),token=randomUUID();
  await writeFile(path.join(root,'connection-key.txt'),token);
- let writes=0,version='0.27.1',board={name:'Synthetic board',repositoryRevision:'a'.repeat(64),versions:['Next'],notes:[{id:randomUUID(),title:'Canvas idea',description:'Synthetic example',branch:'Next',status:'idea',priority:'normal',x:0,y:0,dependencies:[],owner:'Private owner',assigneeIds:['private-member']}]};
+ const signals=[];let writes=0,version='0.27.1',board={repositoryFile:'board-'+randomUUID()+'.json',name:'Synthetic board',repositoryRevision:'a'.repeat(64),versions:['Next'],notes:[{id:randomUUID(),title:'Canvas idea',description:'Synthetic example',branch:'Next',status:'idea',priority:'normal',x:0,y:0,dependencies:[],owner:'Private owner',assigneeIds:['private-member']}]};
  const host=createServer(async(req,res)=>{
   res.setHeader('Content-Type','application/json');
   if(req.headers.authorization!==`Bearer ${token}`){res.writeHead(401);res.end('{}');return;}
   if(req.url==='/api/health'){res.end(JSON.stringify({version}));return;}
   if(req.method==='GET'){res.end(JSON.stringify({board}));return;}
   const chunks=[];for await(const chunk of req)chunks.push(chunk);const data=JSON.parse(Buffer.concat(chunks));
+  if(req.url==='/api/project-board/activity'){signals.push(data);res.end('{}');return;}
   if(data.repositoryRevision!==board.repositoryRevision){res.writeHead(409);res.end('{}');return;}
   writes++;board={...board,...data,repositoryRevision:'b'.repeat(64)};res.end(JSON.stringify(board));
  });
@@ -37,7 +38,7 @@ test('board MCP protects revisions, privacy and old hosts over stdio',async()=>{
   version='0.28.0';assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'a'.repeat(64),items:[item],context})).isError);assert.equal(writes,1);assert.equal(board.canvas.items[0].id,item.id);
   assert.ok((await invoke('update_note',{project:'demo',revision:'a'.repeat(64),id:board.notes[0].id,patch:{title:'Stale edit'}})).isError);assert.equal(writes,1);
   const task=board.notes[0];assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[{...item,id:task.id,kind:'card',text:'Updated task',description:'Updated criteria'}]})).isError);
-  assert.equal(board.notes[0].title,'Updated task');assert.equal(board.notes[0].description,'Updated criteria');assert.equal(board.notes[0].priority,task.priority);
+  assert.equal(board.notes[0].title,'Updated task');assert.equal(board.notes[0].description,'Updated criteria');assert.equal(board.notes[0].priority,task.priority);assert.deepEqual(signals.slice(-2).map(s=>s.phase),['editing','saved']);assert.deepEqual(signals.at(-1).ids,[task.id]);
   const free={id:randomUUID(),from:item.id,fromSide:'e',toPoint:{x:800,y:600}};assert.ok((await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[],links:[free]})).isError);
   version='0.28.4';assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[],links:[free]})).isError);assert.deepEqual(board.canvas.links,[free]);
   const newNote={title:'Context-aware task',description:'Product acceptance',branch:'Next',status:'questions',priority:'normal',x:40,y:80,dependencies:[task.id]};

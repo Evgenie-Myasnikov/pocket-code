@@ -60,3 +60,7 @@ For MCP creation, supply `context: {summary, sources, questions?}` to `create_no
 ## Persistent board conversation
 
 The board Chat action resumes the conversation saved for that board on this installation. Leaving the board or restarting the app preserves the association. **More actions → New board chat** explicitly replaces it; older conversations remain in the regular chat list. The private association is scoped to the connection/account, project and board; it is not written to repository board files or synchronized across devices. If the saved session is unavailable, its association remains and the user must explicitly create a new board chat.
+
+## Automatic board updates
+
+The visible board polls host 0.28.8+ about once per second; unchanged files return only a metadata stamp. Hidden views pause polling. Older hosts and legacy live boards fall back to full reads every three seconds. Updates wait during local editing or gestures; revision conflicts still reject stale saves. MCP writes send temporary object IDs and phases, displayed as an AI marker near the changed object. Direct file changes receive highlighting without invented AI attribution. This is automatic refresh with activity, not a shared unsaved editing session or a simulated moving pointer.

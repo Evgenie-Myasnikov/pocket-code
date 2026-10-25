@@ -4,7 +4,8 @@ import {boardImages,saveBoardImage,readBoardImage} from './board-images.js';
 import {versionBranches} from './board-version-links.js';
 import {projectBoard,createProjectBoard,updateProjectBoard,deleteProjectBoard} from './project-board.js';
 import {boardNotice,assignmentNotices,allowedRecipients,addNotice,assignees} from './board-attention.js';
-import {saveBoardSnapshot,listBoardSnapshots,readBoardSnapshot} from './board-snapshots.js';
+import {saveBoardSnapshot,listBoardSnapshots,readBoardSnapshot,boardSnapshotStamp} from './board-snapshots.js';
+import {BoardLiveActivity} from './board-live.js';
 import {profileName,completeName} from '../src/profile-name.js';
 import {readProjectRoadmap} from './project-roadmap.js';
 import {boardExample,pocketCodeExample} from './board-example.js';
@@ -154,6 +155,18 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   async function projectRoot(value:unknown,write=false){const root=await allowedPath(roots,z.string().parse(value),true),ctx=current();if(ctx&&(!ctx.ws.roots.includes(root)||write&&ctx.person.role==='viewer'))throw new HttpError(403,'Project access denied');return root;}
   app.post('/api/project-board/image',async(req,res)=>{const input=z.object({root:z.string(),data:z.string().max(13981016),caption:z.string().max(160).default('')}).parse(req.body),root=await projectRoot(input.root,true);res.json(await saveBoardImage(root,input.data,input.caption));});
   app.get('/api/project-board/image',async(req,res)=>{const root=await projectRoot(req.query.root);res.json(await readBoardImage(root,z.string().parse(req.query.path)));});
+  const liveActivity=new BoardLiveActivity();
+  const liveFile=z.string().regex(/^board-[a-f0-9-]+\.json$/);
+  app.get('/api/project-board/live',async(req,res)=>{
+    const root=await projectRoot(req.query.root),file=liveFile.parse(req.query.file),known=req.query.known===undefined?undefined:z.string().regex(/^[a-f0-9]{64}$/).parse(req.query.known);
+    const version=await boardSnapshotStamp(root,file),activity=liveActivity.get(root+'|'+file);
+    if(known===version){res.json({version,unchanged:true,activity});return;}
+    const board=await projectBoard(root);if(board)validateDependencies(board.notes);res.json({version,board,activity});
+  });
+  app.post('/api/project-board/activity',async(req,res)=>{
+    const input=z.object({root:z.string(),file:liveFile,ids:z.array(id).min(1).max(100),phase:z.enum(['editing','saved','failed'])}).strict().parse(req.body),root=await projectRoot(input.root,true);
+    await boardSnapshotStamp(root,input.file);res.json(liveActivity.set(root+'|'+input.file,input.ids,input.phase));
+  });
   const privateNames=()=>store.workspaces().flatMap(w=>[...w.hostPeople,...w.members].map(p=>p.name));
   app.get('/api/project-board',async(req,res)=>{const root=await projectRoot(req.query.root),result=await projectBoard(root);if(result)validateDependencies(result.notes);res.json({board:result,miro:store.snapshot().miroBoards.find(b=>b.root===root)||null,canEdit:current()?.person.role!=='viewer'});});
   app.post('/api/project-board/miro',async(req,res)=>{

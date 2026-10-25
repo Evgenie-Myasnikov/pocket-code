@@ -12,12 +12,12 @@ export type NodeActions={
  connect(e:ReactPointerEvent<HTMLElement>,item:Item,side:PortSide):void;
  portKey(item:Item,side:PortSide):void;
 };
-type Props={item:Item;selected:boolean;disabled:boolean;editing:Item|null;visiblePort?:PortSide;target:boolean;ru:boolean;renderCard?(id:string):ReactNode;actions:MutableRefObject<NodeActions>};
+type Props={remote?:boolean;item:Item;selected:boolean;disabled:boolean;editing:Item|null;visiblePort?:PortSide;target:boolean;ru:boolean;renderCard?(id:string):ReactNode;actions:MutableRefObject<NodeActions>};
 
-export const WhiteboardNode=memo(function WhiteboardNode({item,selected,disabled,editing,visiblePort,target,ru,renderCard,actions}:Props){
+export const WhiteboardNode=memo(function WhiteboardNode({remote,item,selected,disabled,editing,visiblePort,target,ru,renderCard,actions}:Props){
  const label=(en:string,ruText:string)=>ru?ruText:en;
  const metadata=useMemo(()=>item.kind==='card'?renderCard?.(item.id):null,[renderCard,item.id,item.kind]);
- return <article onContextMenu={e=>{e.preventDefault();e.stopPropagation();actions.current.menu(item,e.clientX,e.clientY);}} data-canvas-id={item.id} data-note-id={item.kind==='card'?item.id:undefined} className={`whiteboard-item wb-${item.kind} wb-${item.color}${selected?' wb-selected':''}${target?' wb-connect-target':''}`} style={{left:item.x,top:item.y,width:item.width,height:item.height}}>
+ return <article onContextMenu={e=>{e.preventDefault();e.stopPropagation();actions.current.menu(item,e.clientX,e.clientY);}} data-canvas-id={item.id} data-note-id={item.kind==='card'?item.id:undefined} className={`whiteboard-item wb-${item.kind} wb-${item.color}${remote?' wb-remote-updated':''}${selected?' wb-selected':''}${target?' wb-connect-target':''}`} style={{left:item.x,top:item.y,width:item.width,height:item.height}}>
   {editing?<div className="wb-editor" onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))actions.current.finish();}} onKeyDown={e=>{e.stopPropagation();if(e.key==='Escape')actions.current.edit(null);else if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();actions.current.finish();}}}>
    <textarea autoFocus aria-label={label('Text','Текст')} maxLength={item.kind==='card'?160:4000} value={editing.text} onChange={e=>actions.current.edit({...editing,text:e.target.value})}/>
    {item.kind==='card'&&<textarea aria-label={label('Description','Описание')} maxLength={20000} value={editing.description||''} onChange={e=>actions.current.edit({...editing,description:e.target.value})}/>}

@@ -6,11 +6,13 @@
 - Board Chat resumes the conversation saved for that board after navigation or an app restart. More actions → New board chat explicitly replaces its generation; stale jobs cannot repin an older session. Private device storage is isolated by connection/account, project and board and never copied into Git boards. Pending jobs can resume; missing sessions remain pinned and block sending until an explicit replacement. Associations are installation-local, without cross-device synchronization.
 - Shared provider guidance and the board skill require creation context, source references and open questions for new AI-created cards. Read full context and accessible sources before work; request clarification when needed without inventing history or exposing private conversations. The board MCP offers read_note_context for one complete card and bounded dependency summaries; no notifications are sent by this read.
 
+- Visible boards refresh automatically using lightweight file stamps about once per second (older hosts/legacy boards: three-second full reads). Updates wait during local editing; revision conflicts still protect saves. MCP writes publish temporary object activity, shown as an AI marker near affected cards; generic file changes are highlighted without AI attribution. Hidden views pause polling. This is automatic snapshot refresh, not shared unsaved editing or simulated pointer motion.
+
 ### Breaking Changes
 - Board MCP create_note requires context (summary, sources, optional questions); canvas_apply requires it when creating cards or sticky notes. Existing cards remain readable without invented retrospective provenance. Reload the updated MCP tool catalog.
 
 ### Validation
-- Web build, five persistence/MCP/provider-guidance tests and eight browser scenarios passed. Coverage includes mobile/desktop navigation and reload, explicit replacement, unavailable sessions, late-job protection, storage errors, host/project/account isolation and compact header regression. Documentation links passed. Packaging and publication pending; physical devices not tested.
+- Web build, seven persistence/live-API/MCP/provider-guidance tests and ten browser scenarios passed. Coverage includes mobile/desktop navigation and reload, explicit replacement, unavailable sessions, late-job protection, storage errors, host/project/account isolation and compact header regression. External updates, genuine MCP activity and deferred draft handling passed; the 400-card drag retained 400 metadata renders. Documentation links passed. Packaging and publication pending; physical devices not tested.
 
 ## [0.28.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.6...v0.28.7) (2026-10-25)
 

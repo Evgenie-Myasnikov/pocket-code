@@ -1,7 +1,7 @@
 import {whiteboardSchema} from '../src/whiteboard-model.js';
 import {lstat,mkdir,readFile,readdir,rename,writeFile,unlink} from 'node:fs/promises';
 import path from 'node:path';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {z} from 'zod';
@@ -23,6 +23,11 @@ async function folder(root:string,create=false,verifyGit=true){
  let current=root;for(const name of ['project-boards']){current=path.join(current,name);if(create)await mkdir(current).catch(e=>{if(e.code!=='EEXIST')throw e;});const info=await lstat(current);if(info.isSymbolicLink()||!info.isDirectory())throw new HttpError(403,'Board snapshots cannot use linked directories');}return current;
 }
 const filename=z.string().regex(/^board-[a-f0-9-]+\.json$/);
+export async function boardSnapshotStamp(root:string,file:string){
+ const target=path.join(await folder(root,false,false),filename.parse(file)),info=await lstat(target);
+ if(info.isSymbolicLink()||!info.isFile()||info.size>2_000_000)throw new HttpError(400,'Invalid board snapshot');
+ return createHash('sha256').update(JSON.stringify([info.ino,info.size,info.mtimeMs,info.ctimeMs])).digest('hex');
+}
 export async function saveBoardSnapshot(root:string,board:ProjectBoard,names:string[],verifyGit=true){const value=publicBoard(board,names),directory=await folder(root,true,verifyGit),file='board-'+board.id+'.json',target=path.join(directory,file);try{if((await lstat(target)).isSymbolicLink())throw new HttpError(403,'Linked snapshot files are not allowed');}catch(e:any){if(e.code!=='ENOENT')throw e;}const content=JSON.stringify(value,null,2)+'\n';if(Buffer.byteLength(content)>2_000_000)throw new HttpError(413,'Board snapshot exceeds the size limit');const temp=path.join(directory,'.'+randomUUID()+'.tmp');try{await writeFile(temp,content,{flag:'wx',mode:0o600});await rename(temp,target);}finally{await unlink(temp).catch(()=>{});}return {path:'project-boards/'+file};}
 export async function readBoardSnapshot(root:string,file:string,verifyGit=true){const target=path.join(await folder(root,false,verifyGit),filename.parse(file)),info=await lstat(target);if(info.isSymbolicLink()||!info.isFile()||info.size>2_000_000)throw new HttpError(400,'Invalid board snapshot');return snapshot.parse(JSON.parse(await readFile(target,'utf8')));}
 export async function deleteBoardSnapshot(root:string,file:string){

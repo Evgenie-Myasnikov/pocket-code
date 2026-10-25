@@ -1,3 +1,4 @@
+import type {BoardEditActivity} from '../server/board-live';
 import {copySelection,pasteSelection,itemsInRect,selectionRect,type SelectionRect} from './whiteboard-selection';
 import type {CanvasCardCopy,CanvasCopies} from './board-canvas';
 import {CardActionMenu,type CardAction} from './CardActionMenu';
@@ -10,9 +11,11 @@ import {WhiteboardNode,type NodeActions} from './WhiteboardNode';
 import {WhiteboardLink} from './WhiteboardLink';
 import './whiteboard.css';
 
-export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions,cards=[]}:{cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
+export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions,cards=[],onInteraction,liveActivity,remoteIds=[]}:{onInteraction?(active:boolean):void;liveActivity?:BoardEditActivity|null;remoteIds?:string[];cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
  const ru=useLanguage()==='ru',l=(en:string,ruText:string)=>ru?ruText:en;
  const board=value||emptyWhiteboard(),[selected,setSelected]=useState<string[]>([]),[zoom,setZoom]=useState(1),[pan,setPan]=useState({x:40,y:40}),[preview,setPreview]=useState<Canvas|null>(null),[connecting,setConnecting]=useState<{id:string;side:PortSide}|null>(null),[wire,setWire]=useState<{link:Link;moving:'from'|'to';target?:string;targetSide?:PortSide}|null>(null),[editing,setEditing]=useState<Item|null>(null),[history,setHistory]=useState<Canvas[]>([]),[future,setFuture]=useState<Canvas[]>([]);
+ const [interacting,setInteracting]=useState(false);
+ useEffect(()=>{onInteraction?.(interacting||Boolean(editing));return()=>onInteraction?.(false);},[onInteraction,interacting,Boolean(editing)]);
  const [marquee,setMarquee]=useState<SelectionRect|null>(null),[notice,setNotice]=useState('');
  const clipboard=useRef<{canvas:Canvas;cards:CanvasCardCopy[];count:number}|null>(null),surfaceCancel=useRef<(()=>void)|null>(null);
  useEffect(()=>()=>surfaceCancel.current?.(),[]);
@@ -55,10 +58,10 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  function drag(event:React.PointerEvent<HTMLElement>,item:Item,edge=''){
   event.stopPropagation();if(event.button!==0||busy||locked.current||!editable||editing)return;
   if(event.shiftKey){pick(item,true);return;}
-  setSelectedLink(null);const ids=frameSelection(board,selected.includes(item.id)?selected:[item.id]);setSelected(ids);
+  setInteracting(true);setSelectedLink(null);const ids=frameSelection(board,selected.includes(item.id)?selected:[item.id]);setSelected(ids);
   const el=event.currentTarget;el.setPointerCapture(event.pointerId);const start={x:event.clientX,y:event.clientY};let next=board,moved=false;
   const move=(e:PointerEvent)=>{if(pinch.current)return;const dx=(e.clientX-start.x)/zoom,dy=(e.clientY-start.y)/zoom;moved ||= Math.abs(e.clientX-start.x)+Math.abs(e.clientY-start.y)>3;if(!moved)return;if(edge){const x=edge.includes('w')?Math.max(0,Math.min(item.x+item.width-120,item.x+dx)):item.x,y=edge.includes('n')?Math.max(0,Math.min(item.y+item.height-80,item.y+dy)):item.y;next={...board,items:board.items.map(i=>i.id===item.id?{...i,x,y,width:Math.min(6000,edge.includes('w')?item.x+item.width-x:edge.includes('e')?Math.max(120,item.width+dx):item.width),height:Math.min(6000,edge.includes('n')?item.y+item.height-y:edge.includes('s')?Math.max(80,item.height+dy):item.height)}:i)};}else next=moveItems(board,ids,Math.round(dx/8)*8,Math.round(dy/8)*8);draw(()=>setPreview(next));};
-  const end=(e:PointerEvent)=>{stopDraw();el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',end);if(e.type==='pointerup'&&moved&&!pinch.current)void change(next);else setPreview(null);};
+  const end=(e:PointerEvent)=>{setInteracting(false);stopDraw();el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',end);if(e.type==='pointerup'&&moved&&!pinch.current)void change(next);else setPreview(null);};
   el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
  }
 
@@ -68,7 +71,7 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  }
  function beginConnection(event:React.PointerEvent<HTMLElement>,original:Link,moving:'from'|'to',reconnecting:boolean){
   event.stopPropagation();event.preventDefault();if(event.button!==0||!editable||busy||locked.current||editing)return;
-  connectionCancel.current?.();viewport.current?.focus({preventScroll:true});setConnecting(null);
+  connectionCancel.current?.();setInteracting(true);viewport.current?.focus({preventScroll:true});setConnecting(null);
   const el=event.currentTarget,pointerId=event.pointerId,rect=viewport.current!.getBoundingClientRect(),start={x:event.clientX,y:event.clientY};let latest=start,held=false,active=false;
   el.setPointerCapture(pointerId);el.classList.add('wb-port-holding');
   const fixed=moving==='from'?original.to:original.from;
@@ -81,7 +84,7 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
   const update=()=>{if(!held||Math.hypot(latest.x-start.x,latest.y-start.y)<5&&!active)return;active=true;const d=draft();draw(()=>setWire({link:d.link,moving,target:d.port?.item.id,targetSide:d.port?.side}));};
   const timer=window.setTimeout(()=>{held=true;el.classList.add('wb-port-ready');update();},180);
   const move=(e:PointerEvent)=>{latest={x:e.clientX,y:e.clientY};update();};
-  const cleanup=()=>{window.clearTimeout(timer);stopDraw();el.classList.remove('wb-port-holding','wb-port-ready');el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',end);connectionCancel.current=null;setWire(null);setHoverPort(null);if(el.hasPointerCapture(pointerId))el.releasePointerCapture(pointerId);};
+  const cleanup=()=>{setInteracting(false);window.clearTimeout(timer);stopDraw();el.classList.remove('wb-port-holding','wb-port-ready');el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',end);connectionCancel.current=null;setWire(null);setHoverPort(null);if(el.hasPointerCapture(pointerId))el.releasePointerCapture(pointerId);};
   const end=(e:PointerEvent)=>{latest={x:e.clientX,y:e.clientY};cleanup();if(e.type!=='pointerup'||!active)return;const d=draft();if(!reconnecting&&!d.port)return;
    if(d.link.from&&d.link.from===d.link.to)return;
    if(board.links.some(l=>l.id!==original.id&&l.from&&l.from===d.link.from&&l.to===d.link.to))return;
@@ -103,7 +106,7 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  function surfaceStart(e:React.PointerEvent<HTMLDivElement>){
   const blank=e.target===e.currentTarget||e.target instanceof HTMLElement&&e.target.classList.contains('whiteboard-text')&&Boolean(e.target.closest('.wb-frame'));
   const panning=e.button===1||e.pointerType==='touch';if(e.button!==0&&e.button!==1||!panning&&!blank||editing)return;
-  e.preventDefault();e.stopPropagation();surfaceCancel.current?.();connectionCancel.current?.();setMenu(null);setConnecting(null);setNotice('');
+  e.preventDefault();e.stopPropagation();surfaceCancel.current?.();connectionCancel.current?.();setInteracting(true);setMenu(null);setConnecting(null);setNotice('');
   const el=e.currentTarget,rect=el.getBoundingClientRect(),pointerId=e.pointerId,start={x:e.clientX,y:e.clientY},before=pan,previous=selected;
   const world=(v:{clientX:number;clientY:number})=>({x:(v.clientX-rect.left-before.x)/zoom,y:(v.clientY-rect.top-before.y)/zoom});
   const origin=world(e);let moved=false,area:SelectionRect|null=null;
@@ -113,7 +116,7 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
    if(panning)draw(()=>setPan({x:before.x+v.clientX-start.x,y:before.y+v.clientY-start.y}));
    else{area=selectionRect(origin,world(v));const next=area;draw(()=>{setMarquee(next);setSelected([...new Set([...(e.shiftKey?previous:[]),...itemsInRect(board,next)])]);});}
   };
-  const cleanup=()=>{el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',cancel);el.removeEventListener('lostpointercapture',cancel);window.removeEventListener('blur',cancel);surfaceCancel.current=null;if(el.hasPointerCapture(pointerId))el.releasePointerCapture(pointerId);setMarquee(null);};
+  const cleanup=()=>{setInteracting(false);el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',cancel);el.removeEventListener('lostpointercapture',cancel);window.removeEventListener('blur',cancel);surfaceCancel.current=null;if(el.hasPointerCapture(pointerId))el.releasePointerCapture(pointerId);setMarquee(null);};
   const cancel=()=>{stopDraw();cleanup();if(panning)setPan(before);else setSelected(previous);};
   const end=(v:PointerEvent)=>{if(v.pointerId!==pointerId)return;move(v);stopDraw(true);cleanup();};
   surfaceCancel.current=cancel;el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',cancel);el.addEventListener('lostpointercapture',cancel);window.addEventListener('blur',cancel);
@@ -157,8 +160,9 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
   <div ref={viewport} className="whiteboard-viewport" tabIndex={0} onPointerDownCapture={e=>{touchStart(e);if(e.button===1)surfaceStart(e);}} onPointerMoveCapture={e=>{touchMove(e);portHover(e);}} onPointerLeave={()=>setHoverPort(null)} onPointerUpCapture={e=>{const copy={pointerId:e.pointerId};setTimeout(()=>touchEnd(copy as React.PointerEvent),0);}} onPointerCancelCapture={touchEnd} onContextMenu={e=>{if(e.target===e.currentTarget){e.preventDefault();setMenu({x:e.clientX,y:e.clientY});}}} onPointerDown={surfaceStart} onWheel={e=>{if(e.ctrlKey){e.preventDefault();const r=e.currentTarget.getBoundingClientRect();scale(zoom*Math.exp(-e.deltaY*.003),e.clientX-r.left,e.clientY-r.top);}else setPan({x:pan.x-e.deltaX,y:pan.y-e.deltaY});}} onKeyDown={e=>{if((e.target as HTMLElement).closest('textarea,input,select,[contenteditable=true]'))return;if((e.ctrlKey||e.metaKey)&&['a','c','v'].includes(e.key.toLowerCase())){e.preventDefault();if(e.key.toLowerCase()==='a'){setSelected(board.items.map(i=>i.id));setSelectedLink(null);}else if(e.key.toLowerCase()==='c')copy();else void paste();return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();const list=e.shiftKey?future:history;if(list.length)void change(list.at(-1)!,e.shiftKey?'redo':'undo');}if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();const r=viewport.current!.getBoundingClientRect();setMenu({x:r.left+40,y:r.top+40});}if(e.key==='Escape'){if(surfaceCancel.current){surfaceCancel.current();return;}connectionCancel.current?.();setConnecting(null);setSelected([]);setSelectedLink(null);}if(e.key==='Delete'&&selectedLink){void change({...board,links:board.links.filter(link=>link.id!==selectedLink)});setSelectedLink(null);}if((e.key==='Delete'||e.key==='Backspace')&&selected.length){void change(removeItems(board,selected));setSelected([]);}}}>
    <div className="whiteboard-world" style={{transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`,'--wb-handle-scale':1/zoom} as CSSProperties}>
     <svg className="whiteboard-links" width="106000" height="106000" aria-label={l('Visual connections','Визуальные связи')}><defs><marker id="canvas-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="currentColor"/></marker></defs>{shown.links.map(link=><WhiteboardLink label={l('Select connection','Выбрать связь')} key={link.id} link={link} from={itemsById.get(link.from||'')} to={itemsById.get(link.to||'')} selected={selectedLink===link.id} hidden={wire?.link.id===link.id} select={selectLink}/>)}{wire&&<path className="wb-wire" d={connectorPath(connectionPoints(wire.link,itemsById.get(wire.link.from||''),itemsById.get(wire.link.to||'')))} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeDasharray="6 4"/>}</svg>
+    {liveActivity&&liveActivity.ids.map(id=>{const item=itemsById.get(id);if(!item)return null;return <div key={id} className="wb-ai-cursor" aria-hidden="true" style={{left:item.x+item.width-12,top:item.y-12}}><svg width="18" height="22" viewBox="0 0 18 22"><path d="M1 1v17l5-5 4 8 3-2-4-7h7Z" fill="currentColor" stroke="var(--bg)"/></svg><span>{liveActivity.phase==='failed'?l('AI · failed','AI · ошибка'):liveActivity.phase==='editing'?l('AI · editing','AI · редактирует'):l('AI · updated','AI · обновил')}</span></div>;})}
     {marquee&&<div className="wb-marquee" data-testid="canvas-selection" style={{left:marquee.x,top:marquee.y,width:marquee.width,height:marquee.height}}/>}
-    {orderedItems.map(item=><WhiteboardNode key={item.id} item={item} selected={selected.includes(item.id)} disabled={disabled} editing={editing?.id===item.id?editing:null} target={wire?.target===item.id} visiblePort={wire?.target===item.id?wire.targetSide:wire?.moving==='to'&&wire.link.from===item.id?wire.link.fromSide:wire?.moving==='from'&&wire.link.to===item.id?wire.link.toSide:hoverPort?.id===item.id?hoverPort.side:undefined} ru={ru} renderCard={renderCard} actions={nodeActions}/>)}
+    {orderedItems.map(item=><WhiteboardNode remote={remoteIds.includes(item.id)} key={item.id} item={item} selected={selected.includes(item.id)} disabled={disabled} editing={editing?.id===item.id?editing:null} target={wire?.target===item.id} visiblePort={wire?.target===item.id?wire.targetSide:wire?.moving==='to'&&wire.link.from===item.id?wire.link.fromSide:wire?.moving==='from'&&wire.link.to===item.id?wire.link.toSide:hoverPort?.id===item.id?hoverPort.side:undefined} ru={ru} renderCard={renderCard} actions={nodeActions}/>)}
     {!disabled&&selectedLink&&(()=>{const link=shown.links.find(l=>l.id===selectedLink);if(!link)return null;const ends=connectionEnds(link,itemsById.get(link.from||''),itemsById.get(link.to||''));if(!ends)return null;return (['from','to'] as const).map(end=>{const point=end==='from'?ends.start:ends.end;return <button key={end} className="wb-port wb-link-end" style={{left:point.x,top:point.y,opacity:wire?.link.id===link.id?0:undefined}} aria-label={end==='from'?l('Move connection start','Переместить начало связи'):l('Move connection end','Переместить конец связи')} onPointerDown={e=>beginConnection(e,link,end,true)}/>;});})()}
    </div>
    {!board.items.length&&<div className="whiteboard-empty">{l('Start with a sticky note, a heading or a frame.','Начни со стикера, заголовка или рамки.')}</div>}
