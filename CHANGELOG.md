@@ -1,13 +1,15 @@
 # Changelog
 
-## 0.28.7 (unreleased)
+## [0.28.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.6...v0.28.7) (2026-10-25)
+
+Published [v0.28.7](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.7) from [3cbbb0d493f82bae2bf205c3f387859734e8aa75](https://github.com/Evgenie-Myasnikov/pocket-code/commit/3cbbb0d493f82bae2bf205c3f387859734e8aa75) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Bug Fixes
 - Board cards render 256 px thumbnails instead of full-resolution originals. A shared queue bounds original reads/decodes to two, deduplicates repeated references and caches up to 128 thumbnail blobs. One visibility observer serves all board images; leaving the viewport cancels pending work and releases each image URL. Full resolution is displayed only in the viewer. Initial thumbnail generation still downloads the source image; this is a rendering/memory improvement, not server-side thumbnail transfer.
 - Opening a running chat follows its current answer even when an older history position was saved. Idle chats retain their message/text anchor. Live status is recognized from the current job or activity feed.
 
 ### Validation
-- Web build, six position/preview API tests and three browser scenarios passed. A synthetic 2048×1536 image set verifies thumbnail dimensions, bounded reads, shared cache and full-size viewer loading; live opening and idle bookmark restoration passed. Publication and package checks pending; no physical-device performance claim.
+- Web build, six position/preview API tests and three browser scenarios passed. A synthetic 2048×1536 image set verifies thumbnail dimensions, bounded reads, shared cache and full-size viewer loading; live opening and idle bookmark restoration passed. Web/Android/Windows/host builds passed; all 86 shared web files match. All 1,422 decoded package entries passed the privacy audit. APK signer compatibility, GitHub CI, exact source tag and hashes of all four downloaded assets passed. Packages published; no physical-device validation.
 
 ## [0.28.6](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.5...v0.28.6) (2026-10-25)
 
