@@ -50,3 +50,13 @@ in the changelog are resolved against local and remote Git refs automatically an
 retained on the next board save. Missing branches remain explicitly unlinked.
 Every release must record its branch and exact commit; planned columns alone
 never create branches or authorize publication.
+
+## Card creation context
+
+Every new AI-created card must record its creation context: a concise product summary of why it exists, concrete source references, and unresolved questions. Read the full card context and referenced accessible sources before acting. When context is insufficient, request focused clarification or additional source material from the user; never invent missing history or treat a suggestion as an agreed requirement. Reference only product-safe sources in repository cards (project-relative documents, public URLs, existing card IDs). Keep private conversations and their identifiers in private application storage; record a sanitized product summary and state when original details require the user. Do not scan private application storage or send notifications merely to obtain more context. Read-only context retrieval does not authorize implementation.
+
+For MCP creation, supply `context: {summary, sources, questions?}` to `create_note` and when `canvas_apply` creates new cards or sticky notes. `read_note_context` returns one complete product card and its direct dependencies; it does not expose private chat history. Existing cards remain readable without retrospective invented sources. File edits follow the same context rule.
+
+## Persistent board conversation
+
+The board Chat action resumes the conversation saved for that board on this installation. Leaving the board or restarting the app preserves the association. **More actions → New board chat** explicitly replaces it; older conversations remain in the regular chat list. The private association is scoped to the connection/account, project and board; it is not written to repository board files or synchronized across devices. If the saved session is unavailable, its association remains and the user must explicitly create a new board chat.

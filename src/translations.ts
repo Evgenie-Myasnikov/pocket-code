@@ -1,5 +1,7 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Новый чат доски':'New board chat',
+  'Не удалось сохранить привязку чата доски.':'Could not save the board chat association.',
   'Ждёт вашего ответа':'Waiting for your response',
   'Доска':'Board',
   'Подключение досок проектов':'Connect project boards',

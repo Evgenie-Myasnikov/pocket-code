@@ -31,13 +31,20 @@ test('board MCP protects revisions, privacy and old hosts over stdio',async()=>{
   assert.ok(!JSON.stringify(read).includes('Private owner'));assert.ok(!JSON.stringify(read).includes('private-member'));
   assert.ok((await invoke('read_board',{project:'unknown'})).isError);
   const search=JSON.parse((await invoke('search_board',{project:'demo',query:'Canvas'})).content[0].text);assert.equal(search.total,1);
+  const context={summary:'Synthetic creation rationale',sources:['docs/BOARD.md'],questions:['Confirm the expected outcome']};
   const item={id:randomUUID(),kind:'sticky',text:'Synthetic sticky',x:0,y:0,width:240,height:180,color:'sand'};
-  assert.ok((await invoke('canvas_apply',{project:'demo',revision:'a'.repeat(64),items:[item]})).isError);assert.equal(writes,0);
-  version='0.28.0';assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'a'.repeat(64),items:[item]})).isError);assert.equal(writes,1);assert.equal(board.canvas.items[0].id,item.id);
+  assert.ok((await invoke('canvas_apply',{project:'demo',revision:'a'.repeat(64),items:[item],context})).isError);assert.equal(writes,0);
+  version='0.28.0';assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'a'.repeat(64),items:[item],context})).isError);assert.equal(writes,1);assert.equal(board.canvas.items[0].id,item.id);
   assert.ok((await invoke('update_note',{project:'demo',revision:'a'.repeat(64),id:board.notes[0].id,patch:{title:'Stale edit'}})).isError);assert.equal(writes,1);
   const task=board.notes[0];assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[{...item,id:task.id,kind:'card',text:'Updated task',description:'Updated criteria'}]})).isError);
   assert.equal(board.notes[0].title,'Updated task');assert.equal(board.notes[0].description,'Updated criteria');assert.equal(board.notes[0].priority,task.priority);
   const free={id:randomUUID(),from:item.id,fromSide:'e',toPoint:{x:800,y:600}};assert.ok((await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[],links:[free]})).isError);
   version='0.28.4';assert.ok(!(await invoke('canvas_apply',{project:'demo',revision:'b'.repeat(64),items:[],links:[free]})).isError);assert.deepEqual(board.canvas.links,[free]);
+  const newNote={title:'Context-aware task',description:'Product acceptance',branch:'Next',status:'questions',priority:'normal',x:40,y:80,dependencies:[task.id]};
+  const before=writes;assert.ok((await invoke('create_note',{project:'demo',revision:'b'.repeat(64),note:newNote})).isError);assert.equal(writes,before);
+  assert.ok(!(await invoke('create_note',{project:'demo',revision:'b'.repeat(64),note:newNote,context})).isError);
+  const created=board.notes.find(n=>n.title===newNote.title);assert.match(created.description,/Creation context/);assert.match(created.description,/docs\/BOARD.md/);
+  const details=JSON.parse((await invoke('read_note_context',{project:'demo',id:created.id})).content[0].text);assert.equal(details.note.id,created.id);assert.equal(details.dependencies[0].id,task.id);assert.ok(!JSON.stringify(details).includes('Private owner'));assert.ok(!JSON.stringify(details).includes('private-member'));
+
  }finally{await client.close();await new Promise(resolve=>host.close(resolve));await rm(root,{recursive:true,force:true});}
 });

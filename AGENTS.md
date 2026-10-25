@@ -57,3 +57,7 @@ Resolve them from Git; never infer a branch merely from a planned version label.
 Publish tags against that exact commit, after verifying the source branch exists
 on the release repository and contains it. Detached HEAD is not a release branch.
 Keep unreleased work explicit. Linking releases does not authorize a push or release.
+
+# Card creation context
+
+Every new AI-created card must record its creation context: a concise product summary of why it exists, concrete source references, and unresolved questions. Read the full card context and referenced accessible sources before acting. When context is insufficient, request focused clarification or additional source material from the user; never invent missing history or treat a suggestion as an agreed requirement. Reference only product-safe sources in repository cards (project-relative documents, public URLs, existing card IDs). Keep private conversations and their identifiers in private application storage; record a sanitized product summary and state when original details require the user. Do not scan private application storage or send notifications merely to obtain more context. Read-only context retrieval does not authorize implementation.

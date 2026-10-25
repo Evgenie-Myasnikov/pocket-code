@@ -23,7 +23,7 @@ import {BoardImages} from './BoardImages';
 import './work-boards.css';
 import './board-surfaces.css';
 import './task-runs.css';
-export type BoardChat={context?:{name:string;revision:string};taskRun?:TaskRun;root:string;prompt:string;note:BoardNote;boardId:string;connectionUrl?:string;followUp?:boolean};
+export type BoardChat={conversation?:import('./board-conversation').BoardConversationRef;resumeJobId?:string;context?:{name:string;revision:string};taskRun?:TaskRun;root:string;prompt:string;note:BoardNote;boardId:string;connectionUrl?:string;followUp?:boolean};
 export type BoardView=ProjectBoard&{branches:string[];error?:string;repositoryUnavailable?:boolean;repositoryFile?:string;repositoryRevision?:string};
 /** The open board survives switching tabs: the mobile shell unmounts this view, so the selection lives above it for the session. */
 const remembered=new Map<string,BoardView>();

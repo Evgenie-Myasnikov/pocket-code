@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.28.8 (unreleased)
+
+### Features
+- Board Chat resumes the conversation saved for that board after navigation or an app restart. More actions → New board chat explicitly replaces its generation; stale jobs cannot repin an older session. Private device storage is isolated by connection/account, project and board and never copied into Git boards. Pending jobs can resume; missing sessions remain pinned and block sending until an explicit replacement. Associations are installation-local, without cross-device synchronization.
+- Shared provider guidance and the board skill require creation context, source references and open questions for new AI-created cards. Read full context and accessible sources before work; request clarification when needed without inventing history or exposing private conversations. The board MCP offers read_note_context for one complete card and bounded dependency summaries; no notifications are sent by this read.
+
+### Breaking Changes
+- Board MCP create_note requires context (summary, sources, optional questions); canvas_apply requires it when creating cards or sticky notes. Existing cards remain readable without invented retrospective provenance. Reload the updated MCP tool catalog.
+
+### Validation
+- Web build, five persistence/MCP/provider-guidance tests and eight browser scenarios passed. Coverage includes mobile/desktop navigation and reload, explicit replacement, unavailable sessions, late-job protection, storage errors, host/project/account isolation and compact header regression. Documentation links passed. Packaging and publication pending; physical devices not tested.
+
 ## [0.28.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.6...v0.28.7) (2026-10-25)
 
 Published [v0.28.7](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.7) from [3cbbb0d493f82bae2bf205c3f387859734e8aa75](https://github.com/Evgenie-Myasnikov/pocket-code/commit/3cbbb0d493f82bae2bf205c3f387859734e8aa75) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

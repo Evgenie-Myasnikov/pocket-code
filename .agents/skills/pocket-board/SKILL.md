@@ -28,3 +28,9 @@ Canvas writes require host 0.28.0+. MCP edits do not commit, push, publish,
 notify participants or animate a cursor. Do not report any of these as a side
 effect. Saved repository files refresh in the board UI; no unsaved live canvas
 is exposed. Follow the repository's board and changelog workflow.
+
+## Card creation context
+
+Every new AI-created card must record its creation context: a concise product summary of why it exists, concrete source references, and unresolved questions. Read the full card context and referenced accessible sources before acting. When context is insufficient, request focused clarification or additional source material from the user; never invent missing history or treat a suggestion as an agreed requirement. Reference only product-safe sources in repository cards (project-relative documents, public URLs, existing card IDs). Keep private conversations and their identifiers in private application storage; record a sanitized product summary and state when original details require the user. Do not scan private application storage or send notifications merely to obtain more context. Read-only context retrieval does not authorize implementation.
+
+For MCP creation, supply `context: {summary, sources, questions?}` to `create_note` and when `canvas_apply` creates new cards or sticky notes. `read_note_context` returns one complete product card and its direct dependencies; it does not expose private chat history. Existing cards remain readable without retrospective invented sources. File edits follow the same context rule.
