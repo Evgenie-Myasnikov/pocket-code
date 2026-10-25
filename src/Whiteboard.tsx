@@ -1,6 +1,8 @@
+import {copySelection,pasteSelection,itemsInRect,selectionRect,type SelectionRect} from './whiteboard-selection';
+import type {CanvasCardCopy,CanvasCopies} from './board-canvas';
 import {CardActionMenu,type CardAction} from './CardActionMenu';
 import {useEffect,useRef,useState,useMemo,type ReactNode,type CSSProperties} from 'react';
-import {StickyNote,Type,Frame,Undo2,Redo2,Trash2,Square,Maximize} from 'lucide-react';
+import {StickyNote,Type,Frame,Undo2,Redo2,Trash2,Copy,Clipboard,Square,Maximize} from 'lucide-react';
 import {useLanguage} from './i18n';
 import {emptyWhiteboard,moveItems,removeItems,frameSelection,portPoint,type PortSide,type Whiteboard as Canvas,type WhiteboardItem as Item,type WhiteboardLink as Link} from './whiteboard-model';
 import {nearbyPort,connectionEnds,connectionPoints,connectorPath} from './whiteboard-connections';
@@ -8,9 +10,12 @@ import {WhiteboardNode,type NodeActions} from './WhiteboardNode';
 import {WhiteboardLink} from './WhiteboardLink';
 import './whiteboard.css';
 
-export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions}:{renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas):Promise<boolean>;onDiscuss?(ids:string[]):void}){
+export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions,cards=[]}:{cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
  const ru=useLanguage()==='ru',l=(en:string,ruText:string)=>ru?ruText:en;
  const board=value||emptyWhiteboard(),[selected,setSelected]=useState<string[]>([]),[zoom,setZoom]=useState(1),[pan,setPan]=useState({x:40,y:40}),[preview,setPreview]=useState<Canvas|null>(null),[connecting,setConnecting]=useState<{id:string;side:PortSide}|null>(null),[wire,setWire]=useState<{link:Link;moving:'from'|'to';target?:string;targetSide?:PortSide}|null>(null),[editing,setEditing]=useState<Item|null>(null),[history,setHistory]=useState<Canvas[]>([]),[future,setFuture]=useState<Canvas[]>([]);
+ const [marquee,setMarquee]=useState<SelectionRect|null>(null),[notice,setNotice]=useState('');
+ const clipboard=useRef<{canvas:Canvas;cards:CanvasCardCopy[];count:number}|null>(null),surfaceCancel=useRef<(()=>void)|null>(null);
+ useEffect(()=>()=>surfaceCancel.current?.(),[]);
  const [selectedLink,setSelectedLink]=useState<string|null>(null);
  const selectLink=useRef<(id:string)=>void>(null!);
  selectLink.current=id=>{setSelectedLink(id);setSelected([]);setConnecting(null);};
@@ -22,7 +27,7 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  useEffect(()=>{if(seen.current!==stamp){if(expected.current!==stamp){setHistory([]);setFuture([]);}seen.current=stamp;expected.current=null;}},[stamp]);
  const [menu,setMenu]=useState<{x:number;y:number;item?:Item}|null>(null);
  const touches=useRef(new Map<number,{x:number;y:number}>()),pinch=useRef<{distance:number;zoom:number;pan:{x:number;y:number};center:{x:number;y:number}}|null>(null);
- function touchStart(e:React.PointerEvent){if(e.pointerType!=='touch')return;touches.current.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.current.size===2){connectionCancel.current?.();const [a,b]=[...touches.current.values()],r=viewport.current!.getBoundingClientRect();pinch.current={distance:Math.hypot(a.x-b.x,a.y-b.y),zoom,pan,center:{x:(a.x+b.x)/2-r.left,y:(a.y+b.y)/2-r.top}};setPreview(null);}}
+ function touchStart(e:React.PointerEvent){if(e.pointerType!=='touch')return;touches.current.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.current.size===2){connectionCancel.current?.();surfaceCancel.current?.();const [a,b]=[...touches.current.values()],r=viewport.current!.getBoundingClientRect();pinch.current={distance:Math.hypot(a.x-b.x,a.y-b.y),zoom,pan,center:{x:(a.x+b.x)/2-r.left,y:(a.y+b.y)/2-r.top}};setPreview(null);}}
  function touchMove(e:React.PointerEvent){if(!touches.current.has(e.pointerId))return;touches.current.set(e.pointerId,{x:e.clientX,y:e.clientY});const start=pinch.current;if(!start||touches.current.size!==2)return;e.stopPropagation();const [a,b]=[...touches.current.values()],r=viewport.current!.getBoundingClientRect(),z=Math.max(.1,Math.min(3,start.zoom*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,start.distance)));setZoom(z);setPan({x:(a.x+b.x)/2-r.left-(start.center.x-start.pan.x)*z/start.zoom,y:(a.y+b.y)/2-r.top-(start.center.y-start.pan.y)*z/start.zoom});}
  function touchEnd(e:React.PointerEvent){touches.current.delete(e.pointerId);if(!touches.current.size)pinch.current=null;}
  const shown=preview||board;
@@ -33,9 +38,9 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  function draw(update:()=>void){pendingDraw.current=update;if(!drawFrame.current)drawFrame.current=requestAnimationFrame(()=>{drawFrame.current=0;const update=pendingDraw.current;pendingDraw.current=null;update?.();});}
  function stopDraw(flush=false){if(drawFrame.current)cancelAnimationFrame(drawFrame.current);drawFrame.current=0;const update=pendingDraw.current;pendingDraw.current=null;if(flush)update?.();}
  useEffect(()=>()=>stopDraw(),[]);
- async function change(next:Canvas,mode:'edit'|'undo'|'redo'='edit'){
+ async function change(next:Canvas,mode:'edit'|'undo'|'redo'='edit',copies?:CanvasCopies){
   if(!editable||busy||locked.current)return false;locked.current=true;expected.current=JSON.stringify(next);
-  try{if(await onSave(next)){if(mode==='undo'){setHistory(h=>h.slice(0,-1));setFuture(f=>[...f,board]);}else if(mode==='redo'){setFuture(f=>f.slice(0,-1));setHistory(h=>[...h,board]);}else{setHistory(h=>[...h.slice(-49),board]);setFuture([]);}return true;}return false;}finally{locked.current=false;setPreview(null);}
+  try{if(await onSave(next,copies)){if(mode==='undo'){setHistory(h=>h.slice(0,-1));setFuture(f=>[...f,board]);}else if(mode==='redo'){setFuture(f=>f.slice(0,-1));setHistory(h=>[...h,board]);}else{setHistory(h=>[...h.slice(-49),board]);setFuture([]);}return true;}return false;}finally{locked.current=false;setPreview(null);}
  }
  function add(kind:Item['kind'],point?:{x:number;y:number}){
   const rect=viewport.current?.getBoundingClientRect();
@@ -85,11 +90,33 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
   connectionCancel.current=cleanup;el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
  }
  async function finish(){if(!editing)return;if(await change({...board,items:board.items.map(i=>i.id===editing.id?{...i,text:editing.text,description:editing.description}:i)}))setEditing(null);}
- function panStart(e:React.PointerEvent<HTMLDivElement>){
-  if(e.button!==0||e.target!==e.currentTarget)return;setSelected([]);setSelectedLink(null);setConnecting(null);setMenu(null);
-  const el=e.currentTarget;el.setPointerCapture(e.pointerId);const start={x:e.clientX,y:e.clientY},before=pan;let moved=false;
-  const move=(v:PointerEvent)=>{if(pinch.current)return;moved ||= Math.abs(v.clientX-start.x)+Math.abs(v.clientY-start.y)>4;if(moved)draw(()=>setPan({x:before.x+v.clientX-start.x,y:before.y+v.clientY-start.y}));};
-  const end=(v:PointerEvent)=>{stopDraw(true);el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',end);if(el.hasPointerCapture(v.pointerId))el.releasePointerCapture(v.pointerId);};el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
+ function copy(){
+  const canvas=copySelection(board,selected);if(!canvas.items.length)return;
+  const ids=new Set(canvas.items.map(i=>i.id));clipboard.current={canvas,cards:structuredClone(cards.filter(c=>ids.has(c.id))),count:0};setNotice('');
+ }
+ async function paste(point?:{x:number;y:number}){
+  if(disabled||!clipboard.current)return;const saved=clipboard.current,rect=viewport.current!.getBoundingClientRect();
+  const offset=point?{x:(point.x-rect.left-pan.x)/zoom-Math.min(...saved.canvas.items.map(i=>i.x)),y:(point.y-rect.top-pan.y)/zoom-Math.min(...saved.canvas.items.map(i=>i.y))}:{x:32*(saved.count+1),y:32*(saved.count+1)};
+  const result=pasteSelection(board,saved.canvas,offset);if(!result){setNotice(l('Canvas object or connection limit reached','Достигнут лимит объектов или связей на холсте'));return;}
+  if(await change(result.board,'edit',{cards:saved.cards,ids:result.ids})){saved.count++;setSelected(Object.values(result.ids));setSelectedLink(null);setNotice('');}
+ }
+ function surfaceStart(e:React.PointerEvent<HTMLDivElement>){
+  const blank=e.target===e.currentTarget||e.target instanceof HTMLElement&&e.target.classList.contains('whiteboard-text')&&Boolean(e.target.closest('.wb-frame'));
+  const panning=e.button===1||e.pointerType==='touch';if(e.button!==0&&e.button!==1||!panning&&!blank||editing)return;
+  e.preventDefault();e.stopPropagation();surfaceCancel.current?.();connectionCancel.current?.();setMenu(null);setConnecting(null);setNotice('');
+  const el=e.currentTarget,rect=el.getBoundingClientRect(),pointerId=e.pointerId,start={x:e.clientX,y:e.clientY},before=pan,previous=selected;
+  const world=(v:{clientX:number;clientY:number})=>({x:(v.clientX-rect.left-before.x)/zoom,y:(v.clientY-rect.top-before.y)/zoom});
+  const origin=world(e);let moved=false,area:SelectionRect|null=null;
+  if(!panning){setSelected(e.shiftKey?previous:[]);setSelectedLink(null);}
+  el.focus({preventScroll:true});el.setPointerCapture(pointerId);
+  const move=(v:PointerEvent)=>{if(v.pointerId!==pointerId||pinch.current)return;moved ||= Math.hypot(v.clientX-start.x,v.clientY-start.y)>4;if(!moved)return;
+   if(panning)draw(()=>setPan({x:before.x+v.clientX-start.x,y:before.y+v.clientY-start.y}));
+   else{area=selectionRect(origin,world(v));const next=area;draw(()=>{setMarquee(next);setSelected([...new Set([...(e.shiftKey?previous:[]),...itemsInRect(board,next)])]);});}
+  };
+  const cleanup=()=>{el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',cancel);el.removeEventListener('lostpointercapture',cancel);window.removeEventListener('blur',cancel);surfaceCancel.current=null;if(el.hasPointerCapture(pointerId))el.releasePointerCapture(pointerId);setMarquee(null);};
+  const cancel=()=>{stopDraw();cleanup();if(panning)setPan(before);else setSelected(previous);};
+  const end=(v:PointerEvent)=>{if(v.pointerId!==pointerId)return;move(v);stopDraw(true);cleanup();};
+  surfaceCancel.current=cancel;el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',cancel);el.addEventListener('lostpointercapture',cancel);window.addEventListener('blur',cancel);
  }
  function scale(next:number,px?:number,py?:number){const rect=viewport.current?.getBoundingClientRect();const x=px??(rect?.width||800)/2,y=py??(rect?.height||600)/2;next=Math.max(.1,Math.min(3,next));setPan({x:x-(x-pan.x)*next/zoom,y:y-(y-pan.y)*next/zoom});setZoom(next);}
  function fit(){const rect=viewport.current?.getBoundingClientRect();if(!rect||!board.items.length){setZoom(1);setPan({x:40,y:40});return;}const x=Math.min(...board.items.map(i=>i.x)),y=Math.min(...board.items.map(i=>i.y)),w=Math.max(...board.items.map(i=>i.x+i.width))-x,h=Math.max(...board.items.map(i=>i.y+i.height))-y;const z=Math.max(.1,Math.min(1,(rect.width-80)/w,(rect.height-80)/h));setZoom(z);setPan({x:40-x*z,y:40-y*z});}
@@ -102,16 +129,20 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
   if(connecting){connect(connecting.id,item.id,connecting.side,side);setConnecting(null);}else setConnecting({id:item.id,side});
  }
  const disabled=!editable||busy||!!editing;
- nodeActions.current={drag,pick,edit:setEditing,finish:()=>{void finish();},menu:(item,x,y)=>{setSelected([item.id]);setMenu({x,y,item});},connect:connectDrag,portKey,key:(e,item)=>{
+ nodeActions.current={drag,pick,edit:setEditing,finish:()=>{void finish();},menu:(item,x,y)=>{setSelected(old=>old.includes(item.id)?old:[item.id]);setSelectedLink(null);setMenu({x,y,item});},connect:connectDrag,portKey,key:(e,item)=>{
   if(e.key==='Enter'&&!disabled){e.preventDefault();setSelected([item.id]);setEditing({...item});}else if(e.key===' '){e.preventDefault();pick(item,e.shiftKey);}
   const directions:Record<string,[number,number]>={ArrowLeft:[-8,0],ArrowRight:[8,0],ArrowUp:[0,-8],ArrowDown:[0,8]};if(directions[e.key]&&!disabled){e.preventDefault();void change(moveItems(board,selected.includes(item.id)?selected:[item.id],...directions[e.key]));}
  }};
  const menuItems:CardAction[]=!menu?[]:menu.item?[
+  {label:l('Copy','Копировать'),Icon:Copy,onSelect:copy},
+  ...(clipboard.current?[{label:l('Paste','Вставить'),Icon:Clipboard,disabled:disabled,onSelect:()=>void paste(menu)}]:[]),
   {label:l('Write','Написать'),disabled:disabled,onSelect:()=>setEditing({...menu.item!})},
   ...(onDiscuss?[{label:'Chat',onSelect:()=>onDiscuss([menu.item!.id])}]:[]),
   ...(['sand','mint','blue','rose','violet'] as const).map(color=>({label:l('Color: ','Цвет: ')+color,disabled:disabled,onSelect:()=>void change({...board,items:board.items.map(i=>i.id===menu.item!.id?{...i,color}:i)})})),
-  {label:l('Delete','Удалить'),Icon:Trash2,danger:true,disabled:disabled,onSelect:()=>{void change(removeItems(board,[menu.item!.id]));setSelected([]);}}
+  {label:l('Delete','Удалить'),Icon:Trash2,danger:true,disabled:disabled,onSelect:()=>{void change(removeItems(board,selected.includes(menu.item!.id)?selected:[menu.item!.id]));setSelected([]);}}
  ]:[
+  ...(selected.length?[{label:l('Copy selection','Копировать выделенное'),Icon:Copy,onSelect:copy},{label:l('Delete selection','Удалить выделенное'),Icon:Trash2,danger:true,disabled:disabled,onSelect:()=>{void change(removeItems(board,selected));setSelected([]);}}]:[]),
+  ...(clipboard.current?[{label:l('Paste','Вставить'),Icon:Clipboard,disabled:disabled,onSelect:()=>void paste(menu)}]:[]),
   ...([{kind:'card',Icon:Square,label:l('Card','Карточка')},{kind:'sticky',Icon:StickyNote,label:l('Sticky note','Стикер')},{kind:'text',Icon:Type,label:l('Text','Текст')},{kind:'frame',Icon:Frame,label:l('Frame','Рамка')}] as const).map(({kind,Icon,label})=>({label,Icon,disabled:disabled||board.items.length>=500,onSelect:()=>add(kind,menu)})),
   ...(onVersions?[{label:l('Versions','Версии'),onSelect:onVersions}]:[])
  ];
@@ -121,10 +152,12 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
    <button aria-label={l('Redo','Повторить')} disabled={disabled||!future.length} onClick={()=>void change(future.at(-1)!,'redo')}><Redo2 size={18}/></button>
    <button aria-label={l('Fit canvas','Вместить холст')} onClick={fit}><Maximize size={18}/></button>
   </div>
+  {notice&&<div className="whiteboard-status" role="status">{notice}</div>}
   {connecting&&<div className="whiteboard-status" role="status">{l('Select a destination side point','Выбери точку на стороне другого элемента')}</div>}
-  <div ref={viewport} className="whiteboard-viewport" tabIndex={0} onPointerDownCapture={touchStart} onPointerMoveCapture={e=>{touchMove(e);portHover(e);}} onPointerLeave={()=>setHoverPort(null)} onPointerUpCapture={e=>{const copy={pointerId:e.pointerId};setTimeout(()=>touchEnd(copy as React.PointerEvent),0);}} onPointerCancelCapture={touchEnd} onContextMenu={e=>{if(e.target===e.currentTarget){e.preventDefault();setMenu({x:e.clientX,y:e.clientY});}}} onPointerDown={panStart} onWheel={e=>{if(e.ctrlKey){e.preventDefault();const r=e.currentTarget.getBoundingClientRect();scale(zoom*Math.exp(-e.deltaY*.003),e.clientX-r.left,e.clientY-r.top);}else setPan({x:pan.x-e.deltaX,y:pan.y-e.deltaY});}} onKeyDown={e=>{if((e.target as HTMLElement).closest('textarea,input,select'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();const list=e.shiftKey?future:history;if(list.length)void change(list.at(-1)!,e.shiftKey?'redo':'undo');}if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();const r=viewport.current!.getBoundingClientRect();setMenu({x:r.left+40,y:r.top+40});}if(e.key==='Escape'){connectionCancel.current?.();setConnecting(null);setSelected([]);setSelectedLink(null);}if(e.key==='Delete'&&selectedLink){void change({...board,links:board.links.filter(link=>link.id!==selectedLink)});setSelectedLink(null);}if(e.key==='Delete'&&selected.length){void change(removeItems(board,selected));setSelected([]);}}}>
+  <div ref={viewport} className="whiteboard-viewport" tabIndex={0} onPointerDownCapture={e=>{touchStart(e);if(e.button===1)surfaceStart(e);}} onPointerMoveCapture={e=>{touchMove(e);portHover(e);}} onPointerLeave={()=>setHoverPort(null)} onPointerUpCapture={e=>{const copy={pointerId:e.pointerId};setTimeout(()=>touchEnd(copy as React.PointerEvent),0);}} onPointerCancelCapture={touchEnd} onContextMenu={e=>{if(e.target===e.currentTarget){e.preventDefault();setMenu({x:e.clientX,y:e.clientY});}}} onPointerDown={surfaceStart} onWheel={e=>{if(e.ctrlKey){e.preventDefault();const r=e.currentTarget.getBoundingClientRect();scale(zoom*Math.exp(-e.deltaY*.003),e.clientX-r.left,e.clientY-r.top);}else setPan({x:pan.x-e.deltaX,y:pan.y-e.deltaY});}} onKeyDown={e=>{if((e.target as HTMLElement).closest('textarea,input,select,[contenteditable=true]'))return;if((e.ctrlKey||e.metaKey)&&['a','c','v'].includes(e.key.toLowerCase())){e.preventDefault();if(e.key.toLowerCase()==='a'){setSelected(board.items.map(i=>i.id));setSelectedLink(null);}else if(e.key.toLowerCase()==='c')copy();else void paste();return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();const list=e.shiftKey?future:history;if(list.length)void change(list.at(-1)!,e.shiftKey?'redo':'undo');}if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();const r=viewport.current!.getBoundingClientRect();setMenu({x:r.left+40,y:r.top+40});}if(e.key==='Escape'){if(surfaceCancel.current){surfaceCancel.current();return;}connectionCancel.current?.();setConnecting(null);setSelected([]);setSelectedLink(null);}if(e.key==='Delete'&&selectedLink){void change({...board,links:board.links.filter(link=>link.id!==selectedLink)});setSelectedLink(null);}if((e.key==='Delete'||e.key==='Backspace')&&selected.length){void change(removeItems(board,selected));setSelected([]);}}}>
    <div className="whiteboard-world" style={{transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`,'--wb-handle-scale':1/zoom} as CSSProperties}>
     <svg className="whiteboard-links" width="106000" height="106000" aria-label={l('Visual connections','Визуальные связи')}><defs><marker id="canvas-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="currentColor"/></marker></defs>{shown.links.map(link=><WhiteboardLink label={l('Select connection','Выбрать связь')} key={link.id} link={link} from={itemsById.get(link.from||'')} to={itemsById.get(link.to||'')} selected={selectedLink===link.id} hidden={wire?.link.id===link.id} select={selectLink}/>)}{wire&&<path className="wb-wire" d={connectorPath(connectionPoints(wire.link,itemsById.get(wire.link.from||''),itemsById.get(wire.link.to||'')))} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeDasharray="6 4"/>}</svg>
+    {marquee&&<div className="wb-marquee" data-testid="canvas-selection" style={{left:marquee.x,top:marquee.y,width:marquee.width,height:marquee.height}}/>}
     {orderedItems.map(item=><WhiteboardNode key={item.id} item={item} selected={selected.includes(item.id)} disabled={disabled} editing={editing?.id===item.id?editing:null} target={wire?.target===item.id} visiblePort={wire?.target===item.id?wire.targetSide:wire?.moving==='to'&&wire.link.from===item.id?wire.link.fromSide:wire?.moving==='from'&&wire.link.to===item.id?wire.link.toSide:hoverPort?.id===item.id?hoverPort.side:undefined} ru={ru} renderCard={renderCard} actions={nodeActions}/>)}
     {!disabled&&selectedLink&&(()=>{const link=shown.links.find(l=>l.id===selectedLink);if(!link)return null;const ends=connectionEnds(link,itemsById.get(link.from||''),itemsById.get(link.to||''));if(!ends)return null;return (['from','to'] as const).map(end=>{const point=end==='from'?ends.start:ends.end;return <button key={end} className="wb-port wb-link-end" style={{left:point.x,top:point.y,opacity:wire?.link.id===link.id?0:undefined}} aria-label={end==='from'?l('Move connection start','Переместить начало связи'):l('Move connection end','Переместить конец связи')} onPointerDown={e=>beginConnection(e,link,end,true)}/>;});})()}
    </div>

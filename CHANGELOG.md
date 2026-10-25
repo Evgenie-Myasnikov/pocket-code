@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.28.6 (unreleased)
+
+### Features
+- Left-button dragging on empty canvas selects an area; Shift adds objects and reverse dragging works at any canvas zoom. Middle-button dragging pans from blank space or over objects without moving them. Touch pan/pinch remain supported; frame labels move frames while their empty interiors allow area selection.
+- Selected groups move together. Ctrl/Cmd+A selects all, Ctrl/Cmd+C/V copy/paste within the open board, and Delete/Backspace removes the selection. Context menus preserve groups and provide copy, paste at the requested position and delete. Copies receive new IDs and retain internal visual links, ports, free ends, product card properties, image references and remapped dependencies; private assignments and chat associations are excluded. Capacity limits reject a paste atomically.
+
+### Validation
+- Web build, 17 model/geometry/persistence tests and 13 distinct browser scenarios passed, including group movement/copy/deletion, metadata, zoom, middle-button pan, Shift/Escape, Undo/Redo, connectors, pinch and the 400-card drag regression. Documentation links and synthetic selection screenshot checked. Packaging and publication pending; physical devices not tested.
+
 ## [0.28.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.4...v0.28.5) (2026-10-25)
 
 Published [v0.28.5](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.5) from [5de9ebe9c7e26cc81be574ce77021fb247eb369f](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5de9ebe9c7e26cc81be574ce77021fb247eb369f) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

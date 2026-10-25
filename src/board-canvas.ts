@@ -1,6 +1,10 @@
 import type {BoardNote} from '../server/boards';
 import {emptyWhiteboard,type Whiteboard} from './whiteboard-model';
 
+export type CanvasCardCopy=Pick<BoardNote,'id'|'branch'|'status'|'priority'|'dependencies'|'images'>;
+export type CanvasCopies={cards:CanvasCardCopy[];ids:Record<string,string>};
+export function copyCanvasCards(notes:BoardNote[]):CanvasCardCopy[]{return notes.map(({id,branch,status,priority,dependencies,images})=>structuredClone({id,branch,status,priority,dependencies,images}));}
+
 // Notes remain the canonical task records; canvas stores their visual geometry.
 export function boardCanvas(notes:BoardNote[],canvas?:Whiteboard):Whiteboard {
  const value=canvas||emptyWhiteboard(),ids=new Set(notes.map(n=>n.id));
@@ -16,10 +20,10 @@ export function canvasMigrationIssues(notes:BoardNote[],canvas?:Whiteboard){
  if(notes.some(n=>n.dependencies.some(id=>!noteIds.has(id)||id===n.id)))result.push('Invalid task dependencies');
  return result;
 }
-export function canvasNotes(notes:BoardNote[],canvas:Whiteboard):BoardNote[] {
+export function canvasNotes(notes:BoardNote[],canvas:Whiteboard,copies?:CanvasCopies):BoardNote[] {
  const ids=new Set(canvas.items.filter(i=>i.kind==='card').map(i=>i.id));
  return canvas.items.filter(i=>i.kind==='card').map(i=>{
-  const old=notes.find(n=>n.id===i.id);
+  const source=copies?.cards.find(n=>copies.ids[n.id]===i.id),old=notes.find(n=>n.id===i.id)||(source?{...source,owner:'',dependencies:source.dependencies.map(id=>copies?.ids[id]||id).filter(id=>ids.has(id))}:undefined);
   return {...(old||{owner:'',branch:'',status:'idea' as const,priority:'normal' as const,dependencies:[]}),id:i.id,title:i.text.trim().slice(0,160)||'Untitled',description:i.description||'',x:Math.min(20000,i.x),y:Math.min(20000,i.y),dependencies:(old?.dependencies||[]).filter(id=>ids.has(id)||!notes.some(n=>n.id===id))};
  });
 }

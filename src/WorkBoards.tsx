@@ -1,4 +1,4 @@
-import {boardCanvas,canvasNotes,canvasMigrationIssues} from './board-canvas';
+import {boardCanvas,canvasNotes,copyCanvasCards,canvasMigrationIssues} from './board-canvas';
 import {boardChatContext} from './board-chat-context';
 import {Whiteboard} from './Whiteboard';
 import type {Whiteboard as CanvasData} from './whiteboard-model';
@@ -89,7 +89,7 @@ export function WorkBoards({connection,roots,workspaces,onChat,local=false,compa
     {!!migrationIssues.length&&<div role="alert" className="board-error">{l('Legacy board has invalid references. Editing is disabled to preserve all objects and connections.','В старой доске есть повреждённые ссылки. Редактирование отключено, чтобы сохранить все объекты и связи.')} {migrationIssues.join('; ')}</div>}
     {!board?<RepositoryBoards connection={connection} roots={roots} onOpen={next=>{navigation.current++;setBoard(next);setEditing(null);setZoom(1);}}/>:<>
       {board.error&&<p className="board-git-warning">{board.error}</p>}
-      <Whiteboard key={board.root+board.id} value={boardCanvas(board.notes,board.canvas)} onDiscuss={discussBoard} editable={canEdit} busy={busy} onSave={data=>{noteArchive.current.set(JSON.stringify(boardCanvas(board.notes,board.canvas)),board.notes);if(noteArchive.current.size>52)noteArchive.current.delete(noteArchive.current.keys().next().value!);return save(canvasNotes(noteArchive.current.get(JSON.stringify(data))||board.notes,data),board.versions,false,true,data);}}
+      <Whiteboard key={board.root+board.id} value={boardCanvas(board.notes,board.canvas)} onDiscuss={discussBoard} editable={canEdit} busy={busy} cards={copyCanvasCards(board.notes)} onSave={(data,copies)=>{noteArchive.current.set(JSON.stringify(boardCanvas(board.notes,board.canvas)),board.notes);if(noteArchive.current.size>52)noteArchive.current.delete(noteArchive.current.keys().next().value!);return save(canvasNotes(noteArchive.current.get(JSON.stringify(data))||board.notes,data,copies),board.versions,false,true,data);}}
        onVersions={()=>setVersionsOpen(true)}
        renderCard={id=>{const n=board.notes.find(n=>n.id===id);if(!n)return null;const task=runs.get(board.id+'/'+id);return <><BoardTaskMeta note={n} status={statusLabels[n.status]}/><BoardImages connection={connection} root={board.root} images={n.images}/><button aria-label={l('Card properties ','Свойства карточки ')+n.title} onClick={()=>openNote({...n,dependencies:[...n.dependencies]})}>{l('Properties','Свойства')}</button>{agentAvailable&&<button onClick={()=>openNote({...n},'agent')}>{l('Agent','Агент')}</button>}{task&&<button onClick={()=>setTaskDetail(task)}>{taskStageLabel(taskDisplayStage(task))}</button>}</>;}}/>
       </>}
