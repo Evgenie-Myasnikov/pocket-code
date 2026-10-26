@@ -13,7 +13,7 @@ no AionUi runtime or animation library is bundled.
 | Thinking/tool disclosure arrows and hover feedback | Fixed-size chevrons rotate; expanded content fades in. Lazy materialization remains. | Tool disclosure and keyboard-focus checks. |
 | Active tool breathing, `MessageToolGroupSummary.css` | Active grouped tools pulse gently. Completed groups and unknown connection state do not pulse. | Active/completed and reduced-motion checks. |
 | Message action hover, `MessageText.tsx` | Desktop assistant Copy fades in on hover/focus. Touch actions remain visible; copying confirms with the existing check mark and a small icon effect. | Clipboard contents, focus visibility and reduced-motion checks. |
-| Send-box focus/drag colors and Stop glow, `chat/SendBox` | Existing focus/drag transitions plus a fixed-size Stop halo; retry/stopping states remain static. Latest-button hover/press feedback uses transforms without layout changes. | Composer geometry and state checks. |
+| Send-box focus/drag colors and Stop glow, `chat/SendBox` | Existing focus/drag transitions plus a brighter fixed-size breathing halo shared by Stop and the composer frame; retry/stopping states remain static. Input press/focus adds one fading outward border wave. Latest-button hover/press feedback uses transforms without layout changes. | Composer geometry and state checks. |
 | Newly arriving live content | A short entrance fade for new live messages. History pagination and reentry do not replay it. | Snapshot/live distinction and transcript regression checks. |
 
 Reduced-motion and forced-colors preferences suppress decorative animations.
@@ -26,3 +26,17 @@ mention chips belong to features that Pocket Code does not provide in this chat.
 They do not introduce those features through this motion update. This is a complete
 mapping of the applicable audited chat patterns, rather than a copy of the whole
 AionUi application.
+
+## Composer motion refinement
+
+The active halo keeps its original 1.6-second alternating breathing rhythm. Its
+higher-contrast ring blends the theme accent with foreground text and animates
+opacity without changing input or button geometry. A separate 1.35-second border
+wave responds once to input press or keyboard focus; it never intercepts input.
+Reduced-motion and forced-colors suppress both decorations.
+
+[AionUi Stop breathing](https://github.com/iOfficeAI/AionUi/blob/11cd2a9a20d1e033157636efc570b41384c66d85/packages/desktop/src/renderer/components/chat/SendBox/sendbox.css#L215)
+and its [focus-ring hook](https://github.com/iOfficeAI/AionUi/blob/11cd2a9a20d1e033157636efc570b41384c66d85/packages/desktop/src/renderer/hooks/chat/useInputFocusRing.ts)
+are the reference for breathing and focus feedback. The single outward wave is
+an independent extension, not a claimed AionUi feature. No animation dependency
+is needed for these two effects.

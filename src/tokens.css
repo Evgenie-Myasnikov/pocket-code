@@ -65,7 +65,7 @@
  --shadow-sm:0 1px 4px var(--shadow-color);--shadow-md:0 8px 28px var(--shadow-color);--shadow-lg:0 12px 48px var(--shadow-color);--shadow-side:-20px 0 64px var(--shadow-color);
  --material-card:var(--radius-md);--material-menu:var(--radius-md);--material-modal:calc(var(--radius) + 4px);--material-sheet:calc(var(--radius) + 8px);--material-toast:var(--radius-sm);
  /* Global layers; values 1–8 stay local to a component stacking context. */
- --z-popover:10;--z-header:20;--z-drawer:30;--z-panel:90;--z-panel-top:100;--z-chat-menu:120;--z-dialog:140;--z-alert:200;--z-sheet:1000;--z-menu:1050;--z-modal:1100;--z-toast:1400;
+ --z-canvas-selection:20;--z-canvas-cursor:25;--z-popover:10;--z-header:20;--z-drawer:30;--z-panel:90;--z-panel-top:100;--z-chat-menu:120;--z-dialog:140;--z-alert:200;--z-sheet:1000;--z-menu:1050;--z-modal:1100;--z-toast:1400;
  --icon-sm:calc(16px * var(--ui-scale,1));--icon-md:calc(20px * var(--ui-scale,1));--icon-lg:calc(24px * var(--ui-scale,1));--icon-xl:calc(32px * var(--ui-scale,1));
 }
 :root[data-compact=true]{--space-unit:calc(3px * var(--ui-scale,1))}

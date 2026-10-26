@@ -89,6 +89,11 @@
 
 .composer-board-selection{display:flex;align-items:center;gap:6px;max-width:100%;padding:6px 8px;margin-bottom:6px;border:1px solid var(--line);border-radius:var(--control-radius,6px);font-size:calc(12px * var(--ui-scale,1));color:var(--text);background:var(--surface)}.composer-board-selection span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.composer-board-selection small{color:var(--muted);font-size:inherit;margin-left:auto;white-space:nowrap}
 
-.prompt-composer[data-pulsing=true] .stop-button::after{content:"";position:absolute;inset:2px;pointer-events:none;border-radius:50%;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);box-shadow:inset 0 0 5px color-mix(in srgb,var(--accent) 18%,transparent);animation:composer-active-halo 1.6s ease-in-out infinite alternate}
-@keyframes composer-active-halo{from{opacity:.25}to{opacity:.85}}
-@media(prefers-reduced-motion:reduce),(forced-colors:active){.prompt-composer[data-pulsing=true] .stop-button::after{animation:none;display:none}}
+/* Keep the original breathing rhythm; both surfaces share a higher-contrast halo. */
+.prompt-composer{--composer-halo:color-mix(in srgb,var(--accent) 40%,var(--text));isolation:isolate}
+.prompt-composer[data-pulsing=true]::before,.prompt-composer[data-pulsing=true] .stop-button::after,.composer-border-wave{content:"";position:absolute;inset:-1px;pointer-events:none;border-radius:inherit;border:1.5px solid var(--composer-halo);box-shadow:0 0 8px color-mix(in srgb,var(--composer-halo) 28%,transparent),inset 0 0 5px color-mix(in srgb,var(--composer-halo) 18%,transparent);animation:composer-active-halo 1.6s ease-in-out infinite alternate}
+.prompt-composer[data-pulsing=true] .stop-button::after{inset:2px;border-radius:50%}
+.prompt-composer .composer-border-wave{border-width:2px;animation:composer-focus-wave 1.35s cubic-bezier(.22,.61,.36,1) 1 both}
+@keyframes composer-active-halo{from{opacity:.5}to{opacity:1}}
+@keyframes composer-focus-wave{0%{opacity:0;transform:scale(1)}18%{opacity:.95}100%{opacity:0;transform:scale(var(--composer-wave-x,1.02),var(--composer-wave-y,1.08))}}
+@media(prefers-reduced-motion:reduce),(forced-colors:active){.prompt-composer[data-pulsing=true]::before,.prompt-composer[data-pulsing=true] .stop-button::after,.prompt-composer .composer-border-wave{animation:none;display:none}}

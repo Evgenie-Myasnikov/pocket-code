@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased (0.28.14)
+
+Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Not published.
+
+### Features
+- Drag the board/chat divider to resize either side; horizontal and stacked proportions persist separately. Keyboard resizing, cancellation and reset preserve the mounted canvas and unsent draft. The shared sidebar divider now keeps its full hit area inside the panel.
+- The active Stop halo keeps its original breathing rhythm with stronger contrast, also applied around the composer frame. Input press or keyboard focus triggers one smooth outward wave without moving controls. Reduced motion, forced colors and stopping/unknown run states suppress decoration. Reference research and independent implementation are recorded in [Chat motion](docs/CHAT-MOTION.md).
+
+### Bug Fixes
+- Wheel scrolling over overflowing card text, metadata or editors stays inside that area, including its boundaries; empty canvas still pans and Ctrl+wheel zooms.
+- Removed the separate dots button from embedded board chat. Existing actions remain on the title context menu and Shift+F10, including while the chat is busy. Regular chat menus remain available.
+- Reused semantic canvas layer tokens without changing existing selection/cursor stacking values.
+
+### Validation
+- 27 distinct browser scenarios passed across targeted runs: divider drag/keyboard/cancel/reset/persistence, retained draft/canvas, local card scrolling, saved board chat, image drag and selection, live updates, sidebar, narrow/wide headers and accessible motion in light/dark themes. The 400-card drag retained 400 metadata renders. Four design-token checks, TypeScript/Vite, portable-board schema/dependencies and links in 27 documents passed; synthetic captures inspected. Packaging pending; physical devices not tested.
+
 ## [0.28.13](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.12...v0.28.13) (2026-10-25)
 
 Published [v0.28.13](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.13) from [9ccb279e068b2aca074ad0dd40e21db57298d46d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/9ccb279e068b2aca074ad0dd40e21db57298d46d) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
