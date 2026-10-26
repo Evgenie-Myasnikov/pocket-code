@@ -46,7 +46,7 @@ Golos Text is the readable UI family, Manrope provides heading emphasis, and
 Consolas/JetBrains Mono serves code. Tokens define regular 400, medium 500,
 semibold 600 and display 700 weights. Compact controls use 12–14 px type;
 conversation copy starts at 14 px with configurable size and leading.
-Heading tokens are 16, 20 and 24 px. The compact board title is 14 px.
+Heading tokens are 16, 20 and 24 px. Compact desktop board and chat titles use 14 px.
 Secondary metadata is subordinate; it must not replace readable labels.
 
 ## 4. Component Stylings
@@ -54,28 +54,57 @@ Secondary metadata is subordinate; it must not replace readable labels.
 - Buttons: desktop toolbar height 30–36 px, 6–8 px corners, 8 px icon/text gap.
   Use one clear primary action; secondary actions have quiet or transparent fills.
   Keyboard focus uses the accent ring. Do not remove focus to achieve compactness.
-- Menus and dialogs: shared surfaces, subtle border and restrained shadow.
-  Menus use the existing 12 px radius token; dialogs use 16 px.
-- Navigation: a compact provider dropdown, independent list/grid icons, soft
-  active background. The board header contains title, Chat and refresh.
+- Menus and dialogs: shared panel surface, subtle border and restrained shadow.
+  Chat, card, provider and access menus use the same row spacing and state roles
+  through `src/ui-menus.css`. Menu corners use `--material-menu`, rows use
+  `--radius-sm`, and selected rows use `--bg-active` with an accent edge.
+  Keyboard focus has its own ring; disabled and destructive actions stay distinct.
+  Rows scale from 36 px on desktop and retain at least 44 px on coarse pointers.
+- Navigation: one searchable chat list and a collapsible sidebar; no tile switch
+  or Inbox. The active section uses an accent edge and stronger text, while
+  hover is transient and inactive navigation recedes. Board header actions are
+  image gallery, Chat and refresh icons. Desktop chat keeps a compact title and
+  44 px back/menu targets; phone chat retains 48 px targets.
 - Forms: 8–10 px padding, explicit labels, consistent input boundary and focus.
 - Canvas: the single board view, with existing task cards and pastel sticky objects.
-  Edit text inside objects. Create through a blank-canvas click/context menu.
-  Resize at edges/corners; four side ports create connections. Keep only undo,
-  redo and fit in the persistent toolbar; colors and deletion belong in menus.
-  Task dependencies are metadata, separate from user-drawn arrows.
-- Board chat: adjacent pane on desktop; project is inherited from the board.
-  A small context chip replaces raw metadata in the composer.
+  Edit text inside objects. Right-click blank canvas (or use the keyboard
+  context-menu key) to create. Left-drag empty canvas selects an area; middle-drag
+  pans. Resize at edges/corners; approach a side midpoint, then hold briefly
+  and drag from its connection port. Undo, redo, fit and AI following remain
+  available in the toolbar. Card Properties/Agent actions appear for a single
+  selected card and in its context menu, rather than on every card.
+  Task dependencies are metadata, separate from user-drawn arrows. A compact
+  receipt of a confirmed AI write can reveal its surviving affected objects;
+  ordinary file refreshes and reads do not become AI-edit receipts.
+- Gallery: loading, error and decoded previews reserve the same media slot.
+  Preview originals or drag them to the composer. The add action appears on
+  hover/focus and stays visible for touch. Image geometry stays stable during drag.
+- Board chat: the project and saved conversation belong to the current board.
+  A separate selection attachment describes the context of each new message.
+  Opening it shows names, object types and available image previews, with a
+  jump back to the source object. Do not expose raw IDs as visible labels.
+  Embedded desktop chat actions live in the title context menu and Shift+F10;
+  the title remains keyboard reachable while a turn runs.
 
 ## 5. Layout Principles
 
 Use a 4 px spacing unit, reduced to 3 px by the existing compact preference.
 Board toolbar padding is 8 by 12 px. The workspace fills available width rather
-than a marketing-page maximum. Board/chat uses a flexible board and a 42% chat
-pane, stacking below 1000 px. Board actions wrap below 700 px. Fine-pointer
-desktop controls can be compact; coarse-pointer controls retain 44 px targets.
+than a marketing-page maximum. Board/chat has a draggable divider with bounds,
+keyboard adjustment, reset and separately remembered horizontal/stacked sizes.
+Desktop starts with 58% for the board and stacks below 1000 px; the user's ratio
+then takes precedence. On phones, board chat opens as an adjustable bottom sheet
+while the board stays mounted; collapsing it preserves the chat and draft.
+Board actions wrap below 700 px. Fine-pointer desktop controls can be compact;
+coarse-pointer controls retain 44 px targets. Scrollable card content owns its
+wheel gestures, including at its edges; Ctrl+wheel retains canvas zoom.
+
 Left-align names and working content; reserve whitespace for reading and canvas
-navigation. Motion tokens are 100/200/300 ms with reduced-motion overrides.
+navigation. Motion tokens are 100/200/300 ms. Menus enter once with a short fade
+and 2 px translation; closing and action execution remain immediate. The active
+Stop and composer frame share a brighter 1.6-second breathing halo. Focus/press
+adds one 1.35-second outward wave using opacity and transform, without changing
+control geometry. Reduced-motion and forced-colors suppress decoration.
 
 ## 6. Design System Notes for Stitch Generation
 
@@ -83,8 +112,8 @@ Describe a quiet, dense desktop tool with neutral surfaces, restrained jade
 accents and clear typography. Preserve the user's selected theme.
 
 Example prompts:
-- Design a compact board header with back, title, Chat and refresh. Keep the
-  canvas prominent and its undo, redo and fit controls compact.
+- Design a compact board header with back, title and gallery/Chat/refresh icons.
+  Keep the canvas prominent and the toolbar compact; show card actions in context.
 - Design a chat beside a board with inherited project context, a short context
   chip and a clean composer. Do not add another project picker.
 
@@ -92,3 +121,22 @@ Iterate one surface at a time against real rendered captures. Check focus,
 overflow, dark/light modes and touch sizes. This document was extracted from
 React/plain-CSS source using Google's extract-design-md workflow; no Stitch
 screen generation or upload was performed.
+
+## 7. Reference Principles
+
+These sources inform the shared Pocket Code system; they do not require replacing
+its existing React components or adopting another product's palette.
+
+- [Linear's 2026 refresh](https://linear.app/now/behind-the-latest-design-refresh):
+  quiet navigation, clear content hierarchy and deliberate borders.
+- [GitHub Primer ActionList](https://primer.style/product/components/action-list/):
+  consistent rows for icons, labels, selection and supporting information.
+- [Adobe Spectrum color](https://spectrum.adobe.com/page/using-color/):
+  semantic roles and related surface levels across light and dark themes.
+- [React Aria styling](https://react-aria.adobe.com/styling):
+  independent hover, press, selection and keyboard-focus states.
+- [Google supporting panes](https://developer.android.com/develop/ui/compose/layouts/adaptive/canonical-layouts#supporting-pane):
+  board as primary content and chat as a context-preserving adaptive companion.
+
+The source styles and rendered checks remain authoritative for implemented
+behavior. This document is a design contract, not validation or release evidence.

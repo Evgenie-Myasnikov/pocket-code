@@ -1,3 +1,4 @@
+import type {BoardWriteReceipt} from './board-write-receipt';
 import {useAiFollow} from './use-ai-follow';
 import {useBoardView,type BoardViewConnection} from './use-board-view';
 import type {BoardEditActivity} from '../server/board-live';
@@ -5,7 +6,7 @@ import {copySelection,pasteSelection,itemsInRect,selectionRect,type SelectionRec
 import type {CanvasCardCopy,CanvasCopies} from './board-canvas';
 import {CardActionMenu,type CardAction} from './CardActionMenu';
 import {useEffect,useRef,useState,useMemo,type ReactNode,type CSSProperties} from 'react';
-import {StickyNote,Type,Frame,Undo2,Redo2,Trash2,Copy,Clipboard,Square,Maximize,MousePointer2} from 'lucide-react';
+import {StickyNote,Type,Frame,Undo2,Redo2,Trash2,Copy,Clipboard,Square,Maximize,MousePointer2,X,Check} from 'lucide-react';
 import {useLanguage} from './i18n';
 import {emptyWhiteboard,moveItems,removeItems,frameSelection,portPoint,type PortSide,type Whiteboard as Canvas,type WhiteboardItem as Item,type WhiteboardLink as Link} from './whiteboard-model';
 import {nearbyPort,connectionEnds,connectionPoints,connectorPath} from './whiteboard-connections';
@@ -13,7 +14,7 @@ import {WhiteboardNode,type NodeActions} from './WhiteboardNode';
 import {WhiteboardLink} from './WhiteboardLink';
 import './whiteboard.css';
 
-export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVersions,cards=[],onSelection,onInteraction,liveActivity:externalActivity,remoteIds=[],active=true,viewConnection}:{viewConnection?:BoardViewConnection;active?:boolean;onSelection?(ids:string[]):void;onInteraction?(active:boolean):void;liveActivity?:BoardEditActivity|null;remoteIds?:string[];cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
+export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,cardActions,onVersions,receipt,onDismissReceipt,revealObject,cards=[],onSelection,onInteraction,liveActivity:externalActivity,remoteIds=[],active=true,viewConnection}:{cardActions?(id:string):CardAction[];receipt?:BoardWriteReceipt|null;onDismissReceipt?():void;revealObject?:{id:string;requestId:number};viewConnection?:BoardViewConnection;active?:boolean;onSelection?(ids:string[]):void;onInteraction?(active:boolean):void;liveActivity?:BoardEditActivity|null;remoteIds?:string[];cards?:CanvasCardCopy[];renderCard?(id:string):ReactNode;onVersions?():void;value?:Canvas;editable:boolean;busy:boolean;onSave(value:Canvas,copies?:CanvasCopies):Promise<boolean>;onDiscuss?(ids:string[]):void}){
  const ru=useLanguage()==='ru',l=(en:string,ruText:string)=>ru?ruText:en;
  const board=value||emptyWhiteboard(),[selected,setSelected]=useState<string[]>([]),[zoom,setZoom]=useState(1),[pan,setPan]=useState({x:40,y:40}),[preview,setPreview]=useState<Canvas|null>(null),[connecting,setConnecting]=useState<{id:string;side:PortSide}|null>(null),[wire,setWire]=useState<{link:Link;moving:'from'|'to';target?:string;targetSide?:PortSide}|null>(null),[editing,setEditing]=useState<Item|null>(null),[history,setHistory]=useState<Canvas[]>([]),[future,setFuture]=useState<Canvas[]>([]);
  const [interacting,setInteracting]=useState(false);
@@ -46,6 +47,12 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  const aiIds=useMemo(()=>new Set(liveActivity?.ids||[]),[liveActivity]);
  const aiTarget=liveActivity?.targets?.[0]||liveActivity?.ids.map(id=>itemsById.get(id)).find(Boolean);
  const ai=useAiFollow(aiTarget,liveActivity?.id,liveActivity?.expiresAt||0,viewport,{zoom,pan},v=>{setZoom(v.zoom);setPan(v.pan);},!active||interacting||!!editing||!!menu||busy);
+ function focusObjects(ids:string[]){
+  const items=ids.map(id=>itemsById.get(id)).filter((item):item is Item=>!!item),rect=viewport.current?.getBoundingClientRect();if(!items.length||!rect?.width||!rect.height)return false;
+  ai.pause();const x=Math.min(...items.map(i=>i.x)),y=Math.min(...items.map(i=>i.y)),width=Math.max(...items.map(i=>i.x+i.width))-x,height=Math.max(...items.map(i=>i.y+i.height))-y,z=Math.max(.1,Math.min(1,(rect.width-80)/Math.max(1,width),(rect.height-80)/Math.max(1,height)));setZoom(z);setPan({x:rect.width/2-(x+width/2)*z,y:rect.height/2-(y+height/2)*z});return true;
+ }
+ const revealed=useRef<number|undefined>(undefined);
+ useEffect(()=>{if(!revealObject||!active||busy||interacting||editing||revealed.current===revealObject.requestId)return;const frame=requestAnimationFrame(()=>{if(focusObjects([revealObject.id]))revealed.current=revealObject.requestId;});return()=>cancelAnimationFrame(frame);},[revealObject?.requestId,revealObject?.id,active,busy,interacting,!!editing,board]);
  useBoardView(viewConnection,()=>{
   const element=viewport.current,rect=element?.getBoundingClientRect(),world=element?.querySelector('.whiteboard-world'),matrix=world?new DOMMatrixReadOnly(getComputedStyle(world).transform):null;
   const visible=active&&document.visibilityState!=='hidden'&&!!rect&&rect.width>0&&rect.height>0;
@@ -162,10 +169,14 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
  }
  const disabled=!editable||busy||!!editing;
  nodeActions.current={drag,pick,edit:setEditing,finish:()=>{void finish();},menu:(item,x,y)=>{setSelected(old=>old.includes(item.id)?old:[item.id]);setSelectedLink(null);setMenu({x,y,item});},connect:connectDrag,portKey,key:(e,item)=>{
+  if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();e.stopPropagation();const rect=e.currentTarget.getBoundingClientRect();setSelected(old=>old.includes(item.id)?old:[item.id]);setMenu({x:rect.left+24,y:rect.top+24,item});return;}
   if(e.key==='Enter'&&!disabled){e.preventDefault();setSelected([item.id]);setEditing({...item});}else if(e.key===' '){e.preventDefault();pick(item,e.shiftKey);}
   const directions:Record<string,[number,number]>={ArrowLeft:[-8,0],ArrowRight:[8,0],ArrowUp:[0,-8],ArrowDown:[0,8]};if(directions[e.key]&&!disabled){e.preventDefault();void change(moveItems(board,selected.includes(item.id)?selected:[item.id],...directions[e.key]));}
  }};
+ const selectedCard=selected.length===1&&itemsById.get(selected[0])?.kind==='card'?selected[0]:null;
+ const selectedActions=selectedCard&&!editing?(cardActions?.(selectedCard)||[]):[];
  const menuItems:CardAction[]=!menu?[]:menu.item?[
+  ...(menu.item.kind==='card'?cardActions?.(menu.item.id)||[]:[]),
   {label:l('Copy','Копировать'),Icon:Copy,onSelect:copy},
   ...(clipboard.current?[{label:l('Paste','Вставить'),Icon:Clipboard,disabled:disabled,onSelect:()=>void paste(menu)}]:[]),
   {label:l('Write','Написать'),disabled:disabled,onSelect:()=>setEditing({...menu.item!})},
@@ -184,7 +195,9 @@ export function Whiteboard({value,editable,busy,onSave,onDiscuss,renderCard,onVe
    <button aria-label={l('Redo','Повторить')} disabled={disabled||!future.length} onClick={()=>{ai.pause();void change(future.at(-1)!,'redo');}}><Redo2 size={18}/></button>
    <button aria-label={l('Fit canvas','Вместить холст')} onClick={fit}><Maximize size={18}/></button>
    <button className="wb-follow" aria-label={ai.following?l('Pause following AI','Приостановить следование за AI'):l('Follow AI','Следовать за AI')} title={ai.following?l('Following AI · navigate to pause','Следуем за AI · движение по холсту приостановит'):l('Follow AI','Следовать за AI')} aria-pressed={ai.following} onClick={ai.toggle}><MousePointer2 size={18}/><span>AI</span></button>
+   {selectedActions.length>0&&<div className="wb-selection-actions" role="group" aria-label={l('Selected card actions','Действия выбранной карточки')}>{selectedActions.map(action=><button key={action.label} type="button" title={action.label} aria-label={action.label} disabled={busy||action.disabled} onClick={action.onSelect}>{action.Icon?<action.Icon size={18}/>:action.label}</button>)}</div>}
   </div>
+  {active&&receipt&&<div className="wb-write-receipt"><span role="status"><Check size={14} aria-hidden="true"/>{receipt.action==='connect'?l('AI · connections updated','AI · связи обновлены'):l('AI · changes saved','AI · изменения сохранены')} · {l('objects: ','объектов: ')}{receipt.ids.length}</span><button type="button" disabled={!receipt.ids.some(id=>itemsById.has(id))||busy||interacting||!!editing} onClick={()=>focusObjects(receipt.ids)}>{l('Show','Показать')}</button><button type="button" aria-label={l('Dismiss AI result','Скрыть результат AI')} onClick={onDismissReceipt}><X size={14}/></button></div>}
   {notice&&<div className="whiteboard-status" role="status">{notice}</div>}
   {connecting&&<div className="whiteboard-status" role="status">{l('Select a destination side point','Выбери точку на стороне другого элемента')}</div>}
   <div ref={viewport} className="whiteboard-viewport" tabIndex={0} onPointerDownCapture={e=>{ai.pause();touchStart(e);if(e.button===1)surfaceStart(e);}} onPointerMoveCapture={e=>{touchMove(e);portHover(e);}} onPointerLeave={()=>setHoverPort(null)} onPointerUpCapture={e=>{const copy={pointerId:e.pointerId};setTimeout(()=>touchEnd(copy as React.PointerEvent),0);}} onPointerCancelCapture={touchEnd} onContextMenu={e=>{if(e.target===e.currentTarget){e.preventDefault();setMenu({x:e.clientX,y:e.clientY});}}} onPointerDown={surfaceStart} onWheel={e=>{ai.pause();if(!e.ctrlKey){let target=e.target instanceof Element?e.target.closest<HTMLElement>('*'):null;while(target&&target!==e.currentTarget){const style=getComputedStyle(target);if((/(auto|scroll)/.test(style.overflowY)&&target.scrollHeight>target.clientHeight+1)||(/(auto|scroll)/.test(style.overflowX)&&target.scrollWidth>target.clientWidth+1))return;target=target.parentElement;}}if(e.ctrlKey){e.preventDefault();const r=e.currentTarget.getBoundingClientRect();scale(zoom*Math.exp(-e.deltaY*.003),e.clientX-r.left,e.clientY-r.top);}else setPan({x:pan.x-e.deltaX,y:pan.y-e.deltaY});}} onKeyDownCapture={e=>{if(e.key!=='Tab')ai.pause();}} onKeyDown={e=>{if((e.target as HTMLElement).closest('textarea,input,select,[contenteditable=true]'))return;if((e.ctrlKey||e.metaKey)&&['a','c','v'].includes(e.key.toLowerCase())){e.preventDefault();if(e.key.toLowerCase()==='a'){setSelected(board.items.map(i=>i.id));setSelectedLink(null);}else if(e.key.toLowerCase()==='c')copy();else void paste();return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();const list=e.shiftKey?future:history;if(list.length)void change(list.at(-1)!,e.shiftKey?'redo':'undo');}if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();const r=viewport.current!.getBoundingClientRect();setMenu({x:r.left+40,y:r.top+40});}if(e.key==='Escape'){if(surfaceCancel.current){surfaceCancel.current();return;}connectionCancel.current?.();setConnecting(null);setSelected([]);setSelectedLink(null);}if(e.key==='Delete'&&selectedLink){void change({...board,links:board.links.filter(link=>link.id!==selectedLink)});setSelectedLink(null);}if((e.key==='Delete'||e.key==='Backspace')&&selected.length){void change(removeItems(board,selected));setSelected([]);}}}>

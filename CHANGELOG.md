@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased (0.28.15)
+
+Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Not published.
+
+### Features
+- Compact chat headers and shared chat/card/provider/access menu states distinguish selection, hover and keyboard focus. Gallery loading and errors reserve the same image geometry. Card Properties/Agent actions appear on selection or in the context menu.
+- Open the current board-selection attachment to inspect object names and previews, then jump to its source while retaining the selection and draft. Sent messages keep their original context snapshot.
+- Phone board chat opens in an adjustable sheet with remembered height, keyboard resizing and reset. Returning to the board preserves the mounted canvas and unsent draft.
+- A compact result of the latest confirmed AI write shows affected objects and offers Show/dismiss. Reads, stale events and ordinary file refreshes do not produce AI results; this does not add cross-user undo.
+
+### Bug Fixes
+- Retained boards refresh MCP on re-entry from another section; overlaid chat and gallery preserve the current entry. Hidden views release their navigation and polling; Back closes the active chat menu before folding the sheet.
+- A shared bounded limit of 64 version labels/branch mappings preserves growing release history; storage, APIs and UI reject overflow. Hosts before 0.28.15 require at most 40 entries per field.
+
+### Documentation
+- Updated the [compact design contract](.stitch/DESIGN.md) and [board behavior](project-boards/README.md), including primary design references, restrained motion, reduced-motion and forced-color behavior.
+
+### Validation
+- 41 distinct browser scenarios and 20 targeted unit/integration checks passed across the scoped runs. Checks include image drag, selection source jumps, saved chats, draft/canvas retention, keyboard navigation, narrow/wide layouts, menu themes, reduced motion, live feedback and version-limit roundtrips/rejections. The synthetic 400-card drag retained 400 metadata renders. Real MCP view control, hidden-request suspension, menu/sheet Back order, TypeScript/Vite, board schema/dependencies and links in 27 documents passed. Packaging pending; physical devices not tested.
+
 ## [0.28.14](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.13...v0.28.14) (2026-10-26)
 
 Published [v0.28.14](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.14) from [dda92d893d5d4ae25f408b43c5e497c22541d01a](https://github.com/Evgenie-Myasnikov/pocket-code/commit/dda92d893d5d4ae25f408b43c5e497c22541d01a) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

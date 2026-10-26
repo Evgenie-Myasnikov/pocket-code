@@ -1,7 +1,8 @@
 import type {BoardSelection} from './board-selection-context';
+import {BoardSelectionPreview} from './BoardSelectionPreview';
 import {boardImageMime} from './board-image-drag';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode,type CSSProperties} from 'react';
-import {ArrowUp,Paperclip,Square,LoaderCircle,ListPlus,CornerDownRight,Clock,RefreshCw,Scan} from 'lucide-react';
+import {ArrowUp,Paperclip,Square,LoaderCircle,ListPlus,CornerDownRight,Clock,RefreshCw} from 'lucide-react';
 import {AttachmentTray,type DraftAttachment} from './AttachmentTray';
 import {t} from './i18n';
 import './composer-controls.css';
@@ -9,7 +10,7 @@ import './composer-controls.css';
 /** A paste this long becomes a text attachment that can be put back into the message. */
 export const LONG_PASTE=10000;
 type Props={
-  boardSelection?:BoardSelection|null;
+  boardSelection?:BoardSelection|null;onRevealBoardSelection?(id:string):void;
   text:string;label:string;placeholder:string;disabled?:boolean;uploading:boolean;canSend:boolean;
   attachments:DraftAttachment[];controls:ReactNode;usage?:ReactNode;stopLabel:string;
   /** A send is in flight: Send waits, the field keeps focus and the keyboard stays open. */
@@ -33,7 +34,7 @@ function useShortScreen(){
 }
 
 /** Shared Windows/Android input. Resizing never changes the draft or selection. */
-export function ChatComposer({boardSelection,text,label,placeholder,disabled,uploading,canSend,attachments,controls,usage,stopLabel,busy=false,stopping=false,mode='send',blockedReason,stopRetry=false,enterSends=false,keyHint=false,onText,onRemove,onFiles,onBoardImage,onRetry,onInsertText,onRecall,onSend,onStop}:Props){
+export function ChatComposer({boardSelection,onRevealBoardSelection,text,label,placeholder,disabled,uploading,canSend,attachments,controls,usage,stopLabel,busy=false,stopping=false,mode='send',blockedReason,stopRetry=false,enterSends=false,keyHint=false,onText,onRemove,onFiles,onBoardImage,onRetry,onInsertText,onRecall,onSend,onStop}:Props){
   const input=useRef<HTMLTextAreaElement>(null),files=useRef<HTMLInputElement>(null),hadFocus=useRef(false),focusAtPress=useRef(false);
   const [wave,setWave]=useState<{id:number;x:number;y:number}|null>(null),waveSequence=useRef(0),wavePointer=useRef(0);
   const ripple=()=>{if(disabled||matchMedia('(prefers-reduced-motion: reduce), (forced-colors: active)').matches)return;const rect=input.current?.closest('.prompt-composer')?.getBoundingClientRect();if(rect?.width&&rect.height)setWave({id:++waveSequence.current,x:1+16/rect.width,y:1+16/rect.height});};
@@ -65,7 +66,7 @@ export function ChatComposer({boardSelection,text,label,placeholder,disabled,upl
     onDrop={event=>{if(!hasFiles(event))return;event.preventDefault();event.stopPropagation();setDragging(false);if(disabled)return;if(event.dataTransfer.types.includes(boardImageMime)&&onBoardImage){onBoardImage(event.dataTransfer);return;}const incoming=Array.from(event.dataTransfer.files);if(incoming.length)onFiles(incoming);}}>
     {wave&&<span key={wave.id} className="composer-border-wave" aria-hidden="true" style={{'--composer-wave-x':wave.x,'--composer-wave-y':wave.y} as CSSProperties} onAnimationEnd={()=>setWave(null)}/>}
     {dragging&&<div className="composer-drop-zone" aria-hidden="true">{t('Отпустите, чтобы прикрепить')}</div>}
-    {boardSelection&&<div className="composer-board-selection" role="note" title={boardSelection.titles.join(' · ')}><Scan size={16} aria-hidden="true"/><span>{t('Выделение доски')} · {boardSelection.ids.length}</span><small>{t('К каждому сообщению')}</small></div>}
+    {boardSelection&&<BoardSelectionPreview selection={boardSelection} onReveal={onRevealBoardSelection}/>}
     {attachments.length>0&&<AttachmentTray attachments={attachments} disabled={!!disabled} compact={short} onRemove={onRemove} onRetry={onRetry} onInsertText={onInsertText}/>}
     <div className="composer-input">
       <textarea ref={input} rows={1} aria-label={label} placeholder={placeholder} value={text} disabled={disabled} aria-keyshortcuts={enterSends?'Enter':'Control+Enter'}

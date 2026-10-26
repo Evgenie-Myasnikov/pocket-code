@@ -7,6 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {publicBoard,saveBoardSnapshot,readBoardSnapshot,listBoardSnapshots} from '../server/board-snapshots';
 import type {ProjectBoard} from '../server/boards';
+import {BOARD_VERSION_LIMIT} from '../src/board-limits.js';
 const example=():ProjectBoard=>({id:randomUUID(),workspaceId:randomUUID(),name:'Product ideas',root:'C:\\Private\\Project',revision:4,versionSource:'planned',versions:['1.0'],notes:[{id:randomUUID(),title:'Improve search',description:'Add filtering by status.',status:'idea',branch:'1.0',priority:'high',owner:'Alex Example',assigneeId:'person',assigneeIds:['person'],chat:{provider:'codex',sessionId:'private-chat'},x:24,y:70,dependencies:[]}]});
 test('shared snapshots whitelist board content and reject obvious personal text',()=>{
  const board=example(),json=JSON.stringify(publicBoard(board,['Alex Example']));for(const excluded of ['Alex Example','Private','private-chat','workspaceId','assignee','owner','revision'])assert.equal(json.includes(excluded),false);
@@ -19,5 +20,32 @@ test('repository snapshots roundtrip without committing and reject traversal/pri
  await assert.rejects(()=>readBoardSnapshot(root,'../secret.json'));const invalid={...publicBoard(board),participants:[{name:'Hidden identity'}]};await writeFile(path.join(root,saved.path),JSON.stringify(invalid));await assert.rejects(()=>readBoardSnapshot(root,file));assert.deepEqual(await listBoardSnapshots(root),[]);
  await mkdir(path.join(root,'nested'));await assert.rejects(()=>saveBoardSnapshot(path.join(root,'nested'),board,[]),/repository root/);
  assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{windowsHide:true,encoding:'utf8'}).trim(),'?? project-boards/');
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('snapshots retain 40 and 64 release columns and branch links; overflow cannot replace a valid snapshot',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'pocket-snapshot-versions-'));
+ try{
+  const board=example();
+  for(const count of [40,BOARD_VERSION_LIMIT]){
+   board.versions=Array.from({length:count},(_,i)=>'1.0.'+i);
+   board.versionBranches=Object.fromEntries(board.versions.map(version=>[version,'release/'+version]));
+   board.notes[0].branch=board.versions.at(-1)!;
+   const saved=await saveBoardSnapshot(root,board,[],false),file=path.basename(saved.path);
+   assert.deepEqual(await readBoardSnapshot(root,file,false),publicBoard(board));
+   assert.equal((await listBoardSnapshots(root,false)).length,1);
+  }
+  const file='board-'+board.id+'.json',target=path.join(root,'project-boards',file),before=await readFile(target,'utf8');
+  const oversizedVersions={...board,versions:[...board.versions,'overflow']};
+  await assert.rejects(saveBoardSnapshot(root,oversizedVersions,[],false));
+  const oversizedLinks={...board,versionBranches:{...board.versionBranches,overflow:'release/overflow'}};
+  await assert.rejects(saveBoardSnapshot(root,oversizedLinks,[],false));
+  assert.equal(await readFile(target,'utf8'),before);
+  for(const invalid of [oversizedVersions,oversizedLinks]){
+   const payload={...JSON.parse(before),versions:invalid.versions,versionBranches:invalid.versionBranches};
+   await writeFile(target,JSON.stringify(payload));
+   await assert.rejects(readBoardSnapshot(root,file,false));
+   assert.deepEqual(await listBoardSnapshots(root,false),[]);
+  }
  }finally{await rm(root,{recursive:true,force:true});}
 });

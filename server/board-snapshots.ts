@@ -1,4 +1,5 @@
 import {whiteboardSchema} from '../src/whiteboard-model.js';
+import {BOARD_VERSION_LIMIT} from '../src/board-limits.js';
 import {lstat,mkdir,readFile,readdir,rename,writeFile,unlink} from 'node:fs/promises';
 import path from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
@@ -11,7 +12,7 @@ import {boardImages} from './board-images.js';
 import {versionBranches} from './board-version-links.js';
 const exec=promisify(execFile),text=z.string().max(20000);
 const publicNote=z.object({images:boardImages,id:z.string().uuid(),title:z.string().min(1).max(160),description:text,branch:z.string().max(300),status:z.enum(['idea','questions','ready','working','review','done']),priority:z.enum(['critical','high','normal','low']),x:z.number().min(0).max(20000),y:z.number().min(0).max(20000),dependencies:z.array(z.string().uuid()).max(100)}).strict();
-const snapshot=z.object({canvas:whiteboardSchema.optional(),versionBranches,format:z.literal('pocket-code-board'),version:z.literal(1),name:z.string().min(1).max(160),versions:z.array(z.string().min(1).max(300)).max(40),notes:z.array(publicNote).max(500)}).strict();
+const snapshot=z.object({canvas:whiteboardSchema.optional(),versionBranches,format:z.literal('pocket-code-board'),version:z.literal(1),name:z.string().min(1).max(160),versions:z.array(z.string().min(1).max(300)).max(BOARD_VERSION_LIMIT),notes:z.array(publicNote).max(500)}).strict();
 export function publicBoard(board:ProjectBoard,privateNames:string[]=[]){
  const value=snapshot.parse({format:'pocket-code-board',version:1,name:board.name,...(board.canvas?{canvas:board.canvas}:{}),...(board.versionBranches?{versionBranches:board.versionBranches}:{}),versions:board.versions,notes:board.notes.map(n=>({... (n.images?{images:n.images}:{}),id:n.id,title:n.title,description:n.description,branch:n.branch,status:n.status,priority:n.priority||'normal',x:n.x,y:n.y,dependencies:n.dependencies}))});
  const prose=[...(value.canvas?.items.flatMap(i=>[i.text,i.description||''])||[]),value.name,...value.versions,...Object.keys(value.versionBranches||{}),...Object.values(value.versionBranches||{}),...value.notes.flatMap(n=>[n.title,n.description,n.branch,...(n.images||[]).map(i=>i.caption)])].join('\n');

@@ -1,6 +1,7 @@
 import type {BoardMcpRuntime} from './board-mcp-runtime.js';
 import {BoardViewControl,boardViewState,boardViewAction} from './board-view-control.js';
 import {whiteboardSchema} from '../src/whiteboard-model.js';
+import {BOARD_VERSION_LIMIT} from '../src/board-limits.js';
 import {miroLink} from '../src/miro-link.js';
 import {boardImages,saveBoardImage,readBoardImage} from './board-images.js';
 import {versionBranches} from './board-version-links.js';
@@ -23,7 +24,7 @@ import {allowedPath,HttpError} from './security.js';
 
 const id=z.string().uuid(),name=z.string().trim().min(1).max(160);
 const note=z.object({id,images:boardImages,title:name,description:z.string().max(20000),branch:z.string().max(300),status:z.enum(['idea','questions','ready','working','review','done']),owner:z.string().max(160),assigneeId:z.string().max(200).optional(),assigneeIds:z.array(z.string().min(1).max(200)).max(100).optional(),priority:z.enum(['critical','high','normal','low']).optional(),x:z.number().min(0).max(20000),y:z.number().min(0).max(20000),dependencies:z.array(id).max(100),chat:z.object({provider:z.enum(['claude','codex','copilot']),sessionId:z.string().max(200)}).optional()});
-const board=z.object({canvas:whiteboardSchema.optional(),id,versionBranches,workspaceId:id.optional(),name,root:z.string(),revision:z.number().int().nonnegative(),versionSource:z.enum(['planned','git']).default('git'),source:z.literal('project-changelog').optional(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40).default([])});
+const board=z.object({canvas:whiteboardSchema.optional(),id,versionBranches,workspaceId:id.optional(),name,root:z.string(),revision:z.number().int().nonnegative(),versionSource:z.enum(['planned','git']).default('git'),source:z.literal('project-changelog').optional(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(BOARD_VERSION_LIMIT).default([])});
 const role=z.enum(['host','viewer','developer','reviewer','qa']);
 const member=z.object({id,name,firstName:z.string().optional(),lastName:z.string().optional(),role,tokenHash:z.string(),needsName:z.boolean().optional(),approval:z.enum(['pending','approved','rejected']).optional()});
 const workspace=z.object({id,name,roots:z.array(z.string()).max(100),password:z.string().default(''),invite:z.object({hash:z.string(),role}).optional(),members:z.array(member).default([]),hostPeople:z.array(z.object({id:z.string(),name,firstName:z.string().optional(),lastName:z.string().optional()})).default([])});
@@ -209,7 +210,7 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   });
   app.post('/api/project-board/create',async(req,res)=>{const input=z.object({root:z.string(),language:z.enum(['en','ru']).default('en')}).parse(req.body),root=await projectRoot(input.root,true);res.json(await createProjectBoard(root,privateNames(),input.language));});
   app.post('/api/project-board/delete',async(req,res)=>{const input=z.object({root:z.string(),repositoryRevision:z.string().length(64)}).parse(req.body),root=await projectRoot(input.root,true);await deleteProjectBoard(root,input.repositoryRevision);res.json({ok:true});});
-  app.post('/api/project-board',async(req,res)=>{const input=z.object({canvas:whiteboardSchema.optional(),root:z.string(),repositoryRevision:z.string().length(64),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40)}).parse(req.body),root=await projectRoot(input.root,true);validateDependencies(input.notes);res.json(await updateProjectBoard(root,input.repositoryRevision,input.notes,input.versions,privateNames(),input.canvas));});
+  app.post('/api/project-board',async(req,res)=>{const input=z.object({canvas:whiteboardSchema.optional(),root:z.string(),repositoryRevision:z.string().length(64),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(BOARD_VERSION_LIMIT)}).parse(req.body),root=await projectRoot(input.root,true);validateDependencies(input.notes);res.json(await updateProjectBoard(root,input.repositoryRevision,input.notes,input.versions,privateNames(),input.canvas));});
   app.get('/api/repository-boards',async(req,res)=>{if(current())throw new HttpError(403,'Connect to the PC to browse repository boards');const root=await allowedPath(roots,z.string().parse(req.query.root),true);res.json(await listBoardSnapshots(root,false));});
   app.get('/api/repository-board',async(req,res)=>{if(current())throw new HttpError(403,'Connect to the PC to browse repository boards');const root=await allowedPath(roots,z.string().parse(req.query.root),true),file=z.string().parse(req.query.file),shared=await readBoardSnapshot(root,file,false);const notes=shared.notes.map(n=>({...n,owner:'',assigneeIds:[]}));validateDependencies(notes);res.json({...shared,id:file.slice(6,-5),root,notes,revision:0,versionSource:'planned',source:'project-changelog',repositoryFile:file,branches:[]});});
   app.get('/api/board-snapshots',async(req,res)=>{if(current()||!res.locals.deviceAdmin)throw new HttpError(403,'Use the PC host to load board snapshots');const root=await allowedPath(roots,z.string().parse(req.query.root),true);res.json(await listBoardSnapshots(root));});
@@ -236,7 +237,7 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
       if(found.source)throw new HttpError(403,'This board is generated from CHANGELOG.md.');
       if(found.revision!==input.revision)throw new HttpError(409,'This board changed. Reload before changing a branch.');
       if(found.versionSource==='planned'){
-        const next=input.name.trim();if(!next||found.versions.includes(next)&&input.previous!==next)throw new HttpError(409,'Choose a unique version name');if(input.previous&&!found.versions.includes(input.previous))throw new HttpError(404,'Version not found');if(!input.previous&&found.versions.length>=40)throw new HttpError(400,'Version limit reached');
+        const next=input.name.trim();if(!next||found.versions.includes(next)&&input.previous!==next)throw new HttpError(409,'Choose a unique version name');if(input.previous&&!found.versions.includes(input.previous))throw new HttpError(404,'Version not found');if(!input.previous&&found.versions.length>=BOARD_VERSION_LIMIT)throw new HttpError(400,'Version limit reached');
         if(input.previous){found.versions=found.versions.map(v=>v===input.previous?next:v);found.notes=found.notes.map(n=>n.branch===input.previous?{...n,branch:next}:n);}else found.versions.push(next);found.revision++;return found;
       }
       await allowedPath(roots,found.root,true);
@@ -249,7 +250,7 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
         try{await git(['check-ref-format','refs/heads/'+value]);}catch{throw new HttpError(400,'Invalid branch name');}
       }
       if(input.previous===input.name)return found;
-      if(!input.previous&&found.versions.length>=40)throw new HttpError(400,'The board version limit was reached');
+      if(!input.previous&&found.versions.length>=BOARD_VERSION_LIMIT)throw new HttpError(400,'The board version limit was reached');
       try{await git(input.previous?['branch','-m',input.previous,input.name]:['branch',input.name]);}catch{throw new HttpError(409,'Git could not change the branch. Check that the name is unused, the source is a local branch, and the repository has a commit.');}
       if(input.previous){for(const b of data.boards.filter(b=>b.root===found.root)){b.versions=[...new Set(b.versions.map(v=>v===input.previous?input.name:v))];b.notes=b.notes.map(n=>n.branch===input.previous?{...n,branch:input.name}:n);b.revision++;}}
       else{found.versions=[...new Set([...found.versions,input.name])];found.revision++;}
@@ -257,5 +258,5 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
     });res.json({...result,...(result.versionSource==='planned'?{branches:[]}:await boardBranches(result.root))});
   });
   app.get('/api/boards/:id',async(req,res)=>{const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found);try{await allowedPath(roots,found.root,true);}catch{res.json({...visibleBoard(found),branches:[],repositoryUnavailable:true,error:'Repository unavailable. Showing the saved board; reconnect its project folder on the PC to edit.'});return;}res.json({...visibleBoard(found),...(found.source?await readProjectRoadmap(found.root):{}),...(found.versionSource==='planned'?{branches:[]}:await boardBranches(found.root))});});
-  app.post('/api/boards/:id',async(req,res)=>{const input=z.object({canvas:whiteboardSchema.optional(),revision:z.number().int().nonnegative(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(40)}).parse(req.body);const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');if(found.source)throw new HttpError(403,'This board is generated from CHANGELOG.md.');await allowedPath(roots,found.root,true);const notes=current()?input.notes.map(n=>({...n,chat:found.notes.find(old=>old.id===n.id)?.chat})):input.notes;res.json(visibleBoard(await store.save(found.id,input.revision,notes,input.versions,input.canvas)));});
+  app.post('/api/boards/:id',async(req,res)=>{const input=z.object({canvas:whiteboardSchema.optional(),revision:z.number().int().nonnegative(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(BOARD_VERSION_LIMIT)}).parse(req.body);const found=store.getBoard(id.parse(req.params.id));if(!found)throw new HttpError(404,'Board not found');check(found,req.method==='POST');if(found.source)throw new HttpError(403,'This board is generated from CHANGELOG.md.');await allowedPath(roots,found.root,true);const notes=current()?input.notes.map(n=>({...n,chat:found.notes.find(old=>old.id===n.id)?.chat})):input.notes;res.json(visibleBoard(await store.save(found.id,input.revision,notes,input.versions,input.canvas)));});
 }

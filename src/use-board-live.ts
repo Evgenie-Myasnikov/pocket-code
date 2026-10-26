@@ -4,12 +4,15 @@ import type {BoardView} from './WorkBoards';
 import type {BoardEditActivity} from '../server/board-live';
 import {changedBoardObjects} from './board-live-changes';
 import {startVisiblePoll} from './visible-poll';
+import {latestBoardWrite,type BoardWriteReceipt} from './board-write-receipt';
 
 const revision=(board:BoardView)=>board.repositoryRevision||String(board.revision);
 type Pending={base:string;next:BoardView};
-export function useBoardLive(connection:Connection,board:BoardView|null,apply:(board:BoardView)=>void,blocked:boolean){
- const latest=useRef({board,apply,blocked});latest.current={board,apply,blocked};
+export function useBoardLive(connection:Connection,board:BoardView|null,apply:(board:BoardView)=>void,blocked:boolean,active=true){
+ const latest=useRef({board,apply,blocked,active});latest.current={board,apply,blocked,active};
  const [pending,setPending]=useState<Pending|null>(null),[activity,setActivity]=useState<BoardEditActivity|null>(null),[changedIds,setChangedIds]=useState<string[]>([]);
+ const [receipt,setReceipt]=useState<BoardWriteReceipt|null>(null),[waitingReceipt,setWaitingReceipt]=useState<BoardWriteReceipt|null>(null);
+ useEffect(()=>{if(waitingReceipt&&!blocked&&!pending){setReceipt(waitingReceipt);setWaitingReceipt(null);}},[waitingReceipt,blocked,pending]);
  const pulse=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
  function accept(next:BoardView){const current=latest.current.board;if(!current||current.id!==next.id||current.root!==next.root)return;const ids=changedBoardObjects(current,next);clearTimeout(pulse.current);setChangedIds(ids);pulse.current=setTimeout(()=>setChangedIds([]),4000);latest.current.apply(next);}
  useEffect(()=>{
@@ -18,10 +21,11 @@ export function useBoardLive(connection:Connection,board:BoardView|null,apply:(b
   if(!blocked){setPending(null);accept(pending.next);}
  },[pending,blocked,board?.repositoryRevision,board?.revision]);
  useEffect(()=>{
-  setPending(null);setActivity(null);setChangedIds([]);
+  setPending(null);setActivity(null);setChangedIds([]);setReceipt(null);setWaitingReceipt(null);
   if(!board)return;
-  let stopped=false,known='',after='',fallback=false,lastFull=0,lastPoll=0,retryAt=0;
+  let stopped=false,known='',after='',fallback=false,lastFull=0,lastPoll=0,retryAt=0;const received=new Set<string>();
   const poll=startVisiblePoll(async()=>{
+   if(!latest.current.active)return;
    if(!after&&Date.now()-lastPoll<1000)return;lastPoll=Date.now();
    if(fallback&&Date.now()>=retryAt){fallback=false;known='';}
    const before=latest.current.board;if(!before)return;
@@ -32,7 +36,7 @@ export function useBoardLive(connection:Connection,board:BoardView|null,apply:(b
      if(stopped)return;
      if(!/^[a-f0-9]{64}$/.test(result.version||''))fallback=true;
      else{known=result.version;after=result.activityCursor||'';const events=(result.activities||[]).filter(event=>event.expiresAt>Date.now()),last=events.at(-1)||result.activity,active=last&&last.expiresAt>Date.now()?last:null;
-      setActivity(current=>current?.id===active?.id?current:active?{...active,ids:[...new Set(events.length?events.flatMap(event=>event.ids):active.ids)]}:null);next=result.board||null;}
+      setActivity(current=>current?.id===active?.id?current:active?{...active,ids:[...new Set(events.length?events.flatMap(event=>event.ids):active.ids)]}:null);const updates=events.length?events:active?[active]:[],write=latestBoardWrite(updates,received);for(const event of updates)received.add(event.id);while(received.size>128)received.delete(received.values().next().value!);if(write)setWaitingReceipt(write);next=result.board||null;}
     }catch{fallback=true;after='';setActivity(null);}
     if(fallback)retryAt=Date.now()+10000;
    }
@@ -50,5 +54,5 @@ export function useBoardLive(connection:Connection,board:BoardView|null,apply:(b
   return()=>{stopped=true;poll();clearTimeout(pulse.current);};
  },[board?.id,board?.root,board?.repositoryFile,connection.url,connection.token]);
  useEffect(()=>{if(!activity)return;const timer=setTimeout(()=>setActivity(current=>current?.id===activity.id?null:current),Math.max(0,activity.expiresAt-Date.now()));return()=>clearTimeout(timer);},[activity?.id]);
- return {pending:!!pending,activity,changedIds};
+ return {pending:!!pending,activity,changedIds,receipt,dismissReceipt:()=>setReceipt(null)};
 }

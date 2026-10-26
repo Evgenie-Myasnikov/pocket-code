@@ -42,6 +42,29 @@ test('area selection is a single context attachment and an empty gallery has a r
  await openBoard(page,false);const viewport=page.locator('.whiteboard-viewport');const r=(await viewport.boundingBox())!;await page.mouse.move(r.x+5,r.y+5);await page.mouse.down();await page.mouse.move(r.x+650,r.y+335,{steps:8});await page.mouse.up();await page.locator('.board-header').getByRole('button',{name:'Chat',exact:true}).click();await expect(page.locator('.composer-board-selection')).toContainText('Board selection · 2');await page.getByRole('button',{name:'Board images',exact:true}).click();await expect(page.locator('.board-gallery')).toContainText('No images on this board yet.');await page.getByRole('button',{name:'Back to board',exact:true}).click();await expect(viewport).toBeVisible();await expect(page.locator('.composer-board-selection')).toContainText('Board selection · 2');await page.getByRole('button',{name:'Back to boards',exact:true}).click();await expect(page.locator('.composer-board-selection')).toHaveCount(0);
 });
 
+test('selection preview reveals its source from canvas or gallery without changing selection, draft or board data',async({page})=>{
+ await openBoard(page);
+ const first=page.locator(`[data-canvas-id="${one}"]`),second=page.locator(`[data-canvas-id="${two}"]`),viewport=page.locator('.whiteboard-viewport');
+ await first.locator('.whiteboard-text').click();await page.locator('.board-header').getByRole('button',{name:'Chat',exact:true}).click();
+ const input=page.getByRole('textbox',{name:'Message Claude',exact:true}),chip=page.locator('.composer-board-selection');
+ await input.fill('Keep the selected context and this draft');await expect(chip).toContainText('Board selection · 1');
+ const selectedIds=()=>page.locator('.whiteboard-item.wb-selected').evaluateAll(items=>items.map(item=>item.getAttribute('data-canvas-id')));
+ const original=await page.evaluate(()=>JSON.stringify((window as any).projectBoardOverride));expect(await selectedIds()).toEqual([one]);
+ for(const gallery of [false,true]){
+  await viewport.dispatchEvent('wheel',{deltaX:1500,deltaY:1000});
+  await expect.poll(()=>first.evaluate(el=>el.getBoundingClientRect().right)).toBeLessThan(0);
+  if(gallery){await page.getByRole('button',{name:'Board images',exact:true}).click();await expect(page.locator('.board-gallery')).toBeVisible();await expect(page.locator('.board-canvas-stage')).toBeHidden();}
+  await chip.click();const preview=page.getByRole('dialog',{name:'Message context',exact:true});
+  await expect(preview).toContainText('First synthetic card');await expect(preview).not.toContainText('Second synthetic card');await expect(preview.locator('img')).toBeVisible();
+  await preview.getByRole('button',{name:'Show on board: First synthetic card',exact:true}).click();
+  await expect(preview).toHaveCount(0);await expect(page.locator('.board-gallery')).toHaveCount(0);await expect(viewport).toBeVisible();
+  await expect.poll(()=>first.evaluate(el=>{const item=el.getBoundingClientRect(),canvas=document.querySelector('.whiteboard-viewport')!.getBoundingClientRect();return Math.abs(item.x+item.width/2-canvas.x-canvas.width/2)+Math.abs(item.y+item.height/2-canvas.y-canvas.height/2);})).toBeLessThan(3);
+  expect(await selectedIds()).toEqual([one]);await expect(second).not.toHaveClass(/wb-selected/);await expect(input).toHaveValue('Keep the selected context and this draft');await expect(chip).toHaveAttribute('title','First synthetic card');
+ }
+ expect(await page.evaluate(()=>JSON.stringify((window as any).projectBoardOverride))).toBe(original);
+ expect(await page.evaluate(()=>(window as any).desktopCalls.filter((call:any)=>call.action==='write'&&call.endpoint==='/project-board'))).toEqual([]);expect(await calls(page)).toEqual([]);
+});
+
 
 test('a delayed follow-up keeps its sent selection after the canvas selection changes',async({page})=>{
  await openBoard(page,false);await page.locator(`[data-canvas-id="${one}"] .whiteboard-text`).click();await page.locator('.board-header').getByRole('button',{name:'Chat',exact:true}).click();await page.getByLabel('Message Claude',{exact:true}).fill('Start a synthetic turn');await page.locator('.send-button').click();await expect.poll(async()=>(await calls(page)).length).toBe(1);

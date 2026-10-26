@@ -22,3 +22,14 @@
 .board-image-attach{position:absolute;right:4px;top:4px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;width:28px;height:28px;min-height:28px;opacity:0}
 .board-image-item:hover .board-image-attach,.board-image-item:focus-within .board-image-attach{opacity:1}.board-gallery-empty{margin:auto;padding:24px;color:var(--muted);text-align:center}
 @media(pointer:coarse){.board-image-attach{opacity:1;min-width:44px;min-height:44px}}
+
+/* Loading and failed previews occupy the same media slot as a decoded image. */
+.board-image-thumb>span{display:grid;place-items:center;width:100%;height:76px;flex-shrink:0;border-radius:5px;background:var(--surface);color:var(--muted);font-size:var(--type-min)}
+.board-gallery .board-image-thumb>span{height:calc(160px * var(--ui-scale,1));border-radius:0}
+.board-image-thumb img{flex-shrink:0}
+.board-image-thumb:focus-visible,.board-image-attach:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.board-image-attach{transition:opacity var(--dur-short) var(--ease-standard),transform var(--dur-short) var(--ease-standard);transform:translateY(2px)}
+.board-image-item:hover .board-image-attach,.board-image-item:focus-within .board-image-attach{transform:none}
+@media(pointer:coarse){.board-image-attach{transform:none}}
+@media(prefers-reduced-motion:reduce),(forced-colors:active){.board-image-attach{transition:none;transform:none}}
+@media(forced-colors:active){.board-image-thumb:focus-visible,.board-image-attach:focus-visible{outline-color:Highlight}}

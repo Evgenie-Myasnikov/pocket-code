@@ -1,0 +1,1 @@
+export const BOARD_VERSION_LIMIT=64;
