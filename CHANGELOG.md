@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased (0.28.15)
+## [0.28.15](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.14...v0.28.15) (2026-10-26)
 
-Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Not published.
+Published [v0.28.15](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.15) from [c75c544347bcd13d0cbb53f57ff7791301da1a81](https://github.com/Evgenie-Myasnikov/pocket-code/commit/c75c544347bcd13d0cbb53f57ff7791301da1a81) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - Compact chat headers and shared chat/card/provider/access menu states distinguish selection, hover and keyboard focus. Gallery loading and errors reserve the same image geometry. Card Properties/Agent actions appear on selection or in the context menu.
@@ -18,7 +18,7 @@ Prepared on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-
 - Updated the [compact design contract](.stitch/DESIGN.md) and [board behavior](project-boards/README.md), including primary design references, restrained motion, reduced-motion and forced-color behavior.
 
 ### Validation
-- 41 distinct browser scenarios and 20 targeted unit/integration checks passed across the scoped runs. Checks include image drag, selection source jumps, saved chats, draft/canvas retention, keyboard navigation, narrow/wide layouts, menu themes, reduced motion, live feedback and version-limit roundtrips/rejections. The synthetic 400-card drag retained 400 metadata renders. Real MCP view control, hidden-request suspension, menu/sheet Back order, TypeScript/Vite, board schema/dependencies and links in 27 documents passed. Packaging pending; physical devices not tested.
+- 41 distinct browser scenarios and 20 targeted unit/integration checks passed across the scoped runs. Checks include image drag, selection source jumps, saved chats, draft/canvas retention, keyboard navigation, narrow/wide layouts, menu themes, reduced motion, live feedback and version-limit roundtrips/rejections. The synthetic 400-card drag retained 400 metadata renders. Real MCP view control, hidden-request suspension, menu/sheet Back order, TypeScript/Vite, board schema/dependencies and links in 27 documents passed. Android/Windows/host packages passed: 86 shared web files and 342 source files match, 1,476 decoded artifact entries passed privacy review, and APK signer matches 0.28.14. GitHub CI, exact tag and all four downloaded asset hashes verified. Physical devices not tested.
 
 ## [0.28.14](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.13...v0.28.14) (2026-10-26)
 
