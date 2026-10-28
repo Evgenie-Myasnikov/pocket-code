@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.28.20 (2026-10-28)
+## [0.28.20](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.19...v0.28.20) (2026-10-28)
+
+Release source: [6dd748ca612a841c719d977db476d3703ef61fc0](https://github.com/Evgenie-Myasnikov/pocket-code/commit/6dd748ca612a841c719d977db476d3703ef61fc0) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 107; Android, Windows and host packages built from this commit.
+
+Validation: web/Android/Windows/host builds and source GitHub CI passed. Eight browser scenarios passed, including all seven scoped hover/chip/Review checks. Two broader transcript checks failed with the same command-title/menu-focus failures reproduced against the previous release source; not counted as passing. All 93 shared UI files and 455 host inputs match packages; 1538 decoded artifact entries passed privacy checks. Physical devices untested; publication pending.
 
 ### Bug Fixes
 - Transcript: remove the per-turn changed-files summary chip; keep Review in chat actions. Validation: web build and two focused browser checks passed (edited answer without chip, ordinary Review). The broader transcript scenario stopped on its unrelated command-title expectation (npm run lint versus Ran command); not marked passing.
