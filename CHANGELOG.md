@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.17 (2026-10-28)
+## [0.28.17](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.16...v0.28.17) (2026-10-28)
+
+Release source: [e3add0bc2f248f7b2be98fa8db0f41490572ecb9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/e3add0bc2f248f7b2be98fa8db0f41490572ecb9) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 104; Android, Windows and host assets built from this commit.
 
 ### Features
 - Chat library: persist Pocket Code chat names/removal and explicitly added project folders on the host; add context actions and keep all projects visible until filtered. Running titles pulse at a stable height without a duplicate running label.
@@ -16,7 +18,7 @@
 ### Validation
 - TypeScript/Vite, Windows build, Android Java compilation and documentation links passed. 48 focused unit/API checks passed, including all three branch adapters and rejected Codex boundaries. Across focused browser runs, 24 scenarios passed for context actions, composer, dictation cancellation, edit/regenerate, Markdown, attachments, scrolling and draft preservation.
 - Updated the follow-up fixture to supply the existing board-list endpoint and assert its search control after navigation instead of the removed duplicate heading. Compact-composer motion assertions were updated for the intentionally removed halo/wave design.
-- Publication pending. Physical microphone/Android checks and live provider branch calls remain unverified; unsupported installed provider versions fail explicitly. Existing dependency audit reports nine advisories; bundle-size warnings remain.
+- Artifact privacy audit passed for 1,535 decoded/archive entries. Physical microphone/Android checks and live provider branch calls remain unverified; unsupported installed provider versions fail explicitly. Existing dependency audit reports nine advisories; bundle-size warnings remain.
 
 ## [0.28.16](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.15...v0.28.16) (2026-10-28)
 
