@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased (0.28.16)
+## [0.28.16](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.15...v0.28.16) (2026-10-28)
+
+Published [v0.28.16](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.16) from [8143f359e372797dc055de04f9f95024a177e057](https://github.com/Evgenie-Myasnikov/pocket-code/commit/8143f359e372797dc055de04f9f95024a177e057) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).
 
 ### Features
 - Added an assistant-ui external-store adapter with message copy, quote into draft, user-message reuse, Markdown export and optional browser speech synthesis. Existing provider transport, composer, board attachments, tools and history behavior remain authoritative.
@@ -10,7 +12,7 @@
 ### Validation
 - 27 distinct scoped browser scenarios passed across chat actions, light/dark views, WebGL resize, reduced motion, hidden views, sidebar filters/collapse, streaming/manual scroll, board images/selection, phone conversation persistence, composer effects and compact header sizes. TypeScript/Vite build passed; physical devices and audible speech output were not tested.
 - Dependency audit reports nine advisories in pre-existing package versions (three moderate, six high); the added assistant-ui packages are not listed. Broader dependency remediation is outside this UI change. Build retains its large-chunk warning.
-- Historical-message editing, regeneration, branching, feedback submission and voice input still require provider/backend support. This work is unreleased.
+- Historical-message editing, regeneration, branching, feedback submission and voice input still require provider/backend support. Android, Windows and host packages published; all four downloaded asset hashes, exact tag and both GitHub CI runs verified. 89 web files and 350 source files match; 1,504 decoded artifact entries passed privacy review; APK signer matches 0.28.15.
 
 ## [0.28.15](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.14...v0.28.15) (2026-10-26)
 
