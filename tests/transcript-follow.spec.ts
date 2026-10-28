@@ -1,4 +1,31 @@
 import {test,expect} from '@playwright/test';
+for(const variant of ['StreamHandoffHarness','StaleSnapshotHarness'])test(`stream presentation never rewinds: ${variant}`,async({page})=>{
+ await page.goto('http://127.0.0.1:5173');await page.locator('.desktop-tabs:visible').waitFor();
+ await page.evaluate(async name=>{
+  const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
+  const module=await import('/tests/fixtures/TranscriptFollowHarness.tsx' as string);
+  const node=document.createElement('div');document.body.replaceChildren(node);createRoot(node).render(React.createElement(module[name]));
+ },variant);
+ if(variant==='StreamHandoffHarness'){
+  const text='A newly streaming response with enough words to reveal slowly.';
+  await page.evaluate(text=>(window as any).streamHandoff(text),text);
+  await expect.poll(async()=>(await page.locator('.markdown').innerText()).length).toBeGreaterThan(12);
+  await page.evaluate(()=>(window as any).finishHandoff());
+  await expect(page.locator('[data-message-id=final] .markdown')).toHaveText(text,{timeout:250});
+  await expect(page.locator('[data-message-id=final] .stream-glyph')).toHaveCount(0);
+ }else{
+  const target='Existing text. '+ 'More words arrive smoothly. '.repeat(5);
+  await expect(page.locator('.markdown')).toHaveText('Existing text.');
+  await page.evaluate(text=>(window as any).updateSnapshot(text),target);
+  await expect.poll(async()=>(await page.locator('.markdown').innerText()).length).toBeGreaterThan(25);
+  const before=(await page.locator('.markdown').innerText()).length;
+  await page.evaluate(()=>(window as any).updateSnapshot('Existing text. '));
+  const lengths=await page.evaluate(async()=>{const values:number[]=[];for(let i=0;i<15;i++){await new Promise(requestAnimationFrame);values.push((document.querySelector('.markdown') as HTMLElement).innerText.length);}return values;});
+  expect(Math.min(...lengths)).toBeGreaterThanOrEqual(before);
+  await page.evaluate(()=>(window as any).endSnapshot('Final corrected text.'));
+  await expect(page.locator('.markdown')).toHaveText('Final corrected text.');
+ }
+});
 test('loaded running text is immediate; new letters follow layout and manual scroll is retained',async({page})=>{
  await page.goto('http://127.0.0.1:5173');await page.locator('.desktop-tabs:visible').waitFor();
  await page.evaluate(async()=>{

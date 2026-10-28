@@ -1,3 +1,4 @@
+import {Markdown} from '../../src/RichBlocks';
 import {scrollChatToLatest} from '../../src/chat-scroll-motion';
 import {useRef,useState} from 'react';
 import {MessageList,PartialMessage} from '../../src/Messages';
@@ -17,4 +18,15 @@ export function PartialSnapshotHarness(){
  const [text,setText]=useState(''),[visible,setVisible]=useState(true);
  Object.assign(window,{setPartial:setText,togglePartial:()=>setVisible(v=>!v)});
  return visible?<PartialMessage text={text} streaming/>:null;
+}
+
+export function StreamHandoffHarness(){
+ const [text,setText]=useState(''),[messages,setMessages]=useState<ChatMessage[]>([]);
+ Object.assign(window,{streamHandoff:(value:string)=>setText(value),finishHandoff:()=>{setMessages([message('final',text)]);setText('');}});
+ return <><MessageList messages={messages} partialText={text} streaming/><PartialMessage text={text} streaming/></>;
+}
+export function StaleSnapshotHarness(){
+ const [text,setText]=useState('Existing text. '),[streaming,setStreaming]=useState(true);
+ Object.assign(window,{updateSnapshot:setText,endSnapshot:(value:string)=>{setStreaming(false);setText(value);}});
+ return <Markdown text={text} streaming={streaming}/>;
 }

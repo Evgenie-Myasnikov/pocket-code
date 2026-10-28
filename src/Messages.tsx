@@ -28,19 +28,25 @@ function TurnChangesChip({changes,onReview}:{changes:TurnChanges;onReview?:(chan
   const label=t('Изменено')+' '+plural(changes.files.length,['{0} файл','{0} файла','{0} файлов'])+` · +${changes.added} −${changes.removed}`;
   return onReview?<button className="turn-changes" title={changes.files.join(', ')} onClick={()=>onReview(changes)}><GitCompareArrows size={16} aria-hidden="true"/>{label}</button>:<p className="turn-changes" title={changes.files.join(', ')}><GitCompareArrows size={16} aria-hidden="true"/>{label}</p>;
 }
-export const MessageList=memo(function MessageList({messages,runningMessages,turnChanges,onReview,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;onReview?:(changes:TurnChanges)=>void}){
+export const MessageList=memo(function MessageList({messages,partialText,runningMessages,turnChanges,onReview,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];partialText?:string;runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;onReview?:(changes:TurnChanges)=>void}){
   // Messages already present when this transcript mounts are a snapshot, even
   // if their run is still active. Only newly arriving messages start from empty.
   const initialIds=useRef(new Set(messages.map(message=>message.id)));
+  const priorPartial=useRef(''),delivered=useRef(new Set<string>());
+  if(priorPartial.current){
+    const completed=[...messages].reverse().find(message=>message.role==='assistant'&&message.blocks.some(block=>block.type==='text'&&block.text?.startsWith(priorPartial.current)));
+    if(completed){delivered.current.add(completed.id);priorPartial.current='';}
+  }
+  if(partialText)priorPartial.current=partialText;
   return groupActivityMessages(messages,shared.toolResults,runningMessages,shared.mode).map(run=>{
     const ids=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))],ended=ids.map(id=>turnChanges?.get(id)).find(Boolean);
     const body=run.message?
-    <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} animateInitial={!initialIds.current.has(run.message.id)}/>:
+    <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} animateInitial={!initialIds.current.has(run.message.id)&&!delivered.current.has(run.message.id)}/>:
     <article data-enter={shared.streaming&&ids.some(id=>!initialIds.current.has(id))||undefined} key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
       {ids.slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
     </article>;
-    return ended?<Fragment key={run.key}>{body}<TurnChangesChip changes={ended} onReview={onReview}/></Fragment>:body;
+    return <Fragment key={run.key}>{body}{ended&&<TurnChangesChip changes={ended} onReview={onReview}/>}</Fragment>;
   });
 });
 export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false }: MessageProps) {

@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 const graphemes=new Intl.Segmenter(undefined,{granularity:'grapheme'});
 
 /** Pace presentation only; the provider's complete text remains untouched. */
-export function usePacedText(text:string,animateInitial:boolean,speed=40){
+export function usePacedText(text:string,animateInitial:boolean,speed=40,streaming=true){
   const [visible,setVisible]=useState(animateInitial?'':text),current=useRef(visible);
   const pending=useRef({target:text,ends:[] as number[],index:0,last:0,credit:0,frame:0,speed,pauseUntil:0});
   useEffect(()=>{
@@ -13,7 +13,11 @@ export function usePacedText(text:string,animateInitial:boolean,speed=40){
     return()=>{cancelAnimationFrame(state.frame);state.frame=0;media.removeEventListener('change',motion);};
   },[]);
   useEffect(()=>{
-    const state=pending.current;state.target=text;state.speed=speed;
+    const state=pending.current;
+    // Polling can briefly return an older prefix. Do not replay already shown text;
+    // once streaming ends, the authoritative final text can still correct it.
+    if(streaming&&text.length<state.target.length&&state.target.startsWith(text))return;
+    state.target=text;state.speed=speed;
     const show=(value:string)=>{current.current=value;setVisible(value);};
     const flush=()=>{cancelAnimationFrame(state.frame);state.frame=0;state.credit=0;state.pauseUntil=0;show(text);};
     if(speed===0||window.matchMedia('(prefers-reduced-motion: reduce)').matches||!text.startsWith(current.current)||text===current.current){flush();}
@@ -42,6 +46,6 @@ export function usePacedText(text:string,animateInitial:boolean,speed=40){
       };
       state.frame=requestAnimationFrame(tick);
     }
-  },[text,speed]);
+  },[text,speed,streaming]);
   return visible;
 }

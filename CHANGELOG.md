@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.28.18 (2026-10-28)
+
+### Bug Fixes
+- Chat: repair the atmosphere selector that collapsed the background canvas to zero height; keep the visible background active with static reduced-motion and forced-colors fallbacks.
+- Streaming: preserve revealed text across stale shorter snapshots and partial-to-final handoff; keep message identity stable when review actions appear. Final authoritative corrections remain supported.
+- Composer: reserve a separate column for usage indicators so long drafts cannot overlap limits; remove the redundant desktop More update dot.
+
+### Features
+- Chat surface consistency: extend glass to user-message contents, attachments, plans, approval/question cards, queued drafts, menus and result/subagent panels; nested controls use tint without extra blur. Preserve transparent activity rows, media and semantic action colors. Validation: build and four focused browser checks passed; light/dark screenshots and forced-colors fallbacks inspected.
+- Chat surfaces: add subtle glass composer, code blocks and desktop library, with progressive edge blur respecting reading mode, edge-fade opt-out and forced colors.
+
+Validation: TypeScript/Vite build and 10 focused browser checks passed, including mobile/desktop geometry, streaming regressions and accessibility fallbacks. Synthetic screenshots at 390px and 1440px reviewed. Physical-device rendering remains unverified. Release preparation authorized.
+
 ## [0.28.17](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.16...v0.28.17) (2026-10-28)
 
 Release source: [e3add0bc2f248f7b2be98fa8db0f41490572ecb9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/e3add0bc2f248f7b2be98fa8db0f41490572ecb9) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 104; Android, Windows and host assets built from this commit.
