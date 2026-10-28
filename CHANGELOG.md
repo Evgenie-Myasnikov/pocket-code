@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (0.28.16)
+
+### Features
+- Added an assistant-ui external-store adapter with message copy, quote into draft, user-message reuse, Markdown export and optional browser speech synthesis. Existing provider transport, composer, board attachments, tools and history behavior remain authoritative.
+- Added a lazy theme-colored React Bits Dark Veil background, paused for existing conversations and disabled for hidden/reduced-motion views. Fixed upstream immutable-texture resizing and Strict Mode context cleanup; retained bundled licenses.
+- Reworked desktop navigation into a narrow icon rail and compact project/recent-chat list with project filtering. Search, collapse/width preferences, running status and drafts remain available.
+
+### Validation
+- 27 distinct scoped browser scenarios passed across chat actions, light/dark views, WebGL resize, reduced motion, hidden views, sidebar filters/collapse, streaming/manual scroll, board images/selection, phone conversation persistence, composer effects and compact header sizes. TypeScript/Vite build passed; physical devices and audible speech output were not tested.
+- Dependency audit reports nine advisories in pre-existing package versions (three moderate, six high); the added assistant-ui packages are not listed. Broader dependency remediation is outside this UI change. Build retains its large-chunk warning.
+- Historical-message editing, regeneration, branching, feedback submission and voice input still require provider/backend support. This work is unreleased.
+
 ## [0.28.15](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.14...v0.28.15) (2026-10-26)
 
 Published [v0.28.15](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.15) from [c75c544347bcd13d0cbb53f57ff7791301da1a81](https://github.com/Evgenie-Myasnikov/pocket-code/commit/c75c544347bcd13d0cbb53f57ff7791301da1a81) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

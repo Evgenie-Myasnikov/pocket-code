@@ -1,3 +1,4 @@
+import {AssistantMessageActions,useAssistantChat} from './AssistantChat';
 import './chat-motion.css';
 import {MessageAttachment} from './MessageAttachment';
 import {userAttachmentBlocks} from './user-attachments';
@@ -44,6 +45,7 @@ export const MessageList=memo(function MessageList({messages,runningMessages,tur
 });
 export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false }: MessageProps) {
   useLanguage();
+  const assistantChat=useAssistantChat();
   // A message made only of background-task notices is an event line, not the person's bubble.
   const notices=message.role==='user'?message.blocks.map(block=>block.type==='text'?parseClaudeTaskNotification(block.text||''):undefined):[];
   if(notices.length&&notices.every(Boolean))return <article data-message-id={message.id} className="message transcript-event-message">{notices.map((notice,index)=><TaskNotificationEvent key={index} notification={notice!}/>)}</article>;
@@ -61,10 +63,10 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
     });
   if(!content.length&&!attachments.length)return null;
   return <article data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):message.role==='assistant'?provider:undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
-    {isUser ? <>{plain && <CopyButton text={plain}/>}<div className="user-message-content">{attachments.length>0&&<div className="message-attachments">{attachments.map((block,index)=><MessageAttachment key={block.attachmentPath||index} block={block} connection={connection} cwd={cwd}/>)}</div>}{content}</div></> : <>
+    {isUser ? <>{plain && !assistantChat && <CopyButton text={plain}/>}<div className="user-message-content">{attachments.length>0&&<div className="message-attachments">{attachments.map((block,index)=><MessageAttachment key={block.attachmentPath||index} block={block} connection={connection} cwd={cwd}/>)}</div>}{content}</div>{plain&&assistantChat&&<AssistantMessageActions id={message.id} text={plain} user/>}</> : <>
       {!toolOnly && message.role!=='assistant' && <div className="message-label">{t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
       {content}
-      {!toolOnly && message.role==='assistant' && plain && <div className="message-actions"><CopyButton text={plain}/></div>}
+      {!toolOnly && message.role==='assistant' && plain && <div className="message-actions">{assistantChat?<AssistantMessageActions id={message.id} text={plain}/>:<CopyButton text={plain}/>}</div>}
     </>}
   </article>;
 },(before,after)=>{

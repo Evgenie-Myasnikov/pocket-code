@@ -40,3 +40,27 @@ and its [focus-ring hook](https://github.com/iOfficeAI/AionUi/blob/11cd2a9a20d1e
 are the reference for breathing and focus feedback. The single outward wave is
 an independent extension, not a claimed AionUi feature. No animation dependency
 is needed for these two effects.
+
+## Ready chat components and compact navigation (unreleased)
+
+Pocket Code now embeds [assistant-ui](https://www.assistant-ui.com/components)
+0.15.32 through its external-store runtime. Provider messages remain authoritative;
+the existing composer, uploads, board-selection attachments, approvals, tool and
+reasoning renderers, history pagination and scroll restoration remain in place.
+Message actions provide copy, quote into the current draft, reuse a user message,
+Markdown export and browser speech synthesis when available. Export contains message
+text, not tool logs or image binaries. Editing old turns, regeneration, branches,
+feedback submission and voice input are not provided by this adapter.
+
+The lazy-loaded React Bits Dark Veil source is pinned and attributed in
+[src/vendor/react-bits/SOURCE.md](../src/vendor/react-bits/SOURCE.md). Bundles include
+[third-party notices](../public/third-party-notices.txt). The theme-colored background
+uses quarter-resolution shader fields and DPR 1. Existing conversations pause it;
+hidden chats unmount it. Reduced motion and forced colors suppress WebGL decoration.
+Pointer interaction is disabled, and resizing recreates immutable texture storage.
+
+The desktop sidebar has a narrow navigation rail and a separate compact list of
+projects and recent chats. Project buttons toggle a chat filter; they do not switch
+the open conversation. Search, provider choice, running status, keyboard navigation,
+width resizing and collapse persistence remain available. Dates and project details
+are in chat-row tooltips rather than repeated on every row.

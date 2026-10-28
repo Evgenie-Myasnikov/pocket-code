@@ -1,0 +1,6 @@
+﻿.assistant-message-actions{display:flex;align-items:center;gap:4px;margin-top:8px;min-height:32px}
+.assistant-message-actions .icon-button{width:30px;height:30px;border-radius:var(--radius-sm);color:var(--muted);opacity:1;margin:0;position:static}
+.assistant-message-actions .icon-button:hover{color:var(--text);background:var(--bg-hover)}
+.assistant-message-actions .icon-button:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
+.message.user>.assistant-message-actions{justify-content:flex-end;order:2}
+@media(pointer:coarse){.assistant-message-actions .icon-button{width:44px;height:44px}}

@@ -1,6 +1,6 @@
 {
   "name": "pocket-code",
-  "version": "0.28.15",
+  "version": "0.28.16",
   "description": "Android companion for local Claude Code and Codex workspaces",
   "scripts": {
     "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
@@ -16,6 +16,7 @@
   "type": "module",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.285",
+    "@assistant-ui/react": "0.15.32",
     "@capacitor/android": "^8.5.2",
     "@capacitor/core": "^8.5.2",
     "@fontsource/golos-text": "^5.3.0",
