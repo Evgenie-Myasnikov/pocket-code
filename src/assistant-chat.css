@@ -3,4 +3,9 @@
 .assistant-message-actions .icon-button:hover{color:var(--text);background:var(--bg-hover)}
 .assistant-message-actions .icon-button:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
 .message.user>.assistant-message-actions{justify-content:flex-end;order:2}
+:root[data-theme] article.message.user:has(>.assistant-message-actions){display:flex;flex-direction:column;align-items:flex-end;min-width:0;max-width:100%;width:fit-content}
+.message.user>.assistant-message-actions{max-width:100%;flex-wrap:wrap;flex-shrink:0}
+.assistant-message-actions{flex-wrap:wrap;max-width:100%}
+.assistant-message-actions .icon-button{flex-shrink:0}
+.conversation,.conversation-inner,.user-message-content{min-width:0;max-width:100%}
 @media(pointer:coarse){.assistant-message-actions .icon-button{width:44px;height:44px}}

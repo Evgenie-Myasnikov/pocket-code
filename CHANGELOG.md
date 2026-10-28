@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.28.19 (2026-10-28)
+
+Pre-release local build 0.28.19 (2026-10-28), Android versionCode 106: web, Android debug APK, Windows x64 and host packages built successfully. All 93 shared UI files and 455 host files match current inputs across packages; 1538 decoded artifact entries passed the privacy audit. SHA-256 inventory: artifacts/build-0.28.19.json. Built from an uncommitted working tree; no release manifest, tag or publication created. Physical devices not tested.
+
+### Features
+- Appearance: add per-device background enablement, independent color, intensity and motion speed with live preview; phones default to a plain background, desktop defaults to enabled. Zero speed freezes motion; reduced-motion preference remains respected.
+- Visual hierarchy: share text sizing for settings and chat lists, soften chat status presentation to running-title pulses, place desktop atmosphere behind the sidebar and strengthen glass composer edges.
+
+### Bug Fixes
+- Board chat Review: render the chat's diff panel above the board and phone sheet, and size it using the current desktop sidebar width. This fixes overlapping board controls and stale fixed offsets while preserving the draft on close. Review stays scoped to the visible chat; task-result dialogs keep their existing nesting.
+- Board Review validation: TypeScript/Vite build and 10 focused browser scenarios passed, covering 1440/960px desktop layouts, 390px phone layout, resized panels, options/Back/focus, retained drafts and nested task review. Updated an obsolete keyboard-test selector to focus the current title control. Synthetic captures inspected; physical-device validation remains pending.
+- User messages: place action controls below the content and allow wrapping so controls cannot squeeze a message into a narrow column on phones.
+
+Validation: TypeScript/Vite build, four glass browser scenarios, background persistence scenario, four notification routing scenarios and eight notification unit checks passed. Updated obsolete notification test navigation/selectors to match the current UI. Physical device rendering and notification delivery remain unverified.
+
 ## [0.28.18](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.17...v0.28.18) (2026-10-28)
 
 Release source: [5132e0852e95c2ab458f7f1016621401a0444536](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5132e0852e95c2ab458f7f1016621401a0444536) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 105; Android, Windows and host assets built from this commit.

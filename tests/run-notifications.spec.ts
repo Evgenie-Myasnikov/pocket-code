@@ -66,9 +66,9 @@ test('desktop shell opens the exact notification job from Settings with its prov
     }}}});
   });
   await page.goto((test.info().project.use.baseURL||'http://127.0.0.1:5173')+'/?desktop=1');
-  await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await expect(page.locator('.desktop-settings h1')).toHaveText('Settings');
+  await page.locator('.desktop-rail').getByRole('button',{name:'More',exact:true}).click();await page.getByRole('menuitem',{name:'Settings',exact:true}).click();await expect(page.locator('.desktop-settings h1')).toHaveText('Settings');
   await page.evaluate(()=>{const fixture=(window as any).notificationFixture;fixture.pending={provider:'codex',sessionId:'target-session',jobId:'exact-notification-run',cwd:'/fixture/project',title:'Synthetic notification target'};fixture.emit();});
   await expect(page.locator('.conversation')).toContainText('Exact notification job result');
   await expect.poll(()=>page.evaluate(()=>(window as any).notificationFixture.calls.some((call:any)=>call.endpoint?.startsWith('/jobs/exact-notification-run')))).toBe(true);
-  await expect(page.locator('.desktop-rail').getByRole('combobox',{name:'Provider',exact:true})).toHaveValue('codex');
+  await expect(page.locator('.desktop-rail .provider-picker-trigger')).toContainText('Codex');
 });

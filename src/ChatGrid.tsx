@@ -74,7 +74,7 @@ function ChatTile({session,loader,connection,provider,status,disabled,selected,o
   },[near,preview.image,connection,key]);
   const title=session.customTitle||session.summary||t('Без названия'),project=session.cwd?basename(session.cwd):t('Без проекта');
   const text=preview.text||(preview.state==='ready'||preview.state==='error'?(session.customTitle&&session.summary&&session.summary!==title?session.summary:''):'');
-  return <button ref={element} type="button" className="chat-tile" data-preview={preview.state} data-image={thumb?'true':undefined} aria-current={selected?'true':undefined} disabled={disabled} aria-label={title} aria-description={[project,status?undefined:fullTime(session.lastModified)].filter(Boolean).join(' · ')} onClick={()=>onOpen(session)}>
+  return <button ref={element} type="button" className="chat-tile" data-running={status==='running'||undefined} data-preview={preview.state} data-image={thumb?'true':undefined} aria-current={selected?'true':undefined} disabled={disabled} aria-label={title} aria-description={[project,status?undefined:fullTime(session.lastModified)].filter(Boolean).join(' · ')} onClick={()=>onOpen(session)}>
     {preview.image&&<span className="chat-tile-media" aria-hidden="true">{thumb?<img src={thumb} alt="" decoding="async"/>:<span className="chat-tile-media-placeholder"/>}</span>}
     <span className="chat-tile-body">
       <strong className="chat-tile-title">{title}</strong>

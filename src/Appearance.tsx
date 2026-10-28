@@ -1,3 +1,5 @@
+import {BackgroundSettings} from './background-settings';
+import './visual-system.css';
 import { t, useLanguage } from "./i18n";import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowUp, ChevronDown, RotateCcw } from 'lucide-react';
 import { Notice } from './Notice';
@@ -103,6 +105,7 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
     </div>
     <p className="muted">{t("Изменения видны сразу и сохраняются на этом устройстве.")}</p>
     <fieldset className="appearance-segmented"><legend>{t("Тема")}</legend><div className="segmented-options">{([['dark', 'Тёмная'], ['light', 'Светлая'], ['system', 'Системная']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-theme" value={id} checked={appearance.theme === id} onChange={() => setAppearance((p) => ({ ...p, theme: id }))} /><span>{t(title)}</span></label>)}</div></fieldset>
+    <BackgroundSettings/>
     <fieldset className="palette-field"><legend>{t("Цветовая палитра")}</legend><div className="palette-options">{palettes.map((p) => <button type="button" key={p.id} aria-pressed={appearance.palette === p.id} onClick={() => setAppearance((old) => ({ ...old, palette: p.id }))}><span className="palette-swatch" aria-hidden="true" style={{ '--swatch-bg': p.swatch[light ? 'light' : 'dark'][0], '--swatch-accent': p.swatch[light ? 'light' : 'dark'][1] } as CSSProperties} />{t(p.name)}{appearance.palette === p.id && <b aria-hidden="true">✓</b>}</button>)}</div></fieldset>
     <fieldset className="appearance-segmented"><legend>{t("Размер")}</legend><div className="segmented-options">{sizePresets.map((item) => <label key={item.id}><input type="radio" name="appearance-size" checked={preset?.id === item.id} onChange={() => setAppearance((p) => ({ ...p, ...item.value }))} /><span>{t(item.title)}</span></label>)}</div>{!preset && <p className="muted">{t("Сейчас выбраны свои значения в разделе «Дополнительно».")}</p>}</fieldset>
     <fieldset className="appearance-segmented"><legend>{t("Контраст")}</legend><div className="segmented-options">{([['auto', 'Как в системе'], ['normal', 'Обычный'], ['more', 'Высокий']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-contrast" value={id} checked={appearance.contrast === id} onChange={() => setAppearance((p) => ({ ...p, contrast: id }))} /><span>{t(title)}</span></label>)}</div><p className="muted">{t("Высокий контраст усиливает рамки полей и второстепенный текст.")}</p></fieldset>
