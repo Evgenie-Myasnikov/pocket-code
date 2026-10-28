@@ -4,6 +4,8 @@
 
 Release source: [5132e0852e95c2ab458f7f1016621401a0444536](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5132e0852e95c2ab458f7f1016621401a0444536) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 105; Android, Windows and host assets built from this commit.
 
+Published [v0.28.18](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.18). All four downloaded assets match audited files; tag resolves to source 5132e0852e95c2ab458f7f1016621401a0444536 on release/0.28.1. APK signer matches 0.28.17. Final 12 browser scenarios and GitHub Public data checks passed; Android/Windows/host builds and 1534-entry decoded artifact audit passed. Physical-device rendering remains unverified.
+
 ### Bug Fixes
 - Chat: repair the atmosphere selector that collapsed the background canvas to zero height; keep the visible background active with static reduced-motion and forced-colors fallbacks.
 - Streaming: preserve revealed text across stale shorter snapshots and partial-to-final handoff; keep message identity stable when review actions appear. Final authoritative corrections remain supported.
