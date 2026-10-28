@@ -6,11 +6,10 @@ import type {Connection} from './api';
 import { RichBlock, TaskNotificationEvent } from './RichBlocks';
 import {parseClaudeTaskNotification} from './claude-task-notification';
 import type {TurnChanges} from './turn-changes';
-import {plural} from './plural';
 import {ActivityGroup} from './ActivityGroup';
 import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode} from './activity-groups';
 import { t, useLanguage } from "./i18n";import { Fragment, memo, useRef, useState } from 'react';
-import { Copy, Check, GitCompareArrows } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import type { ChatMessage, SubagentView, Block } from '../server/types';
 import './messages.css';
 import {QuestionDialog} from './QuestionDialog';
@@ -23,11 +22,6 @@ export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'ani
   const startedEmpty=useRef(!text);
   return text?<Message {...shared} animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
 }
-/** The end of a turn that edited files says how much changed and leads to Review. */
-function TurnChangesChip({changes,onReview}:{changes:TurnChanges;onReview?:(changes:TurnChanges)=>void}){
-  const label=t('Изменено')+' '+plural(changes.files.length,['{0} файл','{0} файла','{0} файлов'])+` · +${changes.added} −${changes.removed}`;
-  return onReview?<button className="turn-changes" title={changes.files.join(', ')} onClick={()=>onReview(changes)}><GitCompareArrows size={16} aria-hidden="true"/>{label}</button>:<p className="turn-changes" title={changes.files.join(', ')}><GitCompareArrows size={16} aria-hidden="true"/>{label}</p>;
-}
 export const MessageList=memo(function MessageList({messages,partialText,runningMessages,turnChanges,onReview,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];partialText?:string;runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;onReview?:(changes:TurnChanges)=>void}){
   // Messages already present when this transcript mounts are a snapshot, even
   // if their run is still active. Only newly arriving messages start from empty.
@@ -39,14 +33,14 @@ export const MessageList=memo(function MessageList({messages,partialText,running
   }
   if(partialText)priorPartial.current=partialText;
   return groupActivityMessages(messages,shared.toolResults,runningMessages,shared.mode).map(run=>{
-    const ids=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))],ended=ids.map(id=>turnChanges?.get(id)).find(Boolean);
+    const ids=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))];
     const body=run.message?
     <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} animateInitial={!initialIds.current.has(run.message.id)&&!delivered.current.has(run.message.id)}/>:
     <article data-enter={shared.streaming&&ids.some(id=>!initialIds.current.has(id))||undefined} key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
       {ids.slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
     </article>;
-    return <Fragment key={run.key}>{body}{ended&&<TurnChangesChip changes={ended} onReview={onReview}/>}</Fragment>;
+    return <Fragment key={run.key}>{body}</Fragment>;
   });
 });
 export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false }: MessageProps) {

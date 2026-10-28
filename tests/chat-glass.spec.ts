@@ -6,6 +6,12 @@ for(const theme of ['dark','light'])test(`shared chat surfaces and menus in ${th
  await page.addInitScript(theme=>{localStorage.setItem('pocket-code-appearance-v1',JSON.stringify({theme,palette:'neutral',scale:100,textSize:14}));(window as any).branchMessages=[{id:'request',role:'user',blocks:[{type:'text',text:'Review the synthetic layout and keep the controls readable.'}]},{id:'reply',role:'assistant',blocks:[{type:'text',text:'The layout uses one shared surface.\n\n```ts\nconst surface = "glass";\n```'}]}];},theme);
  await desktop(page);await page.locator('.desktop-sessions button').first().click();
  const bubble=page.locator('.user-message-content');
+ const actions=page.locator('article.message.user .assistant-message-actions');
+ await page.mouse.move(0,0);await expect(actions).toHaveCSS('opacity','0');
+ const before=await bubble.boundingBox();await bubble.hover();await expect(actions).toHaveCSS('opacity','1');
+ await page.mouse.move(0,0);await expect(actions).toHaveCSS('opacity','0');expect(await bubble.boundingBox()).toEqual(before);
+ await actions.getByRole('button').first().focus();await expect(actions).toHaveCSS('opacity','1');
+ await page.getByRole('textbox',{name:'Message Claude',exact:true}).focus();await expect(actions).toHaveCSS('opacity','0');
  await expect(bubble).toHaveCSS('backdrop-filter','blur(8px)');
  await expect(page.locator('article.message.user')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
  await expect(page.locator('article.message.user')).toHaveCSS('backdrop-filter','none');

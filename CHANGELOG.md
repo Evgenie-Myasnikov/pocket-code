@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.28.20 (2026-10-28)
+
+### Bug Fixes
+- Transcript: remove the per-turn changed-files summary chip; keep Review in chat actions. Validation: web build and two focused browser checks passed (edited answer without chip, ordinary Review). The broader transcript scenario stopped on its unrelated command-title expectation (npm run lint versus Ran command); not marked passing.
+- Message actions: reveal the action toolbar on message hover or keyboard focus on fine-pointer desktops, reserving its space to avoid layout jumps. Touch controls stay visible. Validation: TypeScript/Vite build and two light/dark browser scenarios passed, covering idle, hover, focus and stable message geometry.
+
 ## [0.28.19](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.18...v0.28.19) (2026-10-28)
 
 Release source: [5b0aa4658e30e6868419e662bef8b69a0ebf2e03](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5b0aa4658e30e6868419e662bef8b69a0ebf2e03) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 106; Android, Windows and host packages built from this commit.

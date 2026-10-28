@@ -8,4 +8,9 @@
 .assistant-message-actions{flex-wrap:wrap;max-width:100%}
 .assistant-message-actions .icon-button{flex-shrink:0}
 .conversation,.conversation-inner,.user-message-content{min-width:0;max-width:100%}
+@media(hover:hover) and (pointer:fine){
+ .assistant-message-actions{opacity:0;pointer-events:none;transition:opacity var(--dur-short,150ms) ease}
+ .message:hover .assistant-message-actions,.message:focus-within .assistant-message-actions{opacity:1;pointer-events:auto}
+}
+@media(prefers-reduced-motion:reduce){.assistant-message-actions{transition:none}}
 @media(pointer:coarse){.assistant-message-actions .icon-button{width:44px;height:44px}}

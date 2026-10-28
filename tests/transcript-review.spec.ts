@@ -10,6 +10,18 @@ const messages=[
  {id:'answer',role:'assistant',blocks:[{type:'text',text:'Fixed.\n\n```ts\nconst ok = true;\n```'}]},
  {id:'notice',role:'user',blocks:[{type:'text',text:'<task-notification><task-id>sample1</task-id><status>completed</status><summary>Background check finished</summary></task-notification>'}]},
 ];
+test('edited turns render the answer without a changed-file chip',async({page})=>{
+ await page.goto('http://127.0.0.1:5173');
+ await page.evaluate(async()=>{
+  const React=(await import('/node_modules/.vite/deps/react.js' as string)).default;
+  const {createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
+  const {MessageList}=await import('/src/Messages.tsx' as string);
+  const root=document.createElement('div');document.body.replaceChildren(root);
+  createRoot(root).render(React.createElement(MessageList,{messages:[{id:'answer',role:'assistant',blocks:[{type:'text',text:'Synthetic edit completed.'}]}],turnChanges:new Map([['answer',{files:['sample.ts'],added:11,removed:0}]]),onReview:()=>{}}));
+ });
+ await expect(page.getByText('Synthetic edit completed.',{exact:true})).toBeVisible();
+ await expect(page.locator('.turn-changes')).toHaveCount(0);
+});
 async function open(page:import('@playwright/test').Page,mode?:'brief'|'detailed'){
  await page.addInitScript(mode=>{sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)}));if(mode)localStorage.setItem('pocket-code-detail-mode-v1',mode);},mode);
  await page.route('**/api/sessions?*',r=>r.fulfill({json:[{sessionId:'review-test',summary:'Transcript review',cwd:'C:/Sample',lastModified:1}]}));
@@ -24,7 +36,7 @@ test('brief transcript folds routine work, keeps errors, plan, changes and notic
  await expect(failed.locator('.tool-error-lines')).toContainText('src/form.ts:4:1 error Unexpected value');
  await failed.locator('summary').click();await expect(failed.locator('.tool-output')).toContainText('> sample lint');
  await expect(failed.getByRole('button',{name:'Copy output'})).toBeVisible();await expect(failed.getByRole('button',{name:'Copy command'})).toBeVisible();
- await expect(page.locator('.turn-changes')).toHaveText('Changed 1 file · +2 −1');
+ await expect(page.locator('.turn-changes')).toHaveCount(0);
  await expect(page.locator('.code-block-bar')).toContainText('ts');
  const notice=page.locator('.transcript-event-message');await expect(notice).toContainText('Background tasks completed');await expect(page.locator('.message.user .claude-task-notification')).toHaveCount(0);
  await expect(page.locator('.plan-bar')).toContainText('Plan 1/3');await expect(page.locator('.plan-bar')).toContainText('Fixing the check');
