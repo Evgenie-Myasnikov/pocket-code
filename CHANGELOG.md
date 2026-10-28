@@ -4,7 +4,9 @@
 
 Release source: [5b0aa4658e30e6868419e662bef8b69a0ebf2e03](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5b0aa4658e30e6868419e662bef8b69a0ebf2e03) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 106; Android, Windows and host packages built from this commit.
 
-Release validation: final 13 browser scenarios and source GitHub CI passed; 93 UI files and 455 host inputs match across packages; 1538 decoded artifact entries passed privacy checks. Physical devices not tested. Publication pending.
+Release validation: final 13 browser scenarios and source GitHub CI passed; 93 UI files and 455 host inputs match across packages; 1538 decoded artifact entries passed privacy checks. Physical devices not tested.
+
+Published [v0.28.19](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.19) (2026-10-28). All four downloaded asset hashes match audited packages; tag points to source 5b0aa4658e30e6868419e662bef8b69a0ebf2e03 on release/0.28.1. Source CI and 13 browser checks passed. Physical devices not tested.
 
 Pre-release local build 0.28.19 (2026-10-28), Android versionCode 106: web, Android debug APK, Windows x64 and host packages built successfully. All 93 shared UI files and 455 host files match current inputs across packages; 1538 decoded artifact entries passed the privacy audit. SHA-256 inventory: artifacts/build-0.28.19.json. Built from an uncommitted working tree; no release manifest, tag or publication created. Physical devices not tested.
 
