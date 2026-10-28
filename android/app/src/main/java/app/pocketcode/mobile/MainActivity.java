@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppUpdatePlugin.class);
         registerPlugin(NavigationPlugin.class);
         registerPlugin(ChatNotificationsPlugin.class);
+        registerPlugin(VoiceInputPlugin.class);
         super.onCreate(savedInstanceState);
         androidx.activity.EdgeToEdge.enable(this);
         android.content.SharedPreferences theme = getSharedPreferences(THEME_PREFERENCES, MODE_PRIVATE);

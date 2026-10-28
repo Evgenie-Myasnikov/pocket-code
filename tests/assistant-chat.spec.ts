@@ -15,7 +15,7 @@ test('ready chat actions retain the draft, export Markdown and survive streaming
 });
 
 test('compact sidebar filters projects and restores recent chats without remounting a draft',async({page})=>{
- await page.setViewportSize({width:1440,height:900});await desktop(page);await page.locator('.desktop-sessions button').first().click();const input=page.getByLabel('Message Claude',{exact:true});await input.fill('Keep this draft');
+ await page.addInitScript(()=>{(window as any).attachedProjects=['C:\\Demo\\Garden'];});await page.setViewportSize({width:1440,height:900});await desktop(page);await page.locator('.desktop-sessions button').first().click();const input=page.getByLabel('Message Claude',{exact:true});await input.fill('Keep this draft');
  const projects=page.locator('.desktop-project-links');await projects.getByRole('button',{name:'Garden',exact:true}).click();await expect(page.locator('.desktop-sessions button')).toHaveCount(1);await expect(page.locator('.desktop-sessions')).toContainText('Documentation');await expect(input).toHaveValue('Keep this draft');
  await projects.getByRole('button',{name:'Garden',exact:true}).click();await expect(page.locator('.desktop-sessions button')).toHaveCount(2);
  await page.screenshot({path:'.local/ready-sidebar.png'});

@@ -52,6 +52,7 @@ test('each file has its own card: a failed upload names the file and retries, a 
   // The card text fits inside the card and Retry is a card-sized target, not a 32px line.
   const card=(await flaky.boundingBox())!,name=(await flaky.locator('strong').boundingBox())!,retry=(await flaky.getByRole('button',{name:'Retry'}).boundingBox())!;
   expect(name.y).toBeGreaterThanOrEqual(card.y+6);expect(retry.y+retry.height).toBeLessThanOrEqual(card.y+card.height-6);
+  await page.screenshot({path:'.local/composer-attachment-hit.png'});
   for(const [x,y] of [[card.x+16,card.y+12],[card.x+card.width-60,card.y+card.height-10]])expect(await page.evaluate(([x,y])=>document.elementFromPoint(x,y)?.closest('button')?.textContent,[x,y])).toBe('Retry');
   const draft=page.getByRole('textbox',{name:'Message Claude'}),send=page.getByRole('button',{name:'Send message',exact:true});
   await draft.fill('Review these');await expect(send).toBeDisabled();

@@ -73,7 +73,7 @@ export function describeTool(block:Block,result?:Block,running=false):ToolView{
   const lower=name.toLowerCase(),mcp=mcpName(name);
   if(/^(bash|command|exec_command|write_stdin|shell|terminal|powershell|local_shell)$/.test(lower)){
     const command=str(input.command)||str(input.cmd)||(Array.isArray(input.command)?(input.command as unknown[]).map(String).join(' '):'');
-    Object.assign(view,{kind:'command',command:command||undefined,mono:Boolean(command),title:command?command.split(/\r?\n/)[0]:t('Команда')});
+    Object.assign(view,{kind:'command',command:command||undefined,mono:false,title:verb('Выполняет команду','Выполнил команду')});
     // grep/rg/findstr report "no matches" through exit code 1 without output; that is an answer, not a failure.
     if(failed&&!denied&&/^\s*(?:rg|grep|findstr|git grep|select-string)\b/i.test(command)&&!stripAnsi(text).replace(/exit code:? ?1/i,'').trim()){failed=false;view.failed=false;view.status='nomatch';}
   }else if(/^(read|view|read_file|readfile|notebookread|open_file)$/.test(lower)){

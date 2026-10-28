@@ -4,6 +4,32 @@
 
 Pocket Code is a Windows host and Android companion for local AI coding tools. Windows and Android can both send chat messages. The host must be running for fresh history, AI requests, files, repository edits and update downloads.
 
+## Chat composer and message actions (unreleased)
+
+The shared assistant-ui composer has a **+** menu for files and, in a new chat,
+the project folder. Adding a folder explicitly makes it appear under Projects;
+importing provider history does not fill the sidebar with every working directory.
+Provider selection stays in the chat list. Existing conversations keep their folder.
+Right-click a chat to rename it or remove it from Pocket Code on this PC and its
+paired phones. Removal does not erase the original provider history.
+
+**Microphone** inserts recognized text into the draft; review it and press Send.
+Android uses the installed speech-recognition activity, Windows opens system
+dictation (Win+H), and supported browsers use their speech-recognition service.
+Availability, language downloads, microphone consent and network requirements
+depend on that service. Pocket Code does not send microphone audio to a coding
+provider. This is dictation, not a live voice conversation.
+
+**Edit message** and **Regenerate response** create a separate conversation at the
+selected user request. Confirm the edited text or repeat the original request;
+the source chat remains intact. Repository files are not rolled back. Inline
+attachments and permitted local files are restored before sending; an unavailable
+attachment blocks the action rather than silently disappearing. A file restored
+from a local path uses its current contents. Older messages may need loading first.
+Wait for the current run to finish before branching. An installed provider must
+support the exact history boundary; unsupported versions show an error. These
+actions reuse the current model and permission settings.
+
 ## Mobile navigation
 
 The phone starts on **Chats**. A bottom bar holds Chats, Board and More

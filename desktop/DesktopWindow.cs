@@ -56,12 +56,14 @@ public static class DesktopReadPolicy {
     public static bool AllowsWrite(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
+        if(path=="/chat-library/projects"||Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(manage|branch)$"))return true;
         if(Regex.IsMatch(path,@"^/(task-runs|task-runs/[a-f0-9-]+/(check|checks|approve|resume)|miro/(config|oauth/start|token|access|disconnect|items/update))$"))return true;
         return Regex.IsMatch(path,@"^/(custom-providers|custom-providers/remove|custom-providers/[a-f0-9-]+/chat|jobs|uploads|project-rules|project-board|project-board/mcp|project-board/view|project-board/create|project-board/delete|project-board/miro|project-board/image|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
     }
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
+        if(path=="/chat-library/projects")return true;
         if(Regex.IsMatch(path,@"^/(activity/events|task-runs(?:/[a-f0-9-]+(?:/(checks|result|board|review))?)?|miro/(status|items))$"))return true;
         return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(custom-providers|custom-providers/[a-f0-9-]+/(models|history)|health|project-board|project-board/mcp|project-board/mcp/status|project-board/views|project-board/live|project-board/image|repository-boards|repository-board|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|claude/models|copilot/usage|updates/status|updates/latest|review|review/availability|message-attachment|project-artifact|document-projects|project-docs|project-rules|project-doc|files|file)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
@@ -76,6 +78,7 @@ public sealed class DesktopBridgeFailure:Exception {
     public DesktopBridgeFailure(string code,string message,int? status=null):base(message){Code=code;Status=status;}
 }
 public sealed class PocketDesktop:Form {
+    [DllImport("user32.dll")] static extern void keybd_event(byte key,byte scan,uint flags,UIntPtr extra);
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
     [DllImport("kernel32.dll")] static extern uint SetThreadExecutionState(uint flags);
     const uint ContinuousState=0x80000000,SystemRequired=0x00000001;
@@ -229,7 +232,10 @@ public sealed class PocketDesktop:Form {
         object id=null;try{
             var message=json.Deserialize<Dictionary<string,object>>(payload);if(!message.TryGetValue("id",out id)||!message.ContainsKey("action"))return;
             string action=message["action"] as string;object result;
-            if(action=="window-theme"){
+            if(action=="dictation"){
+                if(!ContainsFocus)throw new InvalidOperationException("Focus Pocket Code before starting dictation.");
+                web.Focus();keybd_event(0x5B,0,0,UIntPtr.Zero);keybd_event(0x48,0,0,UIntPtr.Zero);keybd_event(0x48,0,2,UIntPtr.Zero);keybd_event(0x5B,0,2,UIntPtr.Zero);result=true;
+            }else if(action=="window-theme"){
                 ApplyWindowTheme(message.ContainsKey("dark")&&message["dark"] is bool&&(bool)message["dark"],ThemeColor(message,"background"),ThemeColor(message,"foreground"),ThemeColor(message,"border"));result=true;
             }else if(action=="run-alerts"){
                 if(preview){result=true;}else{

@@ -9,6 +9,7 @@ async function setup(page:Page,provider:string,options:{queue?:boolean}={}){
     const req=route.request(),endpoint=new URL(req.url()).pathname.replace('/api','');
     if(endpoint==='/health')return route.fulfill({json:{name:'Fixture',roots:['C:\\Fixture'],version:'0.17.0',protocol:1}});
     if(endpoint==='/providers')return route.fulfill({json:[{id:'claude',available:true},{id:'codex',available:true,models:[{id:'test',name:'Test',isDefault:true,reasoningEfforts:['low'],defaultReasoningEffort:'low'}]}]});
+    if(endpoint==='/repository-boards'||endpoint==='/projects')return route.fulfill({json:[]});
     if(endpoint==='/sessions')return route.fulfill({json:[]});
     if(endpoint==='/jobs'&&req.method()==='GET')return route.fulfill({json:f.job?[f.job]:[]});
     if(endpoint==='/jobs'&&req.method()==='POST'){
@@ -44,7 +45,8 @@ for(const provider of ['claude','codex'])test(`${provider} accepts clarification
   // With an empty draft the Send slot holds one filled Stop; with text, Send says what it does and Stop sits beside it.
   const stop=page.locator('.stop-button'),send=page.locator('.send-button');
   await expect(send).toHaveCount(0);await expect(stop).toHaveClass(/stop-primary/);
-  expect((await stop.boundingBox())!.width).toBeGreaterThanOrEqual(48);
+  // Compact assistant-ui desktop control; touch uses a separate 44px target.
+  expect((await stop.boundingBox())!.width).toBeGreaterThanOrEqual(36);
   expect(await stop.evaluate(el=>parseFloat(getComputedStyle(el,'::before').width))).toBeLessThanOrEqual(36);
   await draft.fill('Focus on tests');await expect(send).toHaveAccessibleName(provider==='codex'?'Steer':'Queue');await expect(send).toBeEnabled();
   expect(await stop.evaluate(el=>parseFloat(getComputedStyle(el,'::before').width))).toBeLessThan(await send.evaluate(el=>parseFloat(getComputedStyle(el,'::before').width)));
@@ -67,7 +69,7 @@ for(const provider of ['claude','codex'])test(`${provider} accepts clarification
   }else{
     await expect(page.getByRole('alert')).toContainText('draft is preserved');await expect(draft).toHaveValue('Keep this clarification');
   }
-  await openSection(page,'Board');await expect(page.getByRole('heading',{name:'Board',exact:true})).toBeVisible();await expect(page.getByText('Assigned to me',{exact:true})).toHaveCount(0);
+  await openSection(page,'Board');await expect(page.getByRole('textbox',{name:'Find board',exact:true})).toBeVisible();await expect(page.getByText('Assigned to me',{exact:true})).toHaveCount(0);
 });
 test('a refused message can be edited back into the draft or cancelled',async({page})=>{
   const {f,draft}=await setup(page,'claude');

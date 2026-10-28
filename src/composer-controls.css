@@ -97,3 +97,25 @@
 @keyframes composer-active-halo{from{opacity:.5}to{opacity:1}}
 @keyframes composer-focus-wave{0%{opacity:0;transform:scale(1)}18%{opacity:.95}100%{opacity:0;transform:scale(var(--composer-wave-x,1.02),var(--composer-wave-y,1.08))}}
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.prompt-composer[data-pulsing=true]::before,.prompt-composer[data-pulsing=true] .stop-button::after,.prompt-composer .composer-border-wave{animation:none;display:none}}
+
+/* assistant-ui Composer surface: compact paper, quiet tools, an ink send control. */
+:root[data-theme] .prompt-composer.assistant-composer{padding:10px 12px 6px;border-radius:24px;border:1px solid color-mix(in srgb,var(--text) 10%,transparent);background:var(--panel);box-shadow:none;gap:6px}
+:root[data-theme] .prompt-composer.assistant-composer:focus-within{background:var(--panel);border-color:color-mix(in srgb,var(--text) 18%,transparent);box-shadow:none}
+:root[data-theme] .prompt-composer.assistant-composer textarea{min-height:44px;padding:8px 8px 4px;line-height:1.5;scrollbar-gutter:auto}
+.assistant-composer .composer-tools{grid-template-columns:36px minmax(0,1fr) auto;gap:4px}
+:root[data-theme] .assistant-composer .composer-tools :is(.icon-button,.send-button){width:36px;min-width:36px;height:36px;min-height:36px}
+.assistant-composer .composer-tools select,.assistant-composer .access-chip{min-height:36px;padding-block:4px}
+.assistant-composer .send-button::before,.assistant-composer .stop-button.stop-primary::before{inset:2px;background:var(--text);box-shadow:none}
+:root[data-theme] .assistant-composer .composer-tools .send-button{color:var(--bg)}
+.assistant-composer .send-button:disabled::before{background:color-mix(in srgb,var(--text) 8%,transparent);box-shadow:none}
+.assistant-composer[data-pulsing=true]::before,.assistant-composer[data-pulsing=true] .stop-button::after,.assistant-composer .composer-border-wave{display:none}
+@media(pointer:coarse){:root[data-theme] .assistant-composer .composer-tools :is(.icon-button,.send-button){width:44px;min-width:44px;height:44px;min-height:44px}.assistant-composer .composer-tools{grid-template-columns:44px minmax(0,1fr) auto}.assistant-composer .send-button::before,.assistant-composer .stop-button.stop-primary::before{inset:6px}}
+.composer-add{position:relative}
+.voice-input-notice{position:absolute;bottom:calc(100% + 8px);right:0;max-width:min(320px,90vw);padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);font-size:12px;z-index:var(--z-menu)}
+.composer-voice[aria-pressed=true]{color:var(--status-error)!important}
+.composer-add-menu{position:absolute;bottom:calc(100% + 12px);left:0;z-index:var(--z-menu);width:min(300px,calc(100vw - 48px));padding:6px;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:0 8px 24px var(--shadow-soft)}
+.composer-add-menu>button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px;border:0;background:transparent;color:var(--text);border-radius:10px;text-align:left;font:inherit}
+.composer-add-menu>button:hover{background:var(--bg-hover)}
+.composer-add-menu .chat-project-attach{display:flex;align-items:center;gap:8px;padding:0 8px;font-size:inherit}
+.composer-add-menu .chat-project-attach select{min-width:0;flex:1;max-width:100%;color:var(--text);min-height:44px}
+@media(max-width:760px){:root[data-theme] .prompt-composer.assistant-composer{padding-inline:9px}:root[data-theme] .assistant-composer .composer-tools :is(.icon-button,.send-button){width:44px;min-width:44px;height:44px;min-height:44px}.assistant-composer .composer-tools{grid-template-columns:44px minmax(0,1fr) auto}.assistant-composer .send-button::before,.assistant-composer .stop-button.stop-primary::before{inset:6px}}

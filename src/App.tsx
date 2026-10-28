@@ -1,3 +1,6 @@
+import {MessageBranch,type BranchTarget} from './MessageBranch';
+import {userAttachmentBlocks} from './user-attachments';
+import {ChatActions,type ChatActionTarget} from './ChatActions';
 import {AssistantChatProvider} from './AssistantChat';
 import {ChatAtmosphere} from './ChatAtmosphere';
 import {ChatHistorySkeleton} from './ChatHistorySkeleton';
@@ -162,6 +165,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const projectRoots = (projects || health?.roots || []);
   const [projectReady, setProjectReady] = useStateForWorkspace(false);
   const projectChosen = useRefForWorkspace(false);
+  const [chatAction,setChatAction]=useState<ChatActionTarget|null>(null);
   const [cwd, setCwd] = useStateForWorkspace('');
   // Device navigation survives initial pairing/reconnection. Transcript state remains PC-scoped.
   // The phone starts on Chats, where chats that wait for the person are listed first; Back from there leaves the app.
@@ -424,6 +428,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const openTurnReview=useMemo(()=>reviewReady?(changes?:{files:string[]})=>{setReviewPaths(changes?.files.length?changes.files:undefined);setReviewOpen(true);}:undefined,[reviewReady,setReviewOpen]);
   const quoteToDraft=useCallback((text:string)=>setDraft(current=>current.trim()?current.replace(/\s+$/,'')+'\n\n'+text+'\n':text+'\n'),[setDraft]);
   /** A task follow-up joins the unsent draft instead of replacing it; repeating the same step does not duplicate it. */
+  const [branchTarget,setBranchTarget]=useState<BranchTarget|null>(null);
+  const branchPrepared=useRef<{target:BranchTarget;sessionId:string|null}|null>(null);
   const appendDraft=(text:string)=>setDraft(current=>!current.trim()?text:current.includes(text.trim())?current:current.replace(/\s+$/,'')+'\n\n'+text);
   useEffect(()=>{
     setAgentPanel(null);setAgentList([]);setOutputsOpen(false);
@@ -738,8 +744,33 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     historyWindow.current = 100;setHistoryError('');setFromStart(false);setShowScrollActions(false);lastScrollTop.current = 0;
     pendingPosition.current=null;projectChosen.current=true;setCwd(project);setMobileChat(true);setTab('chats');setTakeover(true);setLoading(false);
   }
+  function requestBranch(id:string,regenerate:boolean){
+    if(running||busy||loading||selected?.readOnly)return;
+    const sourceId=job?.sessionId||selected?.sessionId;if(!sourceId)return;
+    let index=outputMessages.findIndex(m=>m.id===id);
+    if(regenerate)while(index>=0&&outputMessages[index].role!=='user')index--;
+    if(index<0||outputMessages[index].role!=='user'){setError(language==='ru'?'Загрузите более ранние сообщения.':'Load earlier messages to find the original request.');return;}
+    branchPrepared.current=null;setBranchTarget({message:outputMessages[index],history:outputMessages.slice(0,index),sourceId,regenerate});
+  }
+  async function submitBranch(text:string){
+    const target=branchTarget;if(!target||running||busy||loading)return false;
+    const epoch=navigation.current,files:Attachment[]=[];
+    // Re-upload retained attachments before creating a branch; missing files fail visibly.
+    for(const block of userAttachmentBlocks(target.message.blocks)){
+      if(block.type==='text')continue;
+      let name='',base64='';
+      if(block.attachmentPath){const artifact=await api<{name:string;data?:string;text?:string}>(`/message-attachment?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(block.attachmentPath)}`);name=artifact.name;base64=artifact.data||await fileBase64(new File([artifact.text??''],name));}
+      else if(block.source?.data||block.data){const mime=block.source?.media_type||block.mimeType||'application/octet-stream';name='attachment.'+(mime==='image/jpeg'?'jpg':mime.split('/')[1]||'bin');base64=block.source?.data||block.data!;}
+      else throw Error(language==='ru'?'Вложение недоступно. Создайте новый чат и прикрепите файл повторно.':'Attachment unavailable. Start a new chat and reattach it.');
+      files.push(await api<Attachment>('/uploads',{cwd,name,base64}));
+    }
+    if(epoch!==navigation.current)return false;
+    if(branchPrepared.current?.target!==target){const result=await api<{sessionId:string|null}>(`/sessions/${encodeURIComponent(target.sourceId)}/branch`,{provider,messageId:target.message.id});branchPrepared.current={target,sessionId:result.sessionId};}
+    if(epoch!==navigation.current)return false;
+    return Boolean(await send(true,{text,attachments:files,boardSelection:null,branch:{sessionId:branchPrepared.current.sessionId,history:target.history}}));
+  }
   /** Sends the draft, or a waiting message exactly as it was written. Typing during the request is kept. */
-  async function send(confirmed = takeover, payload?: {text:string;attachments:Attachment[];boardSelection?:BoardSelection|null}) {
+  async function send(confirmed = takeover, payload?: {text:string;attachments:Attachment[];boardSelection?:BoardSelection|null;branch?:{sessionId:string|null;history:ChatMessage[]}}) {
     if(boardMissing)return;
     const text=payload?payload.text:draft,files=[...(payload?payload.attachments:attachments)],ids=files.map(item=>item.id);
     const selection=matchingBoardSelection(payload?payload.boardSelection:embedded?embedded.boardSelection:boardSelection,connection,cwd,payload?payload.boardSelection?.boardId:boardChat?.boardId);
@@ -782,7 +813,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       finally{sending.current=false;setBusy(false);}
       return;
     }
-    const sessionId = job?.sessionId || selected?.sessionId;
+    const sessionId = payload?.branch ? payload.branch.sessionId||undefined : job?.sessionId || selected?.sessionId;
     if (sessionId && !confirmed) {setPendingTakeover(true);return;}
     sending.current = true;setBusy(true);setError('');
     const epoch = ++navigation.current;
@@ -790,7 +821,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const access=chatAccess,timeout=approvalTimeout(composerPreferences);
     try{await appendSelection();}catch(e){setError((e as Error).message);sending.current=false;setBusy(false);return;}
     if(epoch!==navigation.current){sending.current=false;setBusy(false);return;}
-    if(boardChat?.context&&!sessionId){
+    if(boardChat?.context&&!sessionId&&!payload?.branch){
       try{
         if(ids.length>=10)throw new Error('Board context needs one attachment slot.');
         if(!boardContextFile.current){const file=new File([boardChat.prompt],'Board context.txt',{type:'text/plain'});boardContextFile.current=await api<Attachment>('/uploads',{cwd,name:file.name,base64:await fileBase64(file)});}
@@ -798,18 +829,20 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       }catch(e){setError((e as Error).message);sending.current=false;setBusy(false);return;}
       if(epoch!==navigation.current){sending.current=false;setBusy(false);return;}
     }
-    const data = { provider, cwd, sessionId, ...(taskRun?{taskRunId:taskRun.id}:{}), text, attachments: ids, model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: provider==='claude'&&access==='plan'?'plan':'default', ...(provider==='claude'?{maxBudgetUsd:clampBudget(budget),claudeAccess:access==='plan'?claudeAccess:access as ClaudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess:access as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), ...(timeout?{approvalTimeoutMinutes:timeout}:{}), takeoverConfirmed: confirmed };
+    const data = { provider, cwd, sessionId, ...(taskRun&&!payload?.branch?{taskRunId:taskRun.id}:{}), text, attachments: ids, model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: provider==='claude'&&access==='plan'?'plan':'default', ...(provider==='claude'?{maxBudgetUsd:clampBudget(budget),claudeAccess:access==='plan'?claudeAccess:access as ClaudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess:access as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), ...(timeout?{approvalTimeoutMinutes:timeout}:{}), takeoverConfirmed: confirmed };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {
       const next = await api<JobView>('/jobs', { ...data, id });
       if (epoch !== navigation.current) return;
       // Freeze the displayed history before the next turn; the server saves full history independently.
-      if (job && job.errorCode!=='codex_thread_busy') setHistory((old) => [...old, ...job.messages]);
+      if(payload?.branch){setHistory(payload.branch.history);setSelected(sessionId?{sessionId,cwd,summary:text.slice(0,200),lastModified:Date.now()}:null);setHasMore(null);setBoardChat(null);rememberDraft();if(embedded&&next.sessionId)embedded.onCreated?.({sessionId:next.sessionId,cwd,summary:text.slice(0,200),lastModified:Date.now()},next);}
+      else if (job && job.errorCode!=='codex_thread_busy') setHistory((old) => [...old, ...job.messages]);
       if(provider==='codex')submissions.current!.set(next.id,{key,text,attachments:files});
       setRejectedDrafts(old=>{const next={...old};delete next[key];return next;});
       setJob(next);setTakeover(true);consume();retry.current = null;nearBottom.current = true;
       if(sessionId)for(const item of activity.items)if(item.status==='error'&&item.provider===provider&&item.sessionId===sessionId)activity.markViewed(item);
+      return true;
     } catch (e) {if (epoch === navigation.current) setError(connectivityError(e)?t('Не отправлено: нет связи с ПК. Сообщение осталось в поле ввода.'):(e as Error).message);} finally {sending.current = false;setBusy(false);}
   }
   /** Updates one draft file wherever its draft is kept, so a finished upload is never lost. */
@@ -886,8 +919,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const providerAttention=(id:WorkspaceProvider)=>waiting.filter(item=>item.provider===id).length;
   const providerChips=<ProviderPicker connection={connection||undefined} value={provider} onChange={setProvider} disabled={demo||busy||uploading} attention={providerAttention}/>;
   const grouped=visible.reduce<{group:'today'|'yesterday'|'earlier';items:Session[]}[]>((list,session)=>{const group=dayGroup(session.lastModified),last=list.at(-1);if(last?.group===group)last.items.push(session);else list.push({group,items:[session]});return list;},[]);
-  const sessionRow=(s:Session)=>{const status=sessionStatus(s.sessionId);return <button className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} aria-current={selected?.sessionId===s.sessionId&&mobileChat?'true':undefined} disabled={busy || uploading} key={s.sessionId} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span aria-hidden="true">·</span>{status?<ChatRunStatus status={status}/>:<time dateTime={new Date(s.lastModified).toISOString()} title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}</small></div></button>;};
-  return <AssistantChatProvider messages={outputMessages} partial={job?.partial||''} running={running&&!runUnknown} disabled={demo||!!selected?.readOnly||boardMissing} onSend={text=>send(takeover,{text,attachments:[],boardSelection:matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)})} onStop={stopRun} onDraft={appendDraft}><div className={`app ${boardPane?'has-board-stage':''} ${boardSheet?'board-chat-sheet-open':''} ${embedded?'embedded-chat':''} ${mobileChat||onboardingVisible ? 'show-chat' : ''} ${tabBar?'has-tabbar':''} ${tab==='chats'&&(mobileChat||embedded)?'chat-edge-to-edge':''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
+  const sessionRow=(s:Session)=>{const status=sessionStatus(s.sessionId);return <button className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} aria-current={selected?.sessionId===s.sessionId&&mobileChat?'true':undefined} disabled={busy || uploading} key={s.sessionId} onContextMenu={event=>{event.preventDefault();setChatAction({session:s,x:event.clientX,y:event.clientY,running:sessionStatus(s.sessionId)==='running'});}} onKeyDown={event=>{if(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10'){event.preventDefault();const r=event.currentTarget.getBoundingClientRect();setChatAction({session:s,x:r.left,y:r.bottom,running:sessionStatus(s.sessionId)==='running'});}}} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span aria-hidden="true">·</span>{status?<ChatRunStatus status={status}/>:<time dateTime={new Date(s.lastModified).toISOString()} title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}</small></div></button>;};
+  return <AssistantChatProvider messages={outputMessages} partial={job?.partial||''} running={running&&!runUnknown} disabled={demo||!!selected?.readOnly||boardMissing} onSend={async text=>{await send(takeover,{text,attachments:[],boardSelection:matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)});}} onBranch={requestBranch} branchDisabled={running||busy||loading||!canRun||!!selected?.readOnly||boardMissing} onStop={stopRun} onDraft={appendDraft}><div className={`app ${boardPane?'has-board-stage':''} ${boardSheet?'board-chat-sheet-open':''} ${embedded?'embedded-chat':''} ${mobileChat||onboardingVisible ? 'show-chat' : ''} ${tabBar?'has-tabbar':''} ${tab==='chats'&&(mobileChat||embedded)?'chat-edge-to-edge':''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
 
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={20}/></button>}
     <aside className="sidebar">
@@ -916,9 +949,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
-        <ChatHeader backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||selected?.summary||(!job&&taskRun?.title)||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
+        <ChatHeader hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||selected?.summary||(!job&&taskRun?.title)||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():boardChat?.context?setTab('workspace'):setMobileChat(false)}
-          context={!selected&&!job&&!taskRun?<>{workspacePicker('header')}{!boardChat?.context&&<><span aria-hidden="true">·</span><label className="project-picker"><Folder size={14} aria-hidden="true"/><select aria-label={t('Папка проекта')} title={cwd} value={cwd} disabled={busy||uploading} onChange={event=>newChat(event.target.value)}>{!projectRoots.includes(cwd)&&<option value={cwd}>{basename(cwd)}</option>}{projectRoots.map(root=><option key={root} value={root}>{basename(root)}</option>)}</select></label></>}</>:undefined}
+          context={undefined}
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>{setReviewPaths(undefined);setReviewOpen(true);},stats:availableReview&&availableReview.files!==undefined?{added:availableReview.added||0,removed:availableReview.removed||0,files:availableReview.files}:undefined}:undefined}
           outputs={hasOutputs?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
           subagents={agentMap.size>0&&parentChatId?{count:agentMap.size,running:[...agentMap.values()].filter(agent=>agent.status==='running').length,disabled:!connection||demo,open:()=>setAgentPanel({})}:undefined}
@@ -964,7 +997,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           {/* Only lost contact needs a notice here; action details stay in the transcript. */}
           {running&&job&&runUnknown&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)&&!runUnknown} lostAt={runUnknown?runLost??jobContact.current.at:undefined}/>}{!error&&connection&&!demo&&!readingMode&&!job?.approvals.length&&<LimitAlert provider={provider} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}{error &&<div className="error-banner" role="alert">{t(error)}{!embedded&&t(error)===t(budgetRangeMessage)&&<button className="text-button" onClick={()=>{setError('');setSettingsSubpage('access');setSettingsPage('workspace');setTab('settings');setMobileChat(true);}}>{t('Открыть настройки бюджета')}</button>}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error-banner" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
-          <ChatComposer onRevealBoardSelection={id=>{const selection=matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId);if(!selection?.ids.includes(id))return;const target={boardId:selection.boardId,root:selection.root,objectId:id,requestId:Date.now()};if(embedded)embedded.onRevealBoardSelection?.(target);else{setBoardReveal(target);setTab('workspace');setMobileChat(true);}}} boardSelection={matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)} text={draft} onText={setDraft} label={t("Сообщение {0}",engineName)}
+          <ChatComposer scopeKey={provider+":"+(job?.sessionId||selected?.sessionId||cwd)+":"+tab+":"+String(embedded?.visible)} onRevealBoardSelection={id=>{const selection=matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId);if(!selection?.ids.includes(id))return;const target={boardId:selection.boardId,root:selection.root,objectId:id,requestId:Date.now()};if(embedded)embedded.onRevealBoardSelection?.(target);else{setBoardReveal(target);setTab('workspace');setMobileChat(true);}}} boardSelection={matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)} text={draft} onText={setDraft} label={t("Сообщение {0}",engineName)}
             placeholder={demo?t("Подключите ПК, чтобы отправлять сообщения"):t("Что нужно сделать?")}
             disabled={demo||selected?.readOnly||boardMissing} uploading={uploading} busy={busy} stopping={stopping}
             mode={canQueue?'later':running?provider==='codex'?'steer':'queue':'send'} blockedReason={unreachable&&!canQueue&&!demo&&connection?t('Нет связи с ПК · черновик сохранится'):undefined} enterSends={enterSendsPreference(composerPreferences,Boolean(embedded))} keyHint={Boolean(embedded)}
@@ -972,6 +1005,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             onBoardImage={connection&&boardChat?.context?data=>{const image=takeBoardImageDrag(data,connection,cwd);if(image)uploadBoardImages([image]);else setError(t('Это изображение относится к другой доске или подключению.'));}:undefined}
             attachments={attachments} onRemove={id=>{boardImageLoads.current.delete(id);setAttachments(old=>old.filter(a=>a.id!==id));}} onFiles={(files,options)=>upload(files,options)} onRetry={retryUpload} onInsertText={id=>void insertPastedText(id)} onRecall={recallLast} onSend={()=>void send()}
             stopLabel={runUnknown?t("Повторить связь"):t("Остановить {0}",engineName)} stopRetry={runUnknown} onStop={running?runUnknown?()=>retryNow():()=>void stopRun():undefined}
+            projectPicker={!selected&&!job&&!taskRun&&!boardChat?.context&&<label className="chat-project-attach"><span>{language==='ru'?'Папка':'Folder'}</span><select aria-label={language==='ru'?'Добавить папку проекта':'Add project folder'} value="" disabled={busy||uploading||demo} onChange={event=>{const root=event.target.value;if(!root)return;void api('/chat-library/projects',{cwd:root}).then(()=>{projectChosen.current=true;setCwd(root);window.dispatchEvent(new Event('pocket-chat-project-added'));}).catch(e=>setError(e.message));}}><option value="">{basename(cwd)||'?'}</option>{(projects||health.roots).map(root=><option key={root} value={root}>{root}</option>)}</select></label>}
             controls={<>{(provider==='claude'||provider==='codex')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>{(provider==='codex'||provider==='claude')&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
             usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||'sonnet')).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}/>
         </div></ChatOverlay>
@@ -979,6 +1013,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     </main>
     {tabBar&&(()=>{const barTab=tab;return <nav className="mobile-tabbar" aria-label={t('Основные разделы')}><button className={barTab==='chats'?'active':''} aria-current={barTab==='chats'?'page':undefined} onClick={()=>showSection('chats')} aria-label={t("Чаты")} aria-description={chatStatusLabel||undefined} title={chatStatusLabel||undefined}><span className="chat-tab-icon"><MessageSquare size={24}/>{chatStatusDot}</span>{t("Чаты")}</button><button className={barTab==='workspace'?'active':''} aria-current={barTab==='workspace'?'page':undefined} onClick={()=>showSection('workspace')}><ClipboardList size={24}/>{t("Доска")}</button><button className={['files','changelog','settings','connection'].includes(barTab)?'active':''} aria-current={['files','changelog','settings','connection'].includes(barTab)?'page':undefined} aria-haspopup="dialog" aria-expanded={moreOpen} aria-description={liveSettings.update?t('Доступно обновление'):undefined} onClick={()=>setMoreOpen(true)}><span className="chat-tab-icon"><MoreHorizontal size={24}/>{liveSettings.update&&<span className="settings-badge tab-badge" aria-hidden="true"/>}</span>{t("Ещё")}</button></nav>;})()}
     {!embedded&&<MobileNavigation open={moreOpen} onClose={()=>setMoreOpen(false)}><nav className="mobile-nav" onClick={event=>{if((event.target as HTMLElement).closest('button'))setMoreOpen(false);}}><button className={tab === 'files' ? 'active' : ''} aria-current={tab==='files'?'page':undefined} onClick={() => showSection('files')}><BookOpen size={20} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} aria-current={tab==='changelog'?'page':undefined} onClick={()=>showSection('changelog')}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings'&&settingsPage!=='connection' ? 'active' : ''} aria-current={tab==='settings'&&settingsPage!=='connection'?'page':undefined} aria-description={liveSettings.update?t('Доступно обновление'):undefined} onClick={() => showSection('settings')}><Settings size={20} />{t("Настройки")}{liveSettings.update&&<span className="settings-badge" aria-hidden="true"/>}</button><button className={tab==='settings'&&settingsPage==='connection'?'active':''} aria-current={tab==='settings'&&settingsPage==='connection'?'page':undefined} onClick={()=>showSection('settings','connection')}><Laptop size={20}/><span className="mobile-nav-label">{t("Подключение к ПК")}<small>{pcStatus?(pcStatus.online?pcStatus.name:t('Нет связи · {0}',pcStatus.name)):saved?.name&&!saved.workspaceOnly?t('Нет связи · {0}',saved.name):t('Не подключено')}</small></span></button></nav></MobileNavigation>}
+    {chatAction&&connection&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={provider} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{setSessions(old=>deleted?old.filter(s=>s.sessionId!==session.sessionId):old.map(s=>s.sessionId===session.sessionId?session:s));if(selected?.sessionId===session.sessionId){if(deleted){newChat();setMobileChat(false);}else setSelected(session);}}}/>}
+    {branchTarget&&<MessageBranch key={branchTarget.sourceId+branchTarget.message.id} target={branchTarget} onClose={()=>setBranchTarget(null)} onSubmit={submitBranch}/>}
     {pendingTakeover && <div className="modal-backdrop"><section ref={confirmation} className="confirm-modal" role="dialog" aria-modal="true" aria-label={t("Продолжить чат с телефона?")}><Terminal size={32} /><h2>{t("Продолжить чат с телефона?")}</h2><p>{t("Сначала дождитесь завершения ответа в {0} на ПК. Одновременная работа с одной историей может вызвать конфликт.",engineName)}</p><button className="primary" onClick={() => {setPendingTakeover(false);setTakeover(true);void send(true);}}>{t("На ПК завершено — продолжить")}</button><button className="text-button" onClick={() => setPendingTakeover(false)}>{t("Отмена")}</button></section></div>}
   </div></AssistantChatProvider>;
 }

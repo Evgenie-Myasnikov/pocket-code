@@ -92,12 +92,37 @@ export class CodexService {
   async sessions(): Promise<CodexSession[]> {
     return this.sessionReads('sessions', () => this.loadSessions());
   }
+  async forkBeforeMessage(id:string,messageId:string):Promise<string|undefined>{
+    if(this.list().some(job=>job.sessionId===id&&job.status==='running'))throw new HttpError(409,'Stop the current turn before branching.');
+    const turns=await this.branchTurns(id);
+    const index=turns.findIndex((turn:any)=>(turn.items||[]).some((item:any)=>item.id===messageId&&item.type==='userMessage'));
+    if(index<0)throw new HttpError(409,'The installed Codex could not resolve this message boundary. Refresh history or update Codex.');
+    if(index===0)return undefined;
+    const result=await(await this.connect()).request('thread/fork',{threadId:id,lastTurnId:turns[index-1].id});
+    if(!result?.thread?.id||result.thread.id===id)throw new HttpError(502,'Codex did not create a separate conversation.');
+    const copied=await this.branchTurns(result.thread.id);
+    if(copied.length!==index||copied.at(-1)?.id!==turns[index-1].id)throw new HttpError(409,'Codex did not preserve the requested branch boundary. Update Codex before retrying.');
+    return result.thread.id;
+  }
+  private async branchTurns(id:string):Promise<any[]>{
+    const metadata=await this.readThread(id);
+    if(metadata.historyMode!=='paginated')return (await this.readThread(id,true)).turns||[];
+    const rpc=await this.connect(),turns:any[]=[],seen=new Set<string>();let cursor:string|null=null,bytes=0;
+    for(let page=0;page<100;page++){
+      const result=await rpc.request('thread/turns/list',{threadId:id,cursor,limit:100,sortDirection:'asc',itemsView:'full'});
+      if(!Array.isArray(result.data))throw new HttpError(409,'Update Codex to enable conversation branching.');
+      bytes+=JSON.stringify(result.data).length;if(bytes>16000000)throw new HttpError(413,'This history is too large to branch safely.');
+      turns.push(...result.data);if(!result.nextCursor)return turns;
+      if(seen.has(result.nextCursor))break;seen.add(result.nextCursor);cursor=result.nextCursor;
+    }
+    throw new HttpError(413,'The conversation boundary could not be loaded completely.');
+  }
   private async loadSessions(): Promise<CodexSession[]> {
     const rpc = await this.connect(), sessions: CodexSession[] = [], seen = new Set<string>();
     let cursor: string | null = null;
     // A bounded scan prevents an unbounded import on PCs with very large archives.
-    for (let page = 0; page < 20; page++) {
-      const result = await rpc.request('thread/list', { cursor, limit: 100, archived: false, sortKey: 'updated_at', sourceKinds: ['cli', 'vscode', 'appServer', 'exec'], modelProviders: [] });
+    for (let page = 0; page < 100; page++) {
+      const result = await rpc.request('thread/list', { cursor, limit: 100, archived: false, sortKey: 'updated_at', sourceKinds: ['cli', 'vscode', 'appServer', 'exec', 'unknown'], modelProviders: [] });
       for (const thread of result.data || []) {
         try {
           if(typeof thread.cwd!=='string'||!thread.cwd)continue;
@@ -109,7 +134,8 @@ export class CodexService {
             lastModified: Number(thread.updatedAt || thread.createdAt || 0) * 1000, gitBranch: thread.gitInfo?.branch, source: 'codex', provider: 'codex',...(readOnly?{readOnly:true}:{}) });
         } catch { /* Other projects must not become visible through this bridge. */ }
       }
-      if (!result.nextCursor || result.nextCursor === cursor) break;
+      if (!result.nextCursor) break;
+      if(result.nextCursor===cursor||page===99)throw new HttpError(413,'Codex chat listing is incomplete. The provider returned too many pages or a repeated cursor.');
       cursor = result.nextCursor;
     }
     return sessions.sort((a, b) => b.lastModified - a.lastModified);

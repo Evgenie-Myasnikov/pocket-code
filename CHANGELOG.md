@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.28.17 (2026-10-28)
+
+### Features
+- Chat library: persist Pocket Code chat names/removal and explicitly added project folders on the host; add context actions and keep all projects visible until filtered. Running titles pulse at a stable height without a duplicate running label.
+- Chat surface: use assistant-ui Composer primitives with compact controls, attach projects through the plus menu, and remove desktop Back and provider/header selectors. Streamdown handles unfinished Markdown while preserving safe links, deferred images and letter reveal.
+- Message actions: add voice dictation into the draft and native conversation branches for editing requests or regenerating replies. Keep source history intact, restore available attachments, reject unavailable boundaries/files, and preserve current model/access choices. Windows uses system dictation, Android the installed recognizer, and supported browsers their speech service.
+
+### Bug Fixes
+- Codex: include unknown top-level sources, continue beyond twenty listing pages and report stalled or bounded scans instead of returning a silently incomplete list.
+
+### Documentation
+- Explain dictation availability, separate conversation branches, current local attachment contents and unchanged repository files in both user guides.
+
+### Validation
+- TypeScript/Vite, Windows build, Android Java compilation and documentation links passed. 48 focused unit/API checks passed, including all three branch adapters and rejected Codex boundaries. Across focused browser runs, 24 scenarios passed for context actions, composer, dictation cancellation, edit/regenerate, Markdown, attachments, scrolling and draft preservation.
+- Updated the follow-up fixture to supply the existing board-list endpoint and assert its search control after navigation instead of the removed duplicate heading. Compact-composer motion assertions were updated for the intentionally removed halo/wave design.
+- Publication pending. Physical microphone/Android checks and live provider branch calls remain unverified; unsupported installed provider versions fail explicitly. Existing dependency audit reports nine advisories; bundle-size warnings remain.
+
 ## [0.28.16](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.15...v0.28.16) (2026-10-28)
 
 Published [v0.28.16](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.16) from [8143f359e372797dc055de04f9f95024a177e057](https://github.com/Evgenie-Myasnikov/pocket-code/commit/8143f359e372797dc055de04f9f95024a177e057) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1).

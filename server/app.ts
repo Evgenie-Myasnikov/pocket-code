@@ -1,3 +1,4 @@
+import {ChatLibrary} from './chat-library.js';
 import {BoardMcpRuntime} from './board-mcp-runtime.js';
 import {ChatPageSync} from './chat-page-sync.js';
 import {CustomProviders,mountCustomProviders} from './custom-providers.js';
@@ -24,7 +25,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
-import { listSessions, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
+import { listSessions, getSessionMessages, forkSession } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { allowedPath, HttpError, safeFilename, validToken, within } from './security.js';
 import { Jobs } from './jobs.js';
@@ -51,11 +52,11 @@ import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 
 export type Config = { port?:number; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
-type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages };
+type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages; forkSession?:typeof forkSession };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
 const providerSchema = z.enum(['claude', 'codex','copilot']).default('claude');
-export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages }, terminals = new Terminals()) {
+export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages, forkSession }, terminals = new Terminals()) {
   const roots = await Promise.all(config.roots.map(p => realpath(p)));
   const claudeCatalog = config.claudeModels || new ClaudeModelCatalog();
   const boardMcp=new BoardMcpRuntime(path.dirname(config.uploads),config.port,root=>config.codex?.refreshBoardMcp?.(root));
@@ -300,6 +301,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json(await queueFor(body.provider).add({ ...body, cwd }));
   });
   app.post('/api/jira/queue/control', async (req, res) => { const body = z.object({ provider: providerSchema, action: z.enum(['pause', 'resume', 'clear']) }).parse(req.body); res.json(await queueFor(body.provider).control(body.action)); });
+  const chatLibrary=new ChatLibrary(path.join(config.uploads,'.chat-library.json'));
   const loadSessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if (provider === 'copilot') return copilot().sessions();
     if (provider === 'codex') return codex().sessions();
@@ -322,7 +324,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
   const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if(workspaceAccess.current())return [];
-    return sessionReads(provider,()=>loadSessions(provider));
+    return chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)));
   };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {
@@ -394,6 +396,40 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/projects',async(_req,res)=>res.json(await projectFolders()));
   app.get('/api/document-projects',async(req,res)=>res.json(await documentProjects(await projectFolders(),z.enum(['rules','changelog','files']).parse(req.query.kind))));
   app.get('/api/sessions', async (req, res) => res.json(await sessions(providerSchema.parse(req.query.provider))));
+  app.get('/api/chat-library/projects',async(_req,res)=>{
+    if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
+    const data=await chatLibrary.read();res.json(data.projects);
+  });
+  app.post('/api/chat-library/projects',async(req,res)=>{
+    if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
+    const body=z.object({cwd:z.string().min(1).max(4096)}).parse(req.body);
+    const cwd=await allowedPath(accessRoots(),body.cwd,true);
+    await chatLibrary.edit(data=>{if(!data.projects.some(p=>process.platform==='win32'?p.toLowerCase()===cwd.toLowerCase():p===cwd))data.projects.push(cwd);});
+    res.json({cwd});
+  });
+  app.post('/api/sessions/:id/manage',async(req,res)=>{
+    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete']),title:z.string().trim().min(1).max(200).optional()}).parse(req.body);
+    const found=await session(String(req.params.id),body.provider);
+    if(body.action==='delete'&&engineFor(body.provider).list().some(j=>j.sessionId===found.sessionId&&j.status==='running'))throw new HttpError(409,'Stop this chat before deleting it');
+    if(body.action==='rename'&&!body.title)throw new HttpError(400,'A chat title is required');
+    await chatLibrary.edit(data=>{const key=body.provider+':'+found.sessionId;data.chats[key]={...data.chats[key],...(body.action==='delete'?{deleted:true}:{title:body.title})};});
+    res.json({sessionId:found.sessionId,deleted:body.action==='delete',title:body.title});
+  });
+  app.post('/api/sessions/:id/branch',async(req,res)=>{
+    const body=z.object({provider:providerSchema,messageId:z.string().min(1).max(200)}).parse(req.body);
+    const source=await session(String(req.params.id),body.provider);
+    if(source.readOnly||!source.cwd)throw new HttpError(403,'This conversation is read-only.');
+    if(engineFor(body.provider).list().some(j=>j.sessionId===source.sessionId&&j.status==='running'))throw new HttpError(409,'Stop the current turn before branching.');
+    let sessionId:string|undefined;
+    if(body.provider==='codex')sessionId=await codex().forkBeforeMessage(source.sessionId,body.messageId);
+    else if(body.provider==='copilot')sessionId=await copilot().forkBeforeMessage(source.sessionId,body.messageId);
+    else {
+      const raw=await sdk.getSessionMessages(source.sessionId,{dir:source.cwd}),index=raw.findIndex(m=>m.uuid===body.messageId&&m.type==='user');
+      if(index<0)throw new HttpError(404,'The selected user message is unavailable.');
+      if(index>0){if(!sdk.forkSession)throw new HttpError(409,'Update the Claude host to enable conversation branching.');sessionId=(await sdk.forkSession(source.sessionId,{dir:source.cwd,upToMessageId:raw[index-1].uuid})).sessionId;if(sessionId===source.sessionId)throw new HttpError(502,'Claude did not create a separate conversation.');}
+    }
+    res.json({sessionId:sessionId||null,cwd:source.cwd});
+  });
   // Chat grid previews: computed only for the tiles a client shows, cached per session version, at most three transcript reads at once.
   const previews=new SessionPreviews({capacity:500,concurrency:3});
   type ListedSession=Awaited<ReturnType<typeof sessions>>[number];
@@ -496,7 +532,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const recent = recentActivityJobs(allJobs().filter(j=>visibleRoot(j.cwd)));
     res.json(recent.map(job => activityItem(jobView(job.id))));
   });
-  app.get('/api/jobs', (req, res) => res.json(engineFor(providerSchema.parse(req.query.provider)).list().filter(j=>visibleRoot(j.cwd))));
+  app.get('/api/jobs', async (req, res) => {const provider=providerSchema.parse(req.query.provider),data=await chatLibrary.read();res.json(engineFor(provider).list().filter(j=>visibleRoot(j.cwd)&&(j.status==='running'||!j.sessionId||!data.chats[provider+':'+j.sessionId]?.deleted)));});
   app.get('/api/jobs/:id', (req, res) => {
     const job = jobView(uuid.parse(req.params.id));if(!visibleRoot(job.cwd))throw new HttpError(404,"Chat not found");
     if (String(job.revision) === req.query.revision) { res.status(204).end(); return; }

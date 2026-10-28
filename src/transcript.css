@@ -77,3 +77,10 @@ button.turn-changes:hover{color:var(--text);border-color:var(--accent)}
 :root .reading-mode .workspace.chat-canvas>.conversation{scroll-padding-block:24px 88px}
 .subagent-card-chevron{flex:none;color:var(--muted)}
 .tool-output-block>.tool-output{font-size:.88em}
+
+.chat-project-attach{display:inline-flex;align-items:center;gap:4px;font-size:inherit;max-width:200px}.chat-project-attach select{min-width:0;width:100%;border:0;background:transparent;color:inherit}
+
+/* Tool summaries stay one compact row; keyboard focus remains visible. */
+.message .tool-card.activity-row>summary{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;border:0;background:transparent}
+.message .tool-card.activity-row{border:0;background:transparent;box-shadow:none}
+.message .tool-card.activity-row>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}

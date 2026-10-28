@@ -1,6 +1,6 @@
 import { memo, useState, useRef, useMemo, useEffect, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
-import ReactMarkdown from 'react-markdown';
+import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
 import {useStreamingReveal} from './useStreamingReveal';
 import {usePacedText} from './usePacedText';
@@ -42,14 +42,16 @@ function CodeBlock({language,children}:{language?:string;children:ReactNode}){
   return <div className="code-block"><div className="code-block-bar"><span>{language||t('Код')}</span><CopyAction text={()=>pre.current?.innerText.replace(/\n$/,'')||''} label={t('Копировать')}/></div><pre ref={pre}>{children}</pre></div>;
 }
 const codeLanguage=(children:ReactNode)=>{const child=(Array.isArray(children)?children[0]:children) as {props?:{className?:string}}|undefined;return /language-([\w+#.-]+)/.exec(child?.props?.className||'')?.[1];};
-const MarkdownBody=memo(function MarkdownBody({text,reveal}:{text:string;reveal?:RevealOptions}) {
+// Keep a single AST so character-reveal offsets remain global across paragraphs.
+const singleMarkdownBlock=(text:string)=>[text];
+const MarkdownBody=memo(function MarkdownBody({text,reveal,streaming=false}:{text:string;reveal?:RevealOptions;streaming?:boolean}) {
   useLanguage();
-  return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={reveal?[[rehypeStreamingReveal,reveal]]:[]} components={{pre:({children})=><CodeBlock language={codeLanguage(children)}>{children}</CodeBlock>,a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<Picture src={safeWebUrl(src as string)!} alt={alt||t('Изображение')}/>:<span>📎 {alt||t('Изображение')}</span>}}>{text}</ReactMarkdown></div>;
+  return <div className="markdown"><Streamdown mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={false} remarkPlugins={[remarkGfm]} rehypePlugins={reveal?[[rehypeStreamingReveal,reveal]]:[]} components={{strong:'strong',em:'em',p:'p',h1:'h1',h2:'h2',h3:'h3',h4:'h4',h5:'h5',h6:'h6',ul:'ul',ol:'ol',li:'li',blockquote:'blockquote',hr:'hr',thead:'thead',tbody:'tbody',tr:'tr',th:'th',td:'td',sup:'sup',sub:'sub',section:'section',code:({children,className})=><code className={className}>{children}</code>,table:({children})=><table>{children}</table>,pre:({children})=><CodeBlock language={codeLanguage(children)}>{children}</CodeBlock>,a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<Picture src={safeWebUrl(src as string)!} alt={alt||t('Изображение')}/>:<span>📎 {alt||t('Изображение')}</span>}}>{text}</Streamdown></div>;
 });
-function StreamingMarkdown({text,animateInitial}:{text:string;animateInitial:boolean}){const speed=useStreamSpeed(),visible=usePacedText(text,animateInitial,speed);return <MarkdownBody text={visible} reveal={useStreamingReveal(visible,speed!==0,animateInitial)}/>;}
+function StreamingMarkdown({text,animateInitial,streaming}:{text:string;animateInitial:boolean;streaming:boolean}){const speed=useStreamSpeed(),visible=usePacedText(text,animateInitial,speed);return <MarkdownBody text={visible} streaming={streaming||visible!==text} reveal={useStreamingReveal(visible,speed!==0,animateInitial)}/>;}
 export const Markdown=memo(function Markdown({text,streaming=false,animateInitial=false}:{text:string;streaming?:boolean;animateInitial?:boolean}){
   const wasStreaming=useRef(streaming);if(streaming)wasStreaming.current=true;
-  return wasStreaming.current?<StreamingMarkdown text={text} animateInitial={animateInitial}/>:<MarkdownBody text={text}/>;
+  return wasStreaming.current?<StreamingMarkdown text={text} animateInitial={animateInitial} streaming={streaming}/>:<MarkdownBody text={text}/>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.
@@ -57,7 +59,7 @@ function Disclosure({className,summary,children,defaultOpen=false}:{className:st
   const [open,setOpen]=useState(false),element=useRef<HTMLDetailsElement|null>(null);
   // Opened once on mount; afterwards the person alone decides.
   useEffect(()=>{if(defaultOpen&&element.current)element.current.open=true;},[]);
-  return <details ref={element} className={className} onToggle={event=>setOpen(event.currentTarget.open)}><summary>{summary}<ChevronRight size={12} className="chat-disclosure-chevron" aria-hidden="true"/></summary>{open&&children()}</details>;
+  return <details ref={element} className={className} onToggle={event=>setOpen(event.currentTarget.open)}><summary>{summary}</summary>{open&&children()}</details>;
 }
 function Document({block}:{block:Block}) {
   const [error,setError]=useState(''); const source=block.source;

@@ -57,3 +57,9 @@
 .desktop-app>.desktop-rail.rail-collapsed nav>button{width:44px}
 @media(pointer:coarse){.desktop-app>.desktop-rail>nav{width:52px}.desktop-rail-content{margin-left:52px}.desktop-app>.desktop-rail .desktop-sessions>button{min-height:44px}.desktop-app>.desktop-rail>nav>button{width:44px;min-height:44px}}
 .desktop-app>.desktop-rail>nav{align-content:start;gap:6px}
+
+/* Running conversations retain their expanded geometry even when deselected. */
+.desktop-app>.desktop-rail .desktop-sessions>button[data-running=true]{min-height:calc(60px * var(--ui-scale,1));}
+.desktop-app>.desktop-rail .desktop-sessions>button[data-running=true] strong{animation:chat-title-breathe 2s ease-in-out infinite;}
+@keyframes chat-title-breathe{0%,100%{opacity:1}50%{opacity:.48}}
+@media(prefers-reduced-motion:reduce),(forced-colors:active){.desktop-app>.desktop-rail .desktop-sessions>button[data-running=true] strong{animation:none}}

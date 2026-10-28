@@ -50,6 +50,15 @@ export class CopilotService{
  async sessions(){const sessions=await(await this.connect()).listSessions();return Promise.all(sessions.filter(item=>!item.isRemote).map(async item=>{const cwd=item.context?.workingDirectory||'';let readOnly=true;try{await allowedPath(this.roots,cwd,true);readOnly=false;}catch{}return{sessionId:item.sessionId,summary:item.summary||'Copilot chat',cwd,lastModified:new Date(item.modifiedTime).getTime(),source:'copilot',provider:'copilot' as const,readOnly};}));}
  private historyReads=coalesceReads<string,ChatMessage[]>(0,8);
  async messages(id:string){return this.historyReads(id,()=>this.loadMessages(id));}
+ async forkBeforeMessage(id:string,messageId:string){
+  if(this.list().some(job=>job.sessionId===id&&job.status==='running'))throw new HttpError(409,'Stop the current turn before branching.');
+  const found=(await this.messages(id)).find(m=>m.id===messageId&&m.role==='user');
+  if(!found)throw new HttpError(404,'The selected user message is unavailable.');
+  const client=await this.connect();if(!client.rpc?.sessions?.fork)throw new HttpError(409,'Update Copilot to enable conversation branching.');
+  const fork=await client.rpc.sessions.fork({sessionId:id,toEventId:messageId});
+  if(!fork.sessionId||fork.sessionId===id)throw new HttpError(502,'Copilot did not create a separate conversation.');
+  return fork.sessionId;
+ }
  private async loadMessages(id:string){
   const live=[...this.runs.values()].find(run=>run.view.sessionId===id&&run.view.status==='running');
   if(live?.session)return(await live.session.getEvents()).map(copilotMessage).filter((message):message is ChatMessage=>!!message);

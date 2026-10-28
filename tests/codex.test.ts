@@ -50,6 +50,20 @@ async function until(predicate: () => boolean) {
   assert.fail('Condition was not reached');
 }
 
+test('Codex lists beyond twenty pages and rejects a stalled listing cursor',async t=>{
+ const {service,rpc}=await setup(t);
+ rpc.handler=(method,params)=>{
+  if(method!=='thread/list')return undefined;
+  assert.ok(params.sourceKinds.includes('unknown'));
+  const page=Number(params.cursor||0);
+  return {data:[{...rpc.thread,id:'thread-'+page}],nextCursor:page<24?String(page+1):null};
+ };
+ assert.equal((await service.sessions()).length,25);
+ const {service:stalled,rpc:stalledRpc}=await setup(t);
+ stalledRpc.handler=method=>method==='thread/list'?{data:[],nextCursor:'same'}:undefined;
+ await assert.rejects(stalled.sessions(),/incomplete/);
+});
+
 test('Codex attaches managed board MCP to new and resumed threads without replacing other settings',async t=>{
  for(const sessionId of [undefined,'session-1']){
   const {rpc,service,input,root}=await setup(t),server={command:'node',args:['board-proxy.mjs'],env:{POCKET_PORT:'4318'}};
@@ -396,4 +410,24 @@ test('Codex history pages retain offsets, hidden reasoning, legacy support and c
   rpc.handler = method => method === 'thread/items/list' ? { data: [], nextCursor: 'loop' } : undefined;
   await assert.rejects(service.messageCount('session-1'), /did not advance/);
   await assert.rejects(service.messagePage('session-1', { offset: 0 }), /did not advance/);
+});
+
+for(const paginated of [false,true])test(`fork keeps only turns before selected message (paginated=${paginated})`,async t=>{
+ const {rpc,service}=await setup(t);const turns=[{id:'t1',items:[{id:'u1',type:'userMessage'}]},{id:'t2',items:[{id:'u2',type:'userMessage'}]}];
+ rpc.thread.turns=turns;rpc.thread.historyMode=paginated?'paginated':'legacy';
+ rpc.handler=(method,p)=>{
+  if(method==='thread/read'&&p.threadId==='fork')return{thread:{...rpc.thread,id:'fork',turns:turns.slice(0,1)}};
+  if(method==='thread/turns/list')return{data:p.threadId==='fork'?turns.slice(0,1):turns,nextCursor:null};
+  if(method==='thread/fork'){assert.equal(p.lastTurnId,'t1');return{thread:{id:'fork'}};}
+ };
+ assert.equal(await service.forkBeforeMessage('session-1','u1'),undefined);
+ assert.equal(await service.forkBeforeMessage('session-1','u2'),'fork');
+ assert.equal(rpc.thread.turns.length,2);
+ await assert.rejects(service.forkBeforeMessage('session-1','missing'),/boundary/);
+ assert.equal(rpc.requests.some(r=>/rollback|truncate|turn\/start/.test(r.method)),false);
+});
+test('fork rejects an older Codex that ignores the requested boundary',async t=>{
+ const {rpc,service}=await setup(t);rpc.thread.turns=[{id:'t1',items:[{id:'u1',type:'userMessage'}]},{id:'t2',items:[{id:'u2',type:'userMessage'}]}];
+ rpc.handler=(method,p)=>method==='thread/fork'?{thread:{id:'fork'}}:method==='thread/read'&&p.threadId==='fork'?{thread:{...rpc.thread,id:'fork'}}:undefined;
+ await assert.rejects(service.forkBeforeMessage('session-1','u2'),/boundary/);
 });
