@@ -4,6 +4,8 @@
 
 Release source: [e3add0bc2f248f7b2be98fa8db0f41490572ecb9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/e3add0bc2f248f7b2be98fa8db0f41490572ecb9) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 104; Android, Windows and host assets built from this commit.
 
+Published [v0.28.17](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.17). Downloaded APK, Windows, host and manifest match audited assets; tag resolves to [e3add0bc2f248f7b2be98fa8db0f41490572ecb9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/e3add0bc2f248f7b2be98fa8db0f41490572ecb9) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK signer matches 0.28.16; GitHub Public data checks passed.
+
 ### Features
 - Chat library: persist Pocket Code chat names/removal and explicitly added project folders on the host; add context actions and keep all projects visible until filtered. Running titles pulse at a stable height without a duplicate running label.
 - Chat surface: use assistant-ui Composer primitives with compact controls, attach projects through the plus menu, and remove desktop Back and provider/header selectors. Streamdown handles unfinished Markdown while preserving safe links, deferred images and letter reveal.
