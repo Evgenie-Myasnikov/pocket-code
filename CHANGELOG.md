@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.18 (2026-10-28)
+## [0.28.18](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.17...v0.28.18) (2026-10-28)
+
+Release source: [5132e0852e95c2ab458f7f1016621401a0444536](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5132e0852e95c2ab458f7f1016621401a0444536) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 105; Android, Windows and host assets built from this commit.
 
 ### Bug Fixes
 - Chat: repair the atmosphere selector that collapsed the background canvas to zero height; keep the visible background active with static reduced-motion and forced-colors fallbacks.
