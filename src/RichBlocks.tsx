@@ -125,7 +125,6 @@ function ToolRow({block,result,running,depth}:{block:Block;result?:Block;running
     <Icon size={16} aria-hidden="true"/><span className={'tool-title'+(view.mono?' mono':'')} title={view.command||undefined}>{view.title}</span>
     {view.kind==='edit'&&(view.added>0||view.removed>0)&&<span className="tool-diffstat" aria-label={t('Добавлено строк: {0}, удалено: {1}',view.added,view.removed)}><b>+{view.added}</b> <i>−{view.removed}</i></span>}
     <ToolState view={view}/>
-    {view.errorLines.length>0&&<span className="tool-error-lines">{view.errorLines.join('\n')}</span>}
   </>}>{()=> <div className="activity-details">
     {view.kind==='command'?view.command&&<pre className="tool-command">{view.command}</pre>:view.kind==='edit'?<DiffBody input={input} name={(block.name||'').toLowerCase()}/>:view.plan?<PlanChecklist items={view.plan}/>:<ToolFields input={block.input}/>}
     {result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth} command={view.command} prose={prose}/></div>}

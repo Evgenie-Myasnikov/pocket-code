@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (0.28.21)
+
+### Bug Fixes
+- Release validation: seven scoped browser checks and one title unit check passed. Three broader assistant-chat checks failed on action-toolbar pointer interception and ambiguous background selectors; not counted as passing. Physical devices remain untested.
+- Chat titles omit generated attachment footers; board conversations use the board name. Explicit project filtering is separate from the board/chat project, so opening a board no longer hides other recent chats.
+- Tool rows: hide inline red error excerpts in collapsed command summaries; keep the failure status and full output inside the disclosure. Validation: focused browser check passed for collapsed/expanded diagnostics; TypeScript/Vite build passed. Not published.
+- Board/chat divider: replace the 4px idle and 6px accent stripe with one subtle 1px boundary aligned to the existing chat border, including stacked layouts. Keep the 12px resize target and keyboard/drag feedback; hover uses a neutral color.
+- Validation: TypeScript/Vite build and five board/chat layout browser scenarios passed for drag, cancel, persistence, keyboard/reset, retained drafts, stacked bounds and local card scrolling. Synthetic layout captures inspected. Not published.
+
 ## [0.28.20](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.19...v0.28.20) (2026-10-28)
 
 Release source: [6dd748ca612a841c719d977db476d3703ef61fc0](https://github.com/Evgenie-Myasnikov/pocket-code/commit/6dd748ca612a841c719d977db476d3703ef61fc0) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). APK versionCode 107; Android, Windows and host packages built from this commit.

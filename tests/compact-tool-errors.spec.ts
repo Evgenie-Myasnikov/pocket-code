@@ -1,0 +1,23 @@
+import {openChatList} from './chat-navigation';
+import {connectByQr} from './qr-connect';
+import { test, expect } from '@playwright/test';
+
+test('failed command hides diagnostic excerpt until explicitly expanded', async ({page}) => {
+  const session='synthetic-tools';
+  await page.route('**/api/sessions?*',route=>route.fulfill({json:[{sessionId:session,summary:'Tool activity',cwd:'C:\\Test',lastModified:1}]}));
+  await page.route(`**/api/sessions/${session}/messages?*`,route=>route.fulfill({json:{messages:[{id:'activity',role:'assistant',blocks:[
+    {type:'tool_use',id:'command',name:'Command',input:{command:'synthetic check'}},
+    {type:'tool_result',tool_use_id:'command',is_error:true,content:[{type:'text',text:'Synthetic command failed'}]},
+    {type:'tool_result',tool_use_id:'other',content:'Unrelated output stays visible'},
+    {type:'codexItem',content:{type:'futureActivity',text:'Preserved extra activity'}},
+  ]}],previous:null,next:null}}));
+  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
+  await page.getByRole('button',{name:/Tool activity/}).click();
+  const paired=page.locator('.tool-card.combined');
+  await expect(page.locator('[data-message-id=activity] .message-label')).toHaveCount(0);await expect(paired).toHaveCount(1);await expect(paired).toHaveClass(/failed/);
+  await expect(paired.locator('summary .tool-state')).toHaveText('Error');await expect(paired.locator('summary')).not.toContainText('Synthetic command failed');
+  expect(await paired.evaluate(e=>getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await paired.locator('summary').click();
+  await expect(paired).toContainText('synthetic check');await expect(paired).toContainText('Synthetic command failed');
+});

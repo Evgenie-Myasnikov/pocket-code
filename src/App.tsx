@@ -1,3 +1,4 @@
+import {chatTitle} from './chat-title';
 import {MessageBranch,type BranchTarget} from './MessageBranch';
 import {createPortal} from 'react-dom';
 import {userAttachmentBlocks} from './user-attachments';
@@ -954,7 +955,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       {chatSurface&&<ChatEdgeGlass/>}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
-        <ChatHeader hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||selected?.summary||(!job&&taskRun?.title)||t('Новый разговор')} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
+        <ChatHeader hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():boardChat?.context?setTab('workspace'):setMobileChat(false)}
           context={undefined}
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>{setReviewPaths(undefined);setReviewOpen(true);},stats:availableReview&&availableReview.files!==undefined?{added:availableReview.added||0,removed:availableReview.removed||0,files:availableReview.files}:undefined}:undefined}

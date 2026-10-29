@@ -33,7 +33,7 @@ test('brief transcript folds routine work, keeps errors, plan, changes and notic
  const group=page.locator('.activity-group');await expect(group).toHaveCount(1);
  await expect(group.locator(':scope > summary')).toHaveText('Explored 1 file · 1 search');
  const failed=page.locator('.tool-card.failed');await expect(failed.locator('summary .tool-title')).toHaveText('npm run lint');
- await expect(failed.locator('.tool-error-lines')).toContainText('src/form.ts:4:1 error Unexpected value');
+ await expect(failed.locator('summary')).not.toContainText('src/form.ts:4:1 error Unexpected value');
  await failed.locator('summary').click();await expect(failed.locator('.tool-output')).toContainText('> sample lint');
  await expect(failed.getByRole('button',{name:'Copy output'})).toBeVisible();await expect(failed.getByRole('button',{name:'Copy command'})).toBeVisible();
  await expect(page.locator('.turn-changes')).toHaveCount(0);

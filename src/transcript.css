@@ -6,7 +6,6 @@
 .tool-state{flex:none;display:inline-flex;align-items:center;font-size:.85em}
 .tool-state[data-status=running]{color:var(--status-running)}.tool-state[data-status=failed]{color:var(--status-error);font-weight:var(--fw-medium)}.tool-state[data-status=denied]{color:var(--status-attention)}.tool-state[data-status=nomatch]{color:var(--muted)}
 .tool-spinner{animation:run-status-spin 1.4s linear infinite}
-.tool-error-lines{flex-basis:100%;min-width:0;margin:2px 0 4px 26px;padding-left:10px;border-left:2px solid var(--status-error);white-space:pre-wrap;overflow-wrap:anywhere;font:.85em/1.5 var(--font-mono);color:var(--text)}
 .tool-output-block{margin:4px 0;padding-left:10px;border-left:2px solid var(--line)}
 .tool-output-block.failed{border-left-color:var(--status-error)}
 .tool-output-block>.tool-output{white-space:pre;overflow:auto;overflow-wrap:normal;margin:2px 0}
