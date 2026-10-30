@@ -3,6 +3,7 @@
 ## 0.28.30 (unreleased)
 
 ### Bug Fixes
+- Cache two opening history pages (up to 200 messages) using existing bounded persistent storage and refresh them in the background. Four scoped cache/navigation browser checks passed for Claude/Codex and reading anchors.
 - Restore composer and shared-surface blur in production builds: place standard `backdrop-filter` after its WebKit alias so CSS optimization retains the property Chromium applies. The previous development-only checks passed while emitted release CSS disabled blur.
 - Validation: reproduced identical blurred/sharp pixels in the built app before the fix; three production browser scenarios now pass with over 99% edge attenuation, plus seven development surface/region checks and TypeScript/Vite build. Synthetic capture inspected. Added `npm run test:glass:release` to verify emitted CSS on a strict preview server. Physical WebView/phone confirmation and publication remain pending.
 

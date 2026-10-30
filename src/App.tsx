@@ -564,7 +564,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   },[cacheScope,provider,demo]);
   useEffect(()=>{
     if(!cacheScope||demo||!selected||loading||fromStart||!outputMessages.length)return;
-    const timer=setTimeout(()=>writeChatCache(cacheScope,provider,'chat:'+selected.sessionId,outputMessages.slice(-100)),400);
+    const timer=setTimeout(()=>writeChatCache(cacheScope,provider,'chat:'+selected.sessionId,outputMessages.slice(-200)),400);
     return()=>clearTimeout(timer);
   },[cacheScope,provider,demo,selected?.sessionId,outputMessages,loading,fromStart]);
   useEffect(()=>{
@@ -730,7 +730,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
     const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
     const savedPosition=positionOnOpen(positionKey(cacheScope,provider,s.sessionId),Boolean(active)||activity.items.some(item=>item.provider===provider&&item.sessionId===s.sessionId&&(item.status==='running'||item.status==='needs_input')));pendingPosition.current=savedPosition;
-    historyWindow.current = savedPosition?.window||100;setHistoryError('');setFromStart(savedPosition?.fromStart||false);setShowScrollActions(savedPosition?!savedPosition.bottom:false);lastScrollTop.current = savedPosition?.top||0;
+    historyWindow.current = savedPosition?.window||200;setHistoryError('');setFromStart(savedPosition?.fromStart||false);setShowScrollActions(savedPosition?!savedPosition.bottom:false);lastScrollTop.current = savedPosition?.top||0;
     const cached=cacheScope&&!demo?readChatCache<ChatMessage[]>(cacheScope,provider,'chat:'+s.sessionId):null;
     setHistory(Array.isArray(cached)?cached:[]);setJob(null);restoreDraft(activeJob?.sessionId||s.sessionId);setError('');setTakeover(false);setHasMore(null);nearBottom.current = savedPosition?.bottom??true;
     if (demo) {setHistory(demoMessages);return;}
