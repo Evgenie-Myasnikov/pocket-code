@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (2026-10-31)
+## 0.28.30 (unreleased)
 
 ### Bug Fixes
 - Restore composer and shared-surface blur in production builds: place standard `backdrop-filter` after its WebKit alias so CSS optimization retains the property Chromium applies. The previous development-only checks passed while emitted release CSS disabled blur.
