@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.28.26 (2026-10-30)
+## [0.28.26](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.24...v0.28.26) (2026-10-30)
 
-Source: [4ebb06acbcda63604e946f4968aa58dc234941f3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/4ebb06acbcda63604e946f4968aa58dc234941f3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 113. All 141 shared web files and 400 source files match APK/Windows/host; 1812 decoded artifact entries audited, signer unchanged. Eleven scoped browser scenarios, TypeScript/Vite build and five privacy-guard checks passed. Physical devices remain untested. Source CI and publication pending.
+Published [v0.28.26](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.26) from [4ebb06acbcda63604e946f4968aa58dc234941f3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/4ebb06acbcda63604e946f4968aa58dc234941f3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 113. Both exact-source GitHub CI runs passed; GitHub server-side SHA-256 digests/sizes for all four assets match the audited local packages. Direct binary downloads are delayed on the verification connection and are not counted as completed. Shared 141 web files and 400 source files match packages; 1812 decoded entries audited, APK signer unchanged. Eleven scoped browser scenarios and TypeScript/Vite build passed. Physical devices remain untested.
 
 ### Bug Fixes
 - Backgrounds: remove the extra atmosphere radial gradient behind transparent live shaders, which added a gray/tinted haze absent from catalog captures. Preserve effect tint, intensity, masks and pause behavior. Regression reproduced before the fix; all 11 scoped background/sidebar/board-chat browser checks passed, including all ten effects under Strict Mode, resize and pause. TypeScript/Vite build and 28-document link checks passed; synthetic Galaxy preview inspected.
