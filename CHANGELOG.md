@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased (0.28.23)
+## [0.28.23](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.22...v0.28.23) (2026-10-30)
 
-Release source: [7837b2582e766e9f11fca2ffe51e55de76ebbaf9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/7837b2582e766e9f11fca2ffe51e55de76ebbaf9) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 110. Android/Windows/host packages verified: 124 shared web files and 402 source inputs match, 1748 decoded artifact entries audited; APK signer unchanged. Source CI passed. Sixteen scoped browser checks, one additional real browser audio playback probe, ten server/unit checks and 13 native policy checks passed. Physical Android audio remains untested. Publication pending.
+Release source: [7837b2582e766e9f11fca2ffe51e55de76ebbaf9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/7837b2582e766e9f11fca2ffe51e55de76ebbaf9) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 110. Android/Windows/host packages verified: 124 shared web files and 402 source inputs match, 1748 decoded artifact entries audited; APK signer unchanged. Source CI passed. Sixteen scoped browser checks, one additional real browser audio playback probe, ten server/unit checks and 13 native policy checks passed. Physical Android audio remains untested. Published [v0.28.23](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.23); all four downloaded hashes and exact tag verified.
 
 ### Features
 - Release verification: 16 scoped browser scenarios and 10 server/unit checks passed, including native speech; 13 Windows policy checks passed. Archive the existing UI card chronology to a linked history document to keep its current description within schema limits.
@@ -19,7 +19,7 @@ Release source: [7837b2582e766e9f11fca2ffe51e55de76ebbaf9](https://github.com/Ev
 - Frosted surfaces: add translucent backdrop blur to floating controls, board chrome, settings cards and supporting panels; keep foreground content sharp and provide opaque accessibility fallbacks. Validation: backdrop pixel comparison/header-control styles and three settings navigation scenarios passed.
 - Header: match overflow button glass to title fill, edge, rounding and blur; remove luminous composer rim and lift the external quota ring by 16px. Validation: dark/light material equality checks and three quota layouts passed.
 - Glass: increase backdrop diffusion and frosting beneath the composer; add a matching rounded title frame with opaque accessibility fallbacks. Validation: deterministic blurred-versus-unfiltered pixel capture and dark/light chat-menu scenarios passed.
-- Composer: replace the white rim with a subdued theme-aware bevel. Place the visible quota ring 6px from the frame instead of measuring the gap to its button. Validation: three quota hover/details/draft scenarios passed at 320/390/1440px; dark/light material scenarios passed. Unreleased.
+- Composer: replace the white rim with a subdued theme-aware bevel. Place the visible quota ring 6px from the frame instead of measuring the gap to its button. Validation: three quota hover/details/draft scenarios passed at 320/390/1440px; dark/light material scenarios passed. Published in 0.28.23.
 
 ## [0.28.22](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.21...v0.28.22) (2026-10-30)
 
