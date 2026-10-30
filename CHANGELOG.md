@@ -2,7 +2,7 @@
 
 ## 0.28.29 (2026-10-30)
 
-Release preparation: Android versionCode 116 on release/0.28.1. The combined release candidate passed 42 scoped browser scenarios, 12 unit/privacy checks, TypeScript/Vite build, 28-document links and 42-card schema/dependency checks. Exact source/package/CI/publication verification pending.
+Source: [14b60c99dc71b1df7fab2301d0e6d885ac8ea8b3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/14b60c99dc71b1df7fab2301d0e6d885ac8ea8b3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 116. All 142 shared web files and 400 source files match APK/Windows/host; 1816 decoded artifact entries audited, APK signing identity unchanged. 42 scoped browser scenarios, 12 unit/privacy checks and TypeScript/Vite build passed. Exact-source CI/publication verification pending. First-ever uncached history remains provider/network-bound; physical-device and historical coverage limitations remain explicit.
 
 ### Bug Fixes
 - Desktop saved-chat navigation: reuse the mounted shared chat runtime, show existing cached history before network refresh and avoid repeating the health handshake on every switch. Preserve separate drafts, provider/new-chat/board-generation isolation, and stale-response guards; treat expired live-job links as saved history except pending-only sessions. New/uncached history still needs its initial provider response.
