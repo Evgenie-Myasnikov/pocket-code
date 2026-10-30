@@ -5,7 +5,7 @@
 ### Features
 - Board: replace dots with a coordinate-aligned line grid that follows pan/zoom and adapts spacing at distant zoom.
 - Backgrounds (correction): replace the initially added custom CSS approximations with ten original React Bits shader components alongside DarkVeil: Silk, Aurora, Iridescence, Gradient Blinds, Plasma Wave, Ghost Fibers, Flux Lines, Lightfall, Molten Metal and Prismatic Burst. Pin upstream source/license, lazy-load the selected effect and use actual rendered thumbnails; preserve saved settings and pause controls.
-- Chat: soften the composer into rounded glass with a broad blurred bevel. Move account limits outside its right edge as a ring only; hover/focus shows the percentage and click opens quota details. Narrow layouts keep controls separate and retain the draft.
+- Chat: soften the composer into rounded glass with a broad blurred bevel. Move account limits outside its upper-right rounded corner as a ring only; hover/focus shows the percentage and click opens quota details. Narrow layouts keep controls separate and retain the draft.
 
 ### Code Refactoring
 - Unify menu, dialog, settings, board chrome, detail-panel and composer edges, radii and surface depth through shared material roles; retain compact navigation, palette colors, opaque accessibility fallbacks and avoid blur on repeated canvas cards. Document coverage in `.stitch/DESIGN.md`.

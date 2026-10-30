@@ -127,7 +127,7 @@
 .composer-with-usage{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:8px;min-width:0;width:100%}
 .composer-with-usage[data-has-usage=true]{grid-template-columns:minmax(0,1fr) max-content}
 .composer-with-usage>.prompt-composer{min-width:0;width:100%;box-sizing:border-box}
-.composer-external-usage{padding-top:4px;justify-self:end}
+.composer-external-usage{margin-top:-20px;padding-top:0;justify-self:end}
 .composer-external-usage>.usage-indicator{position:relative;display:grid;place-items:center;width:48px;min-width:48px;height:48px;min-height:48px;padding:0;font-size:var(--ui-caption-size);opacity:.85}
 
 @container(max-width:340px){
