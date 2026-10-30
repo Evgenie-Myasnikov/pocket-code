@@ -2,10 +2,13 @@
 
 ## 0.28.27 (2026-10-30)
 
-Release preparation: Android versionCode 114 on release/0.28.1. Current release candidate: 24 scoped browser scenarios, five privacy-guard checks, TypeScript/Vite build, 28-document links and 42-card schema/dependencies passed. Exact source/package/CI/publication verification pending.
+Source: [4b73034133c03aec845c516a0e62b2de1875a178](https://github.com/Evgenie-Myasnikov/pocket-code/commit/4b73034133c03aec845c516a0e62b2de1875a178) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 114. Exact-source CI, 24 scoped browser scenarios, five privacy-guard checks, TypeScript/Vite build and 28-document links passed. All 142 shared web files and 400 source files match APK/Windows/host; 1816 decoded entries audited, APK signer unchanged. Publication pending.
 
 ### Features
 - Appearance: independently hide the animated backdrop behind the conversation, transparent controls/composer and chat sidebar with opaque theme surfaces. Preserve existing preferences and the global background toggle, keep the settings preview live and remove the shared shader when every relevant area is disabled. Validation: eight scoped browser scenarios passed for persistence/reset, older and malformed settings, independent region styling, all-off renderer removal, preview/color/pause and composer/menu diffusion. Physical devices remain untested; not published.
+
+### Documentation
+- Archive the UI card chronology to a linked history after source-validation text exceeded the description limit; preserve all earlier records and validate the shortened current board snapshot before publication. Packages exclude portable boards.
 
 ### Bug Fixes
 - Desktop chat: hide the duplicate top title while the chat sidebar is expanded; keep overflow actions, restore the title when collapsed and preserve phone/board-chat navigation. Validation: seven scoped sidebar/board-chat browser scenarios and TypeScript/Vite build passed. Not published.
