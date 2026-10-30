@@ -1,6 +1,18 @@
 import {test,expect} from '@playwright/test';
 import {desktop} from './desktop-fixture';
 
+test('opening cached history follows the refreshed latest end',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await desktop(page);
+ const first=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});
+ const second=page.locator('.desktop-sessions button').filter({hasText:'Documentation'});
+ await page.evaluate(()=>{(window as any).branchMessages=Array.from({length:30},(_,i)=>({id:'old'+i,role:'assistant',blocks:[{type:'text',text:'Cached paragraph '+i+'\n\n'+'Synthetic history. '.repeat(20)}]}));});
+ await first.click();await expect(page.getByText('Cached paragraph 29',{exact:false})).toHaveCount(1);await page.waitForTimeout(900);
+ await page.locator('.conversation').evaluate(el=>{el.scrollTop=100;});await page.waitForTimeout(300);await second.click();
+ await page.evaluate(()=>{(window as any).branchMessages.push({id:'latest',role:'assistant',blocks:[{type:'text',text:'Latest refreshed reply'}]});});
+ await first.click();await expect(page.getByText('Latest refreshed reply',{exact:true})).toBeVisible();
+ await expect.poll(()=>page.locator('.conversation').evaluate(el=>el.scrollHeight-el.scrollTop-el.clientHeight)).toBeLessThan(5);
+});
+
 for(const provider of ['claude','codex'] as const)test(`${provider} saved chats reopen from cache without another health gate or stale navigation`,async({page})=>{
  await page.setViewportSize({width:1440,height:900});await desktop(page);
  if(provider==='codex'){await page.locator('.desktop-rail .provider-picker-trigger').click();await page.getByRole('menuitemradio',{name:'Codex',exact:true}).click();await expect(page.locator('.desktop-sessions button').filter({hasText:'codex · Interface review'})).toBeVisible();}

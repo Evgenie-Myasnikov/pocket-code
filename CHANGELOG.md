@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.28.31 (unreleased)
+
+### Bug Fixes
+- Explicit chat opening now starts at the latest end with a two-page tail window and restores that end after cached history refresh, rather than restoring an old reading offset. Manual scrolling within an open chat remains available. Reproduced the stale position with a failing browser check; six cache/navigation/board lifecycle checks and TypeScript/Vite build passed. Not published.
+- Simplify board header and canvas toolbar: remove individual glass shells, outer borders and shadows; align icons and spacing with quiet hover/selected states and 44px mobile targets. Six board layout/mobile lifecycle scenarios and TypeScript/Vite build passed; synthetic phone capture inspected. Not published.
+- Mobile navigation: return to the ordinary Chats list after leaving a board conversation instead of automatically reopening its sheet. Retain the pinned board session and draft for explicit reopening. Reproduced with a failing sidebar-visibility assertion before the fix.
+- Remove exterior composer shadows on phone widths from both form and backing layer, preserving glass blur.
+- Validation: mobile board lifecycle and dark/light glass scenarios passed (three browser tests), TypeScript/Vite build passed; synthetic phone capture inspected. The older navigation-usability scenario was interrupted while awaiting obsolete takeover-dialog behavior and is not counted as passing. Physical-device confirmation and publication pending.
+
 ## [0.28.30](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.29...v0.28.30) (2026-10-31)
 
 Published [v0.28.30](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.30) from [42f1b388835b533b4d774ebdbcbd79fe5f0ad789](https://github.com/Evgenie-Myasnikov/pocket-code/commit/42f1b388835b533b4d774ebdbcbd79fe5f0ad789) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 117. Both exact-source CI runs passed; three production blur, seven development surface and four cache/navigation browser scenarios passed, with TypeScript/Vite build. All 142 shared web files and 400 source files match packages; 1816 decoded entries privacy-audited, APK signer unchanged. GitHub SHA-256 digests/sizes for four public assets, exact source tag and branch ancestry verified. Physical-device appearance remains unverified; first uncached history remains provider-bound.

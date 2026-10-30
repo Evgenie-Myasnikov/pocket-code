@@ -48,7 +48,7 @@ import {WorkBoards,type BoardChat,type BoardRevealTarget} from './WorkBoards';
 import {BoardChatSheetGrip} from './BoardChatSheet';
 import {useProjectWorkspaces} from './project-workspaces';
 import {version as packageVersion} from '../package.json';
-import {positionKey,positionOnOpen,savePosition,flushPositions,clearPositions,type ChatPosition} from './chat-position';
+import {positionKey,savePosition,flushPositions,clearPositions,type ChatPosition} from './chat-position';
 import {UsageIndicator} from './UsageIndicator';
 import {LimitAlert} from './LimitAlert';
 import './composer-controls.css';
@@ -178,7 +178,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [moreOpen,setMoreOpen]=useState(false);
   const [chatViewOpen,setChatViewOpen]=useStateForWorkspace(false);
   useEffect(()=>{if(tab==='chats')setChatViewOpen(mobileChat);},[tab,mobileChat]);
-  const returnToChats=()=>{setTab('chats');setMobileChat(chatViewOpen);};
+  const returnToChats=()=>{setTab('chats');setMobileChat(boardChat?.context?false:chatViewOpen);};
   const liveSettings=useLiveSettings();
   const [settingsPage,setSettingsPage]=useState<SettingsPage>('index'),[settingsSubpage,setSettingsSubpage]=useState<'access'|null>(null);
   const [draft, setDraft] = useStateForWorkspace(''),[search, setSearch] = useStateForWorkspace(''),[model, setModel] = useStateForWorkspace(id=>preferences(id).model);
@@ -729,7 +729,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     rememberPosition();rememberDraft();setBoardChat(context||null);setBoardMissing(false);releasePending(true);setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
     const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
-    const savedPosition=positionOnOpen(positionKey(cacheScope,provider,s.sessionId),Boolean(active)||activity.items.some(item=>item.provider===provider&&item.sessionId===s.sessionId&&(item.status==='running'||item.status==='needs_input')));pendingPosition.current=savedPosition;
+    const savedPosition:ChatPosition={top:0,window:200,fromStart:false,bottom:true};pendingPosition.current=savedPosition;
     historyWindow.current = savedPosition?.window||200;setHistoryError('');setFromStart(savedPosition?.fromStart||false);setShowScrollActions(savedPosition?!savedPosition.bottom:false);lastScrollTop.current = savedPosition?.top||0;
     const cached=cacheScope&&!demo?readChatCache<ChatMessage[]>(cacheScope,provider,'chat:'+s.sessionId):null;
     setHistory(Array.isArray(cached)?cached:[]);setJob(null);restoreDraft(activeJob?.sessionId||s.sessionId);setError('');setTakeover(false);setHasMore(null);nearBottom.current = savedPosition?.bottom??true;

@@ -146,7 +146,29 @@
 }
 
 /* Opaque regions hide the shared animated canvas without adding more WebGL renderers. */
+@media(max-width:760px){
+ .chat-canvas .composer-with-usage::before,
+ :root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{box-shadow:none}
+}
 .background-regions{display:grid;gap:12px;padding-block:8px}
+/* Board navigation uses one quiet surface instead of individual glass shells. */
+:root[data-theme][data-theme] :is(.board-header,.whiteboard-toolbar){border:0;border-radius:0;box-shadow:none;background:var(--bg);background-image:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-theme][data-theme] .board-header-navigation{gap:8px;align-items:center}
+:root[data-theme][data-theme] :is(.board-header .icon-button,.whiteboard-toolbar button){border:0;border-radius:12px;box-shadow:none;background:transparent;background-image:none;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--muted)}
+:root[data-theme][data-theme] .board-header-navigation .icon-button{width:40px;min-width:40px;height:40px;min-height:40px;flex:0 0 40px;padding:0}
+:root[data-theme][data-theme] :is(.board-header .icon-button,.whiteboard-toolbar button) svg{width:18px;height:18px}
+:root[data-theme][data-theme] .whiteboard-toolbar{padding:4px 12px 8px;gap:4px}
+:root[data-theme][data-theme] :is(.board-header .icon-button,.whiteboard-toolbar button):hover:not(:disabled){background:var(--surface);color:var(--text)}
+:root[data-theme][data-theme] .whiteboard-toolbar button[aria-pressed=true]{background:var(--surface);color:var(--accent)}
+:root[data-theme][data-theme] :is(.board-header .icon-button,.whiteboard-toolbar button):focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
+@media(max-width:760px),(pointer:coarse){
+ :root[data-theme][data-theme] .board-header-navigation .icon-button{width:44px;min-width:44px;height:44px;min-height:44px;flex-basis:44px}
+ :root[data-theme][data-theme] .whiteboard-toolbar button{min-width:44px;min-height:44px}
+}
+@media(forced-colors:active){
+ :root[data-theme][data-theme] :is(.board-header,.whiteboard-toolbar){background:Canvas}
+ :root[data-theme][data-theme] .whiteboard-toolbar button[aria-pressed=true]{background:Highlight;color:HighlightText}
+}
 :root[data-background-chat=false][data-theme] .workspace.chat-canvas>.conversation{background:var(--bg)}
 :root[data-background-sidebar=false][data-theme][data-theme] :is(.desktop-app.desktop-app>.desktop-rail,.app>.sidebar){background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
 :root[data-background-controls=false] .chat-canvas .composer-with-usage::before,
