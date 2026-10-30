@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.28.25 (2026-10-30)
+## 0.28.26 (2026-10-30)
+
+Release preparation: Android versionCode 113 on release/0.28.1; source/package/CI/publication verification pending.
+
+### Bug Fixes
+- Backgrounds: remove the extra atmosphere radial gradient behind transparent live shaders, which added a gray/tinted haze absent from catalog captures. Preserve effect tint, intensity, masks and pause behavior. Regression reproduced before the fix; all 11 scoped background/sidebar/board-chat browser checks passed, including all ten effects under Strict Mode, resize and pause. TypeScript/Vite build and 28-document link checks passed; synthetic Galaxy preview inspected.
+- Sidebar: include the separate 9px resize gutter from the unpublished 0.28.25 draft.
+
+## 0.28.25 (unpublished draft)
+
+Superseded by 0.28.26 before publication. Tag v0.28.25 retains its original sidebar-only source.
 
 Release preparation: Android versionCode 112 on existing release/0.28.1; exact source and package/CI/publication verification pending.
 

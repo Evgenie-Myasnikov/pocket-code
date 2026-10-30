@@ -1,5 +1,14 @@
 import {test,expect} from '@playwright/test';
 
+test('live Galaxy has no extra radial haze behind the transparent shader',async({page})=>{
+ await page.goto('http://127.0.0.1:5173');
+ await page.evaluate(async()=>{localStorage.setItem('pocket-code-background-v1',JSON.stringify({enabled:true,style:'galaxy',color:'',intensity:100,speed:0}));const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{BackgroundSettings}=await import('/src/background-settings.tsx' as string);const host=document.createElement('div');document.body.replaceChildren(host);createRoot(host).render(React.createElement(BackgroundSettings));});
+ const atmosphere=page.locator('.background-preview .chat-atmosphere');await expect(atmosphere.locator('canvas')).toBeVisible();
+ await expect(atmosphere).toHaveCSS('background-image','none');
+ await expect(atmosphere).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+ await page.locator('.background-preview').screenshot({path:'.local/galaxy-preview-no-haze.png'});
+});
+
 test('preview animates with backgrounds disabled and updates color while paused',async({page})=>{
  await page.addInitScript(()=>{const counts=new WeakMap();(window as any).previewDraws=(c:HTMLCanvasElement)=>counts.get(c)||0;const draw=WebGL2RenderingContext.prototype.drawArrays;WebGL2RenderingContext.prototype.drawArrays=function(...args){counts.set(this.canvas,(counts.get(this.canvas)||0)+1);return draw.apply(this,args);};});
  await page.goto('http://127.0.0.1:5173');await page.evaluate(async()=>{const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{BackgroundSettings}=await import('/src/background-settings.tsx' as string);const host=document.createElement('div');host.className='desktop-app';host.innerHTML='<div class="chat-atmosphere"></div><div class="embedded-chat" id="preview-settings"></div>';document.body.replaceChildren(host);createRoot(host.querySelector('#preview-settings')!).render(React.createElement(BackgroundSettings));});

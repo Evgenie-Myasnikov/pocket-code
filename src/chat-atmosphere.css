@@ -1,4 +1,4 @@
-.chat-atmosphere{position:absolute;inset:0;pointer-events:none;mask-image:radial-gradient(ellipse at 50% 35%,black,transparent 110%);overflow:hidden;opacity:.38;transition:opacity var(--dur-long);background:radial-gradient(ellipse at 50% 20%,color-mix(in srgb,var(--accent) 35%,transparent),transparent 65%)}
+.chat-atmosphere{position:absolute;inset:0;pointer-events:none;mask-image:radial-gradient(ellipse at 50% 35%,black,transparent 110%);overflow:hidden;opacity:.38;transition:opacity var(--dur-long);background:transparent}
 .chat-atmosphere[data-empty=true]{opacity:.55}
 .chat-canvas>.conversation{position:relative}
 .chat-atmosphere[data-preview=true]{mask-image:none}
