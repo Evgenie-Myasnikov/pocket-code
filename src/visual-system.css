@@ -8,7 +8,7 @@
 :root .session-row .run-status,:root .chat-tile .run-status,:root .desktop-sessions :is(.desktop-chat-dot,.desktop-run-label){display:none}
 .session-row[data-running=true] strong,.chat-tile[data-running=true] strong{animation:chat-title-breathe 2.6s ease-in-out infinite}
 .desktop-app{position:relative;isolation:isolate}.desktop-app>.chat-atmosphere{z-index:-1}.desktop-app:has(>.chat-atmosphere) .embedded-chat .chat-atmosphere:not([data-preview=true]){display:none}
-:root[data-theme] .desktop-app.desktop-app>.desktop-rail{background:color-mix(in srgb,var(--bg) 40%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+:root[data-theme] .desktop-app.desktop-app>.desktop-rail{background:color-mix(in srgb,var(--bg) 40%,transparent);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
 :root[data-theme] .desktop-app>.desktop-rail .desktop-rail-content{background:transparent}
 :root[data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{background:color-mix(in srgb,var(--panel) 52%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 18%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--text) 8%,transparent),0 8px 30px var(--shadow-glass-composer);border-color:color-mix(in srgb,var(--text) 16%,transparent)}
 @media(pointer:coarse){:root{--ui-control-height:48px}}

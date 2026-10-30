@@ -1,6 +1,6 @@
 {
   "name": "pocket-code",
-  "version": "0.28.29",
+  "version": "0.28.30",
   "description": "Android companion for local Claude Code and Codex workspaces",
   "scripts": {
     "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "android:sync": "npm run build && cap sync android",
     "test:ui": "playwright test",
+    "test:glass:release": "npm run build && playwright test --config playwright.glass-release.config.ts",
     "android:build": "powershell -NoProfile -File scripts/build-android.ps1",
     "check:docs": "node scripts/check-docs.mjs"
   },

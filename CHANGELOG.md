@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (2026-10-31)
+
+### Bug Fixes
+- Restore composer and shared-surface blur in production builds: place standard `backdrop-filter` after its WebKit alias so CSS optimization retains the property Chromium applies. The previous development-only checks passed while emitted release CSS disabled blur.
+- Validation: reproduced identical blurred/sharp pixels in the built app before the fix; three production browser scenarios now pass with over 99% edge attenuation, plus seven development surface/region checks and TypeScript/Vite build. Synthetic capture inspected. Added `npm run test:glass:release` to verify emitted CSS on a strict preview server. Physical WebView/phone confirmation and publication remain pending.
+
 ## [0.28.29](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.27...v0.28.29) (2026-10-30)
 
 Published [v0.28.29](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.29) from [14b60c99dc71b1df7fab2301d0e6d885ac8ea8b3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/14b60c99dc71b1df7fab2301d0e6d885ac8ea8b3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 116. Both exact-source CI runs, 42 scoped browser scenarios, 12 unit/privacy checks and TypeScript/Vite build passed. All 142 shared web files and 400 source files match APK/Windows/host; 1816 decoded artifact entries audited, APK signing identity unchanged. GitHub server-side SHA-256 digests/sizes for all four public assets, exact source tag and branch ancestry verified; latest-release API returns v0.28.29. First-ever uncached history remains provider/network-bound. Physical devices, older-browser fallback and historical excluded regressions remain unverified.

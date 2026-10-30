@@ -2,38 +2,38 @@
 .chat-edge-glass>div{position:absolute;inset-inline:0;height:clamp(36px,7vh,72px);pointer-events:none}
 .chat-edge-glass-top{top:0;--glass-direction:to top}
 .chat-edge-glass-bottom{bottom:0;--glass-direction:to bottom}
-.chat-edge-glass i{position:absolute;inset:0;pointer-events:none;backdrop-filter:blur(1px);-webkit-backdrop-filter:blur(1px);mask-image:linear-gradient(var(--glass-direction),transparent,black 75%);-webkit-mask-image:linear-gradient(var(--glass-direction),transparent,black 75%)}
-.chat-edge-glass i:nth-child(2){backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);mask-image:linear-gradient(var(--glass-direction),transparent 30%,black 90%);-webkit-mask-image:linear-gradient(var(--glass-direction),transparent 30%,black 90%)}
-.chat-edge-glass i:nth-child(3){backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);mask-image:linear-gradient(var(--glass-direction),transparent 65%,black);-webkit-mask-image:linear-gradient(var(--glass-direction),transparent 65%,black)}
+.chat-edge-glass i{position:absolute;inset:0;pointer-events:none;-webkit-backdrop-filter:blur(1px);backdrop-filter:blur(1px);mask-image:linear-gradient(var(--glass-direction),transparent,black 75%);-webkit-mask-image:linear-gradient(var(--glass-direction),transparent,black 75%)}
+.chat-edge-glass i:nth-child(2){-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);mask-image:linear-gradient(var(--glass-direction),transparent 30%,black 90%);-webkit-mask-image:linear-gradient(var(--glass-direction),transparent 30%,black 90%)}
+.chat-edge-glass i:nth-child(3){-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);mask-image:linear-gradient(var(--glass-direction),transparent 65%,black);-webkit-mask-image:linear-gradient(var(--glass-direction),transparent 65%,black)}
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
- :root[data-theme] .chat-canvas .prompt-composer.assistant-composer{background:color-mix(in srgb,var(--panel) 76%,transparent);backdrop-filter:blur(18px) saturate(120%);-webkit-backdrop-filter:blur(18px) saturate(120%);border:1px solid color-mix(in srgb,var(--text) 12%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 6%,transparent),0 6px 24px var(--shadow-glass-chrome)}
- :root[data-theme] .chat-canvas .chat-header-actions>.chat-menu-button{background:color-mix(in srgb,var(--panel) 64%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:50%}
- .chat-canvas .message.user .user-message-content{background:color-mix(in srgb,var(--panel) 78%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
- :root[data-theme] .chat-canvas .code-block{background:color-mix(in srgb,var(--panel) 65%,transparent);border:1px solid color-mix(in srgb,var(--text) 7%,transparent);border-radius:16px;overflow:hidden;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+ :root[data-theme] .chat-canvas .prompt-composer.assistant-composer{background:color-mix(in srgb,var(--panel) 76%,transparent);-webkit-backdrop-filter:blur(18px) saturate(120%);backdrop-filter:blur(18px) saturate(120%);border:1px solid color-mix(in srgb,var(--text) 12%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 6%,transparent),0 6px 24px var(--shadow-glass-chrome)}
+ :root[data-theme] .chat-canvas .chat-header-actions>.chat-menu-button{background:color-mix(in srgb,var(--panel) 64%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-radius:50%}
+ .chat-canvas .message.user .user-message-content{background:color-mix(in srgb,var(--panel) 78%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+ :root[data-theme] .chat-canvas .code-block{background:color-mix(in srgb,var(--panel) 65%,transparent);border:1px solid color-mix(in srgb,var(--text) 7%,transparent);border-radius:16px;overflow:hidden;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
  :root[data-theme] .chat-canvas .code-block>pre{background:transparent;border:0;border-radius:0;box-shadow:none;margin:0!important}
  .chat-canvas .code-block-bar{padding:6px 14px;background:transparent}
  :root[data-theme] .desktop-app{background:radial-gradient(ellipse at 0 35%,color-mix(in srgb,var(--accent) 14%,var(--bg)),var(--bg) 65%)}
- :root[data-theme] .desktop-app>.desktop-rail{background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(22px) saturate(115%);-webkit-backdrop-filter:blur(22px) saturate(115%);border-right-color:color-mix(in srgb,var(--text) 7%,transparent)}
+ :root[data-theme] .desktop-app>.desktop-rail{background:color-mix(in srgb,var(--bg) 72%,transparent);-webkit-backdrop-filter:blur(22px) saturate(115%);backdrop-filter:blur(22px) saturate(115%);border-right-color:color-mix(in srgb,var(--text) 7%,transparent)}
 }
 :root[data-chat-edge-fade=off] .chat-edge-glass,.reading-mode .chat-edge-glass{display:none}
-@media(forced-colors:active){.chat-edge-glass{display:none}:root[data-theme] .chat-canvas .prompt-composer.assistant-composer,.chat-canvas .message.user .user-message-content{background:Canvas;backdrop-filter:none;-webkit-backdrop-filter:none}}
-@media(forced-colors:active){:root[data-theme] .desktop-app>.desktop-rail,:root[data-theme] .chat-canvas .code-block{background:Canvas;backdrop-filter:none;-webkit-backdrop-filter:none;border-color:CanvasText}}
+@media(forced-colors:active){.chat-edge-glass{display:none}:root[data-theme] .chat-canvas .prompt-composer.assistant-composer,.chat-canvas .message.user .user-message-content{background:Canvas;-webkit-backdrop-filter:none;backdrop-filter:none}}
+@media(forced-colors:active){:root[data-theme] .desktop-app>.desktop-rail,:root[data-theme] .chat-canvas .code-block{background:Canvas;-webkit-backdrop-filter:none;backdrop-filter:none;border-color:CanvasText}}
 
 /* Shared surfaces, not global opacity: text, media and semantic action colours stay intact.
    Nested controls use tint only; blur belongs to the containing card or popover. */
 :root{--chat-glass-card:color-mix(in srgb,var(--panel) 74%,transparent);--chat-glass-popover:color-mix(in srgb,var(--panel) 88%,transparent);--chat-glass-inset:color-mix(in srgb,var(--surface) 46%,transparent);--chat-glass-border:color-mix(in srgb,var(--text) 10%,transparent)}
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
- :root[data-theme] .chat-canvas :is(.plan-bar,.approval-card,.outbox-shelf,.voice-input-notice,.followup-status,.scroll-latest,.chat-scroll-actions>button,.message-attachment,.document-card){background:var(--chat-glass-card);border-color:var(--chat-glass-border);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
- :root[data-theme] :is(.chat-menu,.composer-add-menu,.access-menu,.model-catalog-note,.question-dialog,.chat-outputs-panel,.subagents-panel){background:var(--chat-glass-popover);border-color:var(--chat-glass-border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+ :root[data-theme] .chat-canvas :is(.plan-bar,.approval-card,.outbox-shelf,.voice-input-notice,.followup-status,.scroll-latest,.chat-scroll-actions>button,.message-attachment,.document-card){background:var(--chat-glass-card);border-color:var(--chat-glass-border);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+ :root[data-theme] :is(.chat-menu,.composer-add-menu,.access-menu,.model-catalog-note,.question-dialog,.chat-outputs-panel,.subagents-panel){background:var(--chat-glass-popover);border-color:var(--chat-glass-border);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
  :root[data-theme] .chat-canvas :is(.draft-attachment,.attachment-summary,.composer-board-selection,.outbox-item,.approval-card pre,.approval-comment textarea,.question-request button,.tool-card pre,.thinking pre,.markdown code:not(pre code)),
  :root[data-theme] :is(.question-options label.selected,.question-custom textarea,.chat-output-row,.chat-output-code,.chat-output-image-card,.chat-output-image-frame,.subagents-error,.chat-outputs-filters button){background:var(--chat-glass-inset);border-color:var(--chat-glass-border)}
  :root[data-theme] .chat-canvas .prompt-composer .composer-tools{background:transparent}
- :root[data-theme] .chat-canvas .user-message-content :is(.message-attachment,.document-card,.code-block){background:var(--chat-glass-inset);backdrop-filter:none;-webkit-backdrop-filter:none}
+ :root[data-theme] .chat-canvas .user-message-content :is(.message-attachment,.document-card,.code-block){background:var(--chat-glass-inset);-webkit-backdrop-filter:none;backdrop-filter:none}
  :root[data-theme] :is(.chat-menu,.composer-add-menu,.access-menu) button:hover:not(:disabled){background:var(--chat-glass-inset)}
 }
 @media(forced-colors:active){
  :root{--chat-glass-card:Canvas;--chat-glass-popover:Canvas;--chat-glass-inset:Canvas;--chat-glass-border:CanvasText}
  :root[data-theme] .chat-canvas :is(.plan-bar,.approval-card,.outbox-shelf,.voice-input-notice,.followup-status,.scroll-latest,.chat-scroll-actions>button,.message-attachment,.document-card),
- :root[data-theme] :is(.chat-menu,.composer-add-menu,.access-menu,.model-catalog-note,.question-dialog,.chat-outputs-panel,.subagents-panel){backdrop-filter:none;-webkit-backdrop-filter:none}
+ :root[data-theme] :is(.chat-menu,.composer-add-menu,.access-menu,.model-catalog-note,.question-dialog,.chat-outputs-panel,.subagents-panel){-webkit-backdrop-filter:none;backdrop-filter:none}
  :root[data-theme] .question-options label.selected{background:Highlight;color:HighlightText}
 }
