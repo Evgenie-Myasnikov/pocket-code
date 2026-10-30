@@ -140,3 +140,42 @@ its existing React components or adopting another product's palette.
 
 The source styles and rendered checks remain authoritative for implemented
 behavior. This document is a design contract, not validation or release evidence.
+
+## 8. Shared material and background roles
+
+`src/ui-materials.css` owns the shared fine edge, top rim, subtle sheen and
+surface depth. Keep the selected palette; references describe material, not a
+mandatory blue color. Controls use 10px corners, cards 14px and floating panels
+18px. Navigation retains its compact layout and existing selection states.
+
+| Surface | Material treatment |
+| --- | --- |
+| Chat/board menus and dialogs | Fine border, top rim, bounded blur, shared focus rings |
+| Settings, account cards and output cards | Opaque readable fill, light sheen, no repeated blur |
+| Review, agents and output panels | Shared edge and depth, existing layout retained |
+| Composer and code blocks | Shared edge/radius; existing interaction effects remain |
+| Board canvas | World-aligned line grid; adaptive spacing at distant zoom |
+
+Forced colors remove decorative grid and gradients. Reduced transparency uses
+opaque floating panels. Never add backdrop blur to hundreds of canvas objects.
+
+Background settings offer DarkVeil plus ten original React Bits components:
+Silk, Aurora, Iridescence, Gradient Blinds, Plasma Wave, Ghost Fibers, Flux Lines,
+Lightfall, Molten Metal and Prismatic Burst. Their original shader code is pinned
+and attributed in `src/vendor/react-bits/SOURCE.md`. The earlier custom CSS
+approximations were rejected and replaced, not retained under the upstream names.
+Only the selected effect is lazy-loaded; thumbnails are actual rendered captures.
+Choice persists locally; unknown/removed styles fall back to DarkVeil. Color,
+intensity and speed remain configurable; the original artist palette is used
+until a custom color is selected. Speed zero and reduced motion pause rendering.
+
+The composer uses translucent fill, bounded backdrop blur and a beveled rim:
+a bright upper-left lip, quieter middle edge and opposing lower-right highlight.
+Keep the content crisp and clicks unobstructed; reduced transparency and forced
+colors retain an opaque accessible surface. Avoid blurring the transcript text.
+
+The glass edge uses a broad blurred bevel, not a sharp outline. Account quota
+is a ring outside the composer on the right: hover or keyboard focus reveals
+the remaining percentage; click opens quota details. The 48px target remains
+inside the viewport. Very narrow composers separate model controls and actions
+into two rows rather than overlapping them. Quota data remains provider-sourced.

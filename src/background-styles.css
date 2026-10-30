@@ -1,0 +1,5 @@
+.background-style-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
+.background-style-options>button{display:flex;flex-direction:column;gap:6px;padding:6px;border:1px solid var(--line);border-radius:var(--ui-radius-control,10px);background:var(--panel);color:var(--text);font:inherit;min-width:0;text-align:left}
+.background-style-options>button[aria-pressed=true]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.background-swatch{display:block;width:100%;height:48px;border-radius:6px;background-color:var(--bg);background-size:cover;background-position:center}
+@media(forced-colors:active){.background-swatch{background:Canvas;border:1px solid CanvasText}.background-style-options>button[aria-pressed=true]{outline:2px solid Highlight}}

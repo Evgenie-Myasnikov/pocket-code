@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased (2026-10-30)
+
+### Features
+- Board: replace dots with a coordinate-aligned line grid that follows pan/zoom and adapts spacing at distant zoom.
+- Backgrounds (correction): replace the initially added custom CSS approximations with ten original React Bits shader components alongside DarkVeil: Silk, Aurora, Iridescence, Gradient Blinds, Plasma Wave, Ghost Fibers, Flux Lines, Lightfall, Molten Metal and Prismatic Burst. Pin upstream source/license, lazy-load the selected effect and use actual rendered thumbnails; preserve saved settings and pause controls.
+- Chat: soften the composer into rounded glass with a broad blurred bevel. Move account limits outside its right edge as a ring only; hover/focus shows the percentage and click opens quota details. Narrow layouts keep controls separate and retain the draft.
+
+### Code Refactoring
+- Unify menu, dialog, settings, board chrome, detail-panel and composer edges, radii and surface depth through shared material roles; retain compact navigation, palette colors, opaque accessibility fallbacks and avoid blur on repeated canvas cards. Document coverage in `.stitch/DESIGN.md`.
+- Move remaining glass shadows, mask color and font weights into shared design tokens.
+
+### Bug Fixes
+- Improve running-status contrast on light palettes; retain stronger form boundaries and remove decorative grid in forced colors.
+- Initial grid/material validation: 15 distinct scoped browser scenarios passed across background persistence/motion, grid, menus, divider/card scrolling, settings and palette contrast; four token unit checks, TypeScript/Vite build, board schema and documentation checks passed. Synthetic light/dark captures inspected.
+- Correction validation: all 11 upstream effects rendered/resized in React Strict Mode without WebGL errors and stopped drawing when paused; background persistence, light/dark glass/menu checks, five board/chat-layout checks and quota hover/details/draft retention at 320/390/1440px passed. Four token unit checks and TypeScript/Vite build passed. Synthetic thumbnails and glass captures inspected.
+- Quota regression suite: polling/provider-switch checks passed; the older layout test still expects a 48px Send target but the existing compact mobile style uses 44px. This assertion was retained and is not counted as passing.
+- Follow-up: broader `chat-surfaces` test timed out waiting for the absent `.chat-context` header element; that suite was interrupted and is not counted as passing. Physical devices and a complete screen-by-screen interaction audit remain unverified. No release published.
+
 ## [0.28.21](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.20...v0.28.21) (2026-10-29)
 
 Published [v0.28.21](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.21) from [5d1959e7f3c45e30f2d8461ba4bcd99332774fef](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5d1959e7f3c45e30f2d8461ba4bcd99332774fef) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 108. All four downloaded hashes, exact tag and both source CI runs verified; 93 shared web files and 360 source files match packages; 1,540 decoded artifact entries passed privacy checks. APK signing identity unchanged.

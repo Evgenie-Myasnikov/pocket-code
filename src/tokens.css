@@ -9,10 +9,10 @@
 :root{
  --success-fg:#8bcf9f;--warning-fg:#e8c06a;--danger-fg:#f09a90;--info-fg:#86bdf0;--review-fg:#c3a0e0;--running-fg:var(--accent);
  --danger-solid:#b4443e;--on-danger:#fff;--on-avatar:#fff;--qr-paper:#fff;--brand-miro:#ffd02f;--brand-miro-ink:#050038;--on-accent:var(--accent-dark);
- --scrim:rgb(0 0 0 / .55);--shadow-faint:rgb(0 0 0 / .06);--shadow-soft:rgb(0 0 0 / .15);--shadow-color:rgb(0 0 0 / .33);
+ --scrim:rgb(0 0 0 / .55);--shadow-glass-chrome:rgb(0 0 0 / .04);--shadow-glass-composer:rgb(0 0 0 / .07);--mask-solid:#000;--glass-highlight:rgb(255 255 255 / .75);--glass-highlight-soft:rgb(255 255 255 / .18);--shadow-faint:rgb(0 0 0 / .06);--shadow-soft:rgb(0 0 0 / .15);--shadow-color:rgb(0 0 0 / .33);
 }
 :root[data-theme=light]{
- --success-fg:#28663a;--warning-fg:#7f5300;--danger-fg:#a33728;--info-fg:#1b5a96;--review-fg:#6a3fa0;
+ --success-fg:#28663a;--warning-fg:#7f5300;--danger-fg:#a33728;--info-fg:#1b5a96;--review-fg:#6a3fa0;--running-fg:color-mix(in srgb,var(--accent) 85%,black);
  --danger-solid:#a51d26;--scrim:rgb(0 0 0 / .42);--shadow-faint:rgb(0 0 0 / .05);--shadow-soft:rgb(0 0 0 / .1);--shadow-color:rgb(0 0 0 / .16);
 }
 :root{

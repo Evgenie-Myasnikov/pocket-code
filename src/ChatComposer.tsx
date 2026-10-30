@@ -64,7 +64,7 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
   const sendLabel=mode==='later'?t('Отправить, когда ПК будет на связи'):mode==='queue'?t('В очередь'):mode==='steer'?t('Направить'):t('Отправить сообщение');
   const shortcut=enterSends?'Enter':'Ctrl+Enter';
   const hasFiles=(event:React.DragEvent)=>Array.from(event.dataTransfer?.types||[]).includes('Files')||!!onBoardImage&&Array.from(event.dataTransfer?.types||[]).includes(boardImageMime);
-  return <AssistantComposerRoot onSubmit={event=>{event.preventDefault();send();}} data-slot="composer" className={'composer prompt-composer assistant-composer'+(dragging?' composer-drop':'')} data-pulsing={!!onStop&&!stopRetry&&!stopping||undefined} data-stopping={stopping||undefined} data-running={onStop?true:undefined}
+  return <div className="composer-with-usage" data-has-usage={usage?true:undefined}><AssistantComposerRoot onSubmit={event=>{event.preventDefault();send();}} data-slot="composer" className={'composer prompt-composer assistant-composer'+(dragging?' composer-drop':'')} data-pulsing={!!onStop&&!stopRetry&&!stopping||undefined} data-stopping={stopping||undefined} data-running={onStop?true:undefined}
     onDragEnter={event=>{if(!disabled&&hasFiles(event)){event.preventDefault();setDragging(true);}}}
     onDragOver={event=>{if(!disabled&&hasFiles(event)){event.preventDefault();event.dataTransfer.dropEffect='copy';}}}
     onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))setDragging(false);}}
@@ -90,7 +90,6 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
           // Up in an empty field brings back the last message to edit, like a terminal.
           if(event.key==='ArrowUp'&&!text&&onRecall){const previous=onRecall();if(previous){event.preventDefault();onText(previous);}}
         }}/>
-      {usage}
     </div>
     {blockedReason&&<p className="composer-hint composer-blocked" role="status">{blockedReason}</p>}
     <div className="composer-tools">
@@ -109,5 +108,5 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
         </button>}
       </div>
     </div>
-  </AssistantComposerRoot>;
+  </AssistantComposerRoot>{usage&&<div className="composer-external-usage">{usage}</div>}</div>;
 }

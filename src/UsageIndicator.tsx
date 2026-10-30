@@ -28,7 +28,7 @@ export function UsageIndicator({connection,provider,models,onOpen}:{connection:C
   const percent=remaining===null?'—':`${Math.floor(remaining)}%`,tone=remaining===null?'':usageTone(remaining);
   const label=remaining===null?t('{0}: лимиты недоступны',engine):t('{0}: осталось {1} лимита',engine,percent);
   const hint=t('Минимальный остаток доступных лимитов для текущей модели. Нажмите для подробностей.');
-  return <button ref={button} type="button" className={'usage-indicator'+(tone==='danger'?' usage-low':tone==='warning'?' usage-warning':'')} aria-label={label} title={`${label}. ${hint}`} onClick={onOpen}>
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle className="usage-track" cx="10" cy="10" r="8"/><circle className="usage-value" cx="10" cy="10" r="8" pathLength="100" strokeDasharray={`${remaining??0} 100`} transform="rotate(-90 10 10)"/></svg><span>{percent}</span>
+  return <button ref={button} type="button" className={'usage-indicator'+(tone==='danger'?' usage-low':tone==='warning'?' usage-warning':'')} aria-label={label} aria-description={hint} onClick={onOpen}>
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle className="usage-track" cx="10" cy="10" r="8"/><circle className="usage-value" cx="10" cy="10" r="8" pathLength="100" strokeDasharray={`${remaining??0} 100`} transform="rotate(-90 10 10)"/></svg><span className="usage-percent" role="tooltip">{percent}</span>
   </button>;
 }

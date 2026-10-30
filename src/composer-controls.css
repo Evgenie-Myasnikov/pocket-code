@@ -122,3 +122,17 @@
 .composer-add-menu .chat-project-attach{display:flex;align-items:center;gap:8px;padding:0 8px;font-size:inherit}
 .composer-add-menu .chat-project-attach select{min-width:0;flex:1;max-width:100%;color:var(--text);min-height:44px}
 @media(max-width:760px){:root[data-theme] .prompt-composer.assistant-composer{padding-inline:9px}:root[data-theme] .assistant-composer .composer-tools :is(.icon-button,.send-button){width:44px;min-width:44px;height:44px;min-height:44px}.assistant-composer .composer-tools{grid-template-columns:44px minmax(0,1fr) auto}.assistant-composer .send-button::before,.assistant-composer .stop-button.stop-primary::before{inset:6px}}
+
+.composer-area{container-type:inline-size}
+.composer-with-usage{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:8px;min-width:0;width:100%}
+.composer-with-usage[data-has-usage=true]{grid-template-columns:minmax(0,1fr) max-content}
+.composer-with-usage>.prompt-composer{min-width:0;width:100%;box-sizing:border-box}
+.composer-external-usage{padding-top:4px;justify-self:end}
+.composer-external-usage>.usage-indicator{position:relative;display:grid;place-items:center;width:48px;min-width:48px;height:48px;min-height:48px;padding:0;font-size:var(--ui-caption-size);opacity:.85}
+
+@container(max-width:340px){
+ .composer-with-usage[data-has-usage=true] .composer-tools{grid-template-columns:minmax(0,1fr) auto}
+ .composer-with-usage[data-has-usage=true] .composer-models{grid-column:1 / -1;grid-row:1}
+ .composer-with-usage[data-has-usage=true] .composer-add{grid-column:1;grid-row:2}
+ .composer-with-usage[data-has-usage=true] .composer-actions{grid-column:2;grid-row:2}
+}
