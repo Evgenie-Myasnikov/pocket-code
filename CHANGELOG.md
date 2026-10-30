@@ -2,7 +2,7 @@
 
 ## 0.28.26 (2026-10-30)
 
-Release preparation: Android versionCode 113 on release/0.28.1; source/package/CI/publication verification pending.
+Source: [4ebb06acbcda63604e946f4968aa58dc234941f3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/4ebb06acbcda63604e946f4968aa58dc234941f3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 113. All 141 shared web files and 400 source files match APK/Windows/host; 1812 decoded artifact entries audited, signer unchanged. Eleven scoped browser scenarios, TypeScript/Vite build and five privacy-guard checks passed. Physical devices remain untested. Source CI and publication pending.
 
 ### Bug Fixes
 - Backgrounds: remove the extra atmosphere radial gradient behind transparent live shaders, which added a gray/tinted haze absent from catalog captures. Preserve effect tint, intensity, masks and pause behavior. Regression reproduced before the fix; all 11 scoped background/sidebar/board-chat browser checks passed, including all ten effects under Strict Mode, resize and pause. TypeScript/Vite build and 28-document link checks passed; synthetic Galaxy preview inspected.
