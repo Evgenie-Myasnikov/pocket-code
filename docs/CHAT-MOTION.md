@@ -65,7 +65,7 @@ the open conversation. Search, provider choice, running status, keyboard navigat
 width resizing and collapse persistence remain available. Dates and project details
 are in chat-row tooltips rather than repeated on every row.
 
-## Buffered presentation refinement (unreleased)
+## Buffered presentation refinement (0.28.24)
 
 The existing grapheme-safe presentation buffer now drains network bursts within
 750 ms, using a short initial hold and backlog-dependent pacing. Completion drains
@@ -92,7 +92,7 @@ Saved chats resume without a manual PC-finished prompt. Independent interactive
 histories can run in one project; duplicate history writers, provider locks and
 server capacity limits remain enforced. Task-pipeline project isolation is retained.
 
-## Typography and live backgrounds (unreleased)
+## Typography and live backgrounds (0.28.24)
 
 Reviewed AionUi's pinned `Messages/components/MessageText.tsx` and
 `components/Markdown/index.tsx`: message identity, Markdown rendering, code/media

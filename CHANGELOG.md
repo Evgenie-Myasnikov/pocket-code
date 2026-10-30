@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.28.24 (unreleased)
+## [0.28.24](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.23...v0.28.24) (2026-10-30)
 
-Candidate source: [09015512f22041ee7d9fed3adb3ebf941baaa8b3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/09015512f22041ee7d9fed3adb3ebf941baaa8b3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 111. APK/Windows/host built and verified: 141 shared web files, 400 source files and 1812 decoded artifact entries; APK signing identity unchanged. 37 scoped browser scenarios and 67 service/unit checks passed. Source CI and publication pending; physical-device checks remain unverified.
+Published [v0.28.24](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.24) from [09015512f22041ee7d9fed3adb3ebf941baaa8b3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/09015512f22041ee7d9fed3adb3ebf941baaa8b3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 111. All four downloaded asset hashes and exact tag verified; 141 shared web files and 400 source files match packages, 1812 decoded artifact entries audited, APK signer unchanged. Exact-source GitHub CI, 37 scoped browser scenarios and 67 service/unit checks passed. Physical-device and historical broader test limitations remain as documented.
 
 ### Features
 - Chat presentation: keep ordinary assistant text and images visible above one lazy Thinking disclosure for internal work. Retain the same Markdown identity through partial/final delivery; bound burst pacing and final drain, preserve graphemes, authoritative corrections, reduced motion and loaded-history snapshots.
@@ -15,7 +15,7 @@ Candidate source: [09015512f22041ee7d9fed3adb3ebf941baaa8b3](https://github.com/
 - Reading and navigation: give the sidebar one full-height scroll area; retain the visible anchor while paginated Markdown finishes layout and cancel adjustment on manual input. Remove expired reveal wrappers when Markdown settles.
 - Background settings: honor actual theme/custom color, remove static posters under active shaders, exempt the preview from embedded-background suppression, and keep a live sticky preview even when the chat background is disabled.
 
-Validation: 37 scoped browser scenarios and 67 service/unit checks passed for the release candidate. The ten shaders passed Strict Mode render/resize/pause checks; synthetic captures inspected. Board schema/dependencies (42 cards), documentation links and 853 working-tree content checks passed. Existing rich-typography regression tests remain preserved; the new font-selection scenario is separate. Physical-device checks and historical broader settings/access-menu regressions remain unverified. Android/Windows/host packages verified; source CI and publication pending.
+Validation: 37 scoped browser scenarios and 67 service/unit checks passed for the release candidate. The ten shaders passed Strict Mode render/resize/pause checks; synthetic captures inspected. Board schema/dependencies (42 cards), documentation links and 853 working-tree content checks passed. Existing rich-typography regression tests remain preserved; the new font-selection scenario is separate. Physical-device checks and historical broader settings/access-menu regressions remain unverified. Published as 0.28.24; downloaded files, source CI and exact tag verified.
 
 ## [0.28.23](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.22...v0.28.23) (2026-10-30)
 
