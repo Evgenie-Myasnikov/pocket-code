@@ -4,6 +4,9 @@
 
 Published [v0.28.31](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.31) from [f0b24bf8baed6b9500d6e88f1568d7bfa3404a31](https://github.com/Evgenie-Myasnikov/pocket-code/commit/f0b24bf8baed6b9500d6e88f1568d7bfa3404a31) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 118. Both exact-source CI runs, 11 navigation/cache/board browser scenarios, three production glass scenarios and TypeScript/Vite build passed. All 142 shared web files and 400 source files match packages; 1816 decoded entries privacy-audited, APK signer unchanged. GitHub SHA-256 digests/sizes for all four public assets, exact source tag and branch ancestry verified. Physical-device and historical excluded navigation coverage remain unverified.
 
+### Documentation
+- Archive the complete UI card chronology after final release evidence exceeded its description limit; preserve source/release history and revalidate the shortened board snapshot.
+
 ### Bug Fixes
 - Explicit chat opening now starts at the latest end with a two-page tail window and restores that end after cached history refresh, rather than restoring an old reading offset. Manual scrolling within an open chat remains available. Reproduced the stale position with a failing browser check; six cache/navigation/board lifecycle checks and TypeScript/Vite build passed. Published in 0.28.31.
 - Simplify board header and canvas toolbar: remove individual glass shells, outer borders and shadows; align icons and spacing with quiet hover/selected states and 44px mobile targets. Six board layout/mobile lifecycle scenarios and TypeScript/Vite build passed; synthetic phone capture inspected. Published in 0.28.31.
