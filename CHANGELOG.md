@@ -2,7 +2,7 @@
 
 ## 0.28.28 (2026-10-30)
 
-Release preparation: Android versionCode 115 on release/0.28.1. Current candidate: 25 scoped browser scenarios, 10 unit/privacy checks and TypeScript/Vite build passed. Package/source CI/publication verification pending; physical-device and historical coverage limitations remain explicit.
+Source: [0a7650362a19991c0e7a7c4ccad2e884e3a2cc90](https://github.com/Evgenie-Myasnikov/pocket-code/commit/0a7650362a19991c0e7a7c4ccad2e884e3a2cc90) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 115. All 142 shared web files and 400 source files match APK/Windows/host; 1816 decoded artifact entries audited, APK signing identity unchanged. 25 scoped browser scenarios, 10 unit/privacy checks and TypeScript/Vite build passed. Exact-source CI/publication verification pending; physical-device and historical coverage limitations remain explicit.
 
 ### Bug Fixes
 - Streaming: reconcile completed assistant text against its previous content, including an existing empty item with the same ID. Consume the partial once across context compaction and suppress its stale-prefix snapshot while preserving Markdown identity and distinct messages with identical wording. Validation: reproduced the old duplicate with a failing browser assertion; eight scoped browser checks, five streaming/grouping unit checks and TypeScript/Vite build passed. Not published.
