@@ -1,3 +1,4 @@
+import {mountSpeech} from './speech.js';
 import {ChatLibrary} from './chat-library.js';
 import {BoardMcpRuntime} from './board-mcp-runtime.js';
 import {ChatPageSync} from './chat-page-sync.js';
@@ -159,6 +160,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.once('finish', release); next();
   });
   await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}},boardMcp);
+  mountSpeech(app,path.join(path.dirname(config.uploads),'speech'));
   mountMiro(app,{integration:new MiroIntegration(new WindowsMiroStore(path.join(config.uploads,'.miro','credentials.vault'))),roots,access:workspaceAccess});
   taskRuntime=new TaskRuntime({directory:path.join(config.uploads,'.tasks'),roots,access:workspaceAccess,jobs:()=>allJobs().map(job=>jobView(job.id)),managedRoots:managed=>{config.codex?.setManagedTaskRoots?.(managed);config.copilot?.setManagedTaskRoots?.(managed);}});
   await taskRuntime.initialize();taskRuntime.mount(app);

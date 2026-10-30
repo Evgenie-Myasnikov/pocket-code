@@ -145,8 +145,8 @@ behavior. This document is a design contract, not validation or release evidence
 
 `src/ui-materials.css` owns the shared fine edge, top rim, subtle sheen and
 surface depth. Keep the selected palette; references describe material, not a
-mandatory blue color. Controls use 10px corners, cards 14px and floating panels
-18px. Navigation retains its compact layout and existing selection states.
+mandatory blue color. Controls use 14px corners, cards 22px and floating panels
+28px. Navigation retains its compact layout and existing selection states.
 
 | Surface | Material treatment |
 | --- | --- |
@@ -169,13 +169,23 @@ Choice persists locally; unknown/removed styles fall back to DarkVeil. Color,
 intensity and speed remain configurable; the original artist palette is used
 until a custom color is selected. Speed zero and reduced motion pause rendering.
 
-The composer uses translucent fill, bounded backdrop blur and a beveled rim:
-a bright upper-left lip, quieter middle edge and opposing lower-right highlight.
+The composer is the shared matte material reference: translucent fill, bounded
+backdrop blur, soft depth and no luminous outline. Other UI surfaces inherit
+this treatment through shared material tokens.
 Keep the content crisp and clicks unobstructed; reduced transparency and forced
-colors retain an opaque accessible surface. Avoid blurring the transcript text.
+colors retain an opaque accessible surface. Backdrop text beneath glass is diffused; foreground content remains sharp.
 
-The glass edge uses a broad blurred bevel, not a sharp outline. Account quota
+The glass edge has a subdued contour without a light rim. Account quota
 is a ring outside the composer on the right: hover or keyboard focus reveals
 the remaining percentage; click opens quota details. The 48px target remains
 inside the viewport. Very narrow composers separate model controls and actions
 into two rows rather than overlapping them. Quota data remains provider-sourced.
+
+Menus, dialogs, title/actions, settings cards, supporting panels, navigation and
+board chrome share the matte roles. Keep clear field boundaries, keyboard focus,
+selection and semantic status colors. Repeated canvas objects never gain blur.
+
+Floating controls, settings cards and supporting panels use translucent fills
+and 36px backdrop diffusion. Foreground content stays sharp. Avoid repeated
+blur on large canvas/chat lists; nested controls share their parent backdrop.
+Reduced transparency and forced colors use opaque surfaces.

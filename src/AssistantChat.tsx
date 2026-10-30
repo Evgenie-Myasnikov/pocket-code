@@ -1,19 +1,25 @@
-import {AssistantRuntimeProvider,MessageByIndexProvider,ThreadPrimitive,ActionBarPrimitive,useExternalStoreRuntime,useAuiState,WebSpeechSynthesisAdapter,type ThreadMessageLike} from '@assistant-ui/react';
+import {HostSpeechAdapter} from './host-speech';
+import {useSpeechSettings} from './speech-settings-store';
+import type {Connection} from './api';
+import {AssistantRuntimeProvider,MessageByIndexProvider,ThreadPrimitive,ActionBarPrimitive,useExternalStoreRuntime,useAuiState,type ThreadMessageLike} from '@assistant-ui/react';
 import {createContext,useContext,useMemo,useRef,type ReactNode,type MouseEvent} from 'react';
 import {Copy,Check,Quote,FileDown,Volume2,Square,CornerDownLeft,Pencil,RotateCcw} from 'lucide-react';
 import type {ChatMessage} from '../server/types';
 import {useLanguage,t} from './i18n';
 import './assistant-chat.css';
+import {LocalSpeechSynthesisAdapter} from './speech-synthesis';
 
 type Bridge={onDraft(text:string):void;speech:boolean;onBranch?:(id:string,regenerate:boolean)=>void;branchDisabled:boolean};
 const BridgeContext=createContext<Bridge|null>(null);
 export function assistantMessage(message:ChatMessage):ThreadMessageLike{
  return {id:message.id,role:message.role,content:message.blocks.filter(b=>b.type==='text'&&b.text).map(b=>({type:'text' as const,text:b.text!}))};
 }
-export function AssistantChatProvider({messages,partial,running,disabled,onSend,onStop,onDraft,onBranch,branchDisabled=false,children}:{messages:ChatMessage[];partial:string;running:boolean;disabled:boolean;onSend(text:string):Promise<void>;onStop():Promise<void>;onDraft(text:string):void;onBranch?(id:string,regenerate:boolean):void;branchDisabled?:boolean;children:ReactNode}){
+export function AssistantChatProvider({connection,messages,partial,running,disabled,onSend,onStop,onDraft,onBranch,branchDisabled=false,children}:{connection?:Connection|null;messages:ChatMessage[];partial:string;running:boolean;disabled:boolean;onSend(text:string):Promise<void>;onStop():Promise<void>;onDraft(text:string):void;onBranch?(id:string,regenerate:boolean):void;branchDisabled?:boolean;children:ReactNode}){
  const all=useMemo(()=>partial?[...messages,{id:'partial',role:'assistant' as const,blocks:[{type:'text',text:partial}]}]:messages,[messages,partial]);
- const speech=typeof window!=='undefined'&&'speechSynthesis' in window;
- const adapters=useMemo(()=>speech?{speech:new WebSpeechSynthesisAdapter()}:undefined,[speech]);
+ const language=useLanguage();
+ const speechSettings=useSpeechSettings();
+ const speech=(speechSettings.engine==='supertonic'&&!!connection)||typeof window!=='undefined'&&'speechSynthesis' in window;
+ const adapters=useMemo(()=>speech?{speech:speechSettings.engine==='supertonic'&&connection?new HostSpeechAdapter(connection,speechSettings.voice):new LocalSpeechSynthesisAdapter(language==='ru'?'ru-RU':'en-US')}:undefined,[speech,language,speechSettings.engine,speechSettings.voice,connection]);
  const runtime=useExternalStoreRuntime({messages:all,convertMessage:assistantMessage,isRunning:running,isDisabled:disabled,onNew:async message=>onSend(message.content.filter(p=>p.type==='text').map(p=>p.text).join('\n')),onCancel:onStop,adapters});
  const draft=useRef(onDraft);draft.current=onDraft;
  const branch=useRef(onBranch);branch.current=onBranch;const hasBranch=Boolean(onBranch);

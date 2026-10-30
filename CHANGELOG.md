@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased (0.28.23)
+
+### Features
+- Release verification: 16 scoped browser scenarios and 10 server/unit checks passed, including native speech; 13 Windows policy checks passed. Archive the existing UI card chronology to a linked history document to keep its current description within schema limits.
+- Read aloud: add persistent System/Supertonic 3 engine and ten-speaker selection with Preview/Stop in appearance settings. Install the fixed model on the host with SHA-256 verification; generate audio in native workers and use the selected speaker in chat. Keep model weights separate from releases, retain model license, and allow only scoped authenticated API/native-bridge routes.
+- Local speech evaluation: generated Russian Supertonic 3 samples for speakers 0/5 through sherpa-onnx 2.0.1; roughly 28 seconds of audio took 4.55/5.10 seconds on CPU. Model assets approximately 145 MB. Record model license, actual output rate and integration limits in `docs/LOCAL-SPEECH.md`; the selected backend is now connected through the optional local host integration below.
+- UI: extend the matte composer material across headers/actions, menus/dialogs, settings cards/forms, supporting panels, navigation and board chrome. Shared radii, subdued depth and borderless surfaces replace luminous rims; retain field boundaries, focus and semantic states. Validation: 12 scoped browser scenarios passed in light/dark and narrow layouts; captures inspected.
+- Appearance: add persisted Center/Left/Right positioning for transcript and composer. Validation: browser check verified actual positions and reload persistence.
+- Transcript: combine intermediate text, reasoning and tool calls into one collapsed Thinking group per turn. Keep images and the final answer visible; preserve details on expansion. Validation: focused browser scenario and grouping unit check passed; TypeScript/Vite build passed.
+
+### Bug Fixes
+- Chat: disable transcript/header text selection; keep explicit copy/quote actions and editable text fields selectable. Validation: copy and draft selection browser check passed.
+- Speech validation: four scoped browser checks, four server/native checks (including real WAV generation), model installation/extraction probe, 13 native policy checks and Windows build passed. Android device audio and subjective listening remain unverified.
+- Read aloud: explicitly select ru-RU and an installed Russian voice for Russian text; handle delayed voice lists and cancellation. Validation: mocked browser synthesis test and TypeScript/Vite build passed. Actual device audio and missing Russian voice packs remain unverified; cloud TTS was researched but not connected.
+- Frosted surfaces: add translucent backdrop blur to floating controls, board chrome, settings cards and supporting panels; keep foreground content sharp and provide opaque accessibility fallbacks. Validation: backdrop pixel comparison/header-control styles and three settings navigation scenarios passed.
+- Header: match overflow button glass to title fill, edge, rounding and blur; remove luminous composer rim and lift the external quota ring by 16px. Validation: dark/light material equality checks and three quota layouts passed.
+- Glass: increase backdrop diffusion and frosting beneath the composer; add a matching rounded title frame with opaque accessibility fallbacks. Validation: deterministic blurred-versus-unfiltered pixel capture and dark/light chat-menu scenarios passed.
+- Composer: replace the white rim with a subdued theme-aware bevel. Place the visible quota ring 6px from the frame instead of measuring the gap to its button. Validation: three quota hover/details/draft scenarios passed at 320/390/1440px; dark/light material scenarios passed. Unreleased.
+
 ## [0.28.22](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.21...v0.28.22) (2026-10-30)
 
 Source: [8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8](https://github.com/Evgenie-Myasnikov/pocket-code/commit/8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 109; Android/Windows/host packages verified, 124 web files and 395 source files match, 1734 decoded entries audited; signer unchanged. Source CI passed. Published [v0.28.22](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.22); all four downloaded hashes and exact tag verified.

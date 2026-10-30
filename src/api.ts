@@ -60,7 +60,7 @@ async function offlineRead<T>(connection:Connection,endpoint:string,data:unknown
 }
 export async function request<T>(connection: Connection, endpoint: string, data?: unknown): Promise<T> {
   if(connection.desktop)return desktopCall<T>(data===undefined?'read':'write',{endpoint,...(data===undefined?{}:{data})}).then(value=>{reportOk(connection.url);return value;},error=>{if((error as {status?:number}).status)reportOk(connection.url);else if((error as {code?:string}).code?.startsWith('host_'))reportFail(connection.url,{cause:'host'});throw error;});
-  const timeout = endpoint.startsWith('/jira/workflow') ? 300000 : endpoint === '/devices/pair' ? 150000 : endpoint.startsWith('/jira/') || endpoint.startsWith('/updates/') || endpoint.startsWith('/providers') || endpoint.endsWith('/usage') || endpoint.includes('provider=codex') ? 95000 : 30000;
+  const timeout = endpoint.startsWith('/speech/') ? 95000 : endpoint.startsWith('/jira/workflow') ? 300000 : endpoint === '/devices/pair' ? 150000 : endpoint.startsWith('/jira/') || endpoint.startsWith('/updates/') || endpoint.startsWith('/providers') || endpoint.endsWith('/usage') || endpoint.includes('provider=codex') ? 95000 : 30000;
   const url = normalizeUrl(connection.url) + '/api' + endpoint;
   const headers = { Authorization: `Bearer ${connection.token}`, 'Content-Type': 'application/json' };
   let status: number, body: any;

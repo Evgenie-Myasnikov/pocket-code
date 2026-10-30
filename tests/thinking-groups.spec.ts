@@ -1,0 +1,9 @@
+import {test,expect} from '@playwright/test';
+test('Thinking folds intermediate work and keeps image and final answer visible',async({page})=>{
+ await page.goto('http://127.0.0.1:5173');await page.evaluate(async()=>{
+ const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{MessageList}=await import('/src/Messages.tsx' as string);
+ const c=document.createElement('canvas');c.width=20;c.height=20;c.getContext('2d')!.fillRect(0,0,20,20);const data=c.toDataURL().split(',')[1];const root=document.createElement('div');document.body.replaceChildren(root);
+ createRoot(root).render(React.createElement(MessageList,{messages:[{id:'u',role:'user',blocks:[{type:'text',text:'Request'}]},{id:'work',role:'assistant',blocks:[{type:'text',text:'Checking files'},{type:'thinking',thinking:'Planning next step'},{type:'tool_use',id:'c',name:'Bash',input:{command:'check',status:'completed'}}]},{id:'answer',role:'assistant',blocks:[{type:'image',source:{data,media_type:'image/png'}},{type:'text',text:'Final response'}]}]}));
+ });
+ const group=page.locator('.activity-group');await expect(group).toHaveCount(1);await expect(group.locator(':scope > summary')).toHaveText('Thinking');await expect(page.getByText('Final response',{exact:true})).toBeVisible();await expect(page.locator('.image-preview img')).toBeVisible();await expect(page.getByText('Checking files',{exact:true})).toHaveCount(0);await group.locator(':scope > summary').click();await expect(page.getByText('Checking files',{exact:true})).toBeVisible();await expect(page.locator('[data-message-id="answer"]')).toContainText('Final response');
+});

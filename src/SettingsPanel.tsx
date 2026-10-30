@@ -80,7 +80,7 @@ export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,sub
       {inSubpage?<button className="settings-back" onClick={()=>setSubpage('index')}><ArrowLeft size={20}/>{t('Аккаунты AI')}</button>:<button className="settings-back" onClick={()=>onPage('index')}><ArrowLeft size={20}/>{t('Все настройки')}</button>}
       <h2 className="settings-page-title">{inSubpage?subTitle:t(category?.title||'Настройки')}</h2>
       {scope&&<p className="settings-scope">{scope}</p>}
-      {page==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance}/></>}
+      {page==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance} connection={connection}/></>}
       {page==='workspace'&&<>{subpage==='index'&&<>{workspaceSelector}<nav className="settings-index settings-subindex" aria-label={t('Разделы аккаунта AI')}>{subpages.map(item=><button className="settings-category" key={item.id} data-settings-subpage={item.id} aria-labelledby={'settings-sub-'+item.id} aria-describedby={'settings-sub-'+item.id+'-summary'} onClick={()=>setSubpage(item.id)}><span><strong id={'settings-sub-'+item.id}>{t(item.title)}</strong><small id={'settings-sub-'+item.id+'-summary'}>{item.summary}</small></span><ChevronRight size={20} aria-hidden="true"/></button>)}</nav>{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}</>}
         {subpage==='account'&&<><ProviderConnections connection={connection} only={provider}/>{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}</>}
         {subpage==='composer'&&<ComposerSettings desktop={false}/>}

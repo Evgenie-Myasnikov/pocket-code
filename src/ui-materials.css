@@ -1,14 +1,14 @@
 /* Shared material roles. Blur belongs to floating chrome, never repeated canvas cards. */
 :root{
- --ui-radius-control:10px;--ui-radius-card:14px;--ui-radius-panel:18px;
- --ui-material-edge:color-mix(in srgb,var(--text) 13%,transparent);
- --ui-material-rim:color-mix(in srgb,var(--text) 24%,transparent);
- --ui-material-fill:color-mix(in srgb,var(--panel) 88%,transparent);
+ --ui-radius-control:14px;--ui-radius-card:22px;--ui-radius-panel:28px;
+ --ui-material-edge:transparent;
+ --ui-material-rim:transparent;
+ --ui-material-fill:color-mix(in srgb,var(--panel) 66%,transparent);
  --ui-material-inset:color-mix(in srgb,var(--surface) 65%,var(--panel));
- --ui-material-sheen:linear-gradient(155deg,color-mix(in srgb,var(--text) 5%,transparent),transparent 40%,color-mix(in srgb,var(--accent) 3%,transparent));
- --ui-material-shadow:inset 0 1px 0 var(--ui-material-rim),inset 0 -1px 0 color-mix(in srgb,var(--text) 5%,transparent),0 8px 24px color-mix(in srgb,var(--bg) 22%,transparent);
+ --ui-material-sheen:none;
+ --ui-material-shadow:inset 0 1px 6px color-mix(in srgb,var(--panel) 65%,transparent),0 10px 28px var(--shadow-soft);
 }
-:root[data-theme=light]{--ui-material-rim:rgba(255,255,255,.85);--ui-material-fill:color-mix(in srgb,var(--panel) 94%,transparent)}
+:root[data-theme=light]{--ui-material-fill:color-mix(in srgb,var(--panel) 78%,transparent)}
 :root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu,.model-catalog-note,.confirm-modal,.question-dialog,.whiteboard-editor,.image-viewer-dialog){
  background-color:var(--panel);background-image:var(--ui-material-sheen);border:1px solid var(--ui-material-edge);border-radius:var(--ui-radius-panel);box-shadow:var(--ui-material-shadow);color:var(--text);
 }
@@ -23,7 +23,7 @@
 :root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{border-color:var(--ui-material-edge);box-shadow:var(--ui-material-shadow)}
 :root[data-theme][data-theme] .chat-canvas .code-block{border-radius:var(--ui-radius-card);border-color:var(--ui-material-edge)}
 @supports(backdrop-filter:blur(1px)){
- :root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu,.model-catalog-note,.confirm-modal,.question-dialog){background-color:var(--ui-material-fill);backdrop-filter:blur(16px) saturate(110%);-webkit-backdrop-filter:blur(16px) saturate(110%)}
+ :root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu,.model-catalog-note,.confirm-modal,.question-dialog){background-color:var(--ui-material-fill);backdrop-filter:blur(36px) saturate(120%);-webkit-backdrop-filter:blur(36px) saturate(120%)}
 }
 @media(pointer:coarse){:root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu) button{min-height:44px}}
 @media(prefers-reduced-transparency:reduce){:root{--ui-material-fill:var(--panel)}:root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu,.confirm-modal,.question-dialog){backdrop-filter:none;-webkit-backdrop-filter:none}}
@@ -35,18 +35,78 @@
 
 /* A beveled glass lip catches light on the upper edge and the opposite corner. */
 :root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{
- background-color:color-mix(in srgb,var(--panel) 48%,transparent);
+ background-color:color-mix(in srgb,var(--panel) 66%,transparent);
  background-image:linear-gradient(145deg,color-mix(in srgb,var(--text) 7%,transparent),transparent 28%,color-mix(in srgb,var(--accent) 4%,transparent));
  border-color:color-mix(in srgb,var(--text) 8%,transparent);border-radius:28px;
- backdrop-filter:blur(24px) saturate(135%);-webkit-backdrop-filter:blur(24px) saturate(135%);
- box-shadow:inset 0 4px 9px var(--glass-highlight-soft),inset 0 -3px 8px color-mix(in srgb,var(--text) 7%,transparent),inset 3px 0 8px color-mix(in srgb,var(--text) 6%,transparent),0 12px 32px var(--shadow-soft);
+ backdrop-filter:blur(36px) saturate(120%);-webkit-backdrop-filter:blur(36px) saturate(120%);
+ box-shadow:inset 0 4px 9px color-mix(in srgb,var(--text) 6%,transparent),inset 0 -3px 8px color-mix(in srgb,var(--text) 7%,transparent),inset 3px 0 8px color-mix(in srgb,var(--text) 6%,transparent),0 12px 32px var(--shadow-soft);
 }
 :root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer::after{
- inset:-1px;padding:3px;filter:blur(1.6px);opacity:.7;
- background:linear-gradient(135deg,var(--glass-highlight),color-mix(in srgb,var(--text) 16%,transparent) 22%,transparent 42%,color-mix(in srgb,var(--text) 12%,transparent) 62%,color-mix(in srgb,var(--glass-highlight) 65%,transparent) 90%);
+ inset:-1px;padding:3px;filter:blur(1.6px);opacity:.5;
+ background:linear-gradient(135deg,color-mix(in srgb,var(--panel) 75%,var(--text)),color-mix(in srgb,var(--text) 8%,transparent) 22%,transparent 42%,color-mix(in srgb,var(--text) 12%,transparent) 62%,color-mix(in srgb,var(--panel) 80%,var(--text)) 90%);
 }
 :root[data-theme][data-theme] .embedded-chat{box-shadow:inset 1px 0 0 color-mix(in srgb,var(--text) 16%,transparent);background-color:color-mix(in srgb,var(--panel) 20%,transparent)}
 @media(prefers-reduced-transparency:reduce),(forced-colors:active){
  :root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
 }
 @media(forced-colors:active){:root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{background:Canvas;border-color:CanvasText}}
+
+:root[data-theme][data-theme] header.chat-header-conversation :is(.header-title,.chat-header-actions>.chat-menu-button){
+ border:1px solid var(--ui-material-edge);border-radius:22px;
+ background:var(--ui-material-fill);
+ backdrop-filter:blur(36px) saturate(120%);-webkit-backdrop-filter:blur(36px) saturate(120%);
+ box-shadow:var(--ui-material-shadow);
+ padding:8px 14px;min-height:44px;justify-content:center;box-sizing:border-box;
+}
+:root[data-theme][data-theme] header.chat-header-conversation .header-title:has(.chat-title-button){padding:0}
+@media(prefers-reduced-transparency:reduce),(forced-colors:active){
+ :root[data-theme][data-theme] header.chat-header-conversation :is(.header-title,.chat-header-actions>.chat-menu-button){background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+@media(forced-colors:active){:root[data-theme][data-theme] header.chat-header-conversation :is(.header-title,.chat-header-actions>.chat-menu-button){background:Canvas;border-color:CanvasText;box-shadow:none}}
+
+:root[data-chat-align=left] .chat-canvas .conversation-inner{margin-left:0;margin-right:auto}
+:root[data-chat-align=right] .chat-canvas .conversation-inner{margin-left:auto;margin-right:0}
+:root[data-chat-align=left] .chat-canvas .composer-area{align-self:flex-start;margin-left:0;margin-right:auto}
+:root[data-chat-align=right] .chat-canvas .composer-area{align-self:flex-end;margin-left:auto;margin-right:0}
+
+/* Glass has a quiet dark contour, without a luminous rim. */
+:root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{
+ border-color:transparent;background-image:none;
+ box-shadow:inset 0 1px 6px color-mix(in srgb,var(--panel) 65%,transparent),0 10px 28px var(--shadow-soft);
+}
+:root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer::after{display:none}
+:root[data-chat-align] .chat-canvas :is(.conversation-inner,.composer-area){width:100%;max-width:900px;box-sizing:border-box}
+:root[data-chat-align=center] .chat-canvas .conversation-inner{margin-inline:auto}
+:root[data-chat-align=center] .chat-canvas .composer-area{align-self:center;margin-inline:auto}
+@media(forced-colors:active){:root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{border-color:CanvasText;box-shadow:none}}
+
+/* Shared matte surfaces retain status colors and keyboard focus. */
+:root[data-theme][data-theme] :is(.review-panel,.chat-outputs-panel,.subagents-panel,.desktop-shortcuts,.settings-category,.settings-computer,.provider-connection,.update-panel,.board-image-thumb,.chat-output-row,.document-card,.whiteboard-toolbar,.board-toolbar,.board-tools,.code-block){
+ background-image:none;border-color:var(--ui-material-edge);box-shadow:var(--ui-material-shadow);border-radius:var(--ui-radius-card);
+}
+:root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu) button{border-color:transparent;box-shadow:none}
+:root[data-theme][data-theme] :is(.icon-button,.secondary,.provider-picker-button,.model-picker-trigger){border-radius:var(--ui-radius-control)}
+:root[data-theme][data-theme] .desktop-app.desktop-app>.desktop-rail{box-shadow:none;border-right-color:transparent;background:var(--ui-material-fill)}
+:root[data-theme][data-theme] .desktop-app .desktop-session{border-radius:var(--ui-radius-control);border-color:transparent;box-shadow:none}
+:root[data-theme][data-theme] .desktop-app .desktop-session:hover{background:var(--ui-material-inset)}
+@media(forced-colors:active){
+ :root[data-theme][data-theme] :is(.review-panel,.chat-outputs-panel,.subagents-panel,.desktop-shortcuts,.settings-category,.settings-computer,.provider-connection,.update-panel,.board-image-thumb,.chat-output-row,.document-card,.whiteboard-toolbar,.board-toolbar,.board-tools,.code-block){border-color:CanvasText;box-shadow:none}
+ :root[data-theme][data-theme] .desktop-app.desktop-app>.desktop-rail{background:Canvas;border-right-color:CanvasText}
+}
+
+/* Blur the backdrop once per floating surface; keep its controls and text sharp. */
+@supports(backdrop-filter:blur(1px)){
+ :root[data-theme][data-theme] :is(.review-panel,.chat-outputs-panel,.subagents-panel,.desktop-shortcuts,.settings-category,.settings-computer,.provider-connection,.update-panel,.document-card,.whiteboard-toolbar,.board-toolbar,.board-tools,.scroll-latest,.chat-header-main>.mobile-back,.board-header .icon-button){
+  background-color:var(--ui-material-fill);background-image:none;
+  backdrop-filter:blur(36px) saturate(120%);-webkit-backdrop-filter:blur(36px) saturate(120%);
+ }
+ :root[data-theme][data-theme] :is(.chat-header-main>.mobile-back,.board-header .icon-button,.scroll-latest){border-color:transparent;border-radius:var(--ui-radius-card);box-shadow:var(--ui-material-shadow)}
+}
+@media(prefers-reduced-transparency:reduce),(forced-colors:active){
+ :root[data-theme][data-theme] :is(.review-panel,.chat-outputs-panel,.subagents-panel,.desktop-shortcuts,.settings-category,.settings-computer,.provider-connection,.update-panel,.document-card,.whiteboard-toolbar,.board-toolbar,.board-tools,.scroll-latest,.chat-header-main>.mobile-back,.board-header .icon-button){background-color:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+@media(forced-colors:active){
+ :root[data-theme][data-theme] :is(.review-panel,.chat-outputs-panel,.subagents-panel,.desktop-shortcuts,.settings-category,.settings-computer,.provider-connection,.update-panel,.document-card,.whiteboard-toolbar,.board-toolbar,.board-tools,.scroll-latest,.chat-header-main>.mobile-back,.board-header .icon-button){background-color:Canvas;border-color:CanvasText;box-shadow:none}
+}
+
+.speech-settings{display:grid;gap:12px;border:0;padding:0;margin-block:24px;min-width:0}.speech-settings label{display:grid;gap:8px}.speech-settings select{max-width:100%;min-height:44px}.speech-settings legend{font-weight:var(--fw-semibold)}

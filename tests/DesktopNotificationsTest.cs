@@ -22,6 +22,8 @@ public static class DesktopNotificationsTest {
         Check(!DesktopReadPolicy.AllowsWrite("/task-runs/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/delete"),"Unrequested native action denied");
         Check(!DesktopReadPolicy.Allows("/activity/events#other"),"Fragment injection denied");
         Check(DesktopReadPolicy.Allows("/miro/status")&&DesktopReadPolicy.AllowsWrite("/miro/items/update"),"Miro scoped routes allowed");
-        Console.WriteLine("Desktop notifications: 11 checks passed without displaying OS notifications");return 0;
+        Check(DesktopReadPolicy.Allows("/speech/status")&&DesktopReadPolicy.AllowsWrite("/speech/install")&&DesktopReadPolicy.AllowsWrite("/speech/synthesize"),"Speech endpoints allowed");
+        Check(!DesktopReadPolicy.AllowsWrite("/speech/delete")&&!DesktopReadPolicy.Allows("/speech/synthesize"),"Speech access stays scoped");
+        Console.WriteLine("Desktop notifications: 13 checks passed without displaying OS notifications");return 0;
     }
 }

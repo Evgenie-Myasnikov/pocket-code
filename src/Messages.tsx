@@ -7,7 +7,7 @@ import { RichBlock, TaskNotificationEvent } from './RichBlocks';
 import {parseClaudeTaskNotification} from './claude-task-notification';
 import type {TurnChanges} from './turn-changes';
 import {ActivityGroup} from './ActivityGroup';
-import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode} from './activity-groups';
+import {groupThinkingMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode} from './activity-groups';
 import { t, useLanguage } from "./i18n";import { Fragment, memo, useRef, useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import type { ChatMessage, SubagentView, Block } from '../server/types';
@@ -32,8 +32,10 @@ export const MessageList=memo(function MessageList({messages,partialText,running
     if(completed){delivered.current.add(completed.id);priorPartial.current='';}
   }
   if(partialText)priorPartial.current=partialText;
-  return groupActivityMessages(messages,shared.toolResults,runningMessages,shared.mode).map(run=>{
-    const ids=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))];
+  const runs=groupThinkingMessages(messages,shared.toolResults,runningMessages),visibleIds=new Set(runs.flatMap(run=>run.message?[run.message.id]:[]));
+  return runs.map(run=>{
+    const anchors=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))].filter(id=>!visibleIds.has(id));
+    const ids=anchors.length?anchors:[run.key];
     const body=run.message?
     <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} animateInitial={!initialIds.current.has(run.message.id)&&!delivered.current.has(run.message.id)}/>:
     <article data-enter={shared.streaming&&ids.some(id=>!initialIds.current.has(id))||undefined} key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
