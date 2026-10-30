@@ -59,7 +59,7 @@
 .desktop-app>.desktop-rail>nav{align-content:start;gap:6px}
 
 /* One scroll track spans the library instead of separate project/recent panes. */
-.desktop-app>.desktop-rail .desktop-rail-content{overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent;overscroll-behavior-y:contain;box-sizing:border-box}
+.desktop-app>.desktop-rail .desktop-rail-content{margin-right:9px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent;overscroll-behavior-y:contain;box-sizing:border-box}
 .desktop-app>.desktop-rail .desktop-rail-content>:not(.desktop-library){flex-shrink:0}
 .desktop-app>.desktop-rail .desktop-library{flex:0 0 auto;overflow:visible}
 .desktop-app>.desktop-rail :is(.desktop-project-links,.desktop-sessions){max-height:none;overflow:visible;flex-shrink:0}

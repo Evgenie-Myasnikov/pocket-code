@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.28.25 (2026-10-30)
+
+Release preparation: Android versionCode 112 on existing release/0.28.1; exact source and package/CI/publication verification pending.
+
+### Bug Fixes
+- Sidebar: reserve a separate 9px resize gutter so the divider and its pointer target no longer overlap the library scrollbar. Verified the original overlap with a failing geometry check; all seven scoped sidebar/board-chat browser scenarios and TypeScript/Vite build passed after the fix. Default/minimum widths, pointer routing, wheel scrolling, resize, keyboard and reset remain covered. Prepared for 0.28.25; publication pending.
+- Local build validation: Android APK, Windows archive and host bundle assembled separately from published assets; 141 shared web files and 400 host/source files match, 1812 decoded artifact entries passed privacy checks. Packages retain version 0.28.24 and are explicitly unpublished working-tree builds; no update manifest or publication created.
+
 ## [0.28.24](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.23...v0.28.24) (2026-10-30)
 
 Published [v0.28.24](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.24) from [09015512f22041ee7d9fed3adb3ebf941baaa8b3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/09015512f22041ee7d9fed3adb3ebf941baaa8b3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 111. All four downloaded asset hashes and exact tag verified; 141 shared web files and 400 source files match packages, 1812 decoded artifact entries audited, APK signer unchanged. Exact-source GitHub CI, 37 scoped browser scenarios and 67 service/unit checks passed. Physical-device and historical broader test limitations remain as documented.

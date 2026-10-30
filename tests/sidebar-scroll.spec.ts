@@ -16,6 +16,15 @@ test('one full-height sidebar scroll track contains projects and recent chats',a
  const rail=page.locator('.desktop-rail-content'),sessions=page.locator('.desktop-sessions');
  await expect(rail).toHaveCSS('overflow-y','auto');await expect(sessions).toHaveCSS('overflow-y','visible');
  const box=(await rail.boundingBox())!;expect(box.height).toBeGreaterThan(700);
+ const divider=page.getByRole('separator',{name:'Sidebar width'});
+ for(const minimum of [false,true]){
+  if(minimum){await divider.focus();for(let i=0;i<15;i++)await page.keyboard.press('Shift+ArrowLeft');}
+  const scroll=(await rail.boundingBox())!,handle=(await divider.boundingBox())!;
+  expect(scroll.x+scroll.width).toBeLessThanOrEqual(handle.x);
+  expect(await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.closest('[role=separator]')!==null,{x:scroll.x+scroll.width-2,y:scroll.y+120})).toBe(false);
+  expect(await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.getAttribute('role'),{x:handle.x+handle.width/2,y:handle.y+120})).toBe('separator');
+ }
+ await divider.focus();await page.keyboard.press('Home');
  await rail.hover();await page.mouse.wheel(0,1200);await expect.poll(()=>rail.evaluate(el=>el.scrollTop)).toBeGreaterThan(500);
  await expect(sessions.locator('button').last()).not.toBeInViewport();
  await rail.evaluate(el=>el.scrollTop=el.scrollHeight);await expect(sessions.locator('button').last()).toBeInViewport();
