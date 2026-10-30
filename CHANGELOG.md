@@ -1,11 +1,13 @@
 # Changelog
 
-## 0.28.30 (unreleased)
+## [0.28.30](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.29...v0.28.30) (2026-10-31)
+
+Published [v0.28.30](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.30) from [42f1b388835b533b4d774ebdbcbd79fe5f0ad789](https://github.com/Evgenie-Myasnikov/pocket-code/commit/42f1b388835b533b4d774ebdbcbd79fe5f0ad789) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 117. Both exact-source CI runs passed; three production blur, seven development surface and four cache/navigation browser scenarios passed, with TypeScript/Vite build. All 142 shared web files and 400 source files match packages; 1816 decoded entries privacy-audited, APK signer unchanged. GitHub SHA-256 digests/sizes for four public assets, exact source tag and branch ancestry verified. Physical-device appearance remains unverified; first uncached history remains provider-bound.
 
 ### Bug Fixes
 - Cache two opening history pages (up to 200 messages) using existing bounded persistent storage and refresh them in the background. Four scoped cache/navigation browser checks passed for Claude/Codex and reading anchors.
 - Restore composer and shared-surface blur in production builds: place standard `backdrop-filter` after its WebKit alias so CSS optimization retains the property Chromium applies. The previous development-only checks passed while emitted release CSS disabled blur.
-- Validation: reproduced identical blurred/sharp pixels in the built app before the fix; three production browser scenarios now pass with over 99% edge attenuation, plus seven development surface/region checks and TypeScript/Vite build. Synthetic capture inspected. Added `npm run test:glass:release` to verify emitted CSS on a strict preview server. Physical WebView/phone confirmation and publication remain pending.
+- Validation: reproduced identical blurred/sharp pixels in the built app before the fix; three production browser scenarios now pass with over 99% edge attenuation, plus seven development surface/region checks and TypeScript/Vite build. Synthetic capture inspected. Added `npm run test:glass:release` to verify emitted CSS on a strict preview server. Physical WebView/phone confirmation remains pending; published in 0.28.30.
 
 ## [0.28.29](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.27...v0.28.29) (2026-10-30)
 
