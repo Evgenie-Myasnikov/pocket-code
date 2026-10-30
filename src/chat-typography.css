@@ -1,0 +1,29 @@
+/* Prose roles stay independent of the app scale and code/review measurements. */
+:root .chat-canvas .message .markdown,:root .appearance-preview{
+ font-family:var(--font-chat);font-kerning:normal;font-variant-ligatures:common-ligatures;letter-spacing:normal;text-align:start;overflow-wrap:anywhere;
+}
+:root .chat-canvas .message .markdown{font-size:inherit;font-weight:var(--fw-regular);line-height:var(--chat-line-height,1.65);min-width:0}
+:root .chat-canvas .message .markdown :is(p,ul,ol,blockquote,pre,table){margin-block:var(--chat-prose-gap)}
+:root .chat-canvas .message .markdown>:first-child{margin-top:0}
+:root .chat-canvas .message .markdown>:last-child{margin-bottom:0}
+:root .chat-canvas .message .markdown :is(ul,ol){padding-inline-start:1.5em}
+:root .chat-canvas .message .markdown li{padding-inline-start:.15em}
+:root .chat-canvas .message .markdown li+li{margin-top:.3em}
+:root .chat-canvas .message .markdown li>p{margin-block:.4em}
+:root .chat-canvas .message .markdown :is(h1,h2,h3,h4,h5,h6){font-family:var(--font-display);font-weight:var(--fw-semibold);line-height:1.3;letter-spacing:-.015em;margin-block:1.3em .5em;text-wrap:balance}
+:root .chat-canvas .message .markdown h1{font-size:1.5em}
+:root .chat-canvas .message .markdown h2{font-size:1.3em}
+:root .chat-canvas .message .markdown h3{font-size:1.15em}
+:root .chat-canvas .message .markdown :is(h4,h5,h6){font-size:1em}
+:root .chat-canvas .message .markdown :is(h1,h2,h3,h4,h5,h6)>:is(strong,em,a){font-size:inherit;line-height:inherit}
+:root .chat-canvas .message .markdown strong{font-weight:var(--fw-semibold)}
+:root .chat-canvas .message .markdown code{font-family:var(--font-chat-code);font-size:.9em;font-variant-ligatures:none}
+:root .chat-canvas .message .markdown pre{font-family:var(--font-chat-code);font-size:.88em;line-height:1.6;tab-size:2;max-width:100%;box-sizing:border-box}
+:root .chat-canvas .message .markdown pre code{font-size:inherit;line-height:inherit}
+:root .chat-canvas .message .markdown blockquote{margin-inline:0;padding-inline-start:1em}
+:root .chat-canvas .message .markdown :is(th,td){line-height:1.5;vertical-align:top}
+:root .chat-canvas .message .message-actions svg{width:var(--chat-action-icon-size);height:var(--chat-action-icon-size);flex-shrink:0}
+:root .chat-canvas :is(.chat-menu button,.composer-models)>svg{width:var(--chat-icon-size);height:var(--chat-icon-size);flex-shrink:0}
+:root[data-theme] .chat-canvas .prompt-composer.assistant-composer textarea{font-family:var(--font-chat);line-height:1.6;letter-spacing:normal}
+
+:root .chat-canvas .message .markdown .code-block pre{margin:0}

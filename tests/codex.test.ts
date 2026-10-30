@@ -312,13 +312,23 @@ test('Codex approval timeout fails closed and stop cancels pending approval', as
   assert.equal(rpc.requests.find(r => r.method === 'turn/interrupt')?.params.turnId, 'turn-1');
 });
 
-test('Codex stop during turn/start waits for its ID before interrupting and releasing the project', async t => {
+test('Codex permits independent chats in a project and blocks a second writer to one history',async t=>{
+ const {rpc,service,input}=await setup(t);let serial=0;
+ rpc.handler=(method,params)=>method==='thread/start'?{thread:{...rpc.thread,id:`parallel-${++serial}`}}:method==='turn/start'?{turn:{id:`turn-${params.threadId}`,status:'inProgress'}}:undefined;
+ service.start(input);await until(()=>!!service.get(input.id).turnId);
+ const second={...input,id:'independent-chat'};service.start(second);await until(()=>!!service.get(second.id).turnId);
+ assert.equal(service.list().filter(job=>job.status==='running').length,2);
+ assert.notEqual(service.get(input.id).sessionId,service.get(second.id).sessionId);
+ assert.throws(()=>service.start({...input,id:'duplicate-history',sessionId:service.get(input.id).sessionId}),/already running/);
+});
+
+test('Codex stop during turn/start waits for its ID before interrupting and releasing the history', async t => {
   const { rpc, service, input } = await setup(t);
   let resolveTurn!: (value: any) => void;
   rpc.handler = method => method === 'turn/start' ? new Promise(resolve => { resolveTurn = resolve; }) : undefined;
   service.start(input); await until(() => Boolean(resolveTurn)); service.stop(input.id);
   assert.equal(service.get(input.id).status, 'running');
-  assert.throws(() => service.start({ ...input, id: 'job-2' }), (error: any) => error.status === 409);
+  assert.throws(() => service.start({ ...input, id: 'job-2',sessionId:service.get(input.id).sessionId }), (error: any) => error.status === 409);
   resolveTurn({ turn: { id: 'late-turn', status: 'inProgress' } });
   await until(() => service.get(input.id).status === 'stopped');
   assert.equal(rpc.requests.find(r => r.method === 'turn/interrupt')?.params.turnId, 'late-turn');

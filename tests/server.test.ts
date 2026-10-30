@@ -70,7 +70,7 @@ test('API authenticates, scopes sessions, prevents path escapes and routes attac
     const post = { id: randomUUID(), cwd: root, text: 'Read attachment', attachments: [upload.id] };
     const result = await request('/jobs', post); assert.equal(result.status, 200); await waitFor(()=>jobs.get(post.id).status==='done'); assert.match(prompt, /uploads/);
     assert.equal((await request('/jobs', { ...post, id: randomUUID(), attachments: [randomUUID()] })).status, 400);
-    assert.equal((await request('/jobs', { ...post, id: randomUUID(), sessionId: id })).status, 409);
+    const resumed=randomUUID();assert.equal((await request('/jobs', { ...post, id: resumed, sessionId: id })).status, 200);await waitFor(()=>jobs.get(resumed).status==='done');
     assert.equal((await request('/jobs', { ...post, id: randomUUID(), sessionId: id, takeoverConfirmed: true })).status, 200);
     const unauthorizedOrigin = await fetch(base + '/health', { headers: { Origin: 'https://attacker.example', Authorization: 'Bearer ' + token } });
     assert.equal(unauthorizedOrigin.headers.get('Access-Control-Allow-Origin'), null);
@@ -80,7 +80,18 @@ test('API authenticates, scopes sessions, prevents path escapes and routes attac
   } finally { jobs.close(); await new Promise<void>(r => server.close(() => r())); await rm(temporary, { recursive: true, force: true }); }
 });
 
-test('job approvals, cancellation, idempotency and project concurrency', async () => {
+test('Claude permits independent chats in a project while blocking duplicate history and retaining capacity limits',async()=>{
+ const run:any=({options}:any)=>(async function*(){await new Promise<void>(resolve=>options.abortController.signal.addEventListener('abort',()=>resolve(),{once:true}));})();
+ const jobs=new Jobs(run),base={cwd:'/synthetic-project',text:'Independent chat',mode:'default' as const,maxBudgetUsd:1};
+ try{
+  for(const sessionId of ['first','second','third'])jobs.start({...base,id:randomUUID(),sessionId});
+  assert.equal(jobs.list().filter(job=>job.status==='running').length,3);
+  assert.throws(()=>jobs.start({...base,id:randomUUID(),sessionId:'first'}),/already running/);
+  assert.throws(()=>jobs.start({...base,id:randomUUID(),sessionId:'fourth'}),(error:any)=>error.status===429);
+ }finally{jobs.close();}
+});
+
+test('job approvals, cancellation, idempotency and history concurrency', async () => {
   let decision: any, calls = 0;
   const run: any = ({ options }: any) => (async function* () {
     calls++; yield { type: 'system', session_id: 'session-test' };
@@ -92,7 +103,7 @@ test('job approvals, cancellation, idempotency and project concurrency', async (
   try {
     jobs.start(input); jobs.start(input);
     await waitFor(()=>jobs.get(input.id).approvals.length>0); assert.equal(calls, 1);
-    assert.throws(() => jobs.start({ ...input, id: randomUUID() }), /уже работает/);
+    assert.throws(() => jobs.start({ ...input, id: randomUUID(), sessionId: 'session-test' }), /already running/);
     const approval = jobs.get(input.id).approvals[0]; assert.equal(approval.tool, 'Write');
     jobs.approve(input.id, approval.id, true);
     await waitFor(()=>jobs.get(input.id).status==='done'); assert.equal(decision.behavior, 'allow'); assert.equal(jobs.get(input.id).status, 'done');

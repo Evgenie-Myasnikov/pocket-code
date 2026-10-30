@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {mkdirSync} from 'node:fs';
-const names=['veil','silk','gradientBlinds','plasmaWave','ghostFibers','fluxLines','lightfall','moltenMetal','prismaticBurst','aurora','iridescence'];
+const names=['veil','aurora','iridescence','softAurora','grainient','lightPillar','galaxy','liquidChrome','plasma','floatingLines'];
 test('upstream backgrounds render, resize and release canvases in Strict Mode',async({page})=>{
  test.setTimeout(120000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'||/INVALID_OPERATION|shader.*error/i.test(m.text()))errors.push(m.text());});
  await page.addInitScript(()=>{const counts=new WeakMap();(window as any).backgroundDraws=(canvas:HTMLCanvasElement)=>counts.get(canvas)||0;for(const key of ['drawArrays','drawElements','drawArraysInstanced','drawElementsInstanced'] as const){const old=WebGL2RenderingContext.prototype[key];(WebGL2RenderingContext.prototype as any)[key]=function(...args:any[]){counts.set(this.canvas,(counts.get(this.canvas)||0)+1);return (old as any).apply(this,args);};}});

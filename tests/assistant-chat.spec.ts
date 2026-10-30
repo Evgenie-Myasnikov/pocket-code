@@ -10,7 +10,7 @@ test('ready chat actions retain the draft, export Markdown and survive streaming
  const input=page.getByLabel('Message Claude',{exact:true});await input.fill('Existing draft');
  await message.getByRole('button',{name:'Quote in reply'}).click();await expect(input).toBeFocused();await expect(input).toHaveValue(/Existing draft\n\n> ## Interface review/);
  const download=page.waitForEvent('download');await message.getByRole('button',{name:'Download message Markdown'}).click();expect((await download).suggestedFilename()).toBe('message.md');
- await input.fill('A synthetic follow-up');await page.locator('.send-button').click();await page.getByRole('button',{name:/Finished on PC/}).click();await expect(page.locator('.partial-message,.message').filter({hasText:'Working on your request'}).first()).toBeVisible();
+ await input.fill('A synthetic follow-up');await page.locator('.send-button').click();await expect(page.locator('.partial-message,.message').filter({hasText:'Working on your request'}).first()).toBeVisible();
  expect(errors).toEqual([]);await page.screenshot({path:'.local/ready-chat-dark.png'});
 });
 

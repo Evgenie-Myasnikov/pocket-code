@@ -31,14 +31,14 @@ export const palettes: { id: string; name: string; hue: number; hslHue: number; 
 { id: 'mint', name: 'Мята', hue: 184, hslHue: 170, swatch: {"dark": ["#101211", "#0bd8b6"], "light": ["#fbfdfc", "#037b6a"]} }];
 
 type Contrast = 'auto' | 'normal' | 'more';
-type Appearance = {chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
-const defaults: Appearance = { chatAlign:'center', palette: 'sage', theme: 'dark', textSize: 14, scale: 100, spacing: 1.85, compact: false, contrast: 'auto', colorblind: false };
+type Appearance = {chatFont:'golos'|'manrope'|'system';chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
+const defaults: Appearance = { chatFont:'golos',chatAlign:'center', palette: 'sage', theme: 'dark', textSize: 14, scale: 100, spacing: 1.85, compact: false, contrast: 'auto', colorblind: false };
 const storageKey = 'pocket-code-appearance-v1';
 const bounded = (value: unknown, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 function load(): Appearance {
   try {
     const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
-    return { chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette: palettes.some((p) => p.id === data.palette) ? data.palette : defaults.palette,
+    return { chatFont:['golos','manrope','system'].includes(data.chatFont)?data.chatFont:'golos',chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette: palettes.some((p) => p.id === data.palette) ? data.palette : defaults.palette,
       theme: ['dark', 'light', 'system'].includes(data.theme) ? data.theme : defaults.theme,
       textSize: bounded(data.textSize, 8, 22, 14), scale: bounded(data.scale, 60, 130, 100),
       spacing: bounded(data.spacing, 1.1, 2.2, 1.85), compact: data.compact === true,
@@ -60,6 +60,7 @@ export function useAppearance() {
     const applyTheme = () => {root.dataset.theme = appearance.theme === 'system' ? system.matches ? 'light' : 'dark' : appearance.theme;};
     applyTheme();system.addEventListener('change', applyTheme);
     root.dataset.chatAlign = appearance.chatAlign;
+    root.style.setProperty('--font-chat',appearance.chatFont==='manrope'?"'Manrope','Golos Text',sans-serif":appearance.chatFont==='system'?"system-ui,'Golos Text',sans-serif":"'Golos Text',system-ui,sans-serif");
     root.dataset.compact = String(appearance.compact);
     root.dataset.palette = appearance.palette;
     const palette = palettes.find((p) => p.id === appearance.palette)!;
@@ -109,6 +110,7 @@ export function AppearanceSettings({ appearance, setAppearance, saveError,connec
     <p className="muted">{t("Изменения видны сразу и сохраняются на этом устройстве.")}</p>
     <fieldset className="appearance-segmented"><legend>{t("Тема")}</legend><div className="segmented-options">{([['dark', 'Тёмная'], ['light', 'Светлая'], ['system', 'Системная']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-theme" value={id} checked={appearance.theme === id} onChange={() => setAppearance((p) => ({ ...p, theme: id }))} /><span>{t(title)}</span></label>)}</div></fieldset>
     <label className="appearance-row">{language==='ru'?'Положение чата':'Chat position'}<select aria-label={language==='ru'?'Положение чата':'Chat position'} value={appearance.chatAlign} onChange={event=>setAppearance({...appearance,chatAlign:event.target.value as Appearance['chatAlign']})}><option value="center">{language==='ru'?'По центру':'Center'}</option><option value="left">{language==='ru'?'Слева':'Left'}</option><option value="right">{language==='ru'?'Справа':'Right'}</option></select></label>
+    <label className="appearance-row">{language==='ru'?'\u0428\u0440\u0438\u0444\u0442 \u0447\u0430\u0442\u0430':'Chat font'}<select aria-label={language==='ru'?'\u0428\u0440\u0438\u0444\u0442 \u0447\u0430\u0442\u0430':'Chat font'} value={appearance.chatFont} onChange={event=>setAppearance({...appearance,chatFont:event.target.value as Appearance['chatFont']})}><option value="golos">Golos Text</option><option value="manrope">Manrope</option><option value="system">{language==='ru'?'\u0421\u0438\u0441\u0442\u0435\u043c\u043d\u044b\u0439':'System'}</option></select></label>
       <BackgroundSettings/><SpeechSettingsPanel connection={connection}/>
     <fieldset className="palette-field"><legend>{t("Цветовая палитра")}</legend><div className="palette-options">{palettes.map((p) => <button type="button" key={p.id} aria-pressed={appearance.palette === p.id} onClick={() => setAppearance((old) => ({ ...old, palette: p.id }))}><span className="palette-swatch" aria-hidden="true" style={{ '--swatch-bg': p.swatch[light ? 'light' : 'dark'][0], '--swatch-accent': p.swatch[light ? 'light' : 'dark'][1] } as CSSProperties} />{t(p.name)}{appearance.palette === p.id && <b aria-hidden="true">✓</b>}</button>)}</div></fieldset>
     <fieldset className="appearance-segmented"><legend>{t("Размер")}</legend><div className="segmented-options">{sizePresets.map((item) => <label key={item.id}><input type="radio" name="appearance-size" checked={preset?.id === item.id} onChange={() => setAppearance((p) => ({ ...p, ...item.value }))} /><span>{t(item.title)}</span></label>)}</div>{!preset && <p className="muted">{t("Сейчас выбраны свои значения в разделе «Дополнительно».")}</p>}</fieldset>

@@ -58,6 +58,15 @@
 @media(pointer:coarse){.desktop-app>.desktop-rail>nav{width:52px}.desktop-rail-content{margin-left:52px}.desktop-app>.desktop-rail .desktop-sessions>button{min-height:44px}.desktop-app>.desktop-rail>nav>button{width:44px;min-height:44px}}
 .desktop-app>.desktop-rail>nav{align-content:start;gap:6px}
 
+/* One scroll track spans the library instead of separate project/recent panes. */
+.desktop-app>.desktop-rail .desktop-rail-content{overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent;overscroll-behavior-y:contain;box-sizing:border-box}
+.desktop-app>.desktop-rail .desktop-rail-content>:not(.desktop-library){flex-shrink:0}
+.desktop-app>.desktop-rail .desktop-library{flex:0 0 auto;overflow:visible}
+.desktop-app>.desktop-rail :is(.desktop-project-links,.desktop-sessions){max-height:none;overflow:visible;flex-shrink:0}
+.desktop-rail-content::-webkit-scrollbar{width:8px}
+.desktop-rail-content::-webkit-scrollbar-thumb{border:2px solid transparent;border-radius:8px;background:color-mix(in srgb,var(--muted) 45%,transparent);background-clip:padding-box}
+.desktop-rail-content::-webkit-scrollbar-track{background:transparent}
+
 /* Running conversations retain their expanded geometry even when deselected. */
 .desktop-app>.desktop-rail .desktop-sessions>button[data-running=true]{min-height:calc(60px * var(--ui-scale,1));}
 .desktop-app>.desktop-rail .desktop-sessions>button[data-running=true] strong{animation:chat-title-breathe 2s ease-in-out infinite;}

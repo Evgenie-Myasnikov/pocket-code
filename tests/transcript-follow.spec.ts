@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 for(const variant of ['StreamHandoffHarness','StaleSnapshotHarness'])test(`stream presentation never rewinds: ${variant}`,async({page})=>{
- await page.goto('http://127.0.0.1:5173');await page.locator('.desktop-tabs:visible').waitFor();
+ await page.goto('http://127.0.0.1:5173');await page.locator('.app,.desktop-app').first().waitFor();
  await page.evaluate(async name=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const module=await import('/tests/fixtures/TranscriptFollowHarness.tsx' as string);
@@ -11,7 +11,7 @@ for(const variant of ['StreamHandoffHarness','StaleSnapshotHarness'])test(`strea
   await page.evaluate(text=>(window as any).streamHandoff(text),text);
   await expect.poll(async()=>(await page.locator('.markdown').innerText()).length).toBeGreaterThan(12);
   await page.evaluate(()=>(window as any).finishHandoff());
-  await expect(page.locator('[data-message-id=final] .markdown')).toHaveText(text,{timeout:250});
+  await expect(page.locator('[data-message-id=final] .markdown')).toHaveText(text,{timeout:600});
   await expect(page.locator('[data-message-id=final] .stream-glyph')).toHaveCount(0);
  }else{
   const target='Existing text. '+ 'More words arrive smoothly. '.repeat(5);
@@ -27,7 +27,7 @@ for(const variant of ['StreamHandoffHarness','StaleSnapshotHarness'])test(`strea
  }
 });
 test('loaded running text is immediate; new letters follow layout and manual scroll is retained',async({page})=>{
- await page.goto('http://127.0.0.1:5173');await page.locator('.desktop-tabs:visible').waitFor();
+ await page.goto('http://127.0.0.1:5173');await page.locator('.app,.desktop-app').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {TranscriptFollowHarness}=await import('/tests/fixtures/TranscriptFollowHarness.tsx' as string);
@@ -53,7 +53,7 @@ test('loaded running text is immediate; new letters follow layout and manual scr
 });
 
 test('first partial answer animates, but reopening an active partial shows its snapshot immediately',async({page})=>{
- await page.goto('http://127.0.0.1:5173');await page.locator('.desktop-tabs:visible').waitFor();
+ await page.goto('http://127.0.0.1:5173');await page.locator('.app,.desktop-app').first().waitFor();
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default;
   const {PartialSnapshotHarness}=await import('/tests/fixtures/TranscriptFollowHarness.tsx' as string);

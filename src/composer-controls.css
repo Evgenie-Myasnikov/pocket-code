@@ -3,8 +3,6 @@
 :root[data-theme] .prompt-composer:focus-within{background:color-mix(in srgb,var(--panel) 96%,var(--text));border-color:color-mix(in srgb,var(--input) 65%,var(--text));box-shadow:0 6px 26px var(--shadow-faint)}
 :root[data-theme] .prompt-composer textarea{box-sizing:border-box;display:block;width:100%;min-height:64px;max-height:min(260px,30dvh);padding:3px 6px var(--space-3);border:0;outline:0;box-shadow:none;resize:none;background:transparent;font:inherit;font-size:var(--chat-font-size,14px);line-height:1.65;overflow-y:auto;scrollbar-gutter:stable;caret-color:var(--accent)}
 .prompt-composer textarea::placeholder{color:var(--muted);opacity:.85}
-.prompt-composer .composer-input:has(.usage-indicator) textarea{padding-right:78px}
-.prompt-composer .usage-indicator{right:1px;top:-4px;font-size:clamp(11px,calc(11px * var(--ui-scale,1)),14px);opacity:.85}
 .prompt-composer .composer-tools{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:var(--space-1);align-items:center}
 .prompt-composer .composer-models{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:0 var(--space-2);min-width:0}
 .prompt-composer .composer-models .model-picker{flex:1 1 0;min-width:0;max-width:100%}
@@ -111,9 +109,6 @@
 .assistant-composer[data-pulsing=true]::before,.assistant-composer[data-pulsing=true] .stop-button::after,.assistant-composer .composer-border-wave{display:none}
 @media(pointer:coarse){:root[data-theme] .assistant-composer .composer-tools :is(.icon-button,.send-button){width:44px;min-width:44px;height:44px;min-height:44px}.assistant-composer .composer-tools{grid-template-columns:44px minmax(0,1fr) auto}.assistant-composer .send-button::before,.assistant-composer .stop-button.stop-primary::before{inset:6px}}
 .composer-add{position:relative}
-:root[data-theme] .prompt-composer.assistant-composer .composer-input:has(.usage-indicator){display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:start;gap:8px}
-:root[data-theme] .prompt-composer.assistant-composer .composer-input:has(.usage-indicator) textarea{min-width:0;padding-right:8px}
-:root[data-theme] .prompt-composer.assistant-composer .composer-input>.usage-indicator{position:static;min-height:44px;align-self:start}
 .voice-input-notice{position:absolute;bottom:calc(100% + 8px);right:0;max-width:min(320px,90vw);padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);font-size:12px;z-index:var(--z-menu)}
 .composer-voice[aria-pressed=true]{color:var(--status-error)!important}
 .composer-add-menu{position:absolute;bottom:calc(100% + 12px);left:0;z-index:var(--z-menu);width:min(300px,calc(100vw - 48px));padding:6px;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:0 8px 24px var(--shadow-soft)}
@@ -124,15 +119,22 @@
 @media(max-width:760px){:root[data-theme] .prompt-composer.assistant-composer{padding-inline:9px}:root[data-theme] .assistant-composer .composer-tools :is(.icon-button,.send-button){width:44px;min-width:44px;height:44px;min-height:44px}.assistant-composer .composer-tools{grid-template-columns:44px minmax(0,1fr) auto}.assistant-composer .send-button::before,.assistant-composer .stop-button.stop-primary::before{inset:6px}}
 
 .composer-area{container-type:inline-size}
-.composer-with-usage{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:8px;min-width:0;width:100%}
-.composer-with-usage[data-has-usage=true]{grid-template-columns:minmax(0,1fr) max-content;column-gap:0}
+.composer-with-usage{min-width:0;width:100%}
 .composer-with-usage>.prompt-composer{min-width:0;width:100%;box-sizing:border-box}
-.composer-external-usage{margin-top:-12px;padding-top:0;justify-self:end}
-.composer-external-usage>.usage-indicator{position:relative;display:grid;place-items:center;width:48px;min-width:48px;height:48px;min-height:48px;padding:0 0 0 6px;justify-items:start;justify-content:start;box-sizing:border-box;font-size:var(--ui-caption-size);opacity:.85}
+.composer-submit{position:relative;display:grid;place-items:center;flex:none}
+.composer-submit-usage{position:absolute;inset:0;pointer-events:none;z-index:2}
+.composer-submit-usage>.usage-indicator{position:absolute;inset:0;display:grid;place-items:center;width:100%;height:100%;min-width:0;min-height:0;padding:0;pointer-events:none;border-radius:50%;opacity:.9}
+.composer-submit-usage .usage-indicator svg{width:100%;height:100%;fill:none;stroke-width:.8;overflow:visible;pointer-events:none}
+.composer-submit-usage .usage-indicator :is(.usage-track,.usage-value){r:9px;pointer-events:stroke}
+.composer-submit-usage .usage-hit{display:block;stroke:transparent;stroke-width:4px;pointer-events:stroke}
+.composer-submit:hover .usage-percent,.composer-submit:focus-within .usage-percent{display:block}
+.composer-submit-usage .usage-indicator:focus-visible{outline-offset:2px;border-radius:50%}
 
-@container(max-width:340px){
- .composer-with-usage[data-has-usage=true] .composer-tools{grid-template-columns:minmax(0,1fr) auto}
- .composer-with-usage[data-has-usage=true] .composer-models{grid-column:1 / -1;grid-row:1}
- .composer-with-usage[data-has-usage=true] .composer-add{grid-column:1;grid-row:2}
- .composer-with-usage[data-has-usage=true] .composer-actions{grid-column:2;grid-row:2}
+@container(max-width:600px){
+ .prompt-composer .composer-models{gap:0;flex-wrap:nowrap}
+ .prompt-composer .access-chip{padding-inline:0;min-width:44px;justify-content:center}
+ .prompt-composer .access-chip>span,.prompt-composer .access-chip>svg:last-child{display:none}
+ .prompt-composer .composer-models .model-picker{flex:1 1 0;min-width:44px;max-width:100%}
+ .prompt-composer .composer-models .model-picker>select{width:100%;min-width:44px}
+ .prompt-composer .composer-models .effort-picker{flex:0 1 54px;min-width:44px}
 }

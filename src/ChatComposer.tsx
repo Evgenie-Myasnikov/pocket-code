@@ -64,6 +64,7 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
   const sendLabel=mode==='later'?t('Отправить, когда ПК будет на связи'):mode==='queue'?t('В очередь'):mode==='steer'?t('Направить'):t('Отправить сообщение');
   const shortcut=enterSends?'Enter':'Ctrl+Enter';
   const hasFiles=(event:React.DragEvent)=>Array.from(event.dataTransfer?.types||[]).includes('Files')||!!onBoardImage&&Array.from(event.dataTransfer?.types||[]).includes(boardImageMime);
+  const stopControl=onStop?<button type="button" className={'icon-button stop-button'+(stopOnly?' stop-primary':'')} aria-label={stopping?t('Останавливаю…'):stopLabel} title={stopping?t('Останавливаю…'):stopLabel+(keyHint?' (Esc)':'')} aria-busy={stopping||undefined} disabled={stopping} onPointerDown={keepFocus} onClick={onStop}>{stopping?<LoaderCircle size={16} className="composer-uploading"/>:stopRetry?<RefreshCw size={16}/>:<Square size={stopOnly?16:13}/>}</button>:null;
   return <div className="composer-with-usage" data-has-usage={usage?true:undefined}><AssistantComposerRoot onSubmit={event=>{event.preventDefault();send();}} data-slot="composer" className={'composer prompt-composer assistant-composer'+(dragging?' composer-drop':'')} data-pulsing={!!onStop&&!stopRetry&&!stopping||undefined} data-stopping={stopping||undefined} data-running={onStop?true:undefined}
     onDragEnter={event=>{if(!disabled&&hasFiles(event)){event.preventDefault();setDragging(true);}}}
     onDragOver={event=>{if(!disabled&&hasFiles(event)){event.preventDefault();event.dataTransfer.dropEffect='copy';}}}
@@ -101,12 +102,12 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
       <div className="composer-models">{controls}</div>
       <div className="composer-actions">
         <VoiceInput key={scopeKey} disabled={disabled} focus={()=>input.current?.focus({preventScroll:true})} onText={value=>onText(text+(text&&!/\s$/.test(text)?' ':'')+value)}/>
-        {onStop&&<button type="button" className={'icon-button stop-button'+(stopOnly?' stop-primary':'')} aria-label={stopping?t('Останавливаю…'):stopLabel} title={stopping?t('Останавливаю…'):stopLabel+(keyHint?' (Esc)':'')} aria-busy={stopping||undefined} disabled={stopping} onPointerDown={keepFocus} onClick={onStop}>{stopping?<LoaderCircle size={16} className="composer-uploading"/>:stopRetry?<RefreshCw size={16}/>:<Square size={stopOnly?16:13}/>}</button>}
-        {!stopOnly&&<button type="button" className="send-button" data-mode={mode} aria-label={sendLabel} title={`${sendLabel} · ${shortcut}`} aria-keyshortcuts={enterSends?'Enter':'Control+Enter'} aria-busy={busy||undefined} disabled={!canSend} aria-description={blockedReason}
+        {!stopOnly&&stopControl}
+        <div className="composer-submit">{stopOnly?stopControl:<button type="button" className="send-button" data-mode={mode} aria-label={sendLabel} title={`${sendLabel} · ${shortcut}`} aria-keyshortcuts={enterSends?'Enter':'Control+Enter'} aria-busy={busy||undefined} disabled={!canSend} aria-description={blockedReason}
           onPointerDown={keepFocus} onClick={send}>
           {busy?<LoaderCircle size={20} className="composer-uploading"/>:mode==='later'?<Clock size={20}/>:mode==='queue'?<ListPlus size={20}/>:mode==='steer'?<CornerDownRight size={20}/>:<ArrowUp size={20}/>}
-        </button>}
+        </button>}{usage&&<div className="composer-submit-usage">{usage}</div>}</div>
       </div>
     </div>
-  </AssistantComposerRoot>{usage&&<div className="composer-external-usage">{usage}</div>}</div>;
+  </AssistantComposerRoot></div>;
 }

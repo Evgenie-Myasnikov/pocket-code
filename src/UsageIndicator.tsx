@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {request,type Connection} from './api';
 import {t,useLanguage} from './i18n';
 import {startVisiblePoll} from './visible-poll';
-import {remainingUsage} from './usage-summary';
+import {remainingUsage,validUsageSnapshot} from './usage-summary';
 import {usageTone} from './usage-format';
 import {publishUsage} from './live-settings';
 import type {CodexUsageSnapshot} from '../server/codex-usage';
@@ -17,7 +17,7 @@ export function UsageIndicator({connection,provider,models,onOpen}:{connection:C
     setSnapshot(null);setFailed(false);
     if(!visible)return;let active=true;
     const stop=startVisiblePoll(async()=>{
-      try{const value=await request<CodexUsageSnapshot>(connection,`/${provider}/usage`);if(active){setSnapshot(value);setFailed(false);publishUsage(provider,value);}}
+      try{const value=await request<CodexUsageSnapshot>(connection,`/${provider}/usage`);if(!validUsageSnapshot(value))throw new Error('Usage data is unavailable.');if(active){setSnapshot(value);setFailed(false);publishUsage(provider,value);}}
       catch{if(active)setFailed(true);}
     },60_000);
     return()=>{active=false;stop();};
@@ -29,6 +29,6 @@ export function UsageIndicator({connection,provider,models,onOpen}:{connection:C
   const label=remaining===null?t('{0}: лимиты недоступны',engine):t('{0}: осталось {1} лимита',engine,percent);
   const hint=t('Минимальный остаток доступных лимитов для текущей модели. Нажмите для подробностей.');
   return <button ref={button} type="button" className={'usage-indicator'+(tone==='danger'?' usage-low':tone==='warning'?' usage-warning':'')} aria-label={label} aria-description={hint} onClick={onOpen}>
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle className="usage-track" cx="10" cy="10" r="8"/><circle className="usage-value" cx="10" cy="10" r="8" pathLength="100" strokeDasharray={`${remaining??0} 100`} transform="rotate(-90 10 10)"/></svg><span className="usage-percent" role="tooltip">{percent}</span>
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle className="usage-hit" cx="10" cy="10" r="9"/><circle className="usage-track" cx="10" cy="10" r="8"/><circle className="usage-value" cx="10" cy="10" r="8" pathLength="100" strokeDasharray={`${remaining??0} 100`} transform="rotate(-90 10 10)"/></svg><span className="usage-percent" role="tooltip">{percent}</span>
   </button>;
 }

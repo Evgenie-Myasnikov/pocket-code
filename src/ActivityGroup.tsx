@@ -5,7 +5,7 @@ import {useLanguage} from './i18n';
 import {type ActivityBlock} from './activity-groups';
 import './activity-groups.css';
 
-/** Intermediate activity folds under one shared label: "Explored 5 files · 2 searches". */
+/** Internal work stays inside one lazy Thinking disclosure. */
 export const ActivityGroup=memo(function ActivityGroup({items}:{items:ActivityBlock[]}){
  useLanguage();const [open,setOpen]=useState(false);
 

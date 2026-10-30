@@ -40,6 +40,7 @@
 :root{
  --fw-regular:400;--fw-medium:500;--fw-semibold:600;--fw-display:700;--tracking-caps:.08em;
  --font-sans:'Golos Text',system-ui,sans-serif;--font-display:'Manrope','Golos Text',sans-serif;--font-mono:Consolas,'Cascadia Mono','JetBrains Mono',monospace;
+ --font-chat:var(--font-sans);--font-chat-code:'JetBrains Mono',Consolas,monospace;--chat-prose-gap:.85em;--chat-icon-size:18px;--chat-action-icon-size:16px;
  --type-min:11px;
  --type-label-11:var(--fw-medium) calc(max(var(--type-min),11px) * var(--ui-scale,1))/1.4 var(--font-sans);
  --type-label-12:var(--fw-medium) calc(12px * var(--ui-scale,1))/1.45 var(--font-sans);

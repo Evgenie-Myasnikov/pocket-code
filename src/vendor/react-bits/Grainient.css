@@ -1,11 +1,11 @@
-.gradient-blinds-container {
+.grainient-container {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-.gradient-blinds-canvas {
+.grainient-canvas {
   position: absolute;
   inset: 0;
   display: block;

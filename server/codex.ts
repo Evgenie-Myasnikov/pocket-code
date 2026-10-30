@@ -303,8 +303,8 @@ export class CodexService {
     const existing = this.jobs.get(input.id); if (existing) return this.view(existing);
     for (const [id, job] of this.jobs) if (job.status !== 'running' && Date.now() - job.startedAt > 86400000) this.jobs.delete(id);
     if (this.jobs.size >= 100) this.trimCompleted();
-    if ([...this.jobs.values()].some(job => job.status === 'running' && (path.resolve(job.cwd).toLowerCase() === path.resolve(input.cwd).toLowerCase() || (input.sessionId && job.sessionId === input.sessionId))))
-      throw new HttpError(409, 'Codex is already working in this project. Wait or stop that task first.');
+    if ([...this.jobs.values()].some(job => job.status === 'running' && input.sessionId && job.sessionId === input.sessionId))
+      throw new HttpError(409, 'This Codex chat is already running. Send a follow-up to its active turn.');
     if ([...this.jobs.values()].filter(job => job.status === 'running').length >= 3 || this.jobs.size >= 100) throw new HttpError(429, 'Too many Codex jobs. Finish an existing task first.');
     const job: CodexJob = { id: input.id, cwd: input.cwd, sessionId: input.sessionId, provider: 'codex', status: 'running',
       messages: [{ id: randomUUID(), role: 'user', blocks: userInputBlocks(input) }],

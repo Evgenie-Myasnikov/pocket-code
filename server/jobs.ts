@@ -61,8 +61,8 @@ export class Jobs {
     if (existing) return this.view(existing);
     for (const [id, j] of this.jobs) if (j.status !== 'running' && Date.now() - j.startedAt > 86400000) this.jobs.delete(id);
     if (this.jobs.size >= 100) this.trimCompleted();
-    if ([...this.jobs.values()].some(j => j.status === 'running' && (j.cwd === input.cwd || (input.sessionId && j.sessionId === input.sessionId))))
-      throw new HttpError(409, 'В этом проекте уже работает Claude. Дождитесь ответа или остановите задачу.');
+    if ([...this.jobs.values()].some(j => j.status === 'running' && input.sessionId && j.sessionId === input.sessionId))
+      throw new HttpError(409, 'This Claude chat is already running. Send a follow-up to its active turn.');
     if ([...this.jobs.values()].filter(j => j.status === 'running').length >= 3 || this.jobs.size >= 100)
       throw new HttpError(429, 'Лимит задач сервера. Завершите текущие задачи; старые записи хранятся 24 часа.');
     const job: Job = { provider: 'claude', id: input.id, cwd: input.cwd, sessionId: input.sessionId, status: 'running',

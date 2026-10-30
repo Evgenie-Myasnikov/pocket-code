@@ -562,11 +562,9 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       const selected=catalog.models.find(model=>model.id===(body.model||'sonnet'));
       if(catalog.source!=='sdk'||!selected?.reasoningEfforts?.includes(body.claudeEffort))throw new HttpError(400,'This Claude model does not advertise the selected effort. Refresh its model catalog.');
     }
-    if (terminals.list().some(t => t.cwd === cwd && t.status === 'running')) throw new HttpError(409, 'В проекте открыт живой терминал. Завершите его перед запуском обычного чата.');
     if (body.sessionId) {
       const s = await session(body.sessionId, body.provider);
       if (await realpath(s.cwd!) !== cwd) throw new HttpError(400, 'Чат относится к другому проекту');
-      if (!body.takeoverConfirmed) throw new HttpError(409, 'Сначала завершите работу с этим чатом в терминале на ПК');
     }
     const attached = body.attachments.map(id => {
       const file = uploads.get(id);
@@ -578,7 +576,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const baseMessageCount = body.sessionId ? (body.provider === 'copilot' ? (await copilot().messages(body.sessionId)).length : body.provider === 'codex' ? await codex().messageCount(body.sessionId) : (await sdk.getSessionMessages(body.sessionId, { dir: cwd })).length) : 0;
     const raced = allJobs().find(j => j.id === body.id);
     if (raced) { await replyToRetry(raced);return; }
-    guardProject(cwd, body.id);
+    if(body.taskRunId)guardProject(cwd,body.id);
+    if(body.sessionId && (allJobs().some(job=>job.id!==body.id && job.status==='running' && (job.provider||'claude')===body.provider && job.sessionId===body.sessionId) || body.provider==='claude' && terminals.list().some(terminal=>terminal.status==='running' && terminal.sessionId===body.sessionId))) throw new HttpError(409,'This chat is already running. Send a follow-up to its active turn.');
     const bound=await taskRuntime!.bindJob({...body,cwd});
     try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text, approvalTimeoutMs: body.approvalTimeoutMinutes * 60000 }));}
     catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
@@ -615,7 +614,6 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if (body.sessionId) {
       const s = await session(body.sessionId);
       if (await realpath(s.cwd!) !== cwd) throw new HttpError(400, 'Чат относится к другому проекту');
-      if (!body.takeoverConfirmed) throw new HttpError(409, 'Сначала завершите этот чат в терминале на ПК');
     }
     res.json(terminals.start({ ...body, cwd }));
   });

@@ -4,7 +4,7 @@ import { request, type Connection } from './api';
 import { locale, t, useLanguage } from './i18n';
 import type { CodexUsageSnapshot, CodexUsageWindow } from '../server/codex-usage';
 import './codex-usage.css';
-import {validRemaining} from './usage-summary';
+import {validRemaining,validUsageSnapshot} from './usage-summary';
 import {durationLabel,fullDate,momentLabel,narrowestWindow,percentLabel,usagePace,usageTone} from './usage-format';
 import {publishUsage} from './live-settings';
 import {Notice} from './Notice';
@@ -34,6 +34,7 @@ export function CodexUsage({ connection, provider = 'codex' }: { connection: Con
       pending = true; setBusy(true); setFailed(false);
       try {
         const result = await request<CodexUsageSnapshot>(connection!, `/${provider}/usage`);
+        if(!validUsageSnapshot(result))throw new Error('Usage data is unavailable.');
         if (active) { setSnapshot(result); publishUsage(provider, result); }
       } catch { if (active) setFailed(true); } // The last dated read stays; validRemaining turns it into "No data" once it is older than two minutes.
       finally { pending = false; if (active) setBusy(false); }

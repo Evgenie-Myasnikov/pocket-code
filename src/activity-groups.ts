@@ -80,17 +80,23 @@ export function summarizeActivity(items:ActivityBlock[]){
  return parts.map((part,index)=>index?part.charAt(0).toLowerCase()+part.slice(1):part).join(' · ');
 }
 
-/** One disclosure per turn; images and the last answer stay in the transcript. */
+/** Group internal work per turn; ordinary assistant prose stays visible. */
 export function groupThinkingMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null):TranscriptRun[]{
  const runs:TranscriptRun[]=[];let turn:ChatMessage[]=[];
  const flush=()=>{
   if(!turn.length)return;
   const all=turn.flatMap(message=>visibleMessageBlocks(message,results,running?.has(message)));
-  const tail=[...all].reverse().find(item=>item.block.type!=='image');
-  const final=tail?.block.type==='text'&&turn.find(m=>m.id===tail.messageId)?.role==='assistant'?tail:undefined;
-  const activity=all.filter(item=>item!==final&&item.block.type!=='image');
+  const visible=(item:ActivityBlock)=>['text','image','attachment','document'].includes(item.block.type);
+  const activity:ActivityBlock[]=[],visibleBlocks=new Map<string,Block[]>();
+  for(const item of all){
+   if(!visible(item)){activity.push(item);continue;}
+   const blocks=visibleBlocks.get(item.messageId)||[];blocks.push(item.block);visibleBlocks.set(item.messageId,blocks);
+  }
+  for(const message of turn){
+   const blocks=visibleBlocks.get(message.id);
+   if(blocks?.length)runs.push({key:message.id,message:blocks.length===message.blocks.length?message:{...message,blocks}});
+  }
   if(activity.length)runs.push({key:`thinking:${turn[0].id}`,items:activity});
-  for(const item of all)if(item===final||item.block.type==='image')runs.push({key:`${item.messageId}:${item.index}`,message:{id:item===final?item.messageId:`${item.messageId}:${item.index}`,role:'assistant',blocks:[item.block]}});
   turn=[];
  };
  for(const message of messages){

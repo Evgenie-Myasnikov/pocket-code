@@ -26,24 +26,38 @@ export const MessageList=memo(function MessageList({messages,partialText,running
   // Messages already present when this transcript mounts are a snapshot, even
   // if their run is still active. Only newly arriving messages start from empty.
   const initialIds=useRef(new Set(messages.map(message=>message.id)));
-  const priorPartial=useRef(''),delivered=useRef(new Set<string>());
-  if(priorPartial.current){
-    const completed=[...messages].reverse().find(message=>message.role==='assistant'&&message.blocks.some(block=>block.type==='text'&&block.text?.startsWith(priorPartial.current)));
-    if(completed){delivered.current.add(completed.id);priorPartial.current='';}
+  const sequence=useRef(0),mounted=useRef(false);
+  const pending=useRef<{text:string;key:string;animate:boolean;seen:Set<string>}|null>(null),delivered=useRef(new Map<string,{key:string;animate:boolean}>());
+  let completed:ChatMessage|undefined;
+  if(pending.current){
+    const prior=pending.current;
+    completed=[...messages].reverse().find(message=>!prior.seen.has(message.id)&&message.role==='assistant'&&message.blocks.some(block=>block.type==='text'&&(block.text?.startsWith(prior.text)||!partialText)));
+    if(completed){delivered.current.set(completed.id,prior);pending.current=null;}
   }
-  if(partialText)priorPartial.current=partialText;
+  if(partialText&&(!completed||!completed.blocks.some(block=>block.type==='text'&&block.text===partialText))){
+    if(pending.current)pending.current.text=partialText;
+    else pending.current={text:partialText,key:`live-response:${++sequence.current}`,animate:mounted.current,seen:new Set(messages.map(message=>message.id))};
+  }
+  mounted.current=true;
   const runs=groupThinkingMessages(messages,shared.toolResults,runningMessages),visibleIds=new Set(runs.flatMap(run=>run.message?[run.message.id]:[]));
-  return runs.map(run=>{
+  const content=runs.map(run=>{
     const anchors=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))].filter(id=>!visibleIds.has(id));
     const ids=anchors.length?anchors:[run.key];
+    const delivery=run.message?delivered.current.get(run.message.id):undefined,key=delivery?.key||run.key;
     const body=run.message?
-    <Message key={run.key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} animateInitial={!initialIds.current.has(run.message.id)&&!delivered.current.has(run.message.id)}/>:
+    <Message key={key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} animateInitial={delivery?.animate??!initialIds.current.has(run.message.id)}/>:
     <article data-enter={shared.streaming&&ids.some(id=>!initialIds.current.has(id))||undefined} key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
       {ids.slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
     </article>;
-    return <Fragment key={run.key}>{body}</Fragment>;
+    return <Fragment key={key}>{body}</Fragment>;
   });
+  const partial=pending.current;
+  if(partial){
+    const body=<Fragment key={partial.key}><Message key={partial.key} {...shared} animateInitial={partial.animate} message={{id:'partial',role:'assistant',blocks:[{type:'text',text:partial.text}]}}/></Fragment>;
+    content.splice(runs.at(-1)?.items?content.length-1:content.length,0,body);
+  }
+  return content;
 });
 export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false }: MessageProps) {
   useLanguage();
@@ -61,7 +75,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   const content = groupActivityBlocks(visibleMessageBlocks(displayMessage,toolResults,running,live),mode).map(run => {
       const {block,result}=run.items[0];
       if(activityGroupKey(run.items[0],mode))return <ActivityGroup key={run.key} items={run.items}/>;
-      return <RichBlock key={run.key} running={running} streaming={streaming&&message.role==='assistant'} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
+      return <RichBlock key={block.type==='text'?`text:${message.blocks.slice(0,run.items[0].index).filter(item=>item.type==='text').length}`:run.key} running={running} streaming={streaming&&message.role==='assistant'} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
   if(!content.length&&!attachments.length)return null;
   return <article data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):message.role==='assistant'?provider:undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>

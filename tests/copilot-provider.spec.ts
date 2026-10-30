@@ -20,7 +20,6 @@ test('Copilot is a separate workspace, sends auto model and offers detected GitH
  });
  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','fixture-'.repeat(6));await openChatList(page);
  await chooseProvider(page,'copilot');await page.getByRole('button',{name:/Copilot example/}).click();await page.getByLabel('Message Copilot').fill('Hello');await page.getByRole('button',{name:'Send message',exact:true}).click();
- await page.getByRole('button',{name:'Finished on PC — continue',exact:true}).click();
  await expect.poll(()=>sent?.provider).toBe('copilot');expect(sent.model).toBe('auto');expect(sent.reasoningEffort).toBeUndefined();await expect(page.getByText('Copilot response',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Settings',exact:true}).last().click();await page.locator('[data-settings-category="workspace"]').click();await page.getByRole('button',{name:'AI account',exact:true}).click();await expect(page.locator('.provider-card')).toContainText('Signed in');await expect(page.locator('.provider-card')).toContainText('GitHub Copilot');
  await page.screenshot({path:'artifacts/screenshots/copilot-connection.png',fullPage:true});

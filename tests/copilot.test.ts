@@ -11,6 +11,15 @@ function fixture(){let config:any,handler:(event:any)=>void=()=>{},finish:()=>vo
  const service=new CopilotService([process.cwd()],client as any);return{service,session,config:()=>config,emit:(e:any)=>handler(e),finish:()=>finish(),disconnected:()=>disconnected};}
 const input=()=>({id:randomUUID(),cwd:process.cwd(),text:'Fixture',mode:'default' as const,maxBudgetUsd:5});
 
+test('Copilot permits independent histories in one project and rejects duplicate writers',async()=>{
+ const f=fixture();
+ try{
+  f.service.start({...input(),sessionId:'first'});f.service.start({...input(),sessionId:'second'});
+  assert.equal(f.service.list().filter(run=>run.status==='running').length,2);
+  assert.throws(()=>f.service.start({...input(),sessionId:'first'}),/already running/);
+ }finally{await f.service.close();}
+});
+
 test('Copilot attaches managed board MCP to new and resumed sessions',async()=>{
  for(const resume of [false,true]){const f=fixture(),i={...input(),...(resume?{sessionId:f.session.sessionId}:{})},server={command:'node',args:['board-proxy.mjs'],env:{POCKET_PORT:'4318'}};
   f.service.setBoardMcpConfiguration(cwd=>{assert.equal(cwd,i.cwd);return {'pocket-code-boards':server};});

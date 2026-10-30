@@ -10,3 +10,5 @@
 
 .usage-indicator .usage-percent{display:none;position:absolute;right:0;bottom:calc(100% + 4px);padding:5px 8px;min-width:40px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 4px 16px var(--shadow-soft);white-space:nowrap;pointer-events:none}
 .usage-indicator:hover .usage-percent,.usage-indicator:focus-visible .usage-percent{display:block}
+
+.usage-hit{display:none}

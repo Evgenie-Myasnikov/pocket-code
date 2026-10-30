@@ -68,20 +68,20 @@ import {EffortPicker,useCodexEffort,type EffortModel} from './EffortPicker';
 
 
 import {extractChatOutputs} from './chat-outputs';
-import {useBackAction,useBackNavigation,useModal} from './navigation';
+import {useBackAction,useBackNavigation} from './navigation';
 import { preferences, preferredRoot, savePreferredRoot, savePreferences, selectedWorkspace, saveSelectedWorkspace, clampBudget, type WorkspaceProvider, type PreferenceChange } from './preferences';
 import { useWorkspaceState, useWorkspaceRef } from './workspace-state';
 import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
 import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, Terminal, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop, ArrowDown, LoaderCircle } from 'lucide-react';
+import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop, ArrowDown, LoaderCircle } from 'lucide-react';
 import { Connect, type ConnectedPc } from './Connect';
 import { connectionProblem as classifyProblem, type ConnectionProblem } from './connection-errors';
 import { useAppearance } from './Appearance';
 import {SettingsPanel,type SettingsPage} from './SettingsPanel';
 import {useLiveSettings} from './live-settings';
-import { PartialMessage, MessageList, ApprovalCard } from './Messages';
+import { MessageList, ApprovalCard } from './Messages';
 
 import type { DocumentKind } from './DocumentLibrary';
 
@@ -208,9 +208,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     void openSession({sessionId:target.sessionId||`pending-${target.jobId}`,cwd:target.cwd,summary:target.title,provider,lastModified:Date.now()},target.jobId?{id:target.jobId,sessionId:target.sessionId}:undefined);
   },[notificationTarget,provider,connection,busy,uploading]);
   useEffect(()=>{setActivityTarget(null);},[connection]);
-  const [takeover, setTakeover] = useStateForWorkspace(false),[pendingTakeover, setPendingTakeover] = useStateForWorkspace(false),[budget, setBudget] = useStateForWorkspace(id=>preferences(id).budget);
-  const confirmation=useRef<HTMLElement|null>(null);
-  useModal(confirmation,pendingTakeover,()=>setPendingTakeover(false));
+  const [takeover, setTakeover] = useStateForWorkspace(false),[budget, setBudget] = useStateForWorkspace(id=>preferences(id).budget);
   useBackAction(()=>{
     if(activityTarget){setActivityTarget(null);return true;}
     if(readingMode&&tab==='chats'){toggleReadingMode(false);return true;}
@@ -351,7 +349,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const pending=pendingSend;
     if(!pending||!canRun||busy||running||uploading||loading||pending.key!==currentDraftKey()||job&&job.id!==pending.jobId)return;
     setPendingSend(null);
-    void send(true,{text:pending.text,attachments:pending.attachments});
+    void send({text:pending.text,attachments:pending.attachments});
   },[canRun,busy,running,uploading,loading,job?.id,job?.status,pendingSend]);
   useEffect(()=>{
     // When the PC answers again, waiting follow-ups of this chat leave one at a time; older than a day they return to the draft instead.
@@ -359,11 +357,11 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if(!next||!canRun||busy||uploading||loading||pendingSend||sending.current)return;
     setOfflineQueue(old=>old.filter(item=>item.id!==next.id));
     if(Date.now()-next.at>86400000){mergeDraft(next.key,next.text,next.attachments);return;}
-    void send(true,{text:next.text,attachments:next.attachments,boardSelection:next.boardSelection});
+    void send({text:next.text,attachments:next.attachments,boardSelection:next.boardSelection});
   },[canRun,busy,uploading,loading,offlineQueue,pendingSend,job?.id,selected?.sessionId]);
   function acknowledgeVisibleActivity(){
     const element=scroll.current;
-    if(!element||!element.getClientRects().length||element.closest('[inert]')||document.visibilityState==='hidden'||tab!=='chats'||loading||loadingOlder||error||historyError||activityTarget||reviewOpen||agentPanel||outputsOpen||pendingTakeover)return;
+    if(!element||!element.getClientRects().length||element.closest('[inert]')||document.visibilityState==='hidden'||tab!=='chats'||loading||loadingOlder||error||historyError||activityTarget||reviewOpen||agentPanel||outputsOpen)return;
     if(element.scrollHeight-element.scrollTop-element.clientHeight>80)return;
     for(const item of activity.items){
       // An error stays until the task is restarted, the person writes in the chat or hides it explicitly.
@@ -374,7 +372,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     }
   }
   const acknowledgeActivity=useRef(acknowledgeVisibleActivity);acknowledgeActivity.current=acknowledgeVisibleActivity;
-  useEffect(()=>{acknowledgeActivity.current();},[activity.items,job?.revision,loading,loadingOlder,history,provider,tab,mobileChat,activityTarget,reviewOpen,agentPanel,outputsOpen,pendingTakeover,error,historyError]);
+  useEffect(()=>{acknowledgeActivity.current();},[activity.items,job?.revision,loading,loadingOlder,history,provider,tab,mobileChat,activityTarget,reviewOpen,agentPanel,outputsOpen,error,historyError]);
   useEffect(()=>{const visible=()=>{if(document.visibilityState!=='hidden')requestAnimationFrame(()=>acknowledgeActivity.current());};document.addEventListener('visibilitychange',visible);return()=>document.removeEventListener('visibilitychange',visible);},[]);
   const parentChatId = job?.sessionId || selected?.sessionId;
   const taskRun=useTaskRun(demo?null:connection,provider,cwd,job?.id,parentChatId,boardChat?.taskRun||embedded?.boardChat?.taskRun);
@@ -658,6 +656,15 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const message=anchor.messageId?[...el.querySelectorAll<HTMLElement>('.conversation-inner > .message')].find(element=>element.dataset.messageId===anchor.messageId):null;
     el.scrollTop=message&&anchor.offset!==undefined?el.scrollTop+message.getBoundingClientRect().top-el.getBoundingClientRect().top-anchor.offset:anchor.top+(anchor.prepend?el.scrollHeight-anchor.height:0);
     lastScrollTop.current=el.scrollTop;
+    if(!message||anchor.offset===undefined)return;
+    // Markdown can finish its layout after the history commit.
+    const adjust=()=>{el.scrollTop+=message.getBoundingClientRect().top-el.getBoundingClientRect().top-anchor.offset!;lastScrollTop.current=el.scrollTop;};
+    const observer=new ResizeObserver(adjust),content=el.querySelector('.conversation-inner');
+    if(content)observer.observe(content);
+    const cancel=()=>{observer.disconnect();clearTimeout(timer);for(const event of ['wheel','touchstart','keydown','pointerdown'])el.removeEventListener(event,cancel);};
+    const timer=setTimeout(cancel,500);
+    for(const event of ['wheel','touchstart','keydown','pointerdown'])el.addEventListener(event,cancel,{passive:true});
+    return cancel;
   },[history,provider,readingMode]);
   useLayoutEffect(() => {if (!loading && nearBottom.current && !readingMode) bottom.current?.scrollIntoView({ behavior: 'auto' });}, [loading, selected?.sessionId, provider]);
   useTranscriptFollow(scroll,nearBottom,!loading&&!readingMode&&tab==='chats'&&(embedded?embedded.visible!==false:mobileChat),provider+':'+(selected?.sessionId||'new'));
@@ -770,10 +777,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if(epoch!==navigation.current)return false;
     if(branchPrepared.current?.target!==target){const result=await api<{sessionId:string|null}>(`/sessions/${encodeURIComponent(target.sourceId)}/branch`,{provider,messageId:target.message.id});branchPrepared.current={target,sessionId:result.sessionId};}
     if(epoch!==navigation.current)return false;
-    return Boolean(await send(true,{text,attachments:files,boardSelection:null,branch:{sessionId:branchPrepared.current.sessionId,history:target.history}}));
+    return Boolean(await send({text,attachments:files,boardSelection:null,branch:{sessionId:branchPrepared.current.sessionId,history:target.history}}));
   }
   /** Sends the draft, or a waiting message exactly as it was written. Typing during the request is kept. */
-  async function send(confirmed = takeover, payload?: {text:string;attachments:Attachment[];boardSelection?:BoardSelection|null;branch?:{sessionId:string|null;history:ChatMessage[]}}) {
+  async function send(payload?: {text:string;attachments:Attachment[];boardSelection?:BoardSelection|null;branch?:{sessionId:string|null;history:ChatMessage[]}}) {
     if(boardMissing)return;
     const text=payload?payload.text:draft,files=[...(payload?payload.attachments:attachments)],ids=files.map(item=>item.id);
     const selection=matchingBoardSelection(payload?payload.boardSelection:embedded?embedded.boardSelection:boardSelection,connection,cwd,payload?payload.boardSelection?.boardId:boardChat?.boardId);
@@ -817,7 +824,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       return;
     }
     const sessionId = payload?.branch ? payload.branch.sessionId||undefined : job?.sessionId || selected?.sessionId;
-    if (sessionId && !confirmed) {setPendingTakeover(true);return;}
     sending.current = true;setBusy(true);setError('');
     const epoch = ++navigation.current;
     // The chat's access chip overrides the device default from Settings; Plan is a Claude mode of its own.
@@ -832,7 +838,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       }catch(e){setError((e as Error).message);sending.current=false;setBusy(false);return;}
       if(epoch!==navigation.current){sending.current=false;setBusy(false);return;}
     }
-    const data = { provider, cwd, sessionId, ...(taskRun&&!payload?.branch?{taskRunId:taskRun.id}:{}), text, attachments: ids, model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: provider==='claude'&&access==='plan'?'plan':'default', ...(provider==='claude'?{maxBudgetUsd:clampBudget(budget),claudeAccess:access==='plan'?claudeAccess:access as ClaudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess:access as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), ...(timeout?{approvalTimeoutMinutes:timeout}:{}), takeoverConfirmed: confirmed };
+    const data = { provider, cwd, sessionId, ...(taskRun&&!payload?.branch?{taskRunId:taskRun.id}:{}), text, attachments: ids, model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):(model||'sonnet'), mode: provider==='claude'&&access==='plan'?'plan':'default', ...(provider==='claude'?{maxBudgetUsd:clampBudget(budget),claudeAccess:access==='plan'?claudeAccess:access as ClaudeAccess,claudeEffort:claudeEffort.value||undefined}:provider==='codex'?{codexAccess:access as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), ...(timeout?{approvalTimeoutMinutes:timeout}:{}), takeoverConfirmed: true };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {
@@ -923,7 +929,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const providerChips=<ProviderPicker connection={connection||undefined} value={provider} onChange={setProvider} disabled={demo||busy||uploading} attention={providerAttention}/>;
   const grouped=visible.reduce<{group:'today'|'yesterday'|'earlier';items:Session[]}[]>((list,session)=>{const group=dayGroup(session.lastModified),last=list.at(-1);if(last?.group===group)last.items.push(session);else list.push({group,items:[session]});return list;},[]);
   const sessionRow=(s:Session)=>{const status=sessionStatus(s.sessionId);return <button data-running={status==='running'||undefined} className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} aria-current={selected?.sessionId===s.sessionId&&mobileChat?'true':undefined} disabled={busy || uploading} key={s.sessionId} onContextMenu={event=>{event.preventDefault();setChatAction({session:s,x:event.clientX,y:event.clientY,running:sessionStatus(s.sessionId)==='running'});}} onKeyDown={event=>{if(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10'){event.preventDefault();const r=event.currentTarget.getBoundingClientRect();setChatAction({session:s,x:r.left,y:r.bottom,running:sessionStatus(s.sessionId)==='running'});}}} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span aria-hidden="true">·</span>{status?<ChatRunStatus status={status}/>:<time dateTime={new Date(s.lastModified).toISOString()} title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}</small></div></button>;};
-  return <AssistantChatProvider connection={connection} messages={outputMessages} partial={job?.partial||''} running={running&&!runUnknown} disabled={demo||!!selected?.readOnly||boardMissing} onSend={async text=>{await send(takeover,{text,attachments:[],boardSelection:matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)});}} onBranch={requestBranch} branchDisabled={running||busy||loading||!canRun||!!selected?.readOnly||boardMissing} onStop={stopRun} onDraft={appendDraft}><div className={`app ${boardPane?'has-board-stage':''} ${boardSheet?'board-chat-sheet-open':''} ${embedded?'embedded-chat':''} ${mobileChat||onboardingVisible ? 'show-chat' : ''} ${tabBar?'has-tabbar':''} ${tab==='chats'&&(mobileChat||embedded)?'chat-edge-to-edge':''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
+  return <AssistantChatProvider connection={connection} messages={outputMessages} partial={job?.partial||''} running={running&&!runUnknown} disabled={demo||!!selected?.readOnly||boardMissing} onSend={async text=>{await send({text,attachments:[],boardSelection:matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)});}} onBranch={requestBranch} branchDisabled={running||busy||loading||!canRun||!!selected?.readOnly||boardMissing} onStop={stopRun} onDraft={appendDraft}><div className={`app ${boardPane?'has-board-stage':''} ${boardSheet?'board-chat-sheet-open':''} ${embedded?'embedded-chat':''} ${mobileChat||onboardingVisible ? 'show-chat' : ''} ${tabBar?'has-tabbar':''} ${tab==='chats'&&(mobileChat||embedded)?'chat-edge-to-edge':''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
 
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={20}/></button>}
     <aside className="sidebar">
@@ -986,7 +992,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             <MessageList connection={connection} cwd={cwd} key={`${provider}-history`} provider={provider} messages={history} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>
             {hasMore !== null && historyWindow.current >= 5000 && <p className="muted" role="status">{t("Достигнут предел окна: 5000 сообщений")}</p>}
             {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={job.messages} partialText={job.partial} streaming={running&&!runUnknown} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>}
-            {job && <PartialMessage key={`${provider}-${job.id}-partial`} provider={provider} streaming={running&&!runUnknown} text={job.partial||''}/>}
             {job?.expiredApprovals?.map((item,index)=><p key={`expired-${index}`} className="approval-expired transcript-event" role="status">{t('Время ожидания истекло — агенту отправлен отказ')} · {item.tool}</p>)}
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers, extra) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers, ...extra });if(allow&&a.tool==='ExitPlanMode'&&extra?.mode){const key=currentDraftKey(),mode=extra.mode;setAccessChoices(old=>({...old,[key]:mode}));}}} />)}
             {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error-banner">{t(job.error)}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
@@ -1021,6 +1026,5 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     {!embedded&&<MobileNavigation open={moreOpen} onClose={()=>setMoreOpen(false)}><nav className="mobile-nav" onClick={event=>{if((event.target as HTMLElement).closest('button'))setMoreOpen(false);}}><button className={tab === 'files' ? 'active' : ''} aria-current={tab==='files'?'page':undefined} onClick={() => showSection('files')}><BookOpen size={20} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} aria-current={tab==='changelog'?'page':undefined} onClick={()=>showSection('changelog')}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings'&&settingsPage!=='connection' ? 'active' : ''} aria-current={tab==='settings'&&settingsPage!=='connection'?'page':undefined} aria-description={liveSettings.update?t('Доступно обновление'):undefined} onClick={() => showSection('settings')}><Settings size={20} />{t("Настройки")}{liveSettings.update&&<span className="settings-badge" aria-hidden="true"/>}</button><button className={tab==='settings'&&settingsPage==='connection'?'active':''} aria-current={tab==='settings'&&settingsPage==='connection'?'page':undefined} onClick={()=>showSection('settings','connection')}><Laptop size={20}/><span className="mobile-nav-label">{t("Подключение к ПК")}<small>{pcStatus?(pcStatus.online?pcStatus.name:t('Нет связи · {0}',pcStatus.name)):saved?.name&&!saved.workspaceOnly?t('Нет связи · {0}',saved.name):t('Не подключено')}</small></span></button></nav></MobileNavigation>}
     {chatAction&&connection&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={provider} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{setSessions(old=>deleted?old.filter(s=>s.sessionId!==session.sessionId):old.map(s=>s.sessionId===session.sessionId?session:s));if(selected?.sessionId===session.sessionId){if(deleted){newChat();setMobileChat(false);}else setSelected(session);}}}/>}
     {branchTarget&&<MessageBranch key={branchTarget.sourceId+branchTarget.message.id} target={branchTarget} onClose={()=>setBranchTarget(null)} onSubmit={submitBranch}/>}
-    {pendingTakeover && <div className="modal-backdrop"><section ref={confirmation} className="confirm-modal" role="dialog" aria-modal="true" aria-label={t("Продолжить чат с телефона?")}><Terminal size={32} /><h2>{t("Продолжить чат с телефона?")}</h2><p>{t("Сначала дождитесь завершения ответа в {0} на ПК. Одновременная работа с одной историей может вызвать конфликт.",engineName)}</p><button className="primary" onClick={() => {setPendingTakeover(false);setTakeover(true);void send(true);}}>{t("На ПК завершено — продолжить")}</button><button className="text-button" onClick={() => setPendingTakeover(false)}>{t("Отмена")}</button></section></div>}
   </div></AssistantChatProvider>;
 }

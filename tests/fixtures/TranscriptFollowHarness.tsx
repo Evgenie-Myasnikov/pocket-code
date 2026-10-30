@@ -21,9 +21,9 @@ export function PartialSnapshotHarness(){
 }
 
 export function StreamHandoffHarness(){
- const [text,setText]=useState(''),[messages,setMessages]=useState<ChatMessage[]>([]);
- Object.assign(window,{streamHandoff:(value:string)=>setText(value),finishHandoff:()=>{setMessages([message('final',text)]);setText('');}});
- return <><MessageList messages={messages} partialText={text} streaming/><PartialMessage text={text} streaming/></>;
+ const [text,setText]=useState(''),[messages,setMessages]=useState<ChatMessage[]>([]),[streaming,setStreaming]=useState(true);
+ Object.assign(window,{streamHandoff:(value:string)=>setText(value),finishHandoff:()=>{setMessages([message('final',text)]);setText('');setStreaming(false);}});
+ return <MessageList messages={messages} partialText={text} streaming={streaming}/>;
 }
 export function StaleSnapshotHarness(){
  const [text,setText]=useState('Existing text. '),[streaming,setStreaming]=useState(true);

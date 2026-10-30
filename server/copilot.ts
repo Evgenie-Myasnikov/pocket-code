@@ -70,7 +70,7 @@ export class CopilotService{
  view(job:JobView){return job;}
  start(input:Input){
   if(this.runs.has(input.id))return this.get(input.id);
-  if([...this.runs.values()].some(run=>run.view.status==='running'&&(run.view.cwd===input.cwd||input.sessionId&&run.view.sessionId===input.sessionId)))throw new HttpError(409,'Copilot is already working in this project.');
+  if([...this.runs.values()].some(run=>run.view.status==='running'&&input.sessionId&&run.view.sessionId===input.sessionId))throw new HttpError(409,'This Copilot chat is already running. Send a follow-up to its active turn.');
   for(const [id,run] of this.runs)if(run.view.status!=='running'&&this.runs.size>=90)this.runs.delete(id);
   if(this.runs.size>=100||this.list().filter(job=>job.status==='running').length>=3)throw new HttpError(429,'Too many Copilot jobs.');
   const view:JobView={id:input.id,provider:'copilot',cwd:input.cwd,sessionId:input.sessionId,status:'running',messages:[{id:randomUUID(),role:'user',blocks:userInputBlocks(input)}],partial:'',approvals:[],startedAt:Date.now(),revision:0,baseMessageCount:input.baseMessageCount||0,jira:input.jira};

@@ -28,7 +28,6 @@ async function connect(page:Page,provider='codex'){
 }
 async function submit(page:Page){
   await page.getByRole('button',{name:'Send message',exact:true}).click();
-  await page.getByRole('button',{name:'Finished on PC — continue'}).click();
 }
 async function rejectedHost(page:Page){
   await host(page);const reject=gate(),sent:any[]=[];let job:any;

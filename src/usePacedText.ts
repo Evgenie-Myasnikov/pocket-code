@@ -5,7 +5,7 @@ const graphemes=new Intl.Segmenter(undefined,{granularity:'grapheme'});
 /** Pace presentation only; the provider's complete text remains untouched. */
 export function usePacedText(text:string,animateInitial:boolean,speed=40,streaming=true){
   const [visible,setVisible]=useState(animateInitial?'':text),current=useRef(visible);
-  const pending=useRef({target:text,ends:[] as number[],index:0,last:0,credit:0,frame:0,speed,pauseUntil:0});
+  const pending=useRef({target:text,ends:[] as number[],index:0,last:0,credit:0,frame:0,speed,pauseUntil:0,deadline:0});
   useEffect(()=>{
     const media=window.matchMedia('(prefers-reduced-motion: reduce)'),state=pending.current;
     const motion=()=>{if(media.matches){cancelAnimationFrame(state.frame);state.frame=0;state.credit=0;current.current=state.target;setVisible(state.target);}};
@@ -25,20 +25,20 @@ export function usePacedText(text:string,animateInitial:boolean,speed=40,streami
       const start=current.current.length;
       state.ends=Array.from(graphemes.segment(text.slice(start)),part=>start+part.index+part.segment.length);
       state.index=0;
+      const now=performance.now();
+      state.deadline=now+Math.min(streaming?750:220,Math.max(120,state.ends.length/speed*1000));
       if(state.frame)return;
-      state.last=performance.now();
+      state.pauseUntil=streaming?now+50:now;state.last=now;
       const tick=(now:number)=>{
         if(now<state.pauseUntil){state.last=now;state.frame=requestAnimationFrame(tick);return;}
-        // Catch up to large network bursts without letting the display queue grow indefinitely.
-        const rate=Math.min(state.speed*2,Math.max(state.speed,(state.ends.length-state.index)/3));
+        // Drain each network burst within a bounded presentation window.
+        const rate=Math.max(state.speed,(state.ends.length-state.index)*1000/Math.max(16,state.deadline-now));
         state.credit+=Math.min(50,now-state.last)*rate/1000;state.last=now;
         const count=Math.floor(state.credit);
         if(count){
           let consumed=0;
           while(consumed<count&&state.index<state.ends.length){
             const end=state.ends[state.index++];consumed++;
-            // A small breath between words; never alters or delays provider data.
-            if(/\S\s$/u.test(state.target.slice(Math.max(0,end-3),end))){state.pauseUntil=now+60;state.credit=0;break;}
           }
           state.credit=Math.max(0,state.credit-consumed);show(state.target.slice(0,state.ends[state.index-1]));
         }

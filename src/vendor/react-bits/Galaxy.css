@@ -1,11 +1,11 @@
-.prismatic-burst-container {
+.galaxy-container {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-.prismatic-burst-canvas {
+.galaxy-canvas {
   position: absolute;
   inset: 0;
   display: block;

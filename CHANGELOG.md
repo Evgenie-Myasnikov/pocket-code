@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.28.24 (unreleased)
+
+Release preparation on the existing [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1) branch; Android versionCode 111. Exact source and package checks pending.
+
+### Features
+- Chat presentation: keep ordinary assistant text and images visible above one lazy Thinking disclosure for internal work. Retain the same Markdown identity through partial/final delivery; bound burst pacing and final drain, preserve graphemes, authoritative corrections, reduced motion and loaded-history snapshots.
+- Typography: centralize prose/list/heading/code rhythm and icon roles; add persistent Golos Text/Manrope/System chat-font selection using bundled Cyrillic faces. Preserve text-size, line-spacing, alignment and Review font measurements.
+- Backgrounds: replace eight removed effects with seven original pinned React Bits effects, retaining DarkVeil/Aurora/Iridescence for a ten-effect catalog. Use actual shader captures, lazy loading, bounded resolution, disabled pointer effects and working pause/cleanup; old removed IDs fall back to DarkVeil.
+
+### Bug Fixes
+- Composer: draw allowance around Send/primary Stop with separate center/rim/keyboard actions and hover percentage. Keep one phone footer row and full input width; soften header/composer blur to 14 px. Invalid usage payloads remain unavailable instead of crashing details.
+- Sessions: resume saved chats without a manual PC-finished prompt. Allow independent interactive histories in one project; retain duplicate-writer/provider locks, server capacity and task-pipeline project isolation. Existing running turns still accept follow-ups.
+- Reading and navigation: give the sidebar one full-height scroll area; retain the visible anchor while paginated Markdown finishes layout and cancel adjustment on manual input. Remove expired reveal wrappers when Markdown settles.
+- Background settings: honor actual theme/custom color, remove static posters under active shaders, exempt the preview from embedded-background suppression, and keep a live sticky preview even when the chat background is disabled.
+
+Validation: 37 scoped browser scenarios and 67 service/unit checks passed for the release candidate. The ten shaders passed Strict Mode render/resize/pause checks; synthetic captures inspected. Board schema/dependencies (42 cards), documentation links and 853 working-tree content checks passed. Existing rich-typography regression tests remain preserved; the new font-selection scenario is separate. Physical-device checks and historical broader settings/access-menu regressions remain unverified. Android/Windows/host build and publication checks pending.
+
 ## [0.28.23](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.22...v0.28.23) (2026-10-30)
 
 Release source: [7837b2582e766e9f11fca2ffe51e55de76ebbaf9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/7837b2582e766e9f11fca2ffe51e55de76ebbaf9) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 110. Android/Windows/host packages verified: 124 shared web files and 402 source inputs match, 1748 decoded artifact entries audited; APK signer unchanged. Source CI passed. Sixteen scoped browser checks, one additional real browser audio playback probe, ten server/unit checks and 13 native policy checks passed. Physical Android audio remains untested. Published [v0.28.23](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.23); all four downloaded hashes and exact tag verified.

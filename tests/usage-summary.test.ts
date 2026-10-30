@@ -1,10 +1,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {remainingUsage,validRemaining} from '../src/usage-summary';
+import {remainingUsage,validRemaining,validUsageSnapshot} from '../src/usage-summary';
 import type {CodexUsageSnapshot} from '../server/codex-usage';
 const now=1_800_000_000_000;
 const bucket=(name:string,values:(number|null)[])=>({id:name,name,windows:values.map((remainingPercent,index)=>({id:index?'secondary' as const:'primary' as const,usedPercent:null,remainingPercent,windowDurationMins:index?10080:300,resetsAt:null}))});
 const snapshot=(...buckets:CodexUsageSnapshot['buckets']):CodexUsageSnapshot=>({checkedAt:now,ordinaryUsageAllowed:null,buckets});
+
+test('malformed usage responses stay unavailable instead of breaking the details view',()=>{
+ assert.equal(validUsageSnapshot({}),false);assert.equal(validUsageSnapshot({...snapshot(),buckets:[{}]}),false);
+ assert.equal(validUsageSnapshot(snapshot(bucket('Claude',[42]))),true);assert.equal(validUsageSnapshot(snapshot()),true);
+ assert.equal(remainingUsage({...snapshot(),buckets:undefined} as any,'claude',[],now),null);
+});
 test('compact allowance reflects the limiting shared or selected-model window',()=>{
   assert.equal(remainingUsage(snapshot(bucket('Codex',[73,39]),bucket('Other model',[1])), 'codex',['gpt-test'],now),39);
   assert.equal(remainingUsage(snapshot(bucket('Claude',[80,60]),bucket('Sonnet',[42]),bucket('Opus',[3])), 'claude',['claude-sonnet-test'],now),42);

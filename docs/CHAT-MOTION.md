@@ -64,3 +64,63 @@ projects and recent chats. Project buttons toggle a chat filter; they do not swi
 the open conversation. Search, provider choice, running status, keyboard navigation,
 width resizing and collapse persistence remain available. Dates and project details
 are in chat-row tooltips rather than repeated on every row.
+
+## Buffered presentation refinement (unreleased)
+
+The existing grapheme-safe presentation buffer now drains network bursts within
+750 ms, using a short initial hold and backlog-dependent pacing. Completion drains
+the remaining presentation within 220 ms. These are foreground scheduling targets;
+hidden or overloaded browsers can delay animation frames. Speed zero and reduced
+motion reveal the full text immediately. Provider text remains authoritative.
+
+Partial and completed responses share their React/Markdown identity, so completion
+keeps the displayed prefix and continues the same buffer instead of replaying or
+replacing it. Stale shorter streaming snapshots cannot rewind visible text; final
+corrections remain authoritative. Loaded history appears immediately. These changes
+extend the existing implementation after reviewing the pinned AionUi typing hook;
+no upstream code or new animation dependency is bundled.
+
+All ordinary assistant text and images remain visible above the turn's collapsed
+Thinking group while work continues. Thinking contains internal reasoning, tools
+and service events only. History pagination briefly retains its visible anchor
+while Markdown finishes layout; manual input cancels that adjustment.
+
+Floating chrome uses a softer 14 px backdrop blur. Allowance is drawn around the Send/primary Stop control without reserving
+a separate width column. The sidebar library
+uses one full-height scroll area for navigation, projects and recent conversations.
+Saved chats resume without a manual PC-finished prompt. Independent interactive
+histories can run in one project; duplicate history writers, provider locks and
+server capacity limits remain enforced. Task-pipeline project isolation is retained.
+
+## Typography and live backgrounds (unreleased)
+
+Reviewed AionUi's pinned `Messages/components/MessageText.tsx` and
+`components/Markdown/index.tsx`: message identity, Markdown rendering, code/media
+renderers and presentation styles remain separate. Pocket Code retains its own
+Streamdown/assistant-ui pipeline and safe content handling; it does not import
+AionCore or upstream raw-HTML rendering. Shared prose roles now govern headings,
+paragraph/list rhythm, code fonts and action-icon metrics. Existing text-size,
+line-spacing and alignment preferences remain authoritative.
+
+Appearance offers Golos Text, Manrope and System for chat prose/input. Golos Text
+remains the bundled Cyrillic-capable default, Manrope handles headings and
+JetBrains Mono handles chat code. Review keeps its existing measured monospace
+stack. Golos Text, Manrope and JetBrains Mono faces are bundled; System uses
+device fonts. No remote font service is required.
+
+The background catalog now has ten original React Bits effects: DarkVeil, Aurora,
+Iridescence, SoftAurora, Grainient, LightPillar, Galaxy, LiquidChrome, Plasma and
+FloatingLines. Source attribution and lifecycle adaptations are in
+[the vendor source record](../src/vendor/react-bits/SOURCE.md). Removed effects
+and their posters are no longer shipped by this catalog. Stored removed IDs
+fall back to DarkVeil. Active shaders receive the actual theme/custom color;
+static posters no longer show underneath live artwork. Preview remains available
+when the chat background is disabled, stays visible while adjusting controls,
+and is exempt from the embedded-chat background suppression rule.
+
+One footer row contains composer actions on narrow layouts. The allowance ring
+surrounds Send, or primary Stop while a turn runs, on both desktop and phone.
+The center sends/stops, the outer annulus opens details, hover/focus shows the
+percentage, and keyboard activation remains a separate accessible quota action.
+The ring cannot intercept center clicks. Malformed host usage responses show an
+unavailable state instead of crashing the details view.

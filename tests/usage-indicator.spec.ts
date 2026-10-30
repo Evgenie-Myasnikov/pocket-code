@@ -1,5 +1,6 @@
 import {openChatList,newChat,chooseProvider,openSection} from './chat-navigation';
 import {connectByQr} from './qr-connect';
+import {desktop} from './desktop-fixture';
 import {test,expect,type Page} from '@playwright/test';
 const snapshot=(name:string,value:number)=>({checkedAt:Date.now(),ordinaryUsageAllowed:null,buckets:[{id:'quota',name,windows:[{id:'primary',remainingPercent:value,usedPercent:100-value,windowDurationMins:300,resetsAt:null},{id:'secondary',remainingPercent:90,usedPercent:10,windowDurationMins:10080,resetsAt:null}]}]});
 async function open(page:Page){
@@ -9,18 +10,14 @@ async function open(page:Page){
   await page.route('**/api/sessions/quota-chat/messages?*',route=>route.fulfill({json:{messages:[{id:'answer',role:'assistant',blocks:[{type:'text',text:'Example response'}]}],previous:null,next:null}}));
   await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:'Quota example',exact:false}).click();
 }
-test('right-side ring shows remaining allowance and opens details without losing the chat draft',async({page})=>{
-  await page.setViewportSize({width:320,height:640});
-  await page.route('**/api/claude/usage',route=>route.fulfill({json:snapshot('Claude',42)}));
-  await open(page);const indicator=page.locator('.usage-indicator');await expect(indicator).toHaveText('42%');
-  await expect(indicator.locator('.usage-value')).toHaveAttribute('stroke-dasharray','42 100');
-  await expect(page.locator('.prompt-composer .usage-indicator')).toHaveCount(0);await expect(indicator.getByRole('tooltip')).toBeHidden();await indicator.hover();await expect(indicator.getByRole('tooltip')).toHaveText('42%');await expect(indicator.getByRole('tooltip')).toBeVisible();const composer=await page.locator('.prompt-composer').boundingBox();expect((await indicator.boundingBox())!.x).toBeGreaterThanOrEqual(composer!.x+composer!.width);
-  const bounds=await indicator.boundingBox();expect(bounds!.width).toBeGreaterThanOrEqual(48);expect(bounds!.height).toBeGreaterThanOrEqual(48);expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(320);
-  const send=page.locator('.send-button');expect((await send.boundingBox())!.width).toBeGreaterThanOrEqual(48);
-  expect(await send.evaluate(element=>Number.parseFloat(getComputedStyle(element,'::before').width))).toBeLessThanOrEqual(36);
-  await page.getByLabel('Message Claude').fill('Keep this draft');await page.screenshot({path:'artifacts/screenshots/chat-usage-ring.png'});await indicator.click();
-  await expect(page.locator('.codex-usage')).toContainText('42% remaining');await openSection(page,'Chats');await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');
+test('Send remains clickable in the center of the allowance ring',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await desktop(page);await page.locator('.desktop-sessions button').first().click();
+ await page.getByLabel('Message Claude',{exact:true}).fill('Send through the center');await page.locator('.send-button').click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((call:any)=>call.endpoint==='/jobs'&&call.action==='write').length)).toBe(1);
+ await expect(page.locator('.composer-submit .stop-button')).toBeVisible();await expect(page.locator('.composer-submit .usage-indicator')).toHaveCount(1);
+ const control=page.locator('.composer-submit .usage-indicator');await control.focus();await page.keyboard.press('Enter');await expect(page.locator('.codex-usage')).toBeVisible();
 });
+
 test('background polling pauses and a failed refresh becomes unknown rather than a stale current percentage',async({page})=>{
   await page.setViewportSize({width:390,height:844});let fail=false,reads=0;
   await page.route('**/api/claude/usage',route=>{reads++;return fail?route.fulfill({status:503,json:{error:'Unavailable'}}):route.fulfill({json:snapshot('Claude',18)});});
@@ -37,10 +34,17 @@ test('switching providers discards late quota responses',async({page})=>{
   await open(page);await expect.poll(()=>started).toBeGreaterThan(0);await page.getByRole('button',{name:'Back to chats',exact:true}).click();await chooseProvider(page,'codex');await page.getByRole('button',{name:'Quota example',exact:false}).click();await expect(page.locator('.usage-indicator')).toHaveText('67%');release();await expect(page.locator('.usage-indicator')).toHaveAccessibleName('Codex: 67% allowance remaining');
 });
 
-for(const width of [320,390,1440])test(`quota is outside glass with hover percentage and click details at ${width}`,async({page})=>{
+for(const width of [320,390,1440])test(`quota ring surrounds Send with separate limit controls at ${width}`,async({page})=>{
  await page.setViewportSize({width,height:840});await page.route('**/api/claude/usage',route=>route.fulfill({json:snapshot('Claude',42)}));await open(page);
- const ring=page.locator('.usage-indicator'),form=page.locator('.prompt-composer');await expect(ring).toHaveAccessibleName('Claude: 42% allowance remaining');await expect(form.locator('.usage-indicator')).toHaveCount(0);
- await page.mouse.move(0,0);await expect(ring.getByRole('tooltip')).toBeHidden();const r=(await ring.boundingBox())!,f=(await form.boundingBox())!;expect(r.x).toBeGreaterThanOrEqual(f.x+f.width);const ringBox=(await ring.locator('svg').boundingBox())!;expect(ringBox.x-f.x-f.width).toBeGreaterThanOrEqual(6);expect(ringBox.x-f.x-f.width).toBeLessThanOrEqual(8);expect(r.x+r.width).toBeLessThanOrEqual(width);expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
- if(width===320){const models=(await page.locator('.composer-models').boundingBox())!,actions=(await page.locator('.composer-actions').boundingBox())!;expect(actions.y).toBeGreaterThanOrEqual(models.y+models.height-1);}
- await page.getByLabel('Message Claude').fill('Keep quota draft');await page.screenshot({path:`.local/quota-glass-${width}.png`,animations:'disabled'});await ring.hover();await expect(ring.getByRole('tooltip')).toBeVisible();await expect(ring.getByRole('tooltip')).toHaveText('42%');await ring.click();await expect(page.locator('.codex-usage')).toContainText('42% remaining');await openSection(page,'Chats');await expect(page.getByLabel('Message Claude')).toHaveValue('Keep quota draft');
+ const ring=page.locator('.usage-indicator'),form=page.locator('.prompt-composer'),send=page.locator('.send-button'),submit=page.locator('.composer-submit');
+ await expect(ring).toHaveAccessibleName('Claude: 42% allowance remaining');await expect(submit.locator('.usage-indicator')).toHaveCount(1);
+ await page.mouse.move(0,0);await expect(ring.getByRole('tooltip')).toBeHidden();
+ const r=(await ring.boundingBox())!,s=(await send.boundingBox())!,f=(await form.boundingBox())!;
+ expect(Math.abs(r.x+r.width/2-s.x-s.width/2)).toBeLessThanOrEqual(.5);expect(Math.abs(r.y+r.height/2-s.y-s.height/2)).toBeLessThanOrEqual(.5);
+ expect(r.width).toBe(s.width);expect(r.x+r.width).toBeLessThanOrEqual(f.x+f.width);expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+ if(width<=600){expect(f.width).toBeGreaterThan(width-60);const models=(await page.locator('.composer-models').boundingBox())!,actions=(await page.locator('.composer-actions').boundingBox())!;expect(Math.abs(actions.y-models.y)).toBeLessThanOrEqual(6);}
+ await page.getByLabel('Message Claude').fill('Keep quota draft');await page.screenshot({path:`.local/quota-send-${width}.png`,animations:'disabled'});
+ await submit.hover();await expect(ring.getByRole('tooltip')).toBeVisible();await expect(ring.getByRole('tooltip')).toHaveText('42%');
+ await ring.click({position:{x:r.width/2,y:1}});await expect(page.locator('.codex-usage')).toContainText('42% remaining');await openSection(page,'Chats');await expect(page.getByLabel('Message Claude')).toHaveValue('Keep quota draft');
+ await ring.focus();await page.keyboard.press('Enter');await expect(page.locator('.codex-usage')).toContainText('42% remaining');
 });
