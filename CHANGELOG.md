@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.28.27 (2026-10-30)
+
+Release preparation: Android versionCode 114 on release/0.28.1. Current release candidate: 24 scoped browser scenarios, five privacy-guard checks, TypeScript/Vite build, 28-document links and 42-card schema/dependencies passed. Exact source/package/CI/publication verification pending.
+
+### Features
+- Appearance: independently hide the animated backdrop behind the conversation, transparent controls/composer and chat sidebar with opaque theme surfaces. Preserve existing preferences and the global background toggle, keep the settings preview live and remove the shared shader when every relevant area is disabled. Validation: eight scoped browser scenarios passed for persistence/reset, older and malformed settings, independent region styling, all-off renderer removal, preview/color/pause and composer/menu diffusion. Physical devices remain untested; not published.
+
+### Bug Fixes
+- Desktop chat: hide the duplicate top title while the chat sidebar is expanded; keep overflow actions, restore the title when collapsed and preserve phone/board-chat navigation. Validation: seven scoped sidebar/board-chat browser scenarios and TypeScript/Vite build passed. Not published.
+- Composer: move frosted glass into a separate backing layer so text behind the input is diffused without making the form a backdrop root. Portal the access menu to the document layer with retained outside-click, focus, resize/scroll positioning and keyboard selection/dismissal. Theme model/effort dropdowns through native base-select/picker support, with color-scheme and opaque accessibility fallbacks.
+- Validation: 12 scoped browser checks passed for actual composer/menu backdrop pixels, themed picker opening/Escape, provider model/effort requests and quota geometry at 320/390/1440px. TypeScript/Vite build passed; synthetic captures inspected. Two existing Russian 320px size checks still fail their minimum 40px control assertion while page width and control bounds pass; retained unchanged and not counted as passing. Physical devices and older native-select fallback rendering remain unverified. Not published.
+
 ## [0.28.26](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.24...v0.28.26) (2026-10-30)
 
 Published [v0.28.26](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.26) from [4ebb06acbcda63604e946f4968aa58dc234941f3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/4ebb06acbcda63604e946f4968aa58dc234941f3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 113. Both exact-source GitHub CI runs passed; GitHub server-side SHA-256 digests/sizes for all four assets match the audited local packages. Direct binary downloads are delayed on the verification connection and are not counted as completed. Shared 141 web files and 400 source files match packages; 1812 decoded entries audited, APK signer unchanged. Eleven scoped browser scenarios and TypeScript/Vite build passed. Physical devices remain untested.

@@ -1,4 +1,5 @@
 import {useEffect,useId,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {ShieldCheck,ShieldAlert,FilePen,ListChecks,Bot,ChevronDown} from 'lucide-react';
 import {t,useLanguage} from './i18n';
 import type {WorkspaceProvider} from './preferences';
@@ -25,20 +26,22 @@ export function AccessModeChip({provider,value,onChange,running=false,liveChange
   useLanguage();
   const options=accessOptions(provider),current=options.find(option=>option.value===value)||options[0];
   const [open,setOpen]=useState(false),[confirming,setConfirming]=useState<AccessMode|null>(null),[place,setPlace]=useState<{left:number;bottom:number}>({left:8,bottom:80});
-  const root=useRef<HTMLDivElement>(null),menu=useId();
+  const root=useRef<HTMLDivElement>(null),popup=useRef<HTMLDivElement>(null),menu=useId();
   useEffect(()=>{if(!open)return;
-    const away=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node))setOpen(false);};
+    const away=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node)&&!popup.current?.contains(event.target as Node))setOpen(false);};
     const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.stopPropagation();setOpen(false);root.current?.querySelector<HTMLButtonElement>('.access-chip')?.focus();}};
     document.addEventListener('pointerdown',away);document.addEventListener('keydown',key,true);
-    requestAnimationFrame(()=>root.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus());
-    return()=>{document.removeEventListener('pointerdown',away);document.removeEventListener('keydown',key,true);};
+    requestAnimationFrame(()=>popup.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus());
+    const reposition=()=>{const rect=root.current?.getBoundingClientRect();if(rect)setPlace({left:Math.max(8,Math.min(rect.left,innerWidth-308)),bottom:Math.max(8,innerHeight-rect.top+6)});};
+    window.addEventListener('resize',reposition);window.addEventListener('scroll',reposition,true);
+    return()=>{document.removeEventListener('pointerdown',away);document.removeEventListener('keydown',key,true);window.removeEventListener('resize',reposition);window.removeEventListener('scroll',reposition,true);};
   },[open]);
   if(!current)return null;
   const choose=(option:Option)=>{
     // The riskiest mode asks once per device before it is used.
     if(option.danger&&!fullConfirmed()&&confirming!==option.value){setConfirming(option.value);return;}
     if(option.danger)try{localStorage.setItem(confirmedKey,'1');}catch{/* Ask again next time. */}
-    setConfirming(null);setOpen(false);onChange(option.value);
+    setConfirming(null);setOpen(false);onChange(option.value);root.current?.querySelector<HTMLButtonElement>('.access-chip')?.focus();
   };
   // Claude changes Ask/Edits/Plan inside a running turn; everything else applies to the next message.
   const pending=(option:Option)=>running&&!(liveChange&&option.value!=='bypassPermissions');
@@ -50,11 +53,11 @@ export function AccessModeChip({provider,value,onChange,running=false,liveChange
         setConfirming(null);setOpen(value=>!value);}}>
       <current.Icon size={16} aria-hidden="true"/><span>{current.label}</span><ChevronDown size={14} aria-hidden="true"/>
     </button>
-    {open&&<div className="access-menu" id={menu} role="menu" aria-label={t('Режим доступа')} style={{left:place.left,bottom:place.bottom}}>
+    {open&&createPortal(<div ref={popup} className="access-menu" id={menu} role="menu" aria-label={t('Режим доступа')} style={{left:place.left,bottom:place.bottom}}>
       {options.map(option=><button key={option.value} type="button" role="menuitemradio" aria-checked={option.value===value} data-danger={option.danger||undefined} onClick={()=>choose(option)}
         onKeyDown={event=>{const items=[...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role=menuitemradio]')||[])],index=items.indexOf(event.currentTarget);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();items[(index+(event.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus();}}}>
         <option.Icon size={20} aria-hidden="true"/><span><strong>{option.label}</strong><small>{confirming===option.value?t('Нажмите ещё раз, чтобы включить полный доступ для этого чата.'):option.note}{pending(option)&&option.value!==value?' · '+t('со следующего сообщения'):''}</small></span>
       </button>)}
-    </div>}
+    </div>,document.body)}
   </div>;
 }

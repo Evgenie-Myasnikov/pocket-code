@@ -184,7 +184,7 @@ export function DesktopApp(){
     ['Ctrl+Shift+D',label('Open Review','Открыть Review')],['N / P',label('Review: next or previous file','Review: следующий или предыдущий файл')],['V',label('Review: mark the file viewed','Review: отметить файл просмотренным')],['Ctrl+B',label('Review: one or two columns','Review: одна или две колонки')],['Ctrl+Shift+M',label('Access mode of the chat','Режим доступа чата')],['Ctrl+Shift+I',label('Model','Модель')],['Ctrl+Shift+E',label('Reasoning effort','Глубина рассуждений')],
     ['Esc',label('Close a panel or dialog; in a running chat, stop the agent','Закрыть панель или диалог; в работающем чате — остановить агента')]];
   const connectionPanel=<DesktopConnection state={state} action={action} onState={setState} label={label}/>;
-  return <div className="desktop-app" style={{['--desktop-rail-width' as string]:railCollapsed?'52px':railWidth===null?'clamp(280px,calc(310px * var(--ui-scale,1)),380px)':railWidth+'px'}}><ChatAtmosphere active={page==='chats'} empty={false}/>
+  return <div className="desktop-app" style={{['--desktop-rail-width' as string]:railCollapsed?'52px':railWidth===null?'clamp(280px,calc(310px * var(--ui-scale,1)),380px)':railWidth+'px'}}><ChatAtmosphere active={page==='chats'} empty={false} surface="desktop"/>
     {page==='workspace'&&<WorkspaceIdentity connection={state.online?connection:null} value={projectSpaces}/>}
     <aside className={'desktop-rail'+(railCollapsed?' rail-collapsed':'')} aria-label={label('Sidebar','Боковая панель')}>
       {!railCollapsed&&<RailResizer width={railWidth} onChange={setRailWidth}/>}

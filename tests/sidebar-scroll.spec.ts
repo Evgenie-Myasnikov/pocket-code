@@ -3,6 +3,9 @@ import {desktop} from './desktop-fixture';
 
 test('a saved desktop chat sends immediately and accepts another message while running',async({page})=>{
  await desktop(page);await page.locator('.desktop-sessions button').first().click();
+ const title=page.locator('.desktop-chat-host .header-title');await expect(title).toBeHidden();
+ await page.locator('.desktop-chat-host .chat-menu-button').click();await expect(page.getByRole('menu',{name:'More actions',exact:true})).toBeVisible();await page.keyboard.press('Escape');
+ await page.locator('.desktop-rail-heading button').click();await expect(title).toBeVisible();await page.locator('.desktop-rail-heading button').click();await expect(title).toBeHidden();
  const input=page.getByLabel('Message Claude',{exact:true});await input.fill('Start this saved chat');await page.locator('.send-button').click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((call:any)=>call.endpoint==='/jobs'&&call.action==='write').length)).toBe(1);
  await expect(page.getByRole('dialog')).toHaveCount(0);await expect(input).toBeEnabled();await input.fill('Continue with this clarification');await page.locator('.send-button').click();

@@ -110,3 +110,50 @@
 }
 
 .speech-settings{display:grid;gap:12px;border:0;padding:0;margin-block:24px;min-width:0}.speech-settings label{display:grid;gap:8px}.speech-settings select{max-width:100%;min-height:44px}.speech-settings legend{font-weight:var(--fw-semibold)}
+
+/* Keep frosting separate from the form so floating controls do not inherit a backdrop root. */
+.chat-canvas .composer-with-usage{position:relative;isolation:isolate;border-radius:28px}
+.chat-canvas .composer-with-usage::before{content:'';position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:var(--panel)}
+:root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
+@supports(backdrop-filter:blur(1px)){
+ .chat-canvas .composer-with-usage::before{background:color-mix(in srgb,var(--panel) 76%,transparent);backdrop-filter:var(--composer-backdrop,blur(14px) saturate(110%));-webkit-backdrop-filter:var(--composer-backdrop,blur(14px) saturate(110%))}
+ :root[data-theme][data-theme] .access-menu{background:color-mix(in srgb,var(--panel) 84%,transparent);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain}
+}
+
+:root[data-theme=dark] :is(.model-picker>select,select.effort-picker){color-scheme:dark}
+:root[data-theme=light] :is(.model-picker>select,select.effort-picker){color-scheme:light}
+:is(.model-picker>select,select.effort-picker) option{background:var(--panel);color:var(--text)}
+@supports(appearance:base-select){
+ :is(.model-picker>select,select.effort-picker),:is(.model-picker>select,select.effort-picker)::picker(select){appearance:base-select}
+ :is(.model-picker>select,select.effort-picker){align-items:center;gap:8px;overflow:hidden;white-space:nowrap}
+ :is(.model-picker>select,select.effort-picker)::picker(select){
+  box-sizing:border-box;min-width:160px;max-width:calc(100vw - 24px);max-height:min(360px,60dvh);padding:6px;
+  border:1px solid var(--line);border-radius:var(--ui-radius-control);background:color-mix(in srgb,var(--panel) 88%,transparent);color:var(--text);
+  box-shadow:var(--ui-material-shadow);backdrop-filter:blur(14px) saturate(110%);-webkit-backdrop-filter:blur(14px) saturate(110%);font:inherit;overscroll-behavior:contain;
+ }
+ :is(.model-picker>select,select.effort-picker) option{min-height:40px;padding:8px 12px;border:0;border-radius:9px;background:transparent;color:var(--text);white-space:normal;overflow-wrap:anywhere}
+ :is(.model-picker>select,select.effort-picker) option:is(:hover,:focus-visible,:checked){background:var(--ui-material-inset)}
+ :is(.model-picker>select,select.effort-picker) option::checkmark{color:var(--accent)}
+ :is(.model-picker>select,select.effort-picker)::picker-icon{color:var(--muted);flex:none}
+}
+@media(prefers-reduced-transparency:reduce),(forced-colors:active){
+ .chat-canvas .composer-with-usage::before,:root[data-theme][data-theme] .access-menu,:is(.model-picker>select,select.effort-picker)::picker(select){background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+@media(forced-colors:active){
+ .chat-canvas .composer-with-usage::before,:root[data-theme][data-theme] .access-menu,:is(.model-picker>select,select.effort-picker)::picker(select){background:Canvas;color:CanvasText;border-color:CanvasText}
+}
+
+/* Opaque regions hide the shared animated canvas without adding more WebGL renderers. */
+.background-regions{display:grid;gap:12px;padding-block:8px}
+:root[data-background-chat=false][data-theme] .workspace.chat-canvas>.conversation{background:var(--bg)}
+:root[data-background-sidebar=false][data-theme][data-theme] :is(.desktop-app.desktop-app>.desktop-rail,.app>.sidebar){background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none}
+:root[data-background-controls=false] .chat-canvas .composer-with-usage::before,
+:root[data-background-controls=false][data-theme][data-theme] :is(header.chat-header-conversation .header-title,header.chat-header-conversation .chat-header-actions>button,.chat-header-main>.mobile-back,.chat-menu,.access-menu,.composer-add-menu,.model-catalog-note,.provider-picker-menu,.scroll-latest,.chat-scroll-actions>button){background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}
+:root[data-background-controls=false] :is(.model-picker>select,select.effort-picker)::picker(select){background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}
+@media(forced-colors:active){
+ :root[data-background-chat=false][data-theme] .workspace.chat-canvas>.conversation,
+ :root[data-background-sidebar=false][data-theme][data-theme] :is(.desktop-app.desktop-app>.desktop-rail,.app>.sidebar),
+ :root[data-background-controls=false] .chat-canvas .composer-with-usage::before,
+ :root[data-background-controls=false][data-theme][data-theme] :is(.chat-menu,.access-menu,.composer-add-menu,.model-catalog-note,.provider-picker-menu,.scroll-latest,.chat-scroll-actions>button),
+ :root[data-background-controls=false] :is(.model-picker>select,select.effort-picker)::picker(select){background:Canvas}
+}
