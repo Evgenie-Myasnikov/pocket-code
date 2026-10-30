@@ -2,6 +2,8 @@
 
 ## Unreleased (0.28.23)
 
+Release source: [7837b2582e766e9f11fca2ffe51e55de76ebbaf9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/7837b2582e766e9f11fca2ffe51e55de76ebbaf9) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 110. Android/Windows/host packages verified: 124 shared web files and 402 source inputs match, 1748 decoded artifact entries audited; APK signer unchanged. Source CI passed. Sixteen scoped browser checks, one additional real browser audio playback probe, ten server/unit checks and 13 native policy checks passed. Physical Android audio remains untested. Publication pending.
+
 ### Features
 - Release verification: 16 scoped browser scenarios and 10 server/unit checks passed, including native speech; 13 Windows policy checks passed. Archive the existing UI card chronology to a linked history document to keep its current description within schema limits.
 - Read aloud: add persistent System/Supertonic 3 engine and ten-speaker selection with Preview/Stop in appearance settings. Install the fixed model on the host with SHA-256 verification; generate audio in native workers and use the selected speaker in chat. Keep model weights separate from releases, retain model license, and allow only scoped authenticated API/native-bridge routes.
