@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.28.29 (2026-10-30)
+## [0.28.29](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.27...v0.28.29) (2026-10-30)
 
-Source: [14b60c99dc71b1df7fab2301d0e6d885ac8ea8b3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/14b60c99dc71b1df7fab2301d0e6d885ac8ea8b3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 116. All 142 shared web files and 400 source files match APK/Windows/host; 1816 decoded artifact entries audited, APK signing identity unchanged. 42 scoped browser scenarios, 12 unit/privacy checks and TypeScript/Vite build passed. Exact-source CI/publication verification pending. First-ever uncached history remains provider/network-bound; physical-device and historical coverage limitations remain explicit.
+Published [v0.28.29](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.29) from [14b60c99dc71b1df7fab2301d0e6d885ac8ea8b3](https://github.com/Evgenie-Myasnikov/pocket-code/commit/14b60c99dc71b1df7fab2301d0e6d885ac8ea8b3) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 116. Both exact-source CI runs, 42 scoped browser scenarios, 12 unit/privacy checks and TypeScript/Vite build passed. All 142 shared web files and 400 source files match APK/Windows/host; 1816 decoded artifact entries audited, APK signing identity unchanged. GitHub server-side SHA-256 digests/sizes for all four public assets, exact source tag and branch ancestry verified; latest-release API returns v0.28.29. First-ever uncached history remains provider/network-bound. Physical devices, older-browser fallback and historical excluded regressions remain unverified.
 
 ### Bug Fixes
 - Desktop saved-chat navigation: reuse the mounted shared chat runtime, show existing cached history before network refresh and avoid repeating the health handshake on every switch. Preserve separate drafts, provider/new-chat/board-generation isolation, and stale-response guards; treat expired live-job links as saved history except pending-only sessions. New/uncached history still needs its initial provider response.
