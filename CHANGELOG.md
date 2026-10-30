@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased (0.28.22)
+## [0.28.22](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.21...v0.28.22) (2026-10-30)
 
-Source: [8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8](https://github.com/Evgenie-Myasnikov/pocket-code/commit/8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 109; Android/Windows/host packages verified, 124 web files and 395 source files match, 1734 decoded entries audited; signer unchanged. Source CI passed. Publication pending.
+Source: [8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8](https://github.com/Evgenie-Myasnikov/pocket-code/commit/8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 109; Android/Windows/host packages verified, 124 web files and 395 source files match, 1734 decoded entries audited; signer unchanged. Source CI passed. Published [v0.28.22](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.22); all four downloaded hashes and exact tag verified.
 
 ### Features
 - Board: replace dots with a coordinate-aligned line grid that follows pan/zoom and adapts spacing at distant zoom.
@@ -18,7 +18,7 @@ Source: [8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8](https://github.com/Evgenie-My
 - Initial grid/material validation: 15 distinct scoped browser scenarios passed across background persistence/motion, grid, menus, divider/card scrolling, settings and palette contrast; four token unit checks, TypeScript/Vite build, board schema and documentation checks passed. Synthetic light/dark captures inspected.
 - Correction validation: all 11 upstream effects rendered/resized in React Strict Mode without WebGL errors and stopped drawing when paused; background persistence, light/dark glass/menu checks, five board/chat-layout checks and quota hover/details/draft retention at 320/390/1440px passed. Four token unit checks and TypeScript/Vite build passed. Synthetic thumbnails and glass captures inspected.
 - Quota regression suite: polling/provider-switch checks passed; the older layout test still expects a 48px Send target but the existing compact mobile style uses 44px. This assertion was retained and is not counted as passing.
-- Follow-up: broader `chat-surfaces` test timed out waiting for the absent `.chat-context` header element; that suite was interrupted and is not counted as passing. Physical devices and a complete screen-by-screen interaction audit remain unverified. No release published.
+- Follow-up: broader `chat-surfaces` test timed out waiting for the absent `.chat-context` header element; that suite was interrupted and is not counted as passing. Physical devices and a complete screen-by-screen interaction audit remain unverified. Published as 0.28.22.
 
 ## [0.28.21](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.20...v0.28.21) (2026-10-29)
 
