@@ -518,11 +518,12 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   }
   useEffect(()=>{if(!boardChat?.conversation||!job)return;try{attachBoardConversation(boardChat.conversation,provider,job.sessionId,job.id);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}},[boardChat?.conversation?.key,boardChat?.conversation?.generation,provider,job?.id,job?.sessionId]);
   useEffect(()=>{if(embedded&&!embedded.session&&job?.sessionId&&(!boardChat?.conversation||currentBoardConversation(boardChat.conversation)))embedded.onCreated?.({sessionId:job.sessionId,cwd:job.cwd,summary:job.messages.find(m=>m.role==='user')?.blocks.find(b=>b.type==='text')?.text||'New',lastModified:job.startedAt},job);},[job?.sessionId]);
-  const embeddedOpened=useRef(false);
-  useEffect(()=>{if(!embedded||!health||!connection||embeddedOpened.current)return;embeddedOpened.current=true;setBoardChat(embedded.boardChat||null);projectChosen.current=true;setCwd(embedded.cwd);
-    if(embedded.session){void (async()=>{try{let active:JobView|undefined;try{active=embedded.jobId?await request<JobView>(connection,'/jobs/'+embedded.jobId):undefined;}catch(e){if((e as {status?:number}).status!==404||embedded.session!.sessionId.startsWith('pending-'))throw e;}await openSession(embedded.session!,active,embedded.boardChat);if(embedded.boardChat?.followUp)appendDraft(embedded.boardChat.prompt);}catch(e){if(embedded.boardChat?.conversation)setBoardMissing(true);setError((e as Error).message);}})();}
+  const embeddedTarget=embedded?.session?.sessionId||'new:'+embedded?.cwd;
+  const embeddedOpened=useRef<string|null>(null);
+  useEffect(()=>{if(!embedded||!health||!connection||busy||uploading||embeddedOpened.current===embeddedTarget)return;embeddedOpened.current=embeddedTarget;setBoardChat(embedded.boardChat||null);projectChosen.current=true;setCwd(embedded.cwd);
+    if(embedded.session){void openSession(embedded.session,embedded.jobId?{id:embedded.jobId,sessionId:embedded.session.sessionId}:undefined,embedded.boardChat).then(()=>{if(embeddedOpened.current===embeddedTarget&&embedded.boardChat?.followUp)appendDraft(embedded.boardChat.prompt);});}
     else {newChat(embedded.cwd,embedded.boardChat);if(embedded.boardChat)setDraft(embedded.boardChat.context?t('Discuss this board with me.'):embedded.boardChat.prompt);else if(embedded.draft)setDraft(embedded.draft);}
-  },[health,connection,embedded]);
+  },[health,connection,embeddedTarget,busy,uploading]);
   // The desktop keeps this chat mounted when the board opens the same task chat again: a later follow-up still reaches the draft.
   const lastBoardChat=useRef(embedded?.boardChat);
   useEffect(()=>{const next=embedded?.boardChat;if(!next||next===lastBoardChat.current)return;lastBoardChat.current=next;if(embeddedOpened.current&&next.followUp)appendDraft(next.prompt);},[embedded?.boardChat]);
@@ -724,6 +725,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   useEffect(()=>{if(!boardChat||boardChat.context||boardChat.taskRun||!job?.sessionId||!connection)return;const target=boardChat;setBoardChat(null);void (async()=>{try{const b=await request<any>(connection,'/boards/'+target.boardId);await request(connection,'/boards/'+b.id,{revision:b.revision,versions:b.versions,notes:b.notes.map((n:any)=>n.id===target.note.id?{...n,chat:{provider,sessionId:job.sessionId}}:n)});}catch(e){setError((e as Error).message);}})();},[job?.sessionId,boardChat,connection]);
   async function openSession(s: Session, activeJob?: Pick<JobView,'id'|'sessionId'>,context?:BoardChat) {
     if (busy || uploading) return;
+    setReviewOpen(false);setReviewPaths(undefined);
     rememberPosition();rememberDraft();setBoardChat(context||null);setBoardMissing(false);releasePending(true);setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
     const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
@@ -737,7 +739,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       const view=cacheScope?await readHistoryView(cacheScope,provider,s.sessionId):undefined;
       if(epoch!==navigation.current)return;
       if(view&&view.fromStart===(savedPosition?.fromStart||false)&&Array.isArray(view.messages)){historyWindow.current=Math.max(historyWindow.current,view.window);setHistory(view.messages);setHasMore(view.hasMore);}
-      let full:JobView|null=null;if(active){try{full=await api<JobView>(`/jobs/${active.id}`);}catch(e){if(!context?.conversation||s.sessionId.startsWith('pending-')||(e as {status?:number}).status!==404)throw e;}}
+      let full:JobView|null=null;if(active){try{full=await api<JobView>(`/jobs/${active.id}`);}catch(e){if(s.sessionId.startsWith('pending-')||(e as {status?:number}).status!==404)throw e;}}
       if (epoch !== navigation.current) return;
       if(full&&(full.provider||'claude')!==provider)throw new Error(t('Чат относится к другому рабочему пространству.'));
       if(full)setHistory([]);
