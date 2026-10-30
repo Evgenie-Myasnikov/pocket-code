@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased (2026-10-30)
+## Unreleased (0.28.22)
+
+Source: [8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8](https://github.com/Evgenie-Myasnikov/pocket-code/commit/8fccb87b4ef4d5a9f48f52200f14f7eddfba7ef8) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 109; Android/Windows/host packages verified, 124 web files and 395 source files match, 1734 decoded entries audited; signer unchanged. Source CI passed. Publication pending.
 
 ### Features
 - Board: replace dots with a coordinate-aligned line grid that follows pan/zoom and adapts spacing at distant zoom.
