@@ -27,16 +27,17 @@ export const MessageList=memo(function MessageList({messages,partialText,running
   // if their run is still active. Only newly arriving messages start from empty.
   const initialIds=useRef(new Set(messages.map(message=>message.id)));
   const sequence=useRef(0),mounted=useRef(false);
-  const pending=useRef<{text:string;key:string;animate:boolean;seen:Set<string>}|null>(null),delivered=useRef(new Map<string,{key:string;animate:boolean}>());
+  const textOf=(message:ChatMessage)=>message.blocks.filter(block=>block.type==='text').map(block=>block.text||'').join('\n');
+  const pending=useRef<{text:string;key:string;animate:boolean;seen:Map<string,string>}|null>(null),delivered=useRef(new Map<string,{key:string;animate:boolean}>());
   let completed:ChatMessage|undefined;
   if(pending.current){
     const prior=pending.current;
-    completed=[...messages].reverse().find(message=>!prior.seen.has(message.id)&&message.role==='assistant'&&message.blocks.some(block=>block.type==='text'&&(block.text?.startsWith(prior.text)||!partialText)));
+    completed=[...messages].reverse().find(message=>message.role==='assistant'&&prior.seen.get(message.id)!==textOf(message)&&message.blocks.some(block=>block.type==='text'&&block.text&&(block.text.startsWith(prior.text)||!partialText)));
     if(completed){delivered.current.set(completed.id,prior);pending.current=null;}
   }
-  if(partialText&&(!completed||!completed.blocks.some(block=>block.type==='text'&&block.text===partialText))){
+  if(partialText&&(!completed||!completed.blocks.some(block=>block.type==='text'&&block.text?.startsWith(partialText)))){
     if(pending.current)pending.current.text=partialText;
-    else pending.current={text:partialText,key:`live-response:${++sequence.current}`,animate:mounted.current,seen:new Set(messages.map(message=>message.id))};
+    else pending.current={text:partialText,key:`live-response:${++sequence.current}`,animate:mounted.current,seen:new Map(messages.map(message=>[message.id,textOf(message)]))};
   }
   mounted.current=true;
   const runs=groupThinkingMessages(messages,shared.toolResults,runningMessages),visibleIds=new Set(runs.flatMap(run=>run.message?[run.message.id]:[]));

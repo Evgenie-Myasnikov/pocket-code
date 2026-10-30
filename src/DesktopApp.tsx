@@ -33,7 +33,7 @@ import {ProviderConnections,HostStatus} from './ProviderConnections';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import QRCode from 'qrcode';
 import {releaseRepository} from './release-update';
-import {Home,PanelLeftClose,PanelLeftOpen,MoreHorizontal,ArrowDown,BookOpen,FileText,Check,ChevronRight,Folder,GitCompareArrows,Keyboard,MessageSquare,Monitor,Plus,RefreshCw,Search,Settings,Smartphone,Wifi,X} from 'lucide-react';
+import {Home,PanelLeftClose,PanelLeftOpen,MoreHorizontal,ArrowDown,BookOpen,FileText,Check,ChevronRight,Folder,GitCompareArrows,Keyboard,MessageSquare,Monitor,Plus,RefreshCw,Settings,Smartphone,Wifi,X} from 'lucide-react';
 import {request,type Connection} from './api';
 import {desktopCall,watchDesktop,type DesktopState} from './desktop-bridge';
 import {ConnectionStatus} from './ConnectionStatus';
@@ -115,7 +115,7 @@ export function DesktopApp(){
   const [provider,setProvider]=useState<Provider>(()=>{const value=saved('provider','claude');return value==='codex'||value==='copilot'?value:'claude';});
   const [chatAction,setChatAction]=useState<ChatActionTarget|null>(null),[attachedProjects,setAttachedProjects]=useState<string[]>([]);
   const [projectFilter,setProjectFilter]=useState('');
-  const [project,setProject]=useState(''),[search,setSearch]=useState(''),[sessions,setSessions]=useState<Session[]>([]),[projects,setProjects]=useState<string[]>([]),[jobs,setJobs]=useState<JobView[]>([]);
+  const [project,setProject]=useState(''),[sessions,setSessions]=useState<Session[]>([]),[projects,setProjects]=useState<string[]>([]),[jobs,setJobs]=useState<JobView[]>([]);
   const projectSpaces=useProjectWorkspaces(state.online?connection:null);
   const [noticeTarget,setNoticeTarget]=useState<BoardNoticeTarget|null>(null);
   const [localBoards,setLocalBoards]=useState(true);
@@ -124,9 +124,7 @@ export function DesktopApp(){
   const [creating,setCreating]=useState(false);
   const activity=useActivity(state.online?connection:null);
   const [railCollapsed,setRailCollapsed]=useState(()=>{try{return localStorage.getItem('pocket-desktop-sidebar-collapsed-v1')==='true';}catch{return false;}}),[railMenu,setRailMenu]=useState<{x:number;y:number}|null>(null);
-  const railSearch=useRef<HTMLInputElement>(null);
   function collapseRail(value:boolean){setRailCollapsed(value);try{localStorage.setItem('pocket-desktop-sidebar-collapsed-v1',String(value));}catch{}}
-  function searchChats(){collapseRail(false);requestAnimationFrame(()=>railSearch.current?.focus({preventScroll:true}));}
   function navigateRail(next:'chats'|'work'|'rules'|'changelog'|'settings'){if(next==='settings'&&(page==='settings'||page==='connection'))setSettingsNonce(value=>value+1);setPage(next);if(next==='rules'||next==='changelog')setDocTab(next);}
   const [shortcutsOpen,setShortcutsOpen]=useState(false),composerPreferences=useComposerPreferences();
   const shortcutsSheet=useRef<HTMLElement|null>(null);useModal(shortcutsSheet,shortcutsOpen,()=>setShortcutsOpen(false));
@@ -160,7 +158,7 @@ export function DesktopApp(){
   useEffect(()=>{if(!state.online)return;let alive=true;const load=async()=>{await request<string[]>(connection,'/chat-library/projects').then(data=>{if(alive)setAttachedProjects(data);}).catch(()=>{});};const stop=startVisiblePoll(load,60000);window.addEventListener('pocket-chat-project-added',load);return()=>{alive=false;stop();window.removeEventListener('pocket-chat-project-added',load);};},[state.online,revision]);
   // The Project page follows the chat filter, then the open chat, so both views stay on one folder.
   const projectRoot=project||selected?.cwd||allFolders[0]||'';
-  const visible=chatSessions.filter(item=>(!projectFilter||item.cwd===projectFilter)&&`${item.customTitle||item.summary} ${item.cwd}`.toLowerCase().includes(search.toLowerCase()));
+  const visible=chatSessions.filter(item=>!projectFilter||item.cwd===projectFilter);
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
   async function openBoardChat(target:BoardChat,prepared=false){
     try{if(!prepared)target=await prepareBoardConversation(connection,target,provider);setNotificationChat(null);setDocDraft('');setBoardChat(target);setProject(target.root);if(target.conversation){const saved=readBoardConversation(target.conversation.key);if(saved)setProvider(saved.provider);}if(target.taskRun)setProvider(target.taskRun.provider);if(target.note.chat){setProvider(target.note.chat.provider);setSelected({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});setCreating(false);}else{setSelected(null);setCreating(true);}setPage(target.context?'work':'chats');}catch{setError(label('Could not save the board chat association.','Не удалось сохранить привязку чата доски.'));}
@@ -196,7 +194,6 @@ export function DesktopApp(){
       <div className="desktop-rail-content">
       <div className="desktop-rail-heading"><strong hidden={railCollapsed}>Pocket Code</strong><button className="icon-button" aria-label={railCollapsed?label('Expand sidebar','Развернуть панель'):label('Collapse sidebar','Свернуть панель')} title={railCollapsed?label('Expand sidebar','Развернуть панель'):label('Collapse sidebar','Свернуть панель')} aria-expanded={!railCollapsed} onClick={()=>collapseRail(!railCollapsed)}>{railCollapsed?<PanelLeftOpen size={19}/>:<PanelLeftClose size={19}/>}</button></div>
       <button className="desktop-new-chat rail-action" aria-label={label('New chat','Новый чат')} aria-pressed={creating&&!selected&&page==='chats'} aria-keyshortcuts="Control+N" title={label('New chat (Ctrl+N)','Новый чат (Ctrl+N)')} disabled={!state.online||!projectRoot} onClick={startChat}><Plus size={18}/><span>{label('New chat','Новый чат')}</span></button>
-      {railCollapsed?<button className="rail-action rail-search-button" aria-label={label('Find a chat','Найти чат')} title={label('Find a chat','Найти чат')} onClick={searchChats}><Search size={18}/></button>:<div className="desktop-search"><Search size={16}/><input ref={railSearch} aria-label={label('Find a chat','Найти чат')} placeholder={label('Find a chat','Найти чат')} value={search} onChange={event=>setSearch(event.target.value)}/></div>}
 
       <div className="desktop-library" hidden={railCollapsed}><ProviderPicker connection={connection||undefined} value={provider} onChange={setProvider} attention={id=>activity.items.filter(item=>item.provider===id&&(item.status==='needs_input'||item.status==='error')).length}/>
       {folders.length>0&&<div className="desktop-project-links"><div className="desktop-list-caption">{label('Projects','Проекты')}</div>{folders.map(folder=><button key={folder} className="rail-action" title={folder} aria-pressed={projectFilter===folder} onClick={()=>{setProjectFilter(projectFilter===folder?'':folder);setProject(folder);}}><Folder size={16}/><span>{name(folder)}</span></button>)}</div>}

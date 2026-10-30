@@ -1,5 +1,22 @@
 import {test,expect} from '@playwright/test';
 
+for(const stalePartial of [false,true])test(`same-ID assistant completion after compaction consumes its partial once (stale=${stalePartial})`,async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.goto('http://127.0.0.1:5173');
+ await page.evaluate(async(stalePartial)=>{
+  const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{MessageList}=await import('/src/Messages.tsx' as string);
+  const host=document.createElement('div');document.body.replaceChildren(host);const root=createRoot(host);
+  const request={id:'request',role:'user',blocks:[{type:'text',text:'Synthetic request'}]},started={id:'answer',role:'assistant',blocks:[{type:'text',text:''}]};
+  const compact={id:'compact',role:'system',blocks:[{type:'text',text:'Conversation context compacted.'}]};
+  (window as any).renderCompaction=(step:number)=>{const text='A synthetic progress update with preserved text.';const answer={...started,blocks:[{type:'text',text}]};root.render(React.createElement(MessageList,{provider:'codex',messages:step<2?[request,started,...(step===1?[compact]:[])]:[request,answer,compact,...(step===3?[{...answer,id:'distinct-answer'}]:[])],partialText:step<2||step===2&&stalePartial?text.slice(0,28):'',streaming:step<3}));};
+  (window as any).renderCompaction(0);
+ },stalePartial);
+ const partial=page.locator('[data-message-id="partial"] .markdown');await expect(partial).toHaveText('A synthetic progress update');await partial.evaluate(el=>(window as any).compactionNode=el);
+ await page.evaluate(()=>(window as any).renderCompaction(1));await expect(page.getByText('Conversation context compacted.',{exact:true})).toBeVisible();
+ await page.evaluate(()=>(window as any).renderCompaction(2));await expect(page.locator('[data-message-id="answer"] .markdown')).toHaveText('A synthetic progress update with preserved text.');await expect(page.locator('[data-message-id="partial"]')).toHaveCount(0);
+ expect(await page.locator('[data-message-id="answer"] .markdown').evaluate(el=>el===(window as any).compactionNode)).toBe(true);
+ await page.evaluate(()=>(window as any).renderCompaction(3));await expect(page.getByText('A synthetic progress update with preserved text.',{exact:true})).toHaveCount(2);
+});
+
 test('live text buffers bursts and preserves its DOM and progress through final handoff',async({page})=>{
  await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('http://127.0.0.1:5173');
  await page.evaluate(async()=>{

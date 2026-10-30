@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.28.28 (2026-10-30)
+
+Release preparation: Android versionCode 115 on release/0.28.1. Current candidate: 25 scoped browser scenarios, 10 unit/privacy checks and TypeScript/Vite build passed. Package/source CI/publication verification pending; physical-device and historical coverage limitations remain explicit.
+
+### Bug Fixes
+- Streaming: reconcile completed assistant text against its previous content, including an existing empty item with the same ID. Consume the partial once across context compaction and suppress its stale-prefix snapshot while preserving Markdown identity and distinct messages with identical wording. Validation: reproduced the old duplicate with a failing browser assertion; eight scoped browser checks, five streaming/grouping unit checks and TypeScript/Vite build passed. Not published.
+- Sidebar: remove desktop chat search and its collapsed shortcut/state; retain project filtering and direct chat navigation. Remove the provider picker trigger border while preserving its dropdown and focus. Validation: both scoped navigation/sidebar browser scenarios and TypeScript/Vite build passed; not published.
+- Glass material: replace dense matte fills with shared translucent dark/light surfaces, a subtle theme-colored contour and restrained sheen across composer, menus, panels and message cards. Composer opacity changes from 76% to 42% in dark mode and 62% in light mode; preserve background-area opt-outs and opaque accessibility states. The browser blur was active, but the dense fill concealed its visual effect.
+- Validation: a new backdrop-color transmission assertion failed on the published material (62 levels versus a minimum of 90); the revised dark/light material transmits 147/96 levels while reducing sharp backdrop edge energy by over 99%. Seven scoped browser checks passed, including real transcript pixels, access-menu diffusion, native pickers, independent background areas and forced-color fallback. TypeScript/Vite build passed; synthetic captures inspected. Physical WebView/phone verification remains untested; not published.
+
 ## [0.28.27](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.26...v0.28.27) (2026-10-30)
 
 Published [v0.28.27](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.27) from [4b73034133c03aec845c516a0e62b2de1875a178](https://github.com/Evgenie-Myasnikov/pocket-code/commit/4b73034133c03aec845c516a0e62b2de1875a178) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android versionCode 114. Both exact-source CI runs, 24 scoped browser scenarios, five privacy-guard checks and TypeScript/Vite build passed. All 142 shared web files and 400 source files match APK/Windows/host; 1816 decoded artifact entries audited, APK signer unchanged. GitHub server-side SHA-256 digests and sizes for all four public assets, exact source tag and branch ancestry verified. Latest-release API returns v0.28.27. Known 320px minimum-size and physical/older-browser coverage limits remain below.
