@@ -2,11 +2,13 @@ import {useEffect,useRef} from 'react';
 import {createPortal} from 'react-dom';
 import type {LucideIcon} from 'lucide-react';
 import {useBackAction} from './navigation';
+import {useUiEntrance} from './ui-motion';
 
 export type CardAction={label:string;Icon?:LucideIcon;danger?:boolean;disabled?:boolean;current?:boolean;onSelect():void};
 /** Long-press / right-click menu for a card: useful actions first, the destructive one last after a separator. */
 export function CardActionMenu({label,point,items,onClose}:{label:string;point:{x:number;y:number};items:CardAction[];onClose():void}){
   const menu=useRef<HTMLDivElement>(null),previous=useRef<HTMLElement|null>(null),latest=useRef(onClose);latest.current=onClose;
+  useUiEntrance(menu,'menu');
   useBackAction(()=>{onClose();return true;},110,true);
   useEffect(()=>{previous.current=document.activeElement instanceof HTMLElement?document.activeElement:null;return()=>{if(previous.current?.isConnected)previous.current.focus({preventScroll:true});};},[]);
   useEffect(()=>{menu.current?.querySelector<HTMLButtonElement>('[role=menuitem]:not(:disabled)')?.focus({preventScroll:true});},[items.map(item=>item.label).join('|')]);

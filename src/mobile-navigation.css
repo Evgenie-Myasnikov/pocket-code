@@ -1,15 +1,13 @@
-/* Phone navigation: a bottom bar with Chats, Board, Inbox and More. It is hidden inside an open conversation, where Back returns to the list. */
+/* Phone navigation: Chats, Board and More. Hidden inside an open conversation. */
 .mobile-tabbar{display:none}
 .mobile-menu-backdrop{position:fixed;inset:0;z-index:var(--z-sheet);background:var(--scrim);display:flex;align-items:flex-end}
-.mobile-menu-panel{width:100%;max-height:85dvh;box-sizing:border-box;background:var(--bg);color:var(--text);padding:8px 14px calc(16px + env(safe-area-inset-bottom));border-radius:20px 20px 0 0;box-shadow:0 -10px 40px var(--shadow-soft);overflow:auto;animation:section-menu-in .16s ease-out}
+.mobile-menu-panel{width:100%;max-height:85dvh;box-sizing:border-box;background:var(--bg);color:var(--text);padding:8px 14px calc(16px + env(safe-area-inset-bottom));border-radius:20px 20px 0 0;box-shadow:0 -10px 40px var(--shadow-soft);overflow:auto}
 .mobile-menu-panel>header{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 8px 8px;font-size:1.15rem}
 .mobile-menu-panel .mobile-nav{position:static;display:flex;flex-direction:column;align-items:stretch;gap:6px;height:auto;padding:0;border:0;background:transparent}
 .mobile-menu-panel .mobile-nav>button{box-sizing:border-box;display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:16px;min-height:52px;width:100%;padding:12px 16px;border:0;border-radius:14px;background:transparent;color:var(--muted);font-size:1rem;text-align:left}
-.mobile-menu-panel .mobile-nav>button.active{background:color-mix(in srgb,var(--text) 9%,transparent);color:var(--text)}
+.mobile-menu-panel .mobile-nav>button.active{background:var(--bg-active);color:var(--text);box-shadow:inset 3px 0 0 var(--accent)}
 .mobile-menu-panel .mobile-nav>button:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
 .mobile-nav-label{display:flex;flex-direction:column;gap:2px;min-width:0}.mobile-nav-label small{font-size:.8em;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@keyframes section-menu-in{from{transform:translateY(100%)}to{transform:translateY(0)}}
-@media(prefers-reduced-motion:reduce){.mobile-menu-panel{animation:none}}
 @media(max-width:760px){
  .app>.sidebar>.chat-list-actions{gap:8px}
  .app:not(.embedded-chat){padding-bottom:env(safe-area-inset-bottom)}
@@ -26,6 +24,17 @@
  /* The bar carries the inbox on root screens; the list header keeps only the title and New chat. */
  .app:not(.embedded-chat)>.sidebar>.chat-list-actions .board-notifications{display:none}
 }
+
+.mobile-tabbar>button,.mobile-menu-panel .mobile-nav>button{transition:background-color var(--dur-short) var(--ease-standard),color var(--dur-short) var(--ease-standard)}
+.mobile-tabbar>button>svg,.mobile-menu-panel .mobile-nav>button>svg{transition:transform var(--dur-short) var(--ease-standard)}
+.mobile-tabbar>button:active>svg,.mobile-menu-panel .mobile-nav>button:active>svg{transform:scale(.9)}
+.mobile-tabbar>button.active{background:var(--bg-active)}
+.mobile-menu-panel .mobile-nav>button:focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
+@media(prefers-reduced-motion:reduce),(forced-colors:active){
+ .mobile-tabbar>button,.mobile-menu-panel .mobile-nav>button,.mobile-tabbar>button>svg,.mobile-menu-panel .mobile-nav>button>svg{transition:none}
+ .mobile-tabbar>button:active>svg,.mobile-menu-panel .mobile-nav>button:active>svg{transform:none}
+}
+@media(forced-colors:active){.mobile-tabbar>button.active,.mobile-menu-panel .mobile-nav>button.active{outline:2px solid Highlight;outline-offset:-4px;box-shadow:none}}
 @media(min-width:761px){
  /* On wide screens the sidebar bell is always visible; a second bell in the conversation would only repeat it. */
  .app:not(.embedded-chat) .chat-header-conversation .board-notifications{display:none}

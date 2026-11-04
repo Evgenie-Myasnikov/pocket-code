@@ -8,9 +8,9 @@ test('all projects are visible until explicitly filtered; desktop has no Back an
  await rows.first().click();await expect(page.locator('.chat-header .mobile-back')).toHaveCount(0);
  await rows.first().click({button:'right'});await expect(page.getByRole('menu',{name:'Chat actions'})).toBeVisible();await page.keyboard.press('Escape');
  await rows.first().click({button:'right'});await page.getByRole('menuitem',{name:'Rename',exact:true}).click();
- await page.getByRole('textbox',{name:'Chat name'}).fill('Synthetic renamed chat');await page.getByRole('button',{name:'Confirm',exact:true}).click();
+ await page.getByRole('textbox',{name:'Chat name'}).fill('Synthetic renamed chat');await page.getByRole('button',{name:'Rename',exact:true}).click();
  await expect(rows.first()).toContainText('Synthetic renamed chat');
- await rows.first().click({button:'right'});await page.getByRole('menuitem',{name:'Delete from Pocket Code'}).click();await page.getByRole('button',{name:'Confirm',exact:true}).click();await expect(rows).toHaveCount(1);
+ await rows.first().click({button:'right'});await page.getByRole('menuitem',{name:'Delete from Pocket Code'}).click();await page.getByRole('button',{name:'Delete chat',exact:true}).click();await expect(rows).toHaveCount(1);
 });
 
 test('a running title pulses without a Running label and retains height when another chat opens',async({page})=>{

@@ -1,6 +1,6 @@
 {
   "name": "pocket-code",
-  "version": "0.28.31",
+  "version": "0.28.32",
   "description": "Android companion for local Claude Code and Codex workspaces",
   "scripts": {
     "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
@@ -33,6 +33,7 @@
     "express": "^5.2.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.49.0",
+    "motion": "14.9.1",
     "node-pty": "^1.1.0",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",

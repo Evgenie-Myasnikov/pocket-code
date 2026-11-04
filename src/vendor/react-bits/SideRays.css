@@ -1,11 +1,12 @@
-.liquid-chrome {
+.side-rays {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
+  pointer-events: none;
 }
 
-.liquid-chrome__canvas {
+.side-rays__canvas {
   position: absolute;
   inset: 0;
   display: block;

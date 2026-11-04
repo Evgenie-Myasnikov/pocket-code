@@ -31,7 +31,8 @@
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.desktop-app>.desktop-rail :is(.rail-action,nav>button,.desktop-rail-heading .icon-button){transition:none}}
 @media(forced-colors:active){.desktop-app>.desktop-rail nav>button.active{outline:1px solid Highlight;outline-offset:-1px;box-shadow:none}.desktop-app>.desktop-rail :is(.rail-action,nav>button,.desktop-rail-heading .icon-button):focus-visible{outline:2px solid Highlight}}
 .desktop-app>.desktop-rail{padding:0;gap:0;background:var(--bg)}
-.desktop-app>.desktop-rail>nav{position:absolute;inset:0 auto 0 0;width:44px;align-items:center;padding:6px 3px;background:color-mix(in srgb,var(--bg) 92%,var(--text));border-right:1px solid color-mix(in srgb,var(--line) 35%,transparent)}
+/* The icon strip shares the rail's glass instead of covering it with an opaque block. */
+.desktop-app>.desktop-rail>nav{position:absolute;inset:0 auto 0 0;width:44px;align-items:center;padding:6px 3px;background:transparent;border:0}
 .desktop-app>.desktop-rail>nav>button{justify-content:center;width:36px;min-height:36px;padding:8px;position:relative}
 .desktop-app>.desktop-rail>nav>button>span{display:none}
 .desktop-app>.desktop-rail>nav>button.active{box-shadow:none;background:var(--bg-active)}
@@ -72,3 +73,23 @@
 .desktop-app>.desktop-rail .desktop-sessions>button[data-running=true] strong{animation:chat-title-breathe 2s ease-in-out infinite;}
 @keyframes chat-title-breathe{0%,100%{opacity:1}50%{opacity:.48}}
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.desktop-app>.desktop-rail .desktop-sessions>button[data-running=true] strong{animation:none}}
+
+/* Selection stays anchored while hover and press acknowledge the next action. */
+.desktop-app>.desktop-rail :is(.desktop-sessions>button,.desktop-project-links>.rail-action){transition:background-color var(--dur-short) var(--ease-standard),box-shadow var(--dur-short) var(--ease-standard)}
+.desktop-app>.desktop-rail .desktop-sessions>button[aria-pressed=true]{box-shadow:inset 3px 0 0 var(--accent)}
+.desktop-app>.desktop-rail :is(.desktop-sessions>button,.desktop-project-links>.rail-action):focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
+.desktop-app>.desktop-rail :is(nav>button,.desktop-rail-heading .icon-button,.desktop-new-chat):hover:not(.active){background:var(--bg-hover)}
+.desktop-app>.desktop-rail>nav>button.active{background:var(--ui-material-sheen),color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 2px 0 0 var(--accent)}
+.desktop-app>.desktop-rail :is(nav>button,.desktop-rail-heading .icon-button,.desktop-new-chat):not([data-ui-press])>svg{transition:transform var(--dur-short) var(--ease-standard)}
+.desktop-app>.desktop-rail :is(nav>button,.desktop-rail-heading .icon-button,.desktop-new-chat):not([data-ui-press]):active:not(:disabled)>svg{transform:scale(.88)}
+.rail-tooltip{position:fixed;z-index:var(--z-chat-menu);display:block;max-width:min(220px,calc(100vw - 16px));padding:7px 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel);color:var(--text);box-shadow:var(--shadow-md);font:var(--type-label-13);line-height:1.4;overflow-wrap:anywhere}
+@media(prefers-reduced-motion:reduce),(forced-colors:active){
+ .desktop-app>.desktop-rail :is(.desktop-sessions>button,.desktop-project-links>.rail-action),.desktop-app>.desktop-rail :is(nav>button,.desktop-rail-heading .icon-button,.desktop-new-chat):not([data-ui-press])>svg{transition:none}
+ .desktop-app>.desktop-rail :is(nav>button,.desktop-rail-heading .icon-button,.desktop-new-chat):not([data-ui-press]):active:not(:disabled)>svg{transform:none}
+ .rail-tooltip{animation:none}
+}
+@media(forced-colors:active){
+ .rail-tooltip{background:Canvas;color:CanvasText;border-color:CanvasText;box-shadow:none}
+ .desktop-app>.desktop-rail>nav>button.active{background:Highlight;color:HighlightText;box-shadow:none}
+ .desktop-app>.desktop-rail .desktop-sessions>button[aria-pressed=true]{outline:2px solid Highlight;outline-offset:-2px;box-shadow:none}
+}

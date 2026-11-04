@@ -1,11 +1,11 @@
-.aurora-container {
+.beams-container {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-.aurora-canvas {
+.beams-canvas {
   position: absolute;
   inset: 0;
   display: block;

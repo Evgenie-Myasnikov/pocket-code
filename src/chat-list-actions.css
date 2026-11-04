@@ -1,0 +1,20 @@
+/* Main rows and their independent action buttons share a grid row. No nested
+   interactive controls, and revealing an action never changes the text width. */
+.desktop-app>.desktop-rail .desktop-sessions{display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:start}
+:root .desktop-app>.desktop-rail .desktop-sessions>button{grid-column:1/-1;padding-inline-end:42px}
+.desktop-sessions>p{grid-column:1/-1}
+.chat-list-action-slot{grid-column:2;align-self:center;justify-self:end;z-index:1;display:flex;margin-inline-end:4px}
+.chat-list-action-slot .chat-list-action{display:grid;place-items:center;width:32px;min-width:32px;height:32px;min-height:32px;padding:0;border:0;border-radius:var(--radius-sm,7px);background:transparent;color:var(--muted);box-shadow:none;opacity:0;transition:opacity var(--dur-short),background-color var(--dur-short),color var(--dur-short)}
+.desktop-sessions>button:is(:hover,:focus-visible,[aria-pressed=true])+.chat-list-action-slot .chat-list-action,.chat-list-action-slot:is(:hover,:focus-within) .chat-list-action,.chat-list-action-slot .chat-list-action[aria-expanded=true]{opacity:1}
+.chat-list-action-slot .chat-list-action:hover{background:var(--bg-active);color:var(--text)}
+.chat-list-action-slot .chat-list-action:focus-visible{opacity:1;outline:2px solid var(--ring);outline-offset:-2px}
+.sidebar .chat-list-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;min-width:0;position:relative}
+.sidebar .chat-list-entry>.session-row{grid-column:1/-1;grid-row:1;padding-inline-end:56px}
+.sidebar .chat-list-entry>.chat-list-action-slot{grid-row:1}
+.sidebar .chat-list-entry:is(:hover,:focus-within) .chat-list-action{opacity:1}
+@media(max-width:760px),(hover:none),(pointer:coarse){
+ .chat-list-action-slot .chat-list-action{opacity:1;width:44px;min-width:44px;height:44px;min-height:44px}
+ :root .desktop-app>.desktop-rail .desktop-sessions>button{padding-inline-end:52px;min-height:48px}
+}
+@media(prefers-reduced-motion:reduce),(forced-colors:active){.chat-list-action-slot .chat-list-action{transition:none;transform:none}.chat-list-action-slot .chat-list-action:active:not(:disabled){transform:none}}
+@media(forced-colors:active){.chat-list-action-slot .chat-list-action{opacity:1;color:ButtonText}.chat-list-action-slot .chat-list-action:focus-visible{outline-color:Highlight}}

@@ -15,7 +15,7 @@ test('a saved desktop chat sends immediately and accepts another message while r
 
 test('one full-height sidebar scroll track contains projects and recent chats',async({page})=>{
  await page.setViewportSize({width:1440,height:740});await desktop(page);
- await page.locator('.desktop-sessions').evaluate(list=>{const template=list.querySelector('button')!;for(let i=0;i<50;i++){const row=template.cloneNode(true) as HTMLElement;row.textContent=`Synthetic conversation ${i+1}`;list.append(row);}});
+ await page.locator('.desktop-sessions').evaluate(list=>{const template=list.querySelector('button')!;for(let i=0;i<50;i++){const row=template.cloneNode(true) as HTMLElement;row.textContent=`Synthetic conversation ${i+1}`;row.style.gridRow=String(i+3);list.append(row);}});
  const rail=page.locator('.desktop-rail-content'),sessions=page.locator('.desktop-sessions');
  await expect(rail).toHaveCSS('overflow-y','auto');await expect(sessions).toHaveCSS('overflow-y','visible');
  const box=(await rail.boundingBox())!;expect(box.height).toBeGreaterThan(700);

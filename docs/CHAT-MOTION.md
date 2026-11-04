@@ -108,11 +108,13 @@ JetBrains Mono handles chat code. Review keeps its existing measured monospace
 stack. Golos Text, Manrope and JetBrains Mono faces are bundled; System uses
 device fonts. No remote font service is required.
 
-The background catalog now has ten original React Bits effects: DarkVeil, Aurora,
-Iridescence, SoftAurora, Grainient, LightPillar, Galaxy, LiquidChrome, Plasma and
-FloatingLines. Source attribution and lifecycle adaptations are in
+The background catalog has 17 original React Bits effects: DarkVeil, Iridescence,
+SoftAurora, Grainient, LightPillar, Galaxy, Plasma, Prism, LightRays, GradientWaves,
+SideRays, RippleGrid, PixelSnow, Topography, Dither, Orb and Beams.
+Source attribution and lifecycle adaptations are in
 [the vendor source record](../src/vendor/react-bits/SOURCE.md). Removed effects
-and their posters are no longer shipped by this catalog. Stored removed IDs
+and their posters are no longer shipped by this catalog, including Aurora,
+LiquidChrome and FloatingLines. Stored removed IDs
 fall back to DarkVeil. Active shaders receive the actual theme/custom color;
 static posters no longer show underneath live artwork. Preview remains available
 when the chat background is disabled, stays visible while adjusting controls,
@@ -124,3 +126,41 @@ The center sends/stops, the outer annulus opens details, hover/focus shows the
 percentage, and keyboard activation remains a separate accessible quota action.
 The ring cannot intercept center clicks. Malformed host usage responses show an
 unavailable state instead of crashing the details view.
+
+## Navigation and discoverable actions (unreleased)
+
+Chat rows expose a separate actions button for rename/delete: visible on touch,
+and on selection, hover or keyboard focus on desktop. Opening this menu does not
+open a different chat. Confirmation names the affected chat and the actual action.
+The icon rail has portaled hover/focus labels that dismiss on Escape, activation
+or scrolling, so a collapsed sidebar does not clip them.
+
+Navigation, menu rows and action buttons share short press/color transitions;
+mobile section sheets enter over 16 px with a fading scrim. Selected items retain
+a persistent accent, separate from hover feedback. Reduced-motion and forced-color
+preferences suppress decorative movement. Transcript content is not remounted or
+animated again by these controls.
+
+Reference review: [Pinterest contextual actions](https://uisources.com/explainer/pinterest-long-press-pin-save-send-hide)
+illustrate keeping actions close to their object. Direct Pinterest pin access was
+restricted during review; the public interaction capture was inspected.
+[Motion](https://github.com/motiondivision/motion),
+[AutoAnimate](https://github.com/formkit/auto-animate) and
+[React Spring](https://github.com/pmndrs/react-spring) were evaluated as React
+animation options. The initial refinement used CSS tokens and small React controls.
+The subsequent Motion integration below uses the selected library. Automatic layout
+animation across the streaming transcript would need separate scroll/anchor testing.
+
+## Motion React integration (unreleased)
+
+Motion 14.9.1 is pinned in the dependency lockfile. Shared hooks in `src/ui-motion.ts`
+use [`useAnimate` from `motion/react-mini`](https://motion.dev/docs/react-use-animate)
+for the phone menu/scrim, contextual menus, rail labels and icon press feedback.
+The native button and menu nodes remain stable; animations do not defer focus,
+clicks, Back handling or unmounting. Entrance durations follow existing motion tokens.
+
+Hooks cancel animations and restore prior inline styles on teardown and when
+reduced-motion or forced-colors becomes active. Re-enabling motion does not replay
+the current entrance. Browsers without Web Animations retain immediately visible,
+usable controls. These effects do not animate or remount saved conversation text.
+Package licenses are included in `public/third-party-notices.txt`.

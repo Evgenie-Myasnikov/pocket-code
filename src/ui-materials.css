@@ -90,9 +90,12 @@
 :root[data-theme][data-theme] .desktop-app.desktop-app>.desktop-rail{box-shadow:none;border-right-color:transparent;background:var(--ui-material-fill)}
 :root[data-theme][data-theme] .desktop-app .desktop-session{border-radius:var(--ui-radius-control);border-color:transparent;box-shadow:none}
 :root[data-theme][data-theme] .desktop-app .desktop-session:hover{background:var(--ui-material-inset)}
+@media(prefers-reduced-transparency:reduce){
+ :root[data-theme][data-theme] .desktop-app.desktop-app>.desktop-rail{background:var(--panel);-webkit-backdrop-filter:none;backdrop-filter:none}
+}
 @media(forced-colors:active){
  :root[data-theme][data-theme] :is(.review-panel,.chat-outputs-panel,.subagents-panel,.desktop-shortcuts,.settings-category,.settings-computer,.provider-connection,.update-panel,.board-image-thumb,.chat-output-row,.document-card,.whiteboard-toolbar,.board-toolbar,.board-tools,.code-block){border-color:CanvasText;box-shadow:none}
- :root[data-theme][data-theme] .desktop-app.desktop-app>.desktop-rail{background:Canvas;border-right-color:CanvasText}
+ :root[data-theme][data-theme] .desktop-app.desktop-app>.desktop-rail{background:Canvas;border-right-color:CanvasText;-webkit-backdrop-filter:none;backdrop-filter:none}
 }
 
 /* Blur the backdrop once per floating surface; keep its controls and text sharp. */
