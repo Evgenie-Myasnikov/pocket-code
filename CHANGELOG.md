@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.32 (unreleased)
+## [0.28.32](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.31...v0.28.32) (2026-11-04)
+
+Published [v0.28.32](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.32) from [eedf988754ef452fc89f5251e5c9bf3771c10c64](https://github.com/Evgenie-Myasnikov/pocket-code/commit/eedf988754ef452fc89f5251e5c9bf3771c10c64) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 119. Source CI, three production glass scenarios and package builds passed. All 164 web files and 425 host/Windows source files match the reviewed source; 1954 decoded artifact entries passed privacy audit; APK signer unchanged. Four uploaded asset hashes/sizes and exact source tag verified. Supersedes pending-publication statements for this version; physical-device and broader historical acceptance remain unverified.
 
 ### Bug Fixes
 - Desktop rail: remove the opaque nested icon-strip background and divider, keeping one continuous glass surface in expanded/collapsed layouts. Use translucent hover/selected feedback, retain keyboard focus, and correct opaque/no-blur accessibility fallbacks. Validation: nine navigation/background-region browser scenarios and two dark/light visual probes passed; five synthetic text-only captures inspected. Physical-device and release validation remain pending.
