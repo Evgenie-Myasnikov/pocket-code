@@ -7,6 +7,9 @@ export const english: Record<string, string> = {
   'Это изображение относится к другой доске или подключению.':'This image belongs to another board or connection.',
 
   'Новый чат доски':'New board chat',
+  'Открыть доску':'Open board',
+  'Чат доски: {0}':'Board chat: {0}',
+  'Доска этого чата недоступна.':'The board of this chat is unavailable.',
   'Не удалось сохранить привязку чата доски.':'Could not save the board chat association.',
   'Ждёт вашего ответа':'Waiting for your response',
   'Доска':'Board',

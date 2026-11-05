@@ -38,6 +38,7 @@ import {ModelPicker,useClaudeModels} from './ModelPicker';
 import {useChatReturn} from './use-chat-return';
 import {WorkspacePassword} from './WorkspacePassword';
 import type {BoardNoticeTarget} from './BoardNotifications';
+import type {ProjectBoard} from '../server/boards';
 import {savedWorkspaces,rememberWorkspace,workspaceJoinId,type WorkspaceAccess} from './workspace-access';
 import {clearOffline} from './offline-data';
 import {clearReviewViewed} from './review-viewed';
@@ -76,7 +77,7 @@ import { Updates } from './Updates';
 import { useLanguage } from './i18n';
 import { LanguageSelector } from './Language';
 import { t, locale } from "./i18n";import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop, ArrowDown, LoaderCircle } from 'lucide-react';
+import { BookOpen, FileText, ArrowUp, Plus, Search, MessageSquare, Folder, Settings, X, RefreshCw, ShieldCheck, ClipboardList, EyeOff, MoreHorizontal, Laptop, ArrowDown, LoaderCircle, LayoutDashboard } from 'lucide-react';
 import { Connect, type ConnectedPc } from './Connect';
 import { connectionProblem as classifyProblem, type ConnectionProblem } from './connection-errors';
 import { useAppearance } from './Appearance';
@@ -90,7 +91,7 @@ import { fileBase64, loadConnection, normalizeUrl, pairDevice, request, saveConn
 import { demoMessages, demoSessions } from './demo';
 import type { ChatMessage, JobView, SubagentView,ActivityItem } from '../server/types';
 
-import type {Session} from './session';
+import type {BoardLink,Session} from './session';
 type Health = {name: string;roots: string[];version: string;protocol: number;hostId?:string;routes?:string[]};
 // Remembers across the remount that the PC revoked this phone, so the next screen can say why it is empty.
 const revokedKey='pocket-code-revoked';
@@ -503,6 +504,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   };
   useEffect(()=>{const handle=()=>recover.current();window.addEventListener('pocket-recovered',handle);return()=>window.removeEventListener('pocket-recovered',handle);},[]);
   useEffect(()=>()=>{if(!embedded)setPrimaryHost('',null);},[]);
+  // An embedded chat opened while the PC host restarts or updates keeps retrying instead of waiting for a manual Retry.
+  useEffect(()=>{if(!embedded||health||connecting||!connectionError)return;const timer=setTimeout(()=>void connect(embedded.connection),3000);return()=>clearTimeout(timer);},[Boolean(embedded),health,connecting,connectionError]);
   useEffect(()=>{if(embedded){void connect(embedded.connection);return;}loadConnection().then(c=>{if(!c){setRestoring(false);return;}setSaved(c);if(c.workspaceOnly){setRestoring(false);setTab('settings');setSettingsPage('connection');}else{setPaired(true);void connect(c,true);}}).catch(()=>{setRestoring(false);setConnectionError(t('Не удалось восстановить подключение. Отсканируйте QR-код ПК снова.'));});},[]);
   async function switchWorkspace(access:WorkspaceAccess){
     setWorkspaceConnection(access);setLocalBoards(false);setWorkspaceScanner(false);setError('');
@@ -649,7 +652,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     }
     const stop=startVisiblePoll(syncCompleted,3000,true,document,hostGate(connection.url));return () => {cancelled=true;stop();};
   },[connection,provider,job?.id,job?.status,demo,busy,loading,loadingOlder,fromStart,tab]);
-  useLayoutEffect(()=>{if(tab==='chats'&&scroll.current&&!loading){scroll.current.scrollTop=lastScrollTop.current;setShowScrollActions(fromStart||scroll.current.scrollHeight-scroll.current.scrollTop-scroll.current.clientHeight>=80);}},[provider,tab,mobileChat]);
+  // A hidden chat (display:none) loses its scroll offset. Before the first paint after it is shown again,
+  // land on the latest message when the chat was following it, otherwise where the person was reading.
+  const chatShown=tab==='chats'&&(embedded?embedded.visible!==false:mobileChat);
+  useLayoutEffect(()=>{const el=scroll.current;if(!chatShown||!el||loading||!el.getClientRects().length)return;el.scrollTop=nearBottom.current&&!readingMode?el.scrollHeight:lastScrollTop.current;lastScrollTop.current=el.scrollTop;setShowScrollActions(fromStart||el.scrollHeight-el.scrollTop-el.clientHeight>=80);},[provider,chatShown]);
   useLayoutEffect(()=>{const position=pendingPosition.current,el=scroll.current;if(!position||!el||loading&&!history.length&&!job?.messages.length&&!job?.partial||tab!=='chats')return;pendingPosition.current=null;const message=position.messageId?[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.dataset.messageId===position.messageId):null;const textTop=message&&position.textAnchor?restoreTextAnchor(el,message,position.textAnchor):undefined;el.scrollTop=position.bottom?el.scrollHeight:textTop!==undefined?textTop:message&&position.offset!==undefined?el.scrollTop+message.getBoundingClientRect().top-el.getBoundingClientRect().top-position.offset:position.top;lastScrollTop.current=el.scrollTop;nearBottom.current=position.bottom;setShowScrollActions(!position.bottom||fromStart);},[loading,history,job,provider,tab]);
   useChatReturn(selected?positionKey(cacheScope,provider,selected.sessionId):'',tab==='chats'&&(embedded?embedded.visible!==false:mobileChat),running,!loading&&!busy&&!paging.current,()=>{void jumpHistory(false);});
   function rememberPosition(){const el=scroll.current;if(!el||loading||!selected||!el.getClientRects().length)return;const top=el.getBoundingClientRect().top,message=[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.getBoundingClientRect().bottom>top);savePosition(positionKey(cacheScope,provider,selected.sessionId),{top:el.scrollTop,window:historyWindow.current,fromStart,bottom:nearBottom.current,messageId:message?.dataset.messageId,textAnchor:message?captureTextAnchor(el,message):undefined,offset:message?message.getBoundingClientRect().top-top:undefined});}
@@ -728,6 +734,27 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   }
   async function launchBoardChat(target:BoardChat,replace=false){try{const next=await prepareBoardConversation(connection!,target,provider,replace);if(embedded){embedded.onNewBoardChat?.(next);}else setBoardLaunch(next);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}}
   useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch,resuming=Boolean(target.context&&target.conversation?.generation===boardChat?.conversation?.generation&&target.boardId===boardChat?.boardId);if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()},target.resumeJobId?{id:target.resumeJobId,sessionId:target.note.chat.sessionId}:undefined,target);if(target.followUp)appendDraft(target.prompt);}else{newChat(target.root,target);if(!resuming)setDraft(target.context?t('Discuss this board with me.'):target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
+  // A chat started from a board keeps that link in the host chat library, so every chat list marks it and can open the board.
+  const boardLinkOf=(target:BoardChat):BoardLink=>({id:target.boardId,root:target.root,title:(target.context?.name||target.note.title||t('Доска')).slice(0,200),...(target.context?{}:{noteId:target.note.id})});
+  const [linkedBoards,setLinkedBoards]=useState<Record<string,BoardLink>>({});
+  const linkedSessions=useRef(new Set<string>());
+  useEffect(()=>{const sessionId=job?.sessionId||selected?.sessionId;if(!boardChat||!connection||demo||!sessionId||sessionId.startsWith('pending-'))return;
+    const link=boardLinkOf(boardChat),key=provider+':'+sessionId+':'+link.id;if(linkedSessions.current.has(key))return;linkedSessions.current.add(key);
+    setLinkedBoards(old=>({...old,[sessionId]:link}));
+    void request(connection,`/sessions/${encodeURIComponent(sessionId)}/manage`,{provider,action:'board',board:link}).catch(()=>{linkedSessions.current.delete(key);});
+  },[job?.sessionId,selected?.sessionId,boardChat,connection,provider,demo]);
+  const chatBoard=boardChat?boardLinkOf(boardChat):selected?(linkedBoards[selected.sessionId]||selected.board):undefined;
+  async function openChatBoard(link:BoardLink){
+    if(!connection)return;
+    try{
+      let board:ProjectBoard|null=null;
+      try{board=await request<ProjectBoard>(connection,'/boards/'+encodeURIComponent(link.id));}
+      catch(e){if((e as {status?:number}).status!==404)throw e;const repository=await request<{board:ProjectBoard|null}>(connection,'/project-board?root='+encodeURIComponent(link.root));board=repository.board?.id===link.id?repository.board:null;}
+      if(!board)throw Error();
+      const target:BoardNoticeTarget={board,connection,noteId:link.noteId||'',message:'',requestId:Date.now()};
+      if(embedded?.onBoard)embedded.onBoard(target);else{setNoticeTarget(target);setLocalBoards(true);setTab('workspace');}
+    }catch{setError(t('Доска этого чата недоступна.'));}
+  }
   useEffect(()=>{if(!boardChat||boardChat.context||boardChat.taskRun||!job?.sessionId||!connection)return;const target=boardChat;setBoardChat(null);void (async()=>{try{const b=await request<any>(connection,'/boards/'+target.boardId);await request(connection,'/boards/'+b.id,{revision:b.revision,versions:b.versions,notes:b.notes.map((n:any)=>n.id===target.note.id?{...n,chat:{provider,sessionId:job.sessionId}}:n)});}catch(e){setError((e as Error).message);}})();},[job?.sessionId,boardChat,connection]);
   async function openSession(s: Session, activeJob?: Pick<JobView,'id'|'sessionId'>,context?:BoardChat) {
     if (busy || uploading) return;
@@ -909,7 +936,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   async function disconnect(reason:'user'|'revoked'='user') {if(disconnecting.current)return;disconnecting.current=true;++connectEpoch.current;try {if(workspaceConnection&&!workspaceConnection.deviceId)await request(workspaceConnection,'/workspace-logout',{}).catch(()=>{});if(reason==='user'&&connection?.deviceId)await Promise.race([request(connection,'/devices/self/forget',{}).catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);await saveConnection(null);setPrimaryHost('',null);clearOffline();clearReviewViewed();try{localStorage.removeItem("pocket-own-profile");}catch{}clearChatCache();persistPosition.current=()=>{};clearPositions();setRevoked(reason==='revoked'?pcName.current:null);onDisconnect();}catch(e){disconnecting.current=false;setError((e as Error).message);}}
   if(workspacePasswordRequest)return <WorkspacePassword busy={busy} error={error} onCancel={()=>{setWorkspacePasswordRequest(null);setError('');}} onSubmit={password=>void joinWorkspace(workspacePasswordRequest,password)}/>;
   // Without a reachable PC the phone still checks, downloads and offers the latest release itself.
-  if(!health&&embedded)return <div className="desktop-empty" role="status">{error||t("Loading...")}{error&&<button className="secondary" onClick={()=>void connect(embedded.connection)}>{t("Retry")}</button>}</div>;
+  if(!health&&embedded){const failure=error||connectionError;return <div className="desktop-empty" role="status">{failure||t("Loading...")}{failure&&!connecting&&<button className="secondary" onClick={()=>void connect(embedded.connection)}>{t("Retry")}</button>}</div>;}
   if (!health) return <><Connect initial={saved} onConnect={connect} onDemo={startDemo} busy={connecting} error={connectionError} /><Updates connection={null} expanded={false} /></>;
   pcName.current=saved?.name||(connected?health?.name||'':'');
   // Until a PC answers once, Board and Chats explain how to pair instead of showing empty lists.
@@ -939,7 +966,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const providerAttention=(id:WorkspaceProvider)=>waiting.filter(item=>item.provider===id).length;
   const providerChips=<ProviderPicker connection={connection||undefined} value={provider} onChange={setProvider} disabled={demo||busy||uploading} attention={providerAttention}/>;
   const grouped=visible.reduce<{group:'today'|'yesterday'|'earlier';items:Session[]}[]>((list,session)=>{const group=dayGroup(session.lastModified),last=list.at(-1);if(last?.group===group)last.items.push(session);else list.push({group,items:[session]});return list;},[]);
-  const sessionRow=(s:Session)=>{const status=sessionStatus(s.sessionId);return <div className="chat-list-entry" key={s.sessionId}><button data-running={status==='running'||undefined} className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} aria-current={selected?.sessionId===s.sessionId&&mobileChat?'true':undefined} disabled={busy || uploading} key={s.sessionId} onContextMenu={event=>{event.preventDefault();setChatAction({session:s,x:event.clientX,y:event.clientY,running:status==='running'||status==='needs_input'});}} onKeyDown={event=>{if(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10'){event.preventDefault();const r=event.currentTarget.getBoundingClientRect();setChatAction({session:s,x:r.left,y:r.bottom,running:status==='running'||status==='needs_input'});}}} onClick={() => void openSession(s)}><MessageSquare size={16} /><div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span aria-hidden="true">·</span>{status?<ChatRunStatus status={status}/>:<time dateTime={new Date(s.lastModified).toISOString()} title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}</small></div></button><ChatListActions session={s} running={status==='running'||status==='needs_input'} disabled={busy||uploading||!connection||demo} open={chatAction?.session.sessionId===s.sessionId} onOpen={setChatAction} onClose={()=>setChatAction(null)}/></div>;};
+  const sessionRow=(s:Session)=>{const status=sessionStatus(s.sessionId);return <div className="chat-list-entry" key={s.sessionId}><button data-running={status==='running'||undefined} className={`session-row ${selected?.sessionId === s.sessionId ? 'selected' : ''}`} aria-current={selected?.sessionId===s.sessionId&&mobileChat?'true':undefined} disabled={busy || uploading} key={s.sessionId} onContextMenu={event=>{event.preventDefault();setChatAction({session:s,x:event.clientX,y:event.clientY,running:status==='running'||status==='needs_input'});}} onKeyDown={event=>{if(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10'){event.preventDefault();const r=event.currentTarget.getBoundingClientRect();setChatAction({session:s,x:r.left,y:r.bottom,running:status==='running'||status==='needs_input'});}}} onClick={() => void openSession(s)}>{s.board?<LayoutDashboard size={16} aria-label={t('Чат доски: {0}',s.board.title)}/>:<MessageSquare size={16} />}<div><strong>{s.customTitle || s.summary || t("Без названия")}</strong><small>{s.board?s.board.title+' · ':''}{s.source === 'desktop' ? 'Desktop · ' : ''}{basename(s.cwd || '')}{s.archived ? t(" · Архив") : ''}<span aria-hidden="true">·</span>{status?<ChatRunStatus status={status}/>:<time dateTime={new Date(s.lastModified).toISOString()} title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}</small></div></button><ChatListActions session={s} running={status==='running'||status==='needs_input'} disabled={busy||uploading||!connection||demo} open={chatAction?.session.sessionId===s.sessionId} onOpen={setChatAction} onClose={()=>setChatAction(null)}/></div>;};
   return <AssistantChatProvider connection={connection} messages={outputMessages} partial={job?.partial||''} running={running&&!runUnknown} disabled={demo||!!selected?.readOnly||boardMissing} onSend={async text=>{await send({text,attachments:[],boardSelection:matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)});}} onBranch={requestBranch} branchDisabled={running||busy||loading||!canRun||!!selected?.readOnly||boardMissing} onStop={stopRun} onDraft={appendDraft}><div className={`app ${boardPane?'has-board-stage':''} ${boardSheet?'board-chat-sheet-open':''} ${embedded?'embedded-chat':''} ${mobileChat||onboardingVisible ? 'show-chat' : ''} ${tabBar?'has-tabbar':''} ${tab==='chats'&&(mobileChat||embedded)?'chat-edge-to-edge':''} ${readingMode&&tab==='chats'?'reading-mode':''}`}>
 
     {readingMode&&tab==='chats' && <button className="icon-button reading-exit" aria-label={t("Выйти из режима чтения")} title={t("Выйти из режима чтения")} onClick={()=>toggleReadingMode(false)}><EyeOff size={20}/></button>}
@@ -972,7 +999,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       {chatSurface&&<ChatEdgeGlass/>}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
-        <ChatHeader hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
+        <ChatHeader board={chatBoard?{title:chatBoard.title,disabled:!connection||demo,open:()=>void openChatBoard(chatBoard)}:undefined} hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():boardChat?.context?setTab('workspace'):setMobileChat(false)}
           context={undefined}
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>{setReviewPaths(undefined);setReviewOpen(true);},stats:availableReview&&availableReview.files!==undefined?{added:availableReview.added||0,removed:availableReview.removed||0,files:availableReview.files}:undefined}:undefined}

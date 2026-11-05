@@ -93,3 +93,6 @@
  .desktop-app>.desktop-rail>nav>button.active{background:Highlight;color:HighlightText;box-shadow:none}
  .desktop-app>.desktop-rail .desktop-sessions>button[aria-pressed=true]{outline:2px solid Highlight;outline-offset:-2px;box-shadow:none}
 }
+
+/* A chat started from a board carries the board mark before its title. */
+.desktop-sessions strong>.desktop-chat-board{display:inline-block;flex-shrink:0;margin-right:5px;vertical-align:-2px;color:var(--accent)}

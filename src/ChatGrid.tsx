@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
-import {LayoutGrid,List} from 'lucide-react';
+import {LayoutDashboard,LayoutGrid,List} from 'lucide-react';
 import {request,type Connection} from './api';
 import {t} from './i18n';
 import {imageBlob,thumbnailQueue} from './image-thumbnails';
@@ -77,7 +77,7 @@ function ChatTile({session,loader,connection,provider,status,disabled,selected,o
   return <button ref={element} type="button" className="chat-tile" data-running={status==='running'||undefined} data-preview={preview.state} data-image={thumb?'true':undefined} aria-current={selected?'true':undefined} disabled={disabled} aria-label={title} aria-description={[project,status?undefined:fullTime(session.lastModified)].filter(Boolean).join(' · ')} onClick={()=>onOpen(session)}>
     {preview.image&&<span className="chat-tile-media" aria-hidden="true">{thumb?<img src={thumb} alt="" decoding="async"/>:<span className="chat-tile-media-placeholder"/>}</span>}
     <span className="chat-tile-body">
-      <strong className="chat-tile-title">{title}</strong>
+      <strong className="chat-tile-title">{session.board&&<LayoutDashboard className="chat-tile-board" size={13} aria-label={t('Чат доски: {0}',session.board.title)}/>}{title}</strong>
       {preview.state==='loading'?<span className="chat-tile-skeleton" role="status" aria-label={t('Загружаем превью…')}><span/><span/><span/></span>
         :text?<span className="chat-tile-text">{text}</span>:<span className="chat-tile-text chat-tile-empty">{preview.state==='error'?t('Превью недоступно'):t('Ответа AI пока нет')}</span>}
       <small className="chat-tile-meta"><span className="chat-tile-project">{session.source==='desktop'?'Desktop · ':''}{project}</span><span aria-hidden="true">·</span>{status?<ChatRunStatus status={status}/>:<time dateTime={new Date(session.lastModified).toISOString()} title={fullTime(session.lastModified)}>{relativeTime(session.lastModified)}</time>}</small>

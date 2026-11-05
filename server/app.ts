@@ -410,8 +410,14 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({cwd});
   });
   app.post('/api/sessions/:id/manage',async(req,res)=>{
-    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete']),title:z.string().trim().min(1).max(200).optional()}).parse(req.body);
+    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','board']),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional()}).optional()}).parse(req.body);
     const found=await session(String(req.params.id),body.provider);
+    if(body.action==='board'){
+      if(!body.board)throw new HttpError(400,'A board is required');
+      const board={...body.board,root:await allowedPath(accessRoots(),body.board.root,true)};
+      await chatLibrary.edit(data=>{const key=body.provider+':'+found.sessionId;data.chats[key]={...data.chats[key],board};});
+      res.json({sessionId:found.sessionId,board});return;
+    }
     if(body.action==='delete'&&engineFor(body.provider).list().some(j=>j.sessionId===found.sessionId&&j.status==='running'))throw new HttpError(409,'Stop this chat before deleting it');
     if(body.action==='rename'&&!body.title)throw new HttpError(400,'A chat title is required');
     await chatLibrary.edit(data=>{const key=body.provider+':'+found.sessionId;data.chats[key]={...data.chats[key],...(body.action==='delete'?{deleted:true}:{title:body.title})};});

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+- Desktop chat: an embedded chat whose first host connection fails (for example while the PC host restarts or updates) no longer stays on "Loading..." indefinitely. It shows the connection error with Retry and retries every 3 seconds.
+- Chat position: a chat hidden by a desktop page switch loses its scroll offset; before it is shown again it now lands on the latest message when it was following it, otherwise on the reading position, instead of replaying a scroll from the top.
+
+### Features
+- Board chats: a chat started from a board records that board (id, project root, title, note) in the host-private chat library through the existing session manage route, so no native shell change is needed. Desktop rail, phone list and chat tiles mark board chats; the chat header shows the board and opens it (on its note when linked to one), also from the actions menu. Repository boards still never store chat associations. Chats created earlier are linked after they are opened once from their board.
+- Validation: TypeScript and Vite build passed. The unit suite has 5 failures that also fail unchanged on the clean 0.28.32 source (activity feed, compatibility trigger, host packager, checked-in board, activity labels). No browser scenario, desktop window or physical-device check was run; behavior in the live desktop window is unverified.
+
 ## [0.28.32](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.31...v0.28.32) (2026-11-04)
 
 Published [v0.28.32](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.32) from [eedf988754ef452fc89f5251e5c9bf3771c10c64](https://github.com/Evgenie-Myasnikov/pocket-code/commit/eedf988754ef452fc89f5251e5c9bf3771c10c64) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 119. Source CI, three production glass scenarios and package builds passed. All 164 web files and 425 host/Windows source files match the reviewed source; 1954 decoded artifact entries passed privacy audit; APK signer unchanged. Four uploaded asset hashes/sizes and exact source tag verified. Supersedes pending-publication statements for this version; physical-device and broader historical acceptance remain unverified.

@@ -108,3 +108,9 @@ header.chat-header.chat-header-assistant :is(.mobile-back,.chat-menu-button):hov
  header.chat-header-conversation .header-title .chat-title-button{min-height:44px;padding:4px 12px calc(clamp(10px,calc(11px * var(--ui-scale,1)),14px) * 1.3 + 6px)}
  header.chat-header-conversation .header-title:has(.chat-title-button)>.chat-context{left:12px;right:12px;bottom:4px}
 }
+/* A chat started from a board shows that board under its title and opens it. */
+.chat-header-conversation .chat-board-link{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;max-width:100%;min-height:24px;margin:0;padding:2px 8px;border:1px solid var(--line);border-radius:var(--radius-pill);background:transparent;color:var(--accent);font:inherit;font-size:calc(12px * var(--ui-scale,1));cursor:pointer}
+.chat-header-conversation .chat-board-link>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-header-conversation .chat-board-link svg{flex-shrink:0}
+.chat-header-conversation .chat-board-link:hover:not(:disabled){border-color:var(--accent)}
+.chat-header-conversation .chat-board-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
