@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.33 (unreleased)
+## [0.28.33](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.32...v0.28.33) (2026-11-05)
+
+Published [v0.28.33](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.33) from [0a88e6fd75cf8fe3920a865d452a4f5861690ba7](https://github.com/Evgenie-Myasnikov/pocket-code/commit/0a88e6fd75cf8fe3920a865d452a4f5861690ba7) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 120. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; host and Windows packages contain the new board diagram helper. Privacy guard passed for the tree. No browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
 
 ### Bug Fixes
 - Desktop chat: an embedded chat whose first host connection fails (for example while the PC host restarts or updates) no longer stays on "Loading..." indefinitely. It shows the connection error with Retry and retries every 3 seconds.
