@@ -38,7 +38,7 @@ import {ModelPicker,useClaudeModels} from './ModelPicker';
 import {useChatReturn} from './use-chat-return';
 import {WorkspacePassword} from './WorkspacePassword';
 import type {BoardNoticeTarget} from './BoardNotifications';
-import type {ProjectBoard} from '../server/boards';
+import {loadLinkedBoard} from './board-link';
 import {savedWorkspaces,rememberWorkspace,workspaceJoinId,type WorkspaceAccess} from './workspace-access';
 import {clearOffline} from './offline-data';
 import {clearReviewViewed} from './review-viewed';
@@ -735,7 +735,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   async function launchBoardChat(target:BoardChat,replace=false){try{const next=await prepareBoardConversation(connection!,target,provider,replace);if(embedded){embedded.onNewBoardChat?.(next);}else setBoardLaunch(next);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}}
   useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch,resuming=Boolean(target.context&&target.conversation?.generation===boardChat?.conversation?.generation&&target.boardId===boardChat?.boardId);if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()},target.resumeJobId?{id:target.resumeJobId,sessionId:target.note.chat.sessionId}:undefined,target);if(target.followUp)appendDraft(target.prompt);}else{newChat(target.root,target);if(!resuming)setDraft(target.context?t('Discuss this board with me.'):target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
   // A chat started from a board keeps that link in the host chat library, so every chat list marks it and can open the board.
-  const boardLinkOf=(target:BoardChat):BoardLink=>({id:target.boardId,root:target.root,title:(target.context?.name||target.note.title||t('Доска')).slice(0,200),...(target.context?{}:{noteId:target.note.id})});
+  const boardLinkOf=(target:BoardChat):BoardLink=>({id:target.boardId,root:target.root,title:(target.context?.name||target.note.title||t('Доска')).slice(0,200),kind:target.context?'discussion':target.taskRun?'task':'note',...(target.context?{}:{noteId:target.note.id})});
   const [linkedBoards,setLinkedBoards]=useState<Record<string,BoardLink>>({});
   const linkedSessions=useRef(new Set<string>());
   useEffect(()=>{const sessionId=job?.sessionId||selected?.sessionId;if(!boardChat||!connection||demo||!sessionId||sessionId.startsWith('pending-'))return;
@@ -747,10 +747,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   async function openChatBoard(link:BoardLink){
     if(!connection)return;
     try{
-      let board:ProjectBoard|null=null;
-      try{board=await request<ProjectBoard>(connection,'/boards/'+encodeURIComponent(link.id));}
-      catch(e){if((e as {status?:number}).status!==404)throw e;const repository=await request<{board:ProjectBoard|null}>(connection,'/project-board?root='+encodeURIComponent(link.root));board=repository.board?.id===link.id?repository.board:null;}
-      if(!board)throw Error();
+      const board=await loadLinkedBoard(connection,link);
       const target:BoardNoticeTarget={board,connection,noteId:link.noteId||'',message:'',requestId:Date.now()};
       if(embedded?.onBoard)embedded.onBoard(target);else{setNoticeTarget(target);setLocalBoards(true);setTab('workspace');}
     }catch{setError(t('Доска этого чата недоступна.'));}

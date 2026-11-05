@@ -326,7 +326,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
   const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if(workspaceAccess.current())return [];
-    return chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)));
+    return chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)),workspaceAccess.store.chatLinks());
   };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {
@@ -410,7 +410,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({cwd});
   });
   app.post('/api/sessions/:id/manage',async(req,res)=>{
-    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','board']),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional()}).optional()}).parse(req.body);
+    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','board']),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
     const found=await session(String(req.params.id),body.provider);
     if(body.action==='board'){
       if(!body.board)throw new HttpError(400,'A board is required');

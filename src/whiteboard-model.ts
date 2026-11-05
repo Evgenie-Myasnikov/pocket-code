@@ -5,7 +5,7 @@ const side=z.enum(['n','e','s','w']);
 export type PortSide=z.infer<typeof side>;
 export const whiteboardItem=z.object({id:z.string().uuid(),kind:z.enum(['sticky','text','frame','card']),text:z.string().max(4000),description:z.string().max(20000).optional(),x:point,y:point,width:z.number().min(120).max(6000),height:z.number().min(80).max(6000),color:z.enum(['sand','mint','blue','rose','violet']).default('sand')}).strict();
 const loosePoint=z.object({x:z.number().finite().min(0).max(106000),y:z.number().finite().min(0).max(106000)}).strict();
-export const whiteboardLink=z.object({id:z.string().uuid(),from:z.string().uuid().optional(),to:z.string().uuid().optional(),fromPoint:loosePoint.optional(),toPoint:loosePoint.optional(),fromSide:side.optional(),toSide:side.optional()}).strict().superRefine((link,ctx)=>{
+export const whiteboardLink=z.object({id:z.string().uuid(),from:z.string().uuid().optional(),to:z.string().uuid().optional(),fromPoint:loosePoint.optional(),toPoint:loosePoint.optional(),fromSide:side.optional(),toSide:side.optional(),label:z.string().trim().min(1).max(200).optional(),style:z.enum(['arrow','line','dashed']).optional()}).strict().superRefine((link,ctx)=>{
  if(Boolean(link.from)===Boolean(link.fromPoint)||Boolean(link.to)===Boolean(link.toPoint)||!link.from&&link.fromSide||!link.to&&link.toSide)ctx.addIssue({code:'custom',message:'Each endpoint needs exactly one object or free point'});
 });
 export const whiteboardSchema=z.object({version:z.literal(1),items:z.array(whiteboardItem).max(500),links:z.array(whiteboardLink).max(1000)}).strict().superRefine((value,ctx)=>{

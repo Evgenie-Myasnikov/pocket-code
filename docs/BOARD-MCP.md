@@ -8,7 +8,8 @@ the local host connection internally; never put connection keys in MCP arguments
 
 Tools: `list_boards`, `board_overview`, `search_board`, `read_board`,
 `read_objects`, `read_note_context`, `focus_objects`, `create_note`, `update_note`,
-`canvas_apply`, `canvas_patch`, `read_view_state`, `control_view`, `board_mcp_status`. Mutations require the current repository revision and go through
+`canvas_create`, `canvas_connect`, `board_create_diagram`, `canvas_apply`, `canvas_patch`,
+`read_view_state`, `control_view`, `board_mcp_status`. Mutations require the current repository revision and go through
 the same host validation and write lock as the UI. There are no deletion,
 publication or notification tools. Canvas writes refuse hosts older than 0.28.0.
 
@@ -39,6 +40,41 @@ fields, rejects missing IDs and cannot change an object's type. `canvas_apply`
 remains the explicit full-object upsert for creation and connections. All writes
 require the freshly read revision; conflicts require rereading and reconciliation.
 New cards/stickies still require creation context. Dependencies are not visual links.
+
+## Creation, diagrams and structured errors (0.28.33)
+
+Further alignment with Miro MCP's scoped workflow, still in Pocket Code JSON and
+without a Miro account:
+
+- `search_board` filters by `query`, `kinds` (`note`, `sticky`, `text`, `frame`,
+  `card`), `frameId` (objects whose centre lies inside the frame), task `status`
+  and an `area`, with `limit`/`cursor` paging (`next` is `null` on the last page).
+  A call needs a query or at least one filter. `read_board` accepts optional
+  `limit`/`cursor` and then returns only the connections of the objects on the page.
+- `canvas_create` creates objects without caller-chosen IDs: each item has a `ref`,
+  the server issues UUIDs and returns `created.objects` (`ref` -> ID). Its `links`
+  connect new refs or existing canvas object IDs. Prefer it over `canvas_apply`,
+  which remains for explicit upserts and for compatibility.
+- `canvas_connect` adds connections between existing canvas objects and returns
+  their new IDs. Connections may carry `label` (1-200 characters) and `style`
+  (`arrow` default, `line`, `dashed`); these fields need host 0.28.33 or newer.
+- `board_create_diagram` draws a Mermaid flowchart (`flowchart`/`graph` with
+  `TD|TB|BT|LR|RL`) as a frame of stickies with labelled connections and a layered
+  layout. Supported: node shapes, chained edges, `-->`, `==>`, `---`, `-.->`,
+  `-.-`, `-->|label|` and `-- label -->`. Subgraphs, classes and styles are
+  ignored; other syntax fails with its line number. Limits: 60 nodes, 120
+  connections, frames up to 6000x6000. Without `x`/`y` the diagram is placed to
+  the right of existing objects. Creation context is required. It returns the
+  frame ID and a Mermaid node -> object ID map.
+- Failures return `{"error":{code,message,retryable,hint?,currentRevision?}}` with
+  codes `revision_conflict` (retryable; includes the current revision),
+  `not_found`, `invalid_input`, `invalid_diagram`, `host_too_old`,
+  `unknown_project`, `no_board`, `view_unavailable`, `forbidden`,
+  `host_unavailable` (retryable) and `invalid_request`.
+
+Pocket Code still has no delete, publish or notification tools, keeps access to
+explicitly configured local projects, and never stores people, assignments or chat
+associations in repository boards.
 
 `focus_objects` signals inspection of existing IDs at a current revision without
 changing the board. It returns whether the host accepted the activity; this does

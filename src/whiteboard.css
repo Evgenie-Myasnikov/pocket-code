@@ -71,3 +71,5 @@
 .wb-write-receipt>span{display:flex;align-items:center;gap:var(--space-1);min-width:0;overflow-wrap:anywhere}.wb-write-receipt>span>svg{flex:none;color:var(--success-fg)}
 .wb-write-receipt button{display:grid;place-items:center;flex:none;min-height:32px;min-width:32px;padding:4px 6px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text);font:inherit}.wb-write-receipt button:hover{background:var(--surface)}.wb-write-receipt button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 @media(pointer:coarse){.wb-write-receipt button{min-height:44px;min-width:44px}}
+/* Connection labels stay readable over the board with a halo in the board background colour. */
+.wb-link-label{font:500 13px/1 var(--font-sans,system-ui);fill:currentColor;paint-order:stroke;stroke:var(--canvas-bg);stroke-width:4px;stroke-linejoin:round;pointer-events:none}
