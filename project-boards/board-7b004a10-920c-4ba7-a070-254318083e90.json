@@ -873,6 +873,17 @@
         "width": 1560,
         "height": 600,
         "color": "blue"
+      },
+      {
+        "id": "54be85e6-40d7-479f-80ca-8cc4f9238053",
+        "kind": "card",
+        "text": "Чаты доски, позиция чата и MCP доски",
+        "description": "Context\nDesktop chats could stay on an endless loading screen after the PC host restarted, chats reopened from another page showed the top of the conversation, and chats started from a board were indistinguishable from ordinary chats. The board MCP needed the scoped creation and diagram workflow of the Miro MCP while keeping Pocket Code's local, privacy-preserving JSON model.\n\nSources\n- src/App.tsx, src/DesktopApp.tsx, src/ChatHeader.tsx, src/board-link.ts, server/chat-library.ts, server/boards.ts\n- scripts/board-mcp-worker.mjs, scripts/board-diagram.mjs, src/WhiteboardLink.tsx, src/whiteboard-model.ts\n- docs/BOARD-MCP.md, .agents/skills/pocket-board/SKILL.md\n- tests/board-mcp-tools.test.mjs, tests/board-diagram.test.ts, tests/chat-board-links.test.ts\n- https://github.com/miroapp/miro-ai (public Miro MCP reference)\n\nAcceptance\nAn embedded chat whose first host connection fails shows the error with Retry and reconnects automatically. A chat shown again after a page switch lands on the latest message, or on the reading position when the person had scrolled up. Board chats are marked in every chat list, show their board in the chat header and open it; a board discussion opened from the chat list returns to its board. Card chats recorded on host boards are recognised without reopening. Board MCP: filtered and paged search, server-issued IDs on creation, labelled and styled connections, Mermaid flowchart diagrams and structured errors; no delete, publish or notification tools.\n\nValidation (2026-11-05, unreleased): TypeScript/Vite build passed. New stdio MCP tests (filters, paging, create/connect, labels, old-host refusal, structured revision conflict, diagram), Mermaid parser/layout and connection-schema tests, and chat-library link tests passed; existing board MCP tests passed. The full suite keeps the same 5 failures as the clean 0.28.32 source. No browser scenario, desktop window or physical-device check was run.\n\nOpen questions: board discussions created before this version are linked only after being opened once from their board, because their device-local association has no board ID. Live desktop behaviour remains unverified.\n\nRelease preparation (2026-11-05): authorized 0.28.33 packaging from existing release/0.28.1 branch; Android code 120. Exact source commit and publication evidence pending.",
+        "x": 520,
+        "y": 15580,
+        "width": 340,
+        "height": 380,
+        "color": "sand"
       }
     ],
     "links": []
@@ -934,7 +945,8 @@
     "0.28.29": "release/0.28.1",
     "0.28.30": "release/0.28.1",
     "0.28.31": "release/0.28.1",
-    "0.28.32": "release/0.28.1"
+    "0.28.32": "release/0.28.1",
+    "0.28.33": "release/0.28.1"
   },
   "format": "pocket-code-board",
   "version": 1,
@@ -995,7 +1007,8 @@
     "0.28.29",
     "0.28.30",
     "0.28.31",
-    "0.28.32"
+    "0.28.32",
+    "0.28.33"
   ],
   "notes": [
     {
@@ -1532,6 +1545,17 @@
       "priority": "high",
       "x": 490,
       "y": 8560,
+      "dependencies": []
+    },
+    {
+      "id": "54be85e6-40d7-479f-80ca-8cc4f9238053",
+      "title": "Чаты доски, позиция чата и MCP доски",
+      "description": "Context\nDesktop chats could stay on an endless loading screen after the PC host restarted, chats reopened from another page showed the top of the conversation, and chats started from a board were indistinguishable from ordinary chats. The board MCP needed the scoped creation and diagram workflow of the Miro MCP while keeping Pocket Code's local, privacy-preserving JSON model.\n\nSources\n- src/App.tsx, src/DesktopApp.tsx, src/ChatHeader.tsx, src/board-link.ts, server/chat-library.ts, server/boards.ts\n- scripts/board-mcp-worker.mjs, scripts/board-diagram.mjs, src/WhiteboardLink.tsx, src/whiteboard-model.ts\n- docs/BOARD-MCP.md, .agents/skills/pocket-board/SKILL.md\n- tests/board-mcp-tools.test.mjs, tests/board-diagram.test.ts, tests/chat-board-links.test.ts\n- https://github.com/miroapp/miro-ai (public Miro MCP reference)\n\nAcceptance\nAn embedded chat whose first host connection fails shows the error with Retry and reconnects automatically. A chat shown again after a page switch lands on the latest message, or on the reading position when the person had scrolled up. Board chats are marked in every chat list, show their board in the chat header and open it; a board discussion opened from the chat list returns to its board. Card chats recorded on host boards are recognised without reopening. Board MCP: filtered and paged search, server-issued IDs on creation, labelled and styled connections, Mermaid flowchart diagrams and structured errors; no delete, publish or notification tools.\n\nValidation (2026-11-05, unreleased): TypeScript/Vite build passed. New stdio MCP tests (filters, paging, create/connect, labels, old-host refusal, structured revision conflict, diagram), Mermaid parser/layout and connection-schema tests, and chat-library link tests passed; existing board MCP tests passed. The full suite keeps the same 5 failures as the clean 0.28.32 source. No browser scenario, desktop window or physical-device check was run.\n\nOpen questions: board discussions created before this version are linked only after being opened once from their board, because their device-local association has no board ID. Live desktop behaviour remains unverified.\n\nRelease preparation (2026-11-05): authorized 0.28.33 packaging from existing release/0.28.1 branch; Android code 120. Exact source commit and publication evidence pending.",
+      "branch": "0.28.33",
+      "status": "review",
+      "priority": "normal",
+      "x": 520,
+      "y": 15580,
       "dependencies": []
     }
   ]

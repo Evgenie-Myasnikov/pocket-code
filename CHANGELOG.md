@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.33 (unreleased)
 
 ### Bug Fixes
 - Desktop chat: an embedded chat whose first host connection fails (for example while the PC host restarts or updates) no longer stays on "Loading..." indefinitely. It shows the connection error with Retry and retries every 3 seconds.
