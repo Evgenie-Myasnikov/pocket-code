@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+- Custom providers missing from the provider picker: the picker loaded custom providers once, and when the host was not ready yet (desktop start) the list stayed empty, while chats were still filtered by the stored custom provider, so the picker showed Claude with "No matching chats". The list and the provider's model catalog now retry until the host answers, the list refreshes each time the picker opens, the picker says "Custom provider…" until the stored provider is loaded instead of showing Claude, and a provider removed on the PC falls back to the PC's own Claude sign-in.
+- Validation: TypeScript and Vite build passed. The full suite keeps the same 5 known failures. No desktop window, browser scenario or physical-device check was run.
+
 ## [0.28.37](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.36...v0.28.37) (2026-11-06)
 
 Published [v0.28.37](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.37) from [682d156406721f66e6e05738be10c4745af09467](https://github.com/Evgenie-Myasnikov/pocket-code/commit/682d156406721f66e6e05738be10c4745af09467) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 124. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the provider-keeping chat fixes (session account recording, chat library retries, account lookup on open). Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
