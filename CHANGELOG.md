@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.40 (unreleased)
 
 ### Fixes
 - The remaining percentage on Send takes the exact colour of the icon it replaces, so it stays readable on a light Send button (it was white on white). The allowance ring around Send is 30% thicker.
