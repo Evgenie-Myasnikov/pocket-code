@@ -4,20 +4,24 @@ import type {Express} from 'express';
 import type {JiraStore} from './jira-vault.js';
 import {HttpError} from './security.js';
 const message=z.object({role:z.enum(['user','assistant']),content:z.string().max(32000)}).strict();
-const profile=z.object({id:z.string().uuid(),name:z.string().trim().min(1).max(80),url:z.string().max(2048),key:z.string().max(8192),messages:z.array(message).max(100).default([])});
+const profile=z.object({id:z.string().uuid(),name:z.string().trim().min(1).max(80),url:z.string().max(2048),key:z.string().max(8192),messages:z.array(message).max(100).default([]),agentAuth:z.enum(['bearer','x-api-key']).optional()});
+/** Claude Code appends /v1/messages to ANTHROPIC_BASE_URL, so an OpenAI-style .../v1 base URL is reduced to its root. */
+export function agentBaseUrl(url:string){return providerUrl(url).replace(/\/v1$/,'');}
 export function providerUrl(value:string){let url:URL;try{url=new URL(value);}catch{throw new HttpError(400,'Invalid API URL');}if(url.username||url.password||url.search||url.hash||!(url.protocol==='https:'||url.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(url.hostname)))throw new HttpError(400,'Use HTTPS, or HTTP on localhost, without credentials or query parameters');return url.href.replace(/\/$/,'');}
 export function parseModelCatalog(value:unknown){const parsed=z.object({data:z.array(z.object({id:z.string().min(1).max(300)})).max(10000)}).safeParse(value);if(!parsed.success)throw new HttpError(502,'Provider returned an invalid model catalog');return [...new Set(parsed.data.data.map(m=>m.id))].sort();}
-export type ProviderStatus={state:'ready'|'unauthorized'|'no-key'|'unreachable'|'incompatible'|'error';models?:number;message?:string;checkedAt:number};
+export type ProviderStatus={state:'ready'|'unauthorized'|'no-key'|'unreachable'|'incompatible'|'error';models?:number;message?:string;checkedAt:number;agent?:'supported'|'unsupported'|'unknown'};
+/** Variables that must not leak from the host's own Claude sign-in into a custom provider task. */
+const inheritedAuth=['ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN','ANTHROPIC_BASE_URL','CLAUDE_CODE_OAUTH_TOKEN','ANTHROPIC_MODEL','ANTHROPIC_SMALL_FAST_MODEL','ANTHROPIC_DEFAULT_OPUS_MODEL','ANTHROPIC_DEFAULT_SONNET_MODEL','ANTHROPIC_DEFAULT_HAIKU_MODEL','CLAUDE_CODE_SUBAGENT_MODEL','CLAUDE_CODE_USE_BEDROCK','CLAUDE_CODE_USE_VERTEX','CLAUDE_CODE_USE_FOUNDRY'];
 export class CustomProviders{
  private queue:Promise<unknown>=Promise.resolve();
  constructor(private store:JiraStore,private send:typeof fetch=fetch){}
  private async load(){const raw=await this.store.load();return z.array(profile).max(30).parse(raw.profiles||[]);}
  private async transaction<T>(action:()=>Promise<T>):Promise<T>{const work=this.queue.catch(()=>{}).then(action);this.queue=work;return work;}
  /** Profiles without keys or history. With check, each provider's /models is queried to report whether its key works. */
- async list(check=false){const list=await this.load();return Promise.all(list.map(async({key,messages,...p})=>({...p,hasKey:!!key,...(check?{status:await this.status({...p,key,messages})}:{})})));}
+ async list(check=false){const list=await this.load();return Promise.all(list.map(async({key,messages,agentAuth,...p})=>({...p,hasKey:!!key,...(check?{status:await this.status({...p,key,messages,agentAuth})}:{})})));}
  private async status(p:z.infer<typeof profile>):Promise<ProviderStatus>{
   const checkedAt=Date.now();
-  try{return {state:'ready',models:parseModelCatalog(await this.call(p,'models')).length,checkedAt};}
+  try{const models=parseModelCatalog(await this.call(p,'models')).length;return {state:'ready',models,checkedAt,agent:await this.probeAgent(p)};}
   catch(error){const code=(error as HttpError).code||'';
    if(code==='provider_http_401'||code==='provider_http_403')return {state:p.key?'unauthorized':'no-key',checkedAt};
    if(code==='provider_unreachable')return {state:'unreachable',checkedAt};
@@ -41,6 +45,28 @@ export class CustomProviders{
   if(!response.ok){await response.body?.cancel();throw new HttpError(502,response.status===401||response.status===403?'Provider rejected the API key (HTTP '+response.status+')':'Provider returned HTTP '+response.status,'provider_http_'+response.status);}
   const reader=response.body?.getReader();if(!reader)throw new HttpError(502,'Empty provider response');const chunks:Uint8Array[]=[];let size=0;while(true){const next=await reader.read();if(next.done)break;size+=next.value.length;if(size>2_000_000){await reader.cancel();throw new HttpError(502,'Provider response is too large');}chunks.push(next.value);}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new HttpError(502,'Provider returned invalid JSON');}
  }
+ /** Whether the provider serves the Anthropic Messages API used by the Claude Code agent, and with which auth header.
+  * An empty request costs no tokens: 400 means the endpoint and key are accepted; 404 means no such API. */
+ private async probeAgent(p:z.infer<typeof profile>):Promise<'supported'|'unsupported'|'unknown'>{
+  if(!p.key)return 'unknown';
+  for(const auth of ['bearer','x-api-key'] as const){
+   let response:Response;try{response=await this.send(agentBaseUrl(p.url)+'/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01',...(auth==='bearer'?{Authorization:'Bearer '+p.key}:{'x-api-key':p.key})},body:'{}',redirect:'error',signal:AbortSignal.timeout(15000)});}catch{return 'unknown';}
+   await response.body?.cancel();
+   if(response.status===404||response.status===405)return 'unsupported';
+   if(response.status===401||response.status===403)continue;
+   if(p.agentAuth!==auth)await this.transaction(async()=>{const list=await this.load();await this.store.save({profiles:list.map(v=>v.id===p.id?{...v,agentAuth:auth}:v)});});
+   return 'supported';
+  }
+  return 'unknown';
+ }
+ /** Environment for a Claude Code task that runs against this provider: its URL and key replace the host's own Claude sign-in,
+  * and every model slot uses the chosen model so the agent never asks the provider for an unknown Claude model. */
+ async agentEnv(id:string,model:string,base:NodeJS.ProcessEnv=process.env):Promise<NodeJS.ProcessEnv>{
+  const p=await this.get(id);if(!p.key)throw new HttpError(409,'Sign in to this provider with an API key first','provider_no_key');
+  const env:NodeJS.ProcessEnv={...base};for(const name of inheritedAuth)delete env[name];
+  return {...env,ANTHROPIC_BASE_URL:agentBaseUrl(p.url),...(p.agentAuth==='x-api-key'?{ANTHROPIC_API_KEY:p.key}:{ANTHROPIC_AUTH_TOKEN:p.key}),ANTHROPIC_MODEL:model,ANTHROPIC_SMALL_FAST_MODEL:model,ANTHROPIC_DEFAULT_OPUS_MODEL:model,ANTHROPIC_DEFAULT_SONNET_MODEL:model,ANTHROPIC_DEFAULT_HAIKU_MODEL:model,CLAUDE_CODE_SUBAGENT_MODEL:model,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1'};
+ }
+ async name(id:string){return (await this.get(id)).name;}
  async models(id:string){return parseModelCatalog(await this.call(await this.get(id),'models'));}
  async history(id:string){return (await this.get(id)).messages;}
  async chat(id:string,input:unknown){const data=z.object({model:z.string().min(1).max(300),text:z.string().trim().min(1).max(16000)}).strict().parse(input);return this.transaction(async()=>{const p=await this.get(id),models=parseModelCatalog(await this.call(p,'models'));if(!models.includes(data.model))throw new HttpError(400,'Choose a model from the provider catalog');const messages=[...p.messages.slice(-38),{role:'user' as const,content:data.text}];const raw=await this.call(p,'chat/completions',{model:data.model,messages,stream:false});const answer=z.object({choices:z.array(z.object({message:z.object({content:z.string().max(32000)})})).min(1)}).safeParse(raw);if(!answer.success)throw new HttpError(502,'Provider returned no text answer');const updated=[...messages,{role:'assistant' as const,content:answer.data.choices[0].message.content}];const list=await this.load();await this.store.save({profiles:list.map(v=>v.id===id?{...v,messages:updated}:v)});return updated;});}

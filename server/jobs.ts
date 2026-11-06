@@ -56,7 +56,7 @@ export class Jobs {
     if(job.status!=='running'||!job.query)throw new HttpError(409,'The run has ended. The mode applies to the next message.');
     await job.query.setPermissionMode(mode);job.permissionMode=mode;job.revision++;return this.view(job);
   }
-  start(input: { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; claudeEffort?:'low'|'medium'|'high'|'xhigh'|'max'; claudeAccess?:'default'|'acceptEdits'|'bypassPermissions'; maxBudgetUsd: number; approvalTimeoutMs?: number; displayText?: string; attachmentPaths?: string[]; baseMessageCount?: number; jira?: JobView['jira'] }) {
+  start(input: { id: string; cwd: string; sessionId?: string; text: string; model?: string; mode: 'default' | 'plan'; claudeEffort?:'low'|'medium'|'high'|'xhigh'|'max'; claudeAccess?:'default'|'acceptEdits'|'bypassPermissions'; maxBudgetUsd: number; approvalTimeoutMs?: number; displayText?: string; attachmentPaths?: string[]; baseMessageCount?: number; jira?: JobView['jira']; env?: NodeJS.ProcessEnv; account?: string }) {
     const existing = this.jobs.get(input.id);
     if (existing) return this.view(existing);
     for (const [id, j] of this.jobs) if (j.status !== 'running' && Date.now() - j.startedAt > 86400000) this.jobs.delete(id);
@@ -65,7 +65,7 @@ export class Jobs {
       throw new HttpError(409, 'This Claude chat is already running. Send a follow-up to its active turn.');
     if ([...this.jobs.values()].filter(j => j.status === 'running').length >= 3 || this.jobs.size >= 100)
       throw new HttpError(429, 'Лимит задач сервера. Завершите текущие задачи; старые записи хранятся 24 часа.');
-    const job: Job = { provider: 'claude', id: input.id, cwd: input.cwd, sessionId: input.sessionId, status: 'running',
+    const job: Job = { provider: 'claude', ...(input.account ? { account: input.account } : {}), id: input.id, cwd: input.cwd, sessionId: input.sessionId, status: 'running',
       messages: [{ id: randomUUID(), role: 'user', blocks: userInputBlocks(input) }],
       partial: '', approvals: [], startedAt: Date.now(), revision: 0, baseMessageCount: input.baseMessageCount || 0, jira: input.jira,
       controller: new AbortController(), pending: new Map(),inputs:new PromptStream(),waiting:[],followups:new Followups(),acceptingInput:true,approvalTimeoutMs:input.approvalTimeoutMs??0,
@@ -90,6 +90,7 @@ export class Jobs {
         settingSources: ['user', 'project', 'local'],...(Object.keys(mcpServers).length?{mcpServers}:{}),
         systemPrompt: { type: 'preset', preset: 'claude_code', append: await projectBoardInstructions(input.cwd) },
         ...(process.env.CLAUDE_EXECUTABLE ? { pathToClaudeCodeExecutable: process.env.CLAUDE_EXECUTABLE } : {}),
+        ...(input.env ? { env: input.env } : {}),
         canUseTool: async (tool, toolInput, options) => this.ask(job, tool, toolInput, options.signal, options.suggestions),
       } });
       job.query = stream;

@@ -3,9 +3,10 @@ import {ChevronRight,Plus,RefreshCw,KeyRound,Server,CheckCircle2,Loader2} from '
 import {request,type Connection} from './api';
 import {t,useLanguage} from './i18n';
 import {Notice} from './Notice';
+import {customProvidersChanged,setCustomAccount,useCustomAccount} from './custom-account';
 import './provider-connections.css';
 
-export type CustomStatus={state:'ready'|'unauthorized'|'no-key'|'unreachable'|'incompatible'|'error';models?:number;message?:string;checkedAt:number};
+export type CustomStatus={state:'ready'|'unauthorized'|'no-key'|'unreachable'|'incompatible'|'error';models?:number;message?:string;checkedAt:number;agent?:'supported'|'unsupported'|'unknown'};
 export type CustomProfile={id:string;name:string;url:string;hasKey:boolean;status?:CustomStatus};
 
 const host=(url:string)=>{try{return new URL(url).host;}catch{return url;}};
@@ -43,13 +44,13 @@ export function CustomProviderList({connection,online=true,onOpen}:{connection:C
 
 /** One custom provider account: status, sign-in with an API key, endpoint edits and removal, like the built-in providers. */
 export function CustomProviderAccount({connection,online=true,id,onSaved,onRemoved}:{connection:Connection|null;online?:boolean;id:string|'new';onSaved(id:string):void;onRemoved():void}){
-  const {profiles,error:loadError,checking,reload}=useCustomProfiles(connection,online);
+  const {profiles,error:loadError,checking,reload}=useCustomProfiles(connection,online),active=useCustomAccount();
   const profile=id==='new'?null:profiles?.find(p=>p.id===id)||null;
   const [name,setName]=useState(''),[url,setUrl]=useState(''),[key,setKey]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[editing,setEditing]=useState(false),[confirmRemove,setConfirmRemove]=useState(false);
   useEffect(()=>{if(profile){setName(profile.name);setUrl(profile.url);}else if(id==='new'){setName('');setUrl('');}setKey('');setEditing(false);setConfirmRemove(false);setError('');},[id,profile?.id]);
   if(!connection||!online)return <p role="status">{t('Подключите сервер ПК для проверки провайдеров и входа.')}</p>;
-  async function save(body:Record<string,unknown>,done?:(saved:string)=>void){setBusy(true);setError('');try{const saved=await request<{id:string}>(connection!,'/custom-providers',body);setKey('');setEditing(false);reload();done?.(saved.id);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
-  async function remove(){setBusy(true);setError('');try{await request(connection!,'/custom-providers/remove',{id});onRemoved();}catch(e){setError((e as Error).message);setBusy(false);}}
+  async function save(body:Record<string,unknown>,done?:(saved:string)=>void){setBusy(true);setError('');try{const saved=await request<{id:string}>(connection!,'/custom-providers',body);setKey('');setEditing(false);reload();customProvidersChanged();done?.(saved.id);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+  async function remove(){setBusy(true);setError('');try{await request(connection!,'/custom-providers/remove',{id});if(active===id)setCustomAccount('');customProvidersChanged();onRemoved();}catch(e){setError((e as Error).message);setBusy(false);}}
   const keyField=<label className="custom-account-field">{t('API-ключ')}<input type="password" autoComplete="off" spellCheck={false} value={key} maxLength={8192} onChange={e=>setKey(e.target.value)} placeholder={profile?.hasKey?t('Новый ключ заменит сохранённый'):''}/></label>;
   const endpointFields=<><label className="custom-account-field">{t('Название')}<input required maxLength={80} value={name} onChange={e=>setName(e.target.value)}/></label><label className="custom-account-field">{t('Базовый URL API')}<input required type="url" placeholder="https://api.example.com/v1" value={url} onChange={e=>setUrl(e.target.value)}/></label></>;
   if(id==='new')return <section className="provider-connections provider-connections-single"><article className="provider-card">
@@ -65,6 +66,7 @@ export function CustomProviderAccount({connection,online=true,id,onSaved,onRemov
       <div><dt><Server size={16}/>{t('Сервер')}</dt><dd>{checking&&!s?t('Проверяем…'):s?.state==='unreachable'?t('Недоступен'):s?.state==='incompatible'?t('Нет OpenAI-совместимого /models'):s?t('Отвечает'):t('Не проверен')}</dd></div>
       <div><dt><KeyRound size={16}/>{t('Авторизация')}</dt><dd className={ok?'provider-ok':''}>{ok?<><CheckCircle2 size={16}/>{profile.hasKey?t('Ключ принят'):t('Ключ не требуется')}</>:s?.state==='unauthorized'?t('Ключ отклонён провайдером'):s?.state==='no-key'||!profile.hasKey&&s?.state!=='ready'?t('Требуется API-ключ'):t('Не проверена')}</dd></div>
       {ok&&<div><dt>{t('Модели')}</dt><dd>{s?.models??0}</dd></div>}
+      {ok&&<div><dt>{t('Агент')}</dt><dd className={s?.agent==='supported'?'provider-ok':''}>{s?.agent==='supported'?<><CheckCircle2 size={16}/>{t('Работает как Claude Code')}</>:s?.agent==='unsupported'?t('Нет Anthropic API: доступен только API-чат'):t('Не проверен')}</dd></div>}
     </dl>
     {s?.state==='error'&&s.message&&<Notice tone="error">{s.message}</Notice>}
     {s?.state==='unreachable'&&<Notice tone="warning">{t('ПК не может связаться с провайдером. Проверьте URL, сеть или что локальный сервер запущен.')}</Notice>}
@@ -75,7 +77,7 @@ export function CustomProviderAccount({connection,online=true,id,onSaved,onRemov
     <details className="disclosure" open={editing} onToggle={e=>setEditing((e.target as HTMLDetailsElement).open)}><summary>{t('Название и адрес')}</summary>
       <form className="custom-account-form" onSubmit={e=>{e.preventDefault();void save({id,name,url});}}>{endpointFields}<button className="secondary" disabled={busy||!name.trim()||!url.trim()||name===profile.name&&url===profile.url} type="submit">{t('Сохранить')}</button></form></details>
     {!confirmRemove?<button className="secondary danger" disabled={busy} onClick={()=>setConfirmRemove(true)}>{t('Удалить провайдер')}</button>:<div className="confirm-inline" role="group" aria-label={t('Удалить провайдер')}><p>{t('Провайдер, его ключ и история API-чата будут удалены с ПК.')}</p><div className="confirm-inline-actions"><button className="primary danger" disabled={busy} onClick={()=>void remove()}>{t('Удалить')}</button><button className="secondary" disabled={busy} onClick={()=>setConfirmRemove(false)}>{t('Отмена')}</button></div></div>}
-    <p className="muted">{t('Чат с этим провайдером открывается из списка провайдеров: «Свой провайдер…». Это API-чат без инструментов файлов проекта.')}</p>
+    <p className="muted">{t('Выберите этого провайдера в списке провайдеров рядом с Claude, Codex и Copilot: чаты работают как в Claude — с файлами проекта, инструментами, подтверждениями и историей, но через URL и ключ провайдера и его модели.')}</p>
     {error&&<Notice tone="error">{error}</Notice>}
   </article></section>;
 }

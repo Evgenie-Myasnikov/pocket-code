@@ -21,7 +21,7 @@ export function useClaudeModels(connection: Connection | null, provider: Workspa
 }
 
 export function ModelPicker({provider, name, models = [], value, onChange, disabled, unavailable, disabledHint}: {
-  provider: WorkspaceProvider; name: string; models?: ProviderModel[]; value: string;
+  provider: WorkspaceProvider | 'custom'; name: string; models?: ProviderModel[]; value: string;
   onChange(value: string): void; disabled?: boolean; unavailable?: boolean; disabledHint?: string;
 }) {
   const ru = useLanguage() === 'ru';

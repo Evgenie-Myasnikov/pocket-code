@@ -1,5 +1,8 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Работает как Claude Code':'Works as Claude Code',
+  'Нет Anthropic API: доступен только API-чат':'No Anthropic API: only the API chat is available',
+  'Выберите этого провайдера в списке провайдеров рядом с Claude, Codex и Copilot: чаты работают как в Claude — с файлами проекта, инструментами, подтверждениями и историей, но через URL и ключ провайдера и его модели.':'Choose this provider in the provider list next to Claude, Codex and Copilot: chats work as in Claude, with project files, tools, approvals and history, but through this provider\'s URL, key and models.',
   'Свои провайдеры':'Custom providers',
   'Свой провайдер':'Custom provider',
   'Все свои провайдеры':'All custom providers',
@@ -38,7 +41,6 @@ export const english: Record<string, string> = {
   'Требуется API-ключ':'API key required',
   'Удалить ключ':'Remove key',
   'Удалить провайдер':'Remove provider',
-  'Чат с этим провайдером открывается из списка провайдеров: «Свой провайдер…». Это API-чат без инструментов файлов проекта.':'Chat with this provider from the provider list: "Custom provider…". It is an API chat without project file tools.',
   'Сочетания клавиш':'Keyboard shortcuts',
   'Выделение доски':'Board selection',
   'К каждому сообщению':'With each message',

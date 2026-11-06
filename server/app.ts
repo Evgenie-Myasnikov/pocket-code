@@ -326,7 +326,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
   const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if(workspaceAccess.current())return [];
-    return chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)),workspaceAccess.store.chatLinks());
+    const listed=await chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)),workspaceAccess.store.chatLinks());
+    if(provider!=='claude')return listed;
+    // A chat started with a custom provider keeps that account, so it is listed and resumed with the same provider.
+    const fresh=new Map<string,string>();for(const job of jobs.list())if(job.account&&job.sessionId&&!listed.some(s=>s.sessionId===job.sessionId&&(s as {account?:string}).account))fresh.set(job.sessionId,job.account);
+    if(!fresh.size)return listed;
+    await chatLibrary.edit(data=>{for(const [sessionId,account] of fresh){const key='claude:'+sessionId;data.chats[key]={...data.chats[key],account};}});
+    return listed.map(s=>fresh.has(s.sessionId)?{...s,account:fresh.get(s.sessionId)}:s);
   };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {
@@ -373,7 +379,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
     res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
   });
-  mountCustomProviders(app,new CustomProviders(new WindowsJiraStore(path.join(config.uploads,'..','custom-providers.dat'))),()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can use custom providers');});
+  const customProviders=new CustomProviders(new WindowsJiraStore(path.join(config.uploads,'..','custom-providers.dat')));
+  mountCustomProviders(app,customProviders,()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can use custom providers');});
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
   app.post('/api/provider-connections/:provider/login/cancel',async(req,res)=>res.json(await providerConnections.cancel(providerSchema.parse(req.params.provider))));
   app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));
@@ -410,8 +417,14 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({cwd});
   });
   app.post('/api/sessions/:id/manage',async(req,res)=>{
-    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','board']),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
+    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','board','account']),account:uuid.optional(),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
     const found=await session(String(req.params.id),body.provider);
+    if(body.action==='account'){
+      if(body.provider!=='claude'||!body.account)throw new HttpError(400,'A custom provider account is required');
+      await customProviders.name(body.account);
+      await chatLibrary.edit(data=>{const key=body.provider+':'+found.sessionId;data.chats[key]={...data.chats[key],account:body.account};});
+      res.json({sessionId:found.sessionId,account:body.account});return;
+    }
     if(body.action==='board'){
       if(!body.board)throw new HttpError(400,'A board is required');
       const board={...body.board,root:await allowedPath(accessRoots(),body.board.root,true)};
@@ -551,10 +564,17 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       attachments: z.array(uuid).max(10).default([]), model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
       claudeEffort:z.enum(['low','medium','high','xhigh','max']).optional(),claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
-      approvalTimeoutMinutes: z.union([z.literal(0), z.literal(10), z.literal(60)]).default(0), taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
+      approvalTimeoutMinutes: z.union([z.literal(0), z.literal(10), z.literal(60)]).default(0), account:uuid.optional(), taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
     const cwd = await allowedPath(accessRoots(), body.cwd, true);
     const engine = engineFor(body.provider);
     if (body.provider !== 'codex' && body.reasoningEffort) throw new HttpError(400, 'Reasoning effort is available for Codex chats only.');
+    // A custom provider runs the same Claude Code agent with that provider's URL, key and chosen model.
+    if (body.account) {
+      if (workspaceAccess.current()) throw new HttpError(403, 'Only the host can use custom providers');
+      if (body.provider !== 'claude') throw new HttpError(400, 'Custom providers run through the Claude agent');
+      if (!body.model) throw new HttpError(400, 'Choose a model from the provider catalog');
+      if (body.claudeEffort) throw new HttpError(400, 'Effort levels are not available for custom providers');
+    }
     const replyToRetry=async(existing:ReturnType<typeof allJobs>[number])=>{
       if((existing.provider||'claude')!==body.provider||await realpath(existing.cwd)!==cwd||body.sessionId&&existing.sessionId&&body.sessionId!==existing.sessionId)throw new HttpError(409,'This request identifier belongs to another chat or project.');
       if(body.taskRunId){const run=await taskRuntime!.get(body.taskRunId);if(run.jobId!==existing.id||run.worktree?.cwd!==cwd)throw new HttpError(409,'This request identifier belongs to another task run.');}
@@ -585,7 +605,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(body.taskRunId)guardProject(cwd,body.id);
     if(body.sessionId && (allJobs().some(job=>job.id!==body.id && job.status==='running' && (job.provider||'claude')===body.provider && job.sessionId===body.sessionId) || body.provider==='claude' && terminals.list().some(terminal=>terminal.status==='running' && terminal.sessionId===body.sessionId))) throw new HttpError(409,'This chat is already running. Send a follow-up to its active turn.');
     const bound=await taskRuntime!.bindJob({...body,cwd});
-    try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text, approvalTimeoutMs: body.approvalTimeoutMinutes * 60000 }));}
+    const env = body.account ? await customProviders.agentEnv(body.account, body.model) : undefined;
+    try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text, approvalTimeoutMs: body.approvalTimeoutMinutes * 60000, ...(env ? { env } : {}) }));}
     catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
   });
   app.post('/api/jobs/:id/messages',async(req,res)=>{

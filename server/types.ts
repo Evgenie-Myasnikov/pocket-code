@@ -22,6 +22,8 @@ export type JobView = {
   /** Claude's current permission mode; a running turn can change it. */
   permissionMode?:'default'|'acceptEdits'|'bypassPermissions'|'plan';
   provider?: 'claude' | 'codex' | 'copilot';
+  /** Custom provider whose URL and key this Claude agent task runs with. */
+  account?: string;
   id: string; cwd: string; sessionId?: string; status: 'running' | 'done' | 'error' | 'stopped';
   messages: ChatMessage[]; partial: string; approvals: Approval[]; error?: string;
   errorCode?: 'codex_thread_busy';
