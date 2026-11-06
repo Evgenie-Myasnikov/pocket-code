@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.36 (unreleased)
 
 ### Features
 - Custom provider models: the model picker for a custom provider offers "Other model…" to enter an exact model ID, as Claude does. A manually entered ID stays selected even when the provider's /models catalog does not list it, and the picker stays usable when the catalog cannot be loaded. The agent uses that ID for every model slot; the provider must serve it through its Anthropic Messages API.
