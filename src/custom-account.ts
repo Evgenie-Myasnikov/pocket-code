@@ -35,6 +35,6 @@ export function useCustomModels(connection:Connection|null|undefined,account:str
     request<string[]>(connection,`/custom-providers/${account}/models`).then(ids=>{if(live)setState({account,models:ids.map(id=>({id,name:id})) as ProviderModel[],error:''});}).catch(e=>{if(live)setState({account,models:[],error:(e as Error).message});});
     return()=>{live=false;};},[connection?.url,connection?.token,account]);
   const models=state.account===account?state.models:[];
-  const chosen=models.some(m=>m.id===model)?model:models[0]?.id||'';
+  const chosen=model||models[0]?.id||'';
   return {models,model:chosen,error:state.account===account?state.error:'',setModel:(value:string)=>{write(MODEL+account,value);setModelState(value);}};
 }

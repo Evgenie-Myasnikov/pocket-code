@@ -38,11 +38,11 @@ export function ModelPicker({provider, name, models = [], value, onChange, disab
       {!(provider==='claude'&&defaultModel)&&<option value="">{defaultName}</option>}
       {models.map(model => <option key={model.id} value={model.id} title={model.resolvedModel||model.id}>{label(model)}</option>)}
       {value && !selected && <option value={value}>{value}</option>}
-      {provider === 'claude' && <option value="__custom__">{ru ? 'Другая версия…' : 'Other version…'}</option>}
+      {(provider === 'claude' || provider === 'custom') && <option value="__custom__">{provider === 'custom' ? (ru ? 'Другая модель…' : 'Other model…') : (ru ? 'Другая версия…' : 'Other version…')}</option>}
     </select>
     {/* Enter applies the exact ID; the field has focus at once and Apply is the main action. */}
     {custom && <form className="model-custom" onSubmit={event => {event.preventDefault();if (!disabled && validModelId(draft.trim())) {onChange(draft.trim());setCustom(false);}}} onKeyDown={event => {if (event.key === 'Escape') {event.stopPropagation();setCustom(false);}}}>
-      <label>{ru ? 'Точный ID модели Claude' : 'Exact Claude model ID'}<input autoFocus value={draft} disabled={disabled} maxLength={200} onChange={event => setDraft(event.target.value)} placeholder="claude-…" /></label>
+      <label>{provider === 'custom' ? (ru ? 'Точный ID модели провайдера' : 'Exact provider model ID') : (ru ? 'Точный ID модели Claude' : 'Exact Claude model ID')}<input autoFocus value={draft} disabled={disabled} maxLength={200} onChange={event => setDraft(event.target.value)} placeholder={provider === 'custom' ? 'model-id' : 'claude-…'} /></label>
       <button type="submit" className="primary" disabled={disabled || !validModelId(draft.trim())}>{ru ? 'Применить' : 'Apply'}</button>
       <button type="button" className="secondary" onClick={() => setCustom(false)}>{ru ? 'Отмена' : 'Cancel'}</button>
     </form>}

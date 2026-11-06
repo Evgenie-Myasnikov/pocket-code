@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- Custom provider models: the model picker for a custom provider offers "Other model…" to enter an exact model ID, as Claude does. A manually entered ID stays selected even when the provider's /models catalog does not list it, and the picker stays usable when the catalog cannot be loaded. The agent uses that ID for every model slot; the provider must serve it through its Anthropic Messages API.
+- Validation: TypeScript and Vite build passed. The full suite showed the 5 known failures in one run and 8 in an earlier run under load; the three extra failures did not recur. No live provider request, browser scenario, desktop window or physical-device check was run.
+
 ## [0.28.35](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.34...v0.28.35) (2026-11-06)
 
 Published [v0.28.35](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.35) from [44cdb02ca6581b34c9eed614a692124fe5542bbb](https://github.com/Evgenie-Myasnikov/pocket-code/commit/44cdb02ca6581b34c9eed614a692124fe5542bbb) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 122. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the custom provider agent sources. Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
