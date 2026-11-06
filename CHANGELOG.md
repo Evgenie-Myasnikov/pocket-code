@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.36 (unreleased)
+## [0.28.36](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.35...v0.28.36) (2026-11-06)
+
+Published [v0.28.36](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.36) from [f88290000e018f76ee4c16f010c52f86ea0f74f4](https://github.com/Evgenie-Myasnikov/pocket-code/commit/f88290000e018f76ee4c16f010c52f86ea0f74f4) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 123. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the exact model ID picker source. Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
 
 ### Features
 - Custom provider models: the model picker for a custom provider offers "Other model…" to enter an exact model ID, as Claude does. A manually entered ID stays selected even when the provider's /models catalog does not list it, and the picker stays usable when the catalog cannot be loaded. The agent uses that ID for every model slot; the provider must serve it through its Anthropic Messages API.
