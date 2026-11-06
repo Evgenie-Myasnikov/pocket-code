@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.39 (unreleased)
+## [0.28.39](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.38...v0.28.39) (2026-11-06)
+
+Published [v0.28.39](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.39) from [7e698e084e4eb60072239188e42dd4136b525166](https://github.com/Evgenie-Myasnikov/pocket-code/commit/7e698e084e4eb60072239188e42dd4136b525166) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 126. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the provider-name chat resolution and the non-clickable allowance ring sources. Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
 
 ### Fixes
 - The allowance ring around Send is no longer clickable: a press near the edge of Send opened Usage limits by accident. The ring only shows the remaining allowance; Usage limits stay in Settings. Instead, the Send or Stop icon now and then fades into the remaining percentage for a few seconds (shortly after the chat opens and about every 45 seconds while the window is visible) and fades back to the icon. The playwright usage specs pass; the chat glass spec keeps 4 failures about menu and composer blur values that this change does not touch.
