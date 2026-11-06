@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.37 (unreleased)
+## [0.28.37](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.36...v0.28.37) (2026-11-06)
+
+Published [v0.28.37](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.37) from [682d156406721f66e6e05738be10c4745af09467](https://github.com/Evgenie-Myasnikov/pocket-code/commit/682d156406721f66e6e05738be10c4745af09467) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 124. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the provider-keeping chat fixes (session account recording, chat library retries, account lookup on open). Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
 
 ### Fixes
 - Custom provider chats no longer disappear or switch provider. Opening a chat from a running task, a notification, a board or right after its first turn passed the chat without its provider, so the app silently switched back to the PC's Claude sign-in and the provider's chats vanished from the list. A chat now takes its provider from the chat itself, its task or the chat list, and the current provider is kept when none of them knows it; new chats carry their provider from the start. The host records a chat's provider as soon as the task receives its session ID instead of waiting for a later list request, writes it only when it changes, and retries the chat library read and replace when Windows briefly locks the file, so the chat list no longer fails at random. Running tasks of another provider are no longer shown in the current provider's list.
