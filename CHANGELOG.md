@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.40 (unreleased)
+## [0.28.40](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.39...v0.28.40) (2026-11-06)
+
+Published [v0.28.40](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.40) from [e56e95854b4e13699a4dce5d05b42d3148755814](https://github.com/Evgenie-Myasnikov/pocket-code/commit/e56e95854b4e13699a4dce5d05b42d3148755814) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 127. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the allowance colour and ring sources. Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
 
 ### Fixes
 - The remaining percentage on Send takes the exact colour of the icon it replaces, so it stays readable on a light Send button (it was white on white). The allowance ring around Send is 30% thicker.
