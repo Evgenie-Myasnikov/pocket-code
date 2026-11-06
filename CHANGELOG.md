@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.38 (unreleased)
+## [0.28.38](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.37...v0.28.38) (2026-11-06)
+
+Published [v0.28.38](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.38) from [09ffcb9cd14afea69d09b99350cf45dae724ee8d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/09ffcb9cd14afea69d09b99350cf45dae724ee8d) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 125. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the custom provider picker reload sources. Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
 
 ### Fixes
 - Custom providers missing from the provider picker: the picker loaded custom providers once, and when the host was not ready yet (desktop start) the list stayed empty, while chats were still filtered by the stored custom provider, so the picker showed Claude with "No matching chats". The list and the provider's model catalog now retry until the host answers, the list refreshes each time the picker opens, the picker says "Custom provider…" until the stored provider is loaded instead of showing Claude, and a provider removed on the PC falls back to the PC's own Claude sign-in.
