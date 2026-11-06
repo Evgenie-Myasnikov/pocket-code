@@ -7,17 +7,38 @@ const message=z.object({role:z.enum(['user','assistant']),content:z.string().max
 const profile=z.object({id:z.string().uuid(),name:z.string().trim().min(1).max(80),url:z.string().max(2048),key:z.string().max(8192),messages:z.array(message).max(100).default([])});
 export function providerUrl(value:string){let url:URL;try{url=new URL(value);}catch{throw new HttpError(400,'Invalid API URL');}if(url.username||url.password||url.search||url.hash||!(url.protocol==='https:'||url.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(url.hostname)))throw new HttpError(400,'Use HTTPS, or HTTP on localhost, without credentials or query parameters');return url.href.replace(/\/$/,'');}
 export function parseModelCatalog(value:unknown){const parsed=z.object({data:z.array(z.object({id:z.string().min(1).max(300)})).max(10000)}).safeParse(value);if(!parsed.success)throw new HttpError(502,'Provider returned an invalid model catalog');return [...new Set(parsed.data.data.map(m=>m.id))].sort();}
+export type ProviderStatus={state:'ready'|'unauthorized'|'no-key'|'unreachable'|'incompatible'|'error';models?:number;message?:string;checkedAt:number};
 export class CustomProviders{
  private queue:Promise<unknown>=Promise.resolve();
  constructor(private store:JiraStore,private send:typeof fetch=fetch){}
  private async load(){const raw=await this.store.load();return z.array(profile).max(30).parse(raw.profiles||[]);}
  private async transaction<T>(action:()=>Promise<T>):Promise<T>{const work=this.queue.catch(()=>{}).then(action);this.queue=work;return work;}
- async list(){return (await this.load()).map(({key,messages,...p})=>({...p,hasKey:!!key}));}
- async save(input:unknown){const data=z.object({name:profile.shape.name,url:profile.shape.url,key:profile.shape.key}).strict().parse(input);return this.transaction(async()=>{const list=await this.load();if(list.length>=30)throw new HttpError(400,'Provider limit reached');const saved={...data,url:providerUrl(data.url),id:randomUUID(),messages:[]};await this.store.save({profiles:[...list,saved]});return {id:saved.id};});}
+ /** Profiles without keys or history. With check, each provider's /models is queried to report whether its key works. */
+ async list(check=false){const list=await this.load();return Promise.all(list.map(async({key,messages,...p})=>({...p,hasKey:!!key,...(check?{status:await this.status({...p,key,messages})}:{})})));}
+ private async status(p:z.infer<typeof profile>):Promise<ProviderStatus>{
+  const checkedAt=Date.now();
+  try{return {state:'ready',models:parseModelCatalog(await this.call(p,'models')).length,checkedAt};}
+  catch(error){const code=(error as HttpError).code||'';
+   if(code==='provider_http_401'||code==='provider_http_403')return {state:p.key?'unauthorized':'no-key',checkedAt};
+   if(code==='provider_unreachable')return {state:'unreachable',checkedAt};
+   if(code==='provider_http_404')return {state:'incompatible',checkedAt};
+   return {state:'error',message:(error as Error).message.slice(0,200),checkedAt};}
+ }
+ /** Add a provider, or with id update its name, URL or key in place (an omitted key is kept; clearKey removes it). History is kept. */
+ async save(input:unknown){
+  const data=z.object({id:z.string().uuid().optional(),name:profile.shape.name.optional(),url:profile.shape.url.optional(),key:z.string().max(8192).optional(),clearKey:z.literal(true).optional()}).strict().parse(input);
+  return this.transaction(async()=>{const list=await this.load();
+   if(data.id){const old=list.find(p=>p.id===data.id);if(!old)throw new HttpError(404,'Provider not found');if(data.key&&data.clearKey)throw new HttpError(400,'Choose a new key or clear it, not both');
+    const next={...old,...(data.name?{name:data.name}:{}),...(data.url?{url:providerUrl(data.url)}:{}),...(data.key?{key:data.key}:data.clearKey?{key:''}:{})};
+    await this.store.save({profiles:list.map(p=>p.id===old.id?next:p)});return {id:old.id};}
+   if(!data.name||!data.url)throw new HttpError(400,'A name and API URL are required');
+   if(list.length>=30)throw new HttpError(400,'Provider limit reached');
+   const saved={name:data.name,url:providerUrl(data.url),key:data.key||'',id:randomUUID(),messages:[]};await this.store.save({profiles:[...list,saved]});return {id:saved.id};});
+ }
  private async get(id:string){const found=(await this.load()).find(p=>p.id===id);if(!found)throw new HttpError(404,'Provider not found');return found;}
  private async call(p:z.infer<typeof profile>,suffix:string,body?:unknown){
-  let response:Response;try{response=await this.send(providerUrl(p.url)+'/'+suffix,{method:body?'POST':'GET',headers:{...(p.key?{Authorization:'Bearer '+p.key}:{}),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(body?90000:15000)});}catch{throw new HttpError(502,'Provider connection failed or timed out');}
-  if(!response.ok){await response.body?.cancel();throw new HttpError(502,'Provider returned HTTP '+response.status);}
+  let response:Response;try{response=await this.send(providerUrl(p.url)+'/'+suffix,{method:body?'POST':'GET',headers:{...(p.key?{Authorization:'Bearer '+p.key}:{}),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(body?90000:15000)});}catch{throw new HttpError(502,'Provider connection failed or timed out','provider_unreachable');}
+  if(!response.ok){await response.body?.cancel();throw new HttpError(502,response.status===401||response.status===403?'Provider rejected the API key (HTTP '+response.status+')':'Provider returned HTTP '+response.status,'provider_http_'+response.status);}
   const reader=response.body?.getReader();if(!reader)throw new HttpError(502,'Empty provider response');const chunks:Uint8Array[]=[];let size=0;while(true){const next=await reader.read();if(next.done)break;size+=next.value.length;if(size>2_000_000){await reader.cancel();throw new HttpError(502,'Provider response is too large');}chunks.push(next.value);}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new HttpError(502,'Provider returned invalid JSON');}
  }
  async models(id:string){return parseModelCatalog(await this.call(await this.get(id),'models'));}
@@ -26,7 +47,7 @@ export class CustomProviders{
  async remove(id:string){return this.transaction(async()=>{await this.store.save({profiles:(await this.load()).filter(p=>p.id!==id)});});}
 }
 export function mountCustomProviders(app:Express,service:CustomProviders,guard:()=>void){
- app.get('/api/custom-providers',async(_req,res)=>{guard();res.json(await service.list());});
+ app.get('/api/custom-providers',async(req,res)=>{guard();res.json(await service.list(req.query.check==='1'));});
  app.post('/api/custom-providers',async(req,res)=>{guard();res.json(await service.save(req.body));});
  app.post('/api/custom-providers/remove',async(req,res)=>{guard();await service.remove(z.string().uuid().parse(req.body.id));res.json({ok:true});});
  app.get('/api/custom-providers/:id/models',async(req,res)=>{guard();res.json(await service.models(z.string().uuid().parse(req.params.id)));});

@@ -2,3 +2,9 @@
 .provider-connections-single{margin-block:.5rem 1.5rem}.provider-card>header .icon-button{margin-left:auto;min-width:44px;min-height:44px}
 .provider-waiting{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-block:.75rem;line-height:1.5}.provider-waiting>span{flex:1 1 200px;min-width:0}.provider-waiting button{min-height:44px}.provider-spinner{flex-shrink:0;animation:provider-spin 1s linear infinite}@keyframes provider-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.provider-spinner{animation:none}}
 .provider-card a.provider-guide-link{display:flex;align-items:center;gap:.4rem;min-height:48px}
+/* Custom provider accounts: compact labelled fields inside the provider card. */
+.custom-account-form{display:grid;gap:12px;margin:8px 0}
+.custom-account-field{display:grid;gap:6px;font-weight:var(--fw-medium)}
+.custom-account-field>input{min-height:40px;width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);font:inherit;font-weight:var(--fw-regular)}
+.custom-account-field>input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.custom-account-form>.primary,.custom-account-form>.secondary{justify-self:start;display:inline-flex;align-items:center;gap:6px}

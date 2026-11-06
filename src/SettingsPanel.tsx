@@ -1,3 +1,4 @@
+import {CustomProviderAccount,CustomProviderList} from './CustomProviderAccounts';
 import {ClaudeAccessSettings,claudeAccessLabel} from './ClaudeAccessSettings';
 import {ComposerSettings} from './ComposerSettings';
 import {MiroSettings} from './MiroSettings';
@@ -44,6 +45,8 @@ type Props={connectionPanel?:ReactNode;workspaceSelector?:ReactNode;page:Setting
 export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,subpageRequest,provider,connection,computerName,roots,cwd,onProject,appearance,codexAccess,onCodexAccess,budget,onBudget,online}:Props){
   useLanguage();
   const [subpage,setSubpage]=useState<Subpage>(subpageRequest||'index');
+  const [custom,setCustom]=useState<string|null>(null);
+  useEffect(()=>{if(subpage!=='account')setCustom(null);},[subpage]);
   useEffect(()=>setSubpage(subpageRequest||'index'),[page,subpageRequest]);
   useEffect(()=>{if(subpage==='access'&&provider==='copilot')setSubpage('index');},[provider,subpage]);
   // Android Back and Esc leave an AI account page for the AI accounts list first, the same level the on-screen Back names.
@@ -82,7 +85,7 @@ export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,sub
       {scope&&<p className="settings-scope">{scope}</p>}
       {page==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance} connection={connection}/></>}
       {page==='workspace'&&<>{subpage==='index'&&<>{workspaceSelector}<nav className="settings-index settings-subindex" aria-label={t('Разделы аккаунта AI')}>{subpages.map(item=><button className="settings-category" key={item.id} data-settings-subpage={item.id} aria-labelledby={'settings-sub-'+item.id} aria-describedby={'settings-sub-'+item.id+'-summary'} onClick={()=>setSubpage(item.id)}><span><strong id={'settings-sub-'+item.id}>{t(item.title)}</strong><small id={'settings-sub-'+item.id+'-summary'}>{item.summary}</small></span><ChevronRight size={20} aria-hidden="true"/></button>)}</nav>{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}</>}
-        {subpage==='account'&&<><ProviderConnections connection={connection} only={provider}/>{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}</>}
+        {subpage==='account'&&<><ProviderConnections connection={connection} only={provider}/>{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}<h3>{t('Свои провайдеры')}</h3>{custom?<><button className="settings-back" onClick={()=>setCustom(null)}>{t('Все свои провайдеры')}</button><CustomProviderAccount connection={connection} id={custom} onSaved={setCustom} onRemoved={()=>setCustom(null)}/></>:<nav className="settings-index" aria-label={t('Свои провайдеры')}><CustomProviderList connection={connection} onOpen={setCustom}/></nav>}</>}
         {subpage==='composer'&&<ComposerSettings desktop={false}/>}
         {subpage==='project'&&<label>{t('Папка для новых чатов')}<select value={roots.includes(cwd)?cwd:''} onChange={event=>onProject(event.target.value)}>{!roots.includes(cwd)&&<option value="">{cwd}</option>}{roots.map(root=><option key={root}>{root}</option>)}</select></label>}
         {subpage==='access'&&(provider==='codex'?<CodexAccessSettings value={codexAccess} onChange={onCodexAccess}/>:provider==='claude'?<><ClaudeAccessSettings/><BudgetSettings value={budget} onChange={onBudget}/></>:null)}</>}
