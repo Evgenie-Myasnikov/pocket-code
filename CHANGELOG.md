@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.34 (unreleased)
+## [0.28.34](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.33...v0.28.34) (2026-11-06)
+
+Published [v0.28.34](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.34) from [9f71f155152dfd2357289357cb292d8236cf5b15](https://github.com/Evgenie-Myasnikov/pocket-code/commit/9f71f155152dfd2357289357cb292d8236cf5b15) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 121. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the custom provider account sources. Privacy guard passed for the tree. No browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.
 
 ### Features
 - Custom providers as AI accounts: OpenAI-compatible providers appear in Settings -> AI accounts after Claude, Codex and GitHub Copilot, with their own account page like the built-in providers. The page checks the provider through /models and reports Connected (model count), key required, key rejected, unreachable or incompatible. Sign in by saving an API key (stored encrypted on the PC, never shown again), replace or remove the key, edit the name and API URL without losing chat history, and remove the provider with confirmation. Add provider is available from the same list; the phone shows the same list on its account page. Existing desktop bridge routes are reused, so no native shell change is needed. The API chat remains in the provider picker.
