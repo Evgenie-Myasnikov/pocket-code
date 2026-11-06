@@ -8,9 +8,14 @@ import {publishUsage} from './live-settings';
 import type {CodexUsageSnapshot} from '../server/codex-usage';
 import './usage-indicator.css';
 
-export function UsageIndicator({connection,provider,models,onOpen}:{connection:Connection;provider:'claude'|'codex'|'copilot';models:string[];onOpen:()=>void}){
+/** How long the remaining percentage replaces the Send/Stop icon, and how often it comes back. */
+const FLASH_MS=2600,FLASH_EVERY_MS=45_000,FIRST_FLASH_MS=1500;
+
+/** The allowance ring around Send. It is not a control: limit details live in Settings → Usage limits. */
+export function UsageIndicator({connection,provider,models}:{connection:Connection;provider:'claude'|'codex'|'copilot';models:string[]}){
   useLanguage();
-  const button=useRef<HTMLButtonElement|null>(null);
+  const button=useRef<HTMLDivElement|null>(null);
+  const [flash,setFlash]=useState(false);
   const [visible,setVisible]=useState(false),[snapshot,setSnapshot]=useState<CodexUsageSnapshot|null>(null),[failed,setFailed]=useState(false),[,setTick]=useState(0);
   useEffect(()=>{const node=button.current;if(!node)return;const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)));observer.observe(node);return()=>observer.disconnect();},[]);
   useEffect(()=>{
@@ -27,8 +32,12 @@ export function UsageIndicator({connection,provider,models,onOpen}:{connection:C
   const remaining=failed?null:remainingUsage(snapshot,provider,models),engine=provider==='copilot'?'Copilot':provider==='codex'?'Codex':'Claude';
   const percent=remaining===null?'—':`${Math.floor(remaining)}%`,tone=remaining===null?'':usageTone(remaining);
   const label=remaining===null?t('{0}: лимиты недоступны',engine):t('{0}: осталось {1} лимита',engine,percent);
-  const hint=t('Минимальный остаток доступных лимитов для текущей модели. Нажмите для подробностей.');
-  return <button ref={button} type="button" className={'usage-indicator'+(tone==='danger'?' usage-low':tone==='warning'?' usage-warning':'')} aria-label={label} aria-description={hint} onClick={onOpen}>
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle className="usage-hit" cx="10" cy="10" r="9"/><circle className="usage-track" cx="10" cy="10" r="8"/><circle className="usage-value" cx="10" cy="10" r="8" pathLength="100" strokeDasharray={`${remaining??0} 100`} transform="rotate(-90 10 10)"/></svg><span className="usage-percent" role="tooltip">{percent}</span>
-  </button>;
+  // Now and then the button shows the remaining percentage instead of its icon, then returns to Send/Stop.
+  const shown=remaining===null?null:Math.floor(remaining);
+  useEffect(()=>{if(shown===null||!visible){setFlash(false);return;}let hide=0;const show=()=>{setFlash(true);window.clearTimeout(hide);hide=window.setTimeout(()=>setFlash(false),FLASH_MS);};
+    const first=window.setTimeout(show,FIRST_FLASH_MS),every=window.setInterval(()=>{if(document.visibilityState==='visible')show();},FLASH_EVERY_MS);
+    return()=>{window.clearTimeout(first);window.clearInterval(every);window.clearTimeout(hide);};},[shown,visible]);
+  return <div ref={button} role="img" className={'usage-indicator'+(tone==='danger'?' usage-low':tone==='warning'?' usage-warning':'')} data-flash={flash||undefined} aria-label={label}>
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle className="usage-track" cx="10" cy="10" r="8"/><circle className="usage-value" cx="10" cy="10" r="8" pathLength="100" strokeDasharray={`${remaining??0} 100`} transform="rotate(-90 10 10)"/></svg><span className="usage-percent" aria-hidden="true">{percent}</span>
+  </div>;
 }

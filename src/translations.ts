@@ -1432,7 +1432,6 @@ export const english: Record<string, string> = {
   'завтра в {0}': 'tomorrow at {0}',
   '{0}: лимиты недоступны': '{0}: limits unavailable',
   '{0}: осталось {1} лимита': '{0}: {1} allowance remaining',
-  'Минимальный остаток доступных лимитов для текущей модели. Нажмите для подробностей.': 'Lowest remaining allowance across available limits for the current model. Open for details.',
   'Сводка лимитов': 'Limits overview',
   'Нет данных: проверьте вход в {0} на ПК': 'No data: check the {0} sign-in on the PC',
   'Провайдер не передал лимиты': 'The provider did not report limits',

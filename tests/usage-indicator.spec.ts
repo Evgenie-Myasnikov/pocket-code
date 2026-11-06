@@ -15,7 +15,8 @@ test('Send remains clickable in the center of the allowance ring',async({page})=
  await page.getByLabel('Message Claude',{exact:true}).fill('Send through the center');await page.locator('.send-button').click();
  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((call:any)=>call.endpoint==='/jobs'&&call.action==='write').length)).toBe(1);
  await expect(page.locator('.composer-submit .stop-button')).toBeVisible();await expect(page.locator('.composer-submit .usage-indicator')).toHaveCount(1);
- const control=page.locator('.composer-submit .usage-indicator');await control.focus();await page.keyboard.press('Enter');await expect(page.locator('.codex-usage')).toBeVisible();
+ // The ring's edge belongs to the button under it: it never opens Usage limits.
+ const ring=(await page.locator('.composer-submit .usage-indicator').boundingBox())!;expect(await page.evaluate(([x,y])=>document.elementFromPoint(x,y)?.closest('.stop-button')!==null,[ring.x+ring.width/2,ring.y+2])).toBe(true);await expect(page.locator('.codex-usage')).toHaveCount(0);
 });
 
 test('background polling pauses and a failed refresh becomes unknown rather than a stale current percentage',async({page})=>{
@@ -38,13 +39,14 @@ for(const width of [320,390,1440])test(`quota ring surrounds Send with separate 
  await page.setViewportSize({width,height:840});await page.route('**/api/claude/usage',route=>route.fulfill({json:snapshot('Claude',42)}));await open(page);
  const ring=page.locator('.usage-indicator'),form=page.locator('.prompt-composer'),send=page.locator('.send-button'),submit=page.locator('.composer-submit');
  await expect(ring).toHaveAccessibleName('Claude: 42% allowance remaining');await expect(submit.locator('.usage-indicator')).toHaveCount(1);
- await page.mouse.move(0,0);await expect(ring.getByRole('tooltip')).toBeHidden();
- const r=(await ring.boundingBox())!,s=(await send.boundingBox())!,f=(await form.boundingBox())!;
+  const r=(await ring.boundingBox())!,s=(await send.boundingBox())!,f=(await form.boundingBox())!;
  expect(Math.abs(r.x+r.width/2-s.x-s.width/2)).toBeLessThanOrEqual(.5);expect(Math.abs(r.y+r.height/2-s.y-s.height/2)).toBeLessThanOrEqual(.5);
  expect(r.width).toBe(s.width);expect(r.x+r.width).toBeLessThanOrEqual(f.x+f.width);expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
  if(width<=600){expect(f.width).toBeGreaterThan(width-60);const models=(await page.locator('.composer-models').boundingBox())!,actions=(await page.locator('.composer-actions').boundingBox())!;expect(Math.abs(actions.y-models.y)).toBeLessThanOrEqual(6);}
  await page.getByLabel('Message Claude').fill('Keep quota draft');await page.screenshot({path:`.local/quota-send-${width}.png`,animations:'disabled'});
- await submit.hover();await expect(ring.getByRole('tooltip')).toBeVisible();await expect(ring.getByRole('tooltip')).toHaveText('42%');
- await ring.click({position:{x:r.width/2,y:1}});await expect(page.locator('.codex-usage')).toContainText('42% remaining');await openSection(page,'Chats');await expect(page.getByLabel('Message Claude')).toHaveValue('Keep quota draft');
- await ring.focus();await page.keyboard.press('Enter');await expect(page.locator('.codex-usage')).toContainText('42% remaining');
+ // The ring is not a control: its edge never opens Usage limits, and the icon periodically shows the percentage instead.
+ expect(await ring.evaluate(node=>getComputedStyle(node).pointerEvents)).toBe('none');await expect(ring).not.toHaveAttribute('tabindex',/.*/);
+ await page.mouse.click(r.x+r.width/2,r.y+2);await expect(page.locator('.codex-usage')).toHaveCount(0);
+ await expect(ring).toHaveAttribute('data-flash','true',{timeout:5000});await expect(ring.locator('.usage-percent')).toHaveText('42%');
+ await expect(ring).not.toHaveAttribute('data-flash',/.*/,{timeout:5000});
 });
