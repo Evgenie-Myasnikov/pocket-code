@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.39 (unreleased)
 
 ### Fixes
 - The allowance ring around Send is no longer clickable: a press near the edge of Send opened Usage limits by accident. The ring only shows the remaining allowance; Usage limits stay in Settings. Instead, the Send or Stop icon now and then fades into the remaining percentage for a few seconds (shortly after the chat opens and about every 45 seconds while the window is visible) and fades back to the icon. The playwright usage specs pass; the chat glass spec keeps 4 failures about menu and composer blur values that this change does not touch.
