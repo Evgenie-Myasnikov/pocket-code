@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.38 (unreleased)
 
 ### Fixes
 - Custom providers missing from the provider picker: the picker loaded custom providers once, and when the host was not ready yet (desktop start) the list stayed empty, while chats were still filtered by the stored custom provider, so the picker showed Claude with "No matching chats". The list and the provider's model catalog now retry until the host answers, the list refreshes each time the picker opens, the picker says "Custom provider…" until the stored provider is loaded instead of showing Claude, and a provider removed on the PC falls back to the PC's own Claude sign-in.
