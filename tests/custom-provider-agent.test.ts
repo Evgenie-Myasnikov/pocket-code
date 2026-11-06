@@ -75,3 +75,25 @@ test('a custom provider task announces its session with the account, and the cha
   assert.deepEqual(plainSeen,[{sessionId:session}]);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('chats follow their custom provider by name when it is added again, and never disappear',async()=>{
+ const {ChatLibrary}=await import('../server/chat-library.js');
+ const {mkdtemp,rm}=await import('node:fs/promises');const os=await import('node:os');const path=await import('node:path');
+ const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-chat-library-'));
+ try{
+  const library=new ChatLibrary(path.join(dir,'.chat-library.json'));
+  const old='00000000-0000-4000-8000-0000000000a1',fresh='00000000-0000-4000-8000-0000000000a2',other='00000000-0000-4000-8000-0000000000a3';
+  const named='00000000-0000-4000-8000-0000000000b1',legacy='00000000-0000-4000-8000-0000000000b2',gone='00000000-0000-4000-8000-0000000000b3',plain='00000000-0000-4000-8000-0000000000b4';
+  await library.tagAccount(named,old,'OneProvider');await library.tagAccount(legacy,old);await library.tagAccount(gone,other,'Removed');
+  const listed=await library.decorate('claude',[{sessionId:named},{sessionId:legacy},{sessionId:gone},{sessionId:plain}]);
+  const one=await library.resolveAccounts(listed,[{id:fresh,name:' oneprovider '}]);
+  assert.deepEqual(one.map(s=>(s as {account?:string}).account),[fresh,fresh,undefined,undefined]);
+  // The move is stored, so the chats stay with the new provider.
+  const again=await library.decorate('claude',[{sessionId:named},{sessionId:legacy}]);
+  assert.deepEqual(again.map(s=>(s as {account?:string}).account),[fresh,fresh]);
+  // With several providers, a chat without a recorded name is not guessed; it is listed with Claude.
+  const legacy2='00000000-0000-4000-8000-0000000000b5';await library.tagAccount(legacy2,old);
+  const many=await library.resolveAccounts(await library.decorate('claude',[{sessionId:legacy2}]),[{id:fresh,name:'OneProvider'},{id:other,name:'Other'}]);
+  assert.equal((many[0] as {account?:string}).account,undefined);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});

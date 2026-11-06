@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+- Chats follow their custom provider by name: a custom provider removed and added again gets a new ID, and its chats were left with the old one and disappeared from every list. The host now records the provider name with each chat and moves chats to the provider with the same name (case and surrounding spaces ignored). Chats recorded before names were kept move to the only custom provider when there is exactly one; a chat whose provider cannot be found is listed with the PC's Claude sign-in instead of disappearing, and returns once a provider with its name is added. Moves are stored, and renaming a provider updates the recorded name.
+- Validation: TypeScript and Vite build passed. A new test covers the move by name, the legacy move to a single provider, no guessing with several providers, and listing chats of a removed provider with Claude. The full suite keeps the 5 known failures; one extra failure under load (task review baseline) passed when rerun alone. No desktop window or physical-device check was run.
+
 ## [0.28.38](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.37...v0.28.38) (2026-11-06)
 
 Published [v0.28.38](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.38) from [09ffcb9cd14afea69d09b99350cf45dae724ee8d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/09ffcb9cd14afea69d09b99350cf45dae724ee8d) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 125. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the custom provider picker reload sources. Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.

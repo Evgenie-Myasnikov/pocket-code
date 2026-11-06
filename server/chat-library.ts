@@ -2,7 +2,7 @@ import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';
 import path from 'node:path';
 /** The board a chat was started from. Host-private: repository boards never store chat associations. */
 export type BoardLink={id:string;root:string;title:string;noteId?:string;kind?:'discussion'|'note'|'task'};
-type Entry={title?:string;deleted?:boolean;board?:BoardLink;account?:string};
+type Entry={title?:string;deleted?:boolean;board?:BoardLink;account?:string;accountName?:string};
 type Library={chats:Record<string,Entry>;projects:string[]};
 export class ChatLibrary {
  private pending:Promise<unknown>=Promise.resolve();
@@ -19,6 +19,25 @@ export class ChatLibrary {
   const write=this.pending.catch(()=>{}).then(async()=>{const data=await this.read();change(data);await mkdir(path.dirname(this.file),{recursive:true});await writeFile(this.file+'.tmp',JSON.stringify(data));for(let attempt=0;;attempt++){try{await rename(this.file+'.tmp',this.file);break;}catch(error){const code=(error as NodeJS.ErrnoException).code;if(attempt<4&&(code==='EPERM'||code==='EBUSY'||code==='EACCES'))await new Promise(resolve=>setTimeout(resolve,25*(attempt+1)));else throw error;}}});this.pending=write;await write;
  }
  /** Record the custom provider account of a Claude chat; only writes when it changes. */
- async tagAccount(sessionId:string,account:string){const key='claude:'+sessionId;if((await this.read()).chats[key]?.account===account)return;await this.edit(data=>{data.chats[key]={...data.chats[key],account};});}
+ async tagAccount(sessionId:string,account:string,accountName?:string){const key='claude:'+sessionId,entry=(await this.read()).chats[key];if(entry?.account===account&&(!accountName||entry.accountName===accountName))return;await this.edit(data=>{data.chats[key]={...data.chats[key],account,...(accountName?{accountName}:{})};});}
+ /**
+  * Chats follow their custom provider by name: a provider removed and added again gets a new ID, and its chats move to it.
+  * A chat recorded before names were kept moves to the only custom provider; a chat whose provider is gone is listed with the PC's Claude sign-in instead of disappearing.
+  */
+ async resolveAccounts<T extends {sessionId:string;account?:string}>(sessions:T[],providers:{id:string;name:string}[]):Promise<T[]>{
+  const data=await this.read(),ids=new Map(providers.map(p=>[p.id,p.name])),key=(name:string)=>name.trim().toLowerCase(),byName=new Map<string,string|null>();
+  for(const p of providers)byName.set(key(p.name),byName.has(key(p.name))?null:p.id);
+  const moves:[string,string,string][]=[];
+  const resolved=sessions.map(s=>{
+   if(!s.account)return s;
+   const entry=data.chats['claude:'+s.sessionId],name=ids.get(s.account);
+   if(name!==undefined){if(entry?.accountName!==name)moves.push([s.sessionId,s.account,name]);return s;}
+   const target=entry?.accountName?byName.get(key(entry.accountName)):providers.length===1?providers[0].id:undefined;
+   if(target){moves.push([s.sessionId,target,ids.get(target)!]);return {...s,account:target};}
+   const {account:_gone,...rest}=s;return rest as T;
+  });
+  for(const [sessionId,account,name] of moves)await this.tagAccount(sessionId,account,name).catch(()=>{});
+  return resolved;
+ }
  async decorate<T extends {sessionId:string}>(provider:string,sessions:T[],boardLinks?:Map<string,BoardLink>){const data=await this.read();return sessions.filter(s=>!data.chats[provider+':'+s.sessionId]?.deleted).map(s=>{const entry=data.chats[provider+':'+s.sessionId];return {...s,...(entry?.title?{customTitle:entry.title}:{}),...(entry?.account?{account:entry.account}:{}),...(entry?.board?{board:entry.board}:boardLinks?.has(provider+':'+s.sessionId)?{board:boardLinks.get(provider+':'+s.sessionId)}:{})};});}
 }

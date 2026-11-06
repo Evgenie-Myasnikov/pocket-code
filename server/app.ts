@@ -304,7 +304,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.post('/api/jira/queue/control', async (req, res) => { const body = z.object({ provider: providerSchema, action: z.enum(['pause', 'resume', 'clear']) }).parse(req.body); res.json(await queueFor(body.provider).control(body.action)); });
   const chatLibrary=new ChatLibrary(path.join(config.uploads,'.chat-library.json'));
-  jobs.onSession(job=>{if(job.account)void chatLibrary.tagAccount(job.sessionId,job.account).catch(()=>{});});
+  jobs.onSession(job=>{const account=job.account;if(account)void customProviders.name(account).catch(()=>undefined).then(name=>chatLibrary.tagAccount(job.sessionId,account,name)).catch(()=>{});});
   const loadSessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if (provider === 'copilot') return copilot().sessions();
     if (provider === 'codex') return codex().sessions();
@@ -332,9 +332,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     // A chat started with a custom provider keeps that account, so it is listed and resumed with the same provider.
     // Tasks record their account when the session ID appears; this fallback covers tasks listed before that write finished.
     const fresh=new Map<string,string>();for(const job of jobs.list())if(job.account&&job.sessionId&&listed.some(s=>s.sessionId===job.sessionId&&!(s as {account?:string}).account))fresh.set(job.sessionId,job.account);
-    if(!fresh.size)return listed;
     for(const [sessionId,account] of fresh)await chatLibrary.tagAccount(sessionId,account).catch(()=>{});
-    return listed.map(s=>fresh.has(s.sessionId)?{...s,account:fresh.get(s.sessionId)}:s);
+    const tagged=fresh.size?listed.map(s=>fresh.has(s.sessionId)?{...s,account:fresh.get(s.sessionId)}:s):listed;
+    const providers=await customProviders.list().catch(()=>null);
+    return providers?chatLibrary.resolveAccounts(tagged,providers):tagged;
   };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {
@@ -423,8 +424,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const found=await session(String(req.params.id),body.provider);
     if(body.action==='account'){
       if(body.provider!=='claude'||!body.account)throw new HttpError(400,'A custom provider account is required');
-      await customProviders.name(body.account);
-      await chatLibrary.edit(data=>{const key=body.provider+':'+found.sessionId;data.chats[key]={...data.chats[key],account:body.account};});
+      const accountName=await customProviders.name(body.account);
+      await chatLibrary.tagAccount(found.sessionId,body.account,accountName);
       res.json({sessionId:found.sessionId,account:body.account});return;
     }
     if(body.action==='board'){
