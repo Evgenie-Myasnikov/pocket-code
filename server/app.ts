@@ -304,6 +304,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.post('/api/jira/queue/control', async (req, res) => { const body = z.object({ provider: providerSchema, action: z.enum(['pause', 'resume', 'clear']) }).parse(req.body); res.json(await queueFor(body.provider).control(body.action)); });
   const chatLibrary=new ChatLibrary(path.join(config.uploads,'.chat-library.json'));
+  jobs.onSession(job=>{if(job.account)void chatLibrary.tagAccount(job.sessionId,job.account).catch(()=>{});});
   const loadSessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if (provider === 'copilot') return copilot().sessions();
     if (provider === 'codex') return codex().sessions();
@@ -329,9 +330,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const listed=await chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)),workspaceAccess.store.chatLinks());
     if(provider!=='claude')return listed;
     // A chat started with a custom provider keeps that account, so it is listed and resumed with the same provider.
-    const fresh=new Map<string,string>();for(const job of jobs.list())if(job.account&&job.sessionId&&!listed.some(s=>s.sessionId===job.sessionId&&(s as {account?:string}).account))fresh.set(job.sessionId,job.account);
+    // Tasks record their account when the session ID appears; this fallback covers tasks listed before that write finished.
+    const fresh=new Map<string,string>();for(const job of jobs.list())if(job.account&&job.sessionId&&listed.some(s=>s.sessionId===job.sessionId&&!(s as {account?:string}).account))fresh.set(job.sessionId,job.account);
     if(!fresh.size)return listed;
-    await chatLibrary.edit(data=>{for(const [sessionId,account] of fresh){const key='claude:'+sessionId;data.chats[key]={...data.chats[key],account};}});
+    for(const [sessionId,account] of fresh)await chatLibrary.tagAccount(sessionId,account).catch(()=>{});
     return listed.map(s=>fresh.has(s.sessionId)?{...s,account:fresh.get(s.sessionId)}:s);
   };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);

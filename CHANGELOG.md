@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+- Custom provider chats no longer disappear or switch provider. Opening a chat from a running task, a notification, a board or right after its first turn passed the chat without its provider, so the app silently switched back to the PC's Claude sign-in and the provider's chats vanished from the list. A chat now takes its provider from the chat itself, its task or the chat list, and the current provider is kept when none of them knows it; new chats carry their provider from the start. The host records a chat's provider as soon as the task receives its session ID instead of waiting for a later list request, writes it only when it changes, and retries the chat library read and replace when Windows briefly locks the file, so the chat list no longer fails at random. Running tasks of another provider are no longer shown in the current provider's list.
+- Validation: TypeScript and Vite build passed. A new test covers the task announcing its session with the account and the chat library keeping it. The full suite keeps the same 5 known failures. No live provider request, desktop window or physical-device check was run.
+
 ## [0.28.36](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.35...v0.28.36) (2026-11-06)
 
 Published [v0.28.36](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.36) from [f88290000e018f76ee4c16f010c52f86ea0f74f4](https://github.com/Evgenie-Myasnikov/pocket-code/commit/f88290000e018f76ee4c16f010c52f86ea0f74f4) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 123. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the exact model ID picker source. Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.

@@ -18,6 +18,10 @@ export class Jobs {
   private boardMcp:BoardMcpConfiguration=()=>({});
   setBoardMcpConfiguration(config:BoardMcpConfiguration){this.boardMcp=config;}
   private jobs = new Map<string, Job>();
+  private sessionListeners: ((job: { sessionId: string; account?: string }) => void)[] = [];
+  /** Called once a task learns its session ID, so a custom provider account is recorded before any list request. */
+  onSession(listener: (job: { sessionId: string; account?: string }) => void) { this.sessionListeners.push(listener); }
+  private announceSession(job: Job) { if (!job.sessionId) return; for (const listener of this.sessionListeners) { try { listener({ sessionId: job.sessionId, ...(job.account ? { account: job.account } : {}) }); } catch { /* A listener never breaks the task. */ } } }
   constructor(private run: Run = query) {}
   view(job: Job): JobView {
     const { controller, pending, inputs, waiting, followups, acceptingInput, query, approvalTimeoutMs, ...view } = job;
@@ -99,7 +103,7 @@ export class Jobs {
         // Forwarded child messages have their own session/deltas/results. They must
         // neither replace the parent identity nor be appended to its transcript.
         if ('parent_tool_use_id' in event && event.parent_tool_use_id) { job.revision++; continue; }
-        if ('session_id' in event && event.session_id) job.sessionId = event.session_id;
+        if ('session_id' in event && event.session_id && job.sessionId !== event.session_id) { job.sessionId = event.session_id; this.announceSession(job); }
         updateClaudeAgentResults(job.messages, event);
         const msg = normalize(event);
         // The initial prompt is already visible; tool-result user events are kept.

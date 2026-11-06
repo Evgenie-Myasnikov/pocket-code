@@ -525,7 +525,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     }catch(e){if((e as {status?:number}).status===428)setWorkspacePasswordRequest(c);setError((e as Error).message);}finally{setBusy(false);}
   }
   useEffect(()=>{if(!boardChat?.conversation||!job)return;try{attachBoardConversation(boardChat.conversation,provider,job.sessionId,job.id);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}},[boardChat?.conversation?.key,boardChat?.conversation?.generation,provider,job?.id,job?.sessionId]);
-  useEffect(()=>{if(embedded&&!embedded.session&&job?.sessionId&&(!boardChat?.conversation||currentBoardConversation(boardChat.conversation)))embedded.onCreated?.({sessionId:job.sessionId,cwd:job.cwd,summary:job.messages.find(m=>m.role==='user')?.blocks.find(b=>b.type==='text')?.text||'New',lastModified:job.startedAt},job);},[job?.sessionId]);
+  useEffect(()=>{if(embedded&&!embedded.session&&job?.sessionId&&(!boardChat?.conversation||currentBoardConversation(boardChat.conversation)))embedded.onCreated?.({sessionId:job.sessionId,cwd:job.cwd,summary:job.messages.find(m=>m.role==='user')?.blocks.find(b=>b.type==='text')?.text||'New',lastModified:job.startedAt,...(job.account?{account:job.account}:{})},job);},[job?.sessionId]);
   const embeddedTarget=embedded?.session?.sessionId||'new:'+embedded?.cwd;
   const embeddedOpened=useRef<string|null>(null);
   useEffect(()=>{if(!embedded||!health||!connection||busy||uploading||embeddedOpened.current===embeddedTarget)return;embeddedOpened.current=embeddedTarget;setBoardChat(embedded.boardChat||null);projectChosen.current=true;setCwd(embedded.cwd);
@@ -762,7 +762,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     rememberPosition();rememberDraft();setBoardChat(context||null);setBoardMissing(false);releasePending(true);setReadingMode(false);paging.current=null;setLoadingOlder(false);scrollAnchor.current=null;
     historyExpanded.current=false;
     // A chat continues with the provider it was started with: the PC's Claude sign-in or its custom provider.
-    if(provider==='claude'&&!demo&&(s.account||'')!==customAccount)setCustomAccount(s.account||'');
+    // Chats opened from a running task, a notification, a board or a new turn arrive without the account: look it up, and keep the current provider when it is unknown.
+    if(provider==='claude'&&!demo){const owner=jobs.find(j=>activeJob&&j.id===activeJob.id||j.sessionId===s.sessionId),listed=sessions.find(x=>x.sessionId===s.sessionId),owned=s.account||owner?.account||listed?.account||(owner||listed?'':undefined);if(owned!==undefined&&owned!==customAccount)setCustomAccount(owned);}
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
     const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
     const savedPosition:ChatPosition={top:0,window:200,fromStart:false,bottom:true};pendingPosition.current=savedPosition;
@@ -885,7 +886,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       const next = await api<JobView>('/jobs', { ...data, id });
       if (epoch !== navigation.current) return;
       // Freeze the displayed history before the next turn; the server saves full history independently.
-      if(payload?.branch){setHistory(payload.branch.history);setSelected(sessionId?{sessionId,cwd,summary:text.slice(0,200),lastModified:Date.now()}:null);setHasMore(null);setBoardChat(null);rememberDraft();if(embedded&&next.sessionId)embedded.onCreated?.({sessionId:next.sessionId,cwd,summary:text.slice(0,200),lastModified:Date.now()},next);}
+      if(payload?.branch){setHistory(payload.branch.history);setSelected(sessionId?{sessionId,cwd,summary:text.slice(0,200),lastModified:Date.now(),...(account?{account}:{})}:null);setHasMore(null);setBoardChat(null);rememberDraft();if(embedded&&next.sessionId)embedded.onCreated?.({sessionId:next.sessionId,cwd,summary:text.slice(0,200),lastModified:Date.now(),...(next.account?{account:next.account}:{})},next);}
       else if (job && job.errorCode!=='codex_thread_busy') setHistory((old) => [...old, ...job.messages]);
       if(provider==='codex')submissions.current!.set(next.id,{key,text,attachments:files});
       setRejectedDrafts(old=>{const next={...old};delete next[key];return next;});
@@ -983,7 +984,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       <div className="session-list">
         {waiting.length>0&&!search&&<section className="session-group session-group-waiting" aria-labelledby="waiting-chats"><h2 className="list-label" id="waiting-chats">{t('Ждут вас')}<span>{waiting.length}</span></h2>
           {waiting.map(item=><button className="session-row" key={item.provider+':'+item.id} disabled={busy||uploading||Boolean(activityTarget)} onClick={()=>openActivity(item)}><MessageSquare size={16}/><div><strong>{item.title||t('Новый разговор')}</strong><small>{providerName(item.provider)} · {basename(item.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={item.status}/></small></div></button>)}</section>}
-        {jobs.filter((j) => j.status === 'running' && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><MessageSquare size={16}/><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={j.approvals?.length?'needs_input':'running'}/></small></div></button>)}
+        {jobs.filter((j) => j.status === 'running' && (provider!=='claude'||(j.account||'')===account) && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><MessageSquare size={16}/><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={j.approvals?.length?'needs_input':'running'}/></small></div></button>)}
         {grouped.map(group=><section className="session-group" key={group.group} aria-label={dayGroupLabel(group.group)}><h2 className="list-label">{dayGroupLabel(group.group)}<span>{group.items.length}</span></h2>{group.items.map(sessionRow)}</section>)}
         {/* "No chats yet" only after the PC answered; before that a skeleton, or why the list cannot load. */}
         {!visible.length && connection && !search && !demo && !sessionsLoaded ? unreachable ? <div className="empty-list" role="status"><MessageSquare size={32} /><p>{t('Список чатов загрузится, когда ПК будет на связи.')}</p><button className="secondary" onClick={()=>retryNow()}>{t('Повторить')}</button></div> : <div className="loading-skeleton" role="status" aria-label={t('Загружаем чаты…')}><span/><span/><span/></div>

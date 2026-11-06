@@ -52,3 +52,26 @@ test('a Claude task passes the custom provider environment to the agent and repo
  for(let i=0;i<50&&!options;i++)await new Promise(resolve=>setTimeout(resolve,10));
  assert.equal('env' in options,false);
 });
+
+test('a custom provider task announces its session with the account, and the chat library keeps it',async()=>{
+ const {ChatLibrary}=await import('../server/chat-library.js');
+ const {mkdtemp,rm}=await import('node:fs/promises');const os=await import('node:os');const path=await import('node:path');
+ const dir=await mkdtemp(path.join(os.tmpdir(),'pocket-chat-library-'));
+ try{
+  const library=new ChatLibrary(path.join(dir,'.chat-library.json'));
+  const session='00000000-0000-4000-8000-000000000011',account='00000000-0000-4000-8000-000000000013';
+  const run=(()=>(async function*(){yield {type:'system',subtype:'init',session_id:session} as any;yield {type:'result',subtype:'success',session_id:session,result:'done',is_error:false} as any;})()) as any;
+  const jobs=new Jobs(run),seen:{sessionId:string;account?:string}[]=[];
+  jobs.onSession(job=>{seen.push(job);if(job.account)void library.tagAccount(job.sessionId,job.account);});
+  jobs.start({id:'00000000-0000-4000-8000-000000000012',cwd:process.cwd(),text:'Hello',model:'m',mode:'default',maxBudgetUsd:1,account});
+  for(let i=0;i<50&&!seen.length;i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.deepEqual(seen,[{sessionId:session,account}]);
+  await library.tagAccount(session,account);
+  const [listed]=await library.decorate('claude',[{sessionId:session}]);
+  assert.equal((listed as {account?:string}).account,account);
+  const plain=new Jobs(run),plainSeen:unknown[]=[];plain.onSession(job=>plainSeen.push(job));
+  plain.start({id:'00000000-0000-4000-8000-000000000014',cwd:process.cwd(),text:'Hello',mode:'default',maxBudgetUsd:1});
+  for(let i=0;i<50&&!plainSeen.length;i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.deepEqual(plainSeen,[{sessionId:session}]);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
