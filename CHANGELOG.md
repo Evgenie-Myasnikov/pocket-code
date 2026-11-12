@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.43 (unreleased)
+## [0.28.43](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.42...v0.28.43) (2026-11-12)
+
+Published [v0.28.43](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.43) from [fe406ac14a9e39ce9ce5ae3a2dfb41b274505dad](https://github.com/Evgenie-Myasnikov/pocket-code/commit/fe406ac14a9e39ce9ce5ae3a2dfb41b274505dad) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 130. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit. Privacy guard passed for the tree. The update handoff, desktop window and devices were not run on the published packages.
 
 ### Bug Fixes
 - Windows update: the updated window always starts the PC host, even when the connection switch was turned off while the previous window handed over; before, such an update waited five minutes and rolled back with the host stopped.
