@@ -176,7 +176,7 @@ public sealed class PocketDesktop:Form {
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         tray.BalloonTipClicked+=(_,e)=>{OpenRunAlert();CompleteRunAlert();};tray.BalloonTipClosed+=(_,e)=>CompleteRunAlert();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
-        Resize+=(_,e)=>{if(WindowState==FormWindowState.Minimized)Hide();};timer.Tick+=async(_,e)=>await Poll();autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
+        Resize+=(_,e)=>{if(WindowState==FormWindowState.Minimized)Hide();};timer.Tick+=async(_,e)=>await Poll();if(!preview&&Array.IndexOf(args,"--updated")>=0)preferences.Connect=true;autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
         Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0&&!reopen)Hide();await InitializeWeb();}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);return;}
             if(preview)return;
             // Host polling must not depend on this write; the next Toggle or settings change saves again.
@@ -347,7 +347,7 @@ public sealed class PocketDesktop:Form {
             request.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",token);if(post)request.Content=new StringContent(requestBody,Encoding.UTF8,"application/json");
             HttpResponseMessage sent;
             try{sent=await client.SendAsync(request);}
-            catch(HttpRequestException){throw new DesktopBridgeFailure("host_unreachable","The PC host is not answering.");}
+            catch(HttpRequestException){if(!preferences.Connect&&owner==null)throw new DesktopBridgeFailure("host_stopped","The PC host is stopped.");throw new DesktopBridgeFailure("host_unreachable","The PC host is not answering.");}
             catch(TaskCanceledException){throw new DesktopBridgeFailure("host_timeout","The PC host did not answer in time.");}
             using(var response=sent){
                 string body=await response.Content.ReadAsStringAsync();object parsed=null;try{parsed=json.DeserializeObject(body);}catch{}
