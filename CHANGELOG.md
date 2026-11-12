@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.41 (unreleased)
+## [0.28.41](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.40...v0.28.41) (2026-11-12)
+
+Published [v0.28.41](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.41) from [dad89236f7750d02eaf63372254589c286ce53fd](https://github.com/Evgenie-Myasnikov/pocket-code/commit/dad89236f7750d02eaf63372254589c286ce53fd) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 128. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package (608 files) contains the board contract, backup and chart sources and the MCP worker with the chart and repair tools; the Windows package contains the same host sources, an interface with the repair, backup and board-chat routes, and a window whose bridge allows them. Privacy guard passed for the tree. Unit, API and browser results are listed under Validation below. No desktop window, physical-device or live provider check was run; live behaviour remains unverified.
 
 ### Features
 - boards: a board file is read record by record. A record outside the format no longer stops the board from opening: readable cards and objects are shown, damaged ones are marked, and a panel names the card, field, limit and value of each problem. Such a board is read-only until **Repair** brings the records back inside the format; removed text is appended word for word to `project-boards/history`. The host keeps private copies of each repository board and **Restore…** rolls back to a saved snapshot, also when the file is no longer valid JSON.
