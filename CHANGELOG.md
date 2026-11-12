@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.42 (unreleased)
 
 ### Changes
 - Windows sidebar: Rules, Changelog and Settings are icons in the sidebar next to Chats and Board; the More menu is gone.
