@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- boards: a board file is read record by record. A record outside the format no longer stops the board from opening: readable cards and objects are shown, damaged ones are marked, and a panel names the card, field, limit and value of each problem. Such a board is read-only until **Repair** brings the records back inside the format; removed text is appended word for word to `project-boards/history`. The host keeps private copies of each repository board and **Restore…** rolls back to a saved snapshot, also when the file is no longer valid JSON.
+- boards: every write through the app, the board MCP or the host API is validated and a refused write names the card, field, limit and value; the file is replaced atomically or not at all. A description over 20,000 characters is accepted and its older paragraphs move to `project-boards/history/card-<id>.md`. The text of a card is stored once: its canvas object keeps geometry and title.
+- boards: bar charts as canvas objects. The board stores categories and series, the host draws grouped or stacked bars with an optional reference line and the change between two series; the data is edited as a table. Up to 8 series and 40 categories.
+- boards: acceptance checklist on a card, status history recorded by the host with the time of each change, Find on board (Ctrl+F) by text and status, and a warning for a description above 90% of its limit.
+- board MCP: `board_health`, `repair_board`, `board_create_chart`, `board_update_chart`; `checklist` in `create_note`/`update_note`; a write answers with the new revision and only the changed objects; `read_board` summarises a large board unless `detail` is `"full"`; refusals carry the explanation of the host with codes `board_needs_repair`, `board_unrepairable`, `invalid_input` and `board_too_large`.
+- board chat (PC): the chat beside a board is a compact panel with visible **New board chat** and **Close board chat** buttons.
+
+### Bug Fixes
+- board chat: the PC host now remembers which chat is the current discussion of a board, so the desktop window and phones resume one conversation instead of each device keeping its own; a discussion opened from the chat list becomes the chat of the board, so the board and the list no longer show two diverging histories. A chat that has just started is linked to its board even before its provider lists it, and a failed link is retried.
+- boards: a dependency on a missing card or a dependency cycle is reported per card instead of failing the whole read.
+- boards: replacing a board file is retried when Windows briefly locks it (a reader, the indexer or a virus scanner), instead of failing the save; the read cache uses the exact file identity and is dropped after every host write.
+- this repository's board file had 65 branch links against a limit of 64 and did not open in its own host; it was repaired with the new tool (two links of versions that are not on the board moved to `project-boards/history/board-repair.md`).
+
+### Performance
+- boards: host read 78 → 15 ms and save 220 → 40 ms (p50), response 1.16 MB → 0.66 MB; pan with the whole board in view, frame p95 41.7 → 7.1 ms; zoom 34.6 → 7.0 ms; keyboard move of an object, edit to saved, 314 → 93 ms; reopening a board downloads no image originals. Measured on a copy of a real 1.2 MB board (74 cards, 257 canvas objects, 105 connections); method, table and causes are in docs/PERFORMANCE.md. `scripts/benchmark-board.mjs` repeats the run.
+- board MCP: the answer to a one-field `update_note` on that board shrank from 836,800 to 1,203 characters.
+
+### Breaking Changes
+- Charts, checklists and status history are new optional fields of the version 1 board format. Hosts older than this change refuse a file that contains them; a board without them stays readable by 0.28.40. The Windows desktop window needs this build to reach the repair, restore, backup and board-chat routes.
+
+### Documentation
+- docs/BOARDS.md, docs/BOARD-MCP.md, docs/PERFORMANCE.md, docs/USER_GUIDE.ru.md, project-boards/README.md and the pocket-board skill describe the above; the built-in provider guidance names the format limits and the repair and chart tools.
+
+### Validation
+- 2026-11-12, working tree: TypeScript and Vite build passed. Full `npm test`: 486 tests, 478 passed, 1 skipped, 7 failed — the 5 that also fail on the untouched 0.28.40 commit (activity HTTP feed, activity rows, compatibility trigger, host packager, checked-in board content) and 2 that failed only while benchmarks ran in parallel and passed when rerun alone (Jira workflow routes, task review approval). The checked-in board test no longer fails on the format; it still fails because four older cards do not mention the changelog.
+- New tests: tolerant reading, repair, rollback, validated writes, history overflow, status history and warnings (9); the same through a real host and the real MCP worker over stdio, with chart creation and summaries (3); chart validation, geometry, pasted tables and the desktop route policy (6); the board chat association on the host and across two devices (4).
+- Browser (Chrome, synthetic data): 53 of 55 scenarios passed across 21 board and canvas spec files, including a damaged board opened, repaired, edited and rolled back; a chart drawn, edited and created; search; checklist; and the board chat panel closed, reopened and replaced. The 2 failures (board-example, one board-images-selection scenario) expect interface that the 0.28.40 commit does not have either; work-boards, maintenance-board and canvas-board specs fail for the same reason and were not counted.
+- Screenshots of the diagnostics panel, the chart in dark and light themes, the checklist and the compact chat panel were inspected.
+- The Windows desktop window compiles with the new allowed routes (scripts/build-desktop.ps1) and the built interface contains the new board features. Not checked: the desktop window running (WebView2 and its bridge), Android, and live provider sessions.
+
 ## [0.28.40](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.39...v0.28.40) (2026-11-06)
 
 Published [v0.28.40](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.40) from [e56e95854b4e13699a4dce5d05b42d3148755814](https://github.com/Evgenie-Myasnikov/pocket-code/commit/e56e95854b4e13699a4dce5d05b42d3148755814) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 127. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package contains the allowance colour and ring sources. Privacy guard passed for the tree. No live provider request, browser scenario, desktop window or physical-device check was run; live behaviour remains unverified.

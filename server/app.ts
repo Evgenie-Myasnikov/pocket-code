@@ -159,7 +159,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.end = function (this: express.Response, ...args: any[]) { try { return (end as any).apply(this, args); } finally { release(); } } as typeof res.end;
     res.once('finish', release); next();
   });
-  await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}},boardMcp);
+  await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}},boardMcp,path.join(config.uploads,'.boards','backups'));
   mountSpeech(app,path.join(path.dirname(config.uploads),'speech'));
   mountMiro(app,{integration:new MiroIntegration(new WindowsMiroStore(path.join(config.uploads,'.miro','credentials.vault'))),roots,access:workspaceAccess});
   taskRuntime=new TaskRuntime({directory:path.join(config.uploads,'.tasks'),roots,access:workspaceAccess,jobs:()=>allJobs().map(job=>jobView(job.id)),managedRoots:managed=>{config.codex?.setManagedTaskRoots?.(managed);config.copilot?.setManagedTaskRoots?.(managed);}});
@@ -373,7 +373,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     activeMutations++;let released=false;const release=()=>{if(!released){released=true;activeMutations--;}};res.once('finish',release);res.once('close',release);
     try{const file=await config.updater.download(z.coerce.number().int().positive().parse(req.query.release));res.type('application/vnd.android.package-archive');res.sendFile(file,{dotfiles:'allow'});}catch(error){release();throw error;}
   });
-  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots:accessRoots(), version: packageJson.version, protocol: 1, processId: process.pid, ...(config.devices?{hostId:config.devices.hostId}:{}), ...(res.locals.deviceId&&config.routes?{routes:config.routes()}:{}) }));
+  app.get('/api/health', (_req, res) => res.json({ name: config.hostName, roots:accessRoots(), version: packageJson.version, protocol: 1, boardFeatures:['diagnostics','repair','charts','checklist','status-history','history-overflow'], processId: process.pid, ...(config.devices?{hostId:config.devices.hostId}:{}), ...(res.locals.deviceId&&config.routes?{routes:config.routes()}:{}) }));
   app.get('/api/claude/models', async (req, res) => {
     const cwd = await allowedPath(accessRoots(), text.parse(req.query.cwd), true);
     res.json(await claudeCatalog.read(cwd));
@@ -419,9 +419,25 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     await chatLibrary.edit(data=>{if(!data.projects.some(p=>process.platform==='win32'?p.toLowerCase()===cwd.toLowerCase():p===cwd))data.projects.push(cwd);});
     res.json({cwd});
   });
+  // The board's current discussion chat is host state: the PC window and every phone resume the same conversation.
+  const boardChatKey=(root:string,board:string)=>board+'|'+(process.platform==='win32'?root.toLowerCase():root);
+  const boardChatTarget=z.object({root:z.string().min(1).max(4096),board:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/)});
+  app.get('/api/project-board/chat',async(req,res)=>{
+    if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
+    const query=boardChatTarget.parse(req.query),root=await allowedPath(accessRoots(),query.root,true),data=await chatLibrary.read(),saved=data.boardChats?.[boardChatKey(root,query.board)];
+    res.json({chat:saved&&!data.chats[saved.provider+':'+saved.sessionId]?.deleted?{provider:saved.provider,sessionId:saved.sessionId}:null});
+  });
+  app.post('/api/project-board/chat',async(req,res)=>{
+    if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
+    const body=boardChatTarget.extend({provider:providerSchema.optional(),sessionId:uuid.nullable()}).parse(req.body),root=await allowedPath(accessRoots(),body.root,true),key=boardChatKey(root,body.board);
+    if(body.sessionId&&!body.provider)throw new HttpError(400,'A provider is required');
+    await chatLibrary.edit(data=>{const next={...data.boardChats};if(body.sessionId)next[key]={provider:body.provider!,sessionId:body.sessionId,at:Date.now()};else delete next[key];const keys=Object.keys(next);if(keys.length>500)for(const old of keys.sort((a,b)=>next[a].at-next[b].at).slice(0,keys.length-500))delete next[old];data.boardChats=next;});
+    res.json({ok:true});
+  });
   app.post('/api/sessions/:id/manage',async(req,res)=>{
     const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','board','account']),account:uuid.optional(),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
-    const found=await session(String(req.params.id),body.provider);
+    // A chat that has just started can be linked to its board before its provider lists it.
+    const found=await session(String(req.params.id),body.provider).catch(error=>{if(body.action==='board'&&error?.status===404&&engineFor(body.provider).list().some(job=>job.sessionId===req.params.id))return {sessionId:String(req.params.id)} as Awaited<ReturnType<typeof session>>;throw error;});
     if(body.action==='account'){
       if(body.provider!=='claude'||!body.account)throw new HttpError(400,'A custom provider account is required');
       const accountName=await customProviders.name(body.account);
@@ -709,7 +725,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const status = error instanceof z.ZodError ? 400 : error.status || 500;
     // A per-request spend limit outside the range is a settings problem, not a malformed request; name it so the chat can point to Settings.
     if (error instanceof z.ZodError && error.issues.some(issue => issue.path.includes('maxBudgetUsd'))) { res.status(400).json({ error: 'Лимит стоимости запроса вне диапазона $0.10–$100. Измените его в настройках доступа Claude.', code: 'budget_out_of_range' }); return; }
-    res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message, ...(error instanceof HttpError&&error.code?{code:error.code}:{}) });
+    res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message, ...(error instanceof HttpError&&error.code?{code:error.code}:{}),...(error instanceof HttpError&&Array.isArray((error as any).issues)?{issues:(error as any).issues.slice(0,40)}:{}) });
   });
   async function maintainEngines() {
     if(!config.engineUpdates||runtimeStopping||config.hostUpdater?.draining)return;

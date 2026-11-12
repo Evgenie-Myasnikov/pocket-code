@@ -32,7 +32,7 @@ export function useBoardLive(connection:Connection,board:BoardView|null,apply:(b
    const base=revision(before);let next:BoardView|null=null;
    if(before.repositoryFile&&!fallback){
     try{
-     const result=await request<{version:string;unchanged?:boolean;board?:BoardView|null;activity?:BoardEditActivity|null;activityCursor?:string;activities?:BoardEditActivity[]}>(connection,'/project-board/live?'+new URLSearchParams({root:before.root,file:before.repositoryFile,...(known?{known}:{}),...(after?{after,wait:'1000'}:{})}));
+     const result=await request<{version:string;unchanged?:boolean;board?:BoardView|null;activity?:BoardEditActivity|null;activityCursor?:string;activities?:BoardEditActivity[]}>(connection,'/project-board/live?'+new URLSearchParams({root:before.root,file:before.repositoryFile,...(known?{known}:{}),...(/^[a-f0-9]{64}$/.test(base)?{revision:base}:{}),...(after?{after,wait:'1000'}:{})}));
      if(stopped)return;
      if(!/^[a-f0-9]{64}$/.test(result.version||''))fallback=true;
      else{known=result.version;after=result.activityCursor||'';const events=(result.activities||[]).filter(event=>event.expiresAt>Date.now()),last=events.at(-1)||result.activity,active=last&&last.expiresAt>Date.now()?last:null;

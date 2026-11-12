@@ -94,3 +94,23 @@ provide shared unsaved collaboration or cross-user undo.
 Host 0.28.15 raises the bounded version-label and branch-map limit from 40 to 64.
 Older hosts require at most 40 entries in each field; update the host before
 loading a larger snapshot. The limit is shared by storage, APIs and the UI.
+
+## Format limits, health and history (unreleased)
+
+Limits of a version 1 board file: title 1–160 characters, description up to
+20,000, image caption up to 160, 12 images, 100 dependencies and 50 checklist
+items per card, 500 cards, 500 canvas objects, 1,000 connections, 4,000 characters
+of object text, 64 version labels, 2,000,000 bytes per file. `status` is idea,
+questions, ready, working, review or done; `priority` is critical, high, normal or
+low. Optional card fields: `images`, `checklist: [{text, done}]` and
+`statusHistory: [{status, at}]` (written by the host). A canvas object of kind
+`chart` carries `chart: {type: "bar", categories, series, unit?, stacked?,
+lowerIsBetter?, reference?}`.
+
+A record outside these limits does not stop the board from opening: the host lists
+the problem and the board is read-only until **Repair** runs. Do not make room by
+deleting text: a description over the limit is moved by the host, oldest
+paragraphs first and word for word, to `project-boards/history/card-<id>.md`,
+leaving a pointer in the card. History files travel with the board in Git.
+The canvas object of a card holds its geometry and title only; the description
+lives in the card record and does not need to be repeated on the canvas.

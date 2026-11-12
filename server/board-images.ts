@@ -3,9 +3,9 @@ import {lstat,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {HttpError} from './security.js';
+import {boardImage,boardImages} from '../src/board-contract.js';
 
-export const boardImage=z.object({path:z.string().regex(/^project-boards\/assets\/[a-f0-9]{64}\.(png|jpg|webp)$/),caption:z.string().max(160)}).strict();
-export const boardImages=z.array(boardImage).max(12).optional();
+export {boardImage,boardImages};
 const limit=10*1024*1024;
 function imageType(bytes:Buffer){
  if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return {extension:'png',mimeType:'image/png'};

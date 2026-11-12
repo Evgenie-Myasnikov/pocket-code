@@ -9,7 +9,9 @@ import {PanelResizeHandle} from './PanelResizeHandle';
 import {CardActionMenu} from './CardActionMenu';
 import './desktop-sidebar.css';
 import type {BoardSelection} from './board-selection-context';
-import {prepareBoardConversation,readBoardConversation} from './board-conversation';
+import {prepareBoardConversation,adoptBoardConversation,readBoardConversation} from './board-conversation';
+import {boardConversationHost} from './board-conversation-host';
+import './board-chat-compact.css';
 import './compact-ui.css';
 import {ProviderPicker} from './ProviderPicker';
 import {useActivity} from './useActivity';
@@ -170,7 +172,7 @@ export function DesktopApp(){
   const visible=chatSessions.filter(item=>!projectFilter||item.cwd===projectFilter);
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
   async function openBoardChat(target:BoardChat,prepared=false){
-    try{if(!prepared)target=await prepareBoardConversation(connection,target,provider);setNotificationChat(null);setDocDraft('');setBoardChat(target);setProject(target.root);if(target.conversation){const saved=readBoardConversation(target.conversation.key);if(saved)setProvider(saved.provider);}if(target.taskRun)setProvider(target.taskRun.provider);if(target.note.chat){setProvider(target.note.chat.provider);setSelected({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});setCreating(false);}else{setSelected(null);setCreating(true);}setPage(target.context?'work':'chats');}catch{setError(label('Could not save the board chat association.','Не удалось сохранить привязку чата доски.'));}
+    try{if(!prepared)target=await prepareBoardConversation(connection,target,provider,false,boardConversationHost(connection));setNotificationChat(null);setDocDraft('');setBoardChat(target);setProject(target.root);if(target.conversation){const saved=readBoardConversation(target.conversation.key);if(saved)setProvider(saved.provider);}if(target.taskRun)setProvider(target.taskRun.provider);if(target.note.chat){setProvider(target.note.chat.provider);setSelected({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});setCreating(false);}else{setSelected(null);setCreating(true);}setPage(target.context?'work':'chats');}catch{setError(label('Could not save the board chat association.','Не удалось сохранить привязку чата доски.'));}
   }
   function startChat(){if(!state.online||!projectRoot)return;setDocDraft('');setNotificationChat(null);setBoardChat(undefined);setCreating(true);setSelected(null);setPage('chats');}
   function openChat(session:Session){if(session.board?.kind==='discussion'&&state.online){void openDiscussion(session,session.board);return;}openPlainChat(session);}
@@ -180,7 +182,8 @@ export function DesktopApp(){
     try{
       const board=await loadLinkedBoard(connection,link);
       const target:BoardChat={root:board.root,boardId:board.id,connectionUrl:connection.url,context:{name:board.name,revision:(board as {repositoryRevision?:string}).repositoryRevision||String(board.revision)},prompt:boardChatContext(board,[]),note:{id:board.id,title:board.name,description:'',owner:'',status:'idea',priority:'normal',branch:'',x:0,y:0,dependencies:[]}};
-      const prepared=await prepareBoardConversation(connection,target,provider);
+      // The chat picked from the list becomes the board's chat, so the board and the list keep one history.
+      const prepared=await adoptBoardConversation(connection,target,provider,session.sessionId,boardConversationHost(connection));
       setNotificationChat(null);setDocDraft('');setBoardChat({...prepared,note:{...prepared.note,chat:{provider,sessionId:session.sessionId}}});setProject(board.root);setSelected(session);setCreating(false);
       setNoticeTarget({board,connection,noteId:'',message:'',requestId:Date.now()});setPage('work');
     }catch{openPlainChat(session);}

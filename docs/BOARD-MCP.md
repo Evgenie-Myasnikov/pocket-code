@@ -157,3 +157,35 @@ and `/chat/completions`. Catalog entries are fetched from the provider; profiles
 and history stay in the local encrypted host store. This is text API chat, with
 no project file tools or coding-agent execution. External account access is not
 implied by a model appearing in the catalog.
+
+## Health, repair, charts and compact results (unreleased)
+
+- A write returns the new revision and only the objects that changed (`changed`,
+  `removed`, `totals`), with long text cut and its full length stated. Read
+  complete objects with `read_objects` or `read_note_context`.
+- `read_board` answers a large board with a summary (descriptions cut to 400
+  characters, their lengths stated) unless `detail: "full"` is passed; paging with
+  `limit`/`cursor` still returns complete objects.
+- `board_health` lists every record outside the format (card ID, field, limit,
+  actual value, the automatic fix), warnings for records above 90% of a limit and
+  the format limits. `board_overview` and `list_boards` include the error and
+  warning counts.
+- A board with format errors is readable but refuses writes with the code
+  `board_needs_repair` and the list of problems. `repair_board` fixes them without
+  losing text (removed text goes to `project-boards/history`) and returns the new
+  revision; `board_unrepairable` means a person has to decide.
+- A refused write carries the explanation of the host: `invalid_input` names the
+  card, the field, the limit and the value; `board_too_large` reports the file
+  size. Nothing is saved in either case.
+- `update_note` and `create_note` accept a description of up to 200,000
+  characters; the host moves the older paragraphs beyond 20,000 to
+  `project-boards/history/card-<id>.md`. `checklist` holds acceptance criteria
+  (`[{text, done}]`, up to 50). The host records status changes; `statusHistory`
+  is returned and cannot be set.
+- `board_create_chart` draws a bar chart from `categories` and `series` (one value
+  per category, `null` for a missing one), with optional `unit`, `stacked`,
+  `lowerIsBetter`, a `reference` line and `near` to place it beside an object and
+  connect it. `board_update_chart` changes the stored data; `setSeries` adds or
+  replaces one series by name. `canvas_create`, `canvas_apply` and `canvas_patch`
+  accept the `chart` kind as well. Charts need a host that reports the `charts`
+  board feature in its health reply.

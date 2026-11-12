@@ -5,14 +5,17 @@ import {BOARD_VERSION_LIMIT} from '../src/board-limits.js';
 import {miroLink} from '../src/miro-link.js';
 import {boardImages,saveBoardImage,readBoardImage} from './board-images.js';
 import {versionBranches} from './board-version-links.js';
-import {projectBoard,createProjectBoard,updateProjectBoard,deleteProjectBoard} from './project-board.js';
+import {projectBoard,createProjectBoard,updateProjectBoard,deleteProjectBoard,repairProjectBoard,restoreProjectBoard,projectBoardBackups,assertBoardEditable} from './project-board.js';
+import {BoardBackups} from './board-backups.js';
+import {BOARD_LIMITS,NOTE_STATUSES,NOTE_PRIORITIES,boardChecklist,boardStatusHistory} from '../src/board-contract.js';
 import {boardNotice,assignmentNotices,allowedRecipients,addNotice,assignees} from './board-attention.js';
-import {saveBoardSnapshot,listBoardSnapshots,readBoardSnapshot,boardSnapshotStamp} from './board-snapshots.js';
+import {saveBoardSnapshot,listBoardSnapshots,readBoardSnapshot,boardSnapshotStamp,parseBoardInput,BoardValidationError} from './board-snapshots.js';
 import {BoardLiveActivity} from './board-live.js';
 import {profileName,completeName} from '../src/profile-name.js';
 import {readProjectRoadmap} from './project-roadmap.js';
 import {boardExample,pocketCodeExample} from './board-example.js';
-import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {replaceFile} from './fs-retry.js';
 import path from 'node:path';
 import {randomUUID,randomBytes,createHmac,scryptSync,timingSafeEqual,createHash} from 'node:crypto';
 import {AsyncLocalStorage} from 'node:async_hooks';
@@ -23,7 +26,10 @@ import type {Express} from 'express';
 import {allowedPath,HttpError} from './security.js';
 
 const id=z.string().uuid(),name=z.string().trim().min(1).max(160);
-const note=z.object({id,images:boardImages,title:name,description:z.string().max(20000),branch:z.string().max(300),status:z.enum(['idea','questions','ready','working','review','done']),owner:z.string().max(160),assigneeId:z.string().max(200).optional(),assigneeIds:z.array(z.string().min(1).max(200)).max(100).optional(),priority:z.enum(['critical','high','normal','low']).optional(),x:z.number().min(0).max(20000),y:z.number().min(0).max(20000),dependencies:z.array(id).max(100),chat:z.object({provider:z.enum(['claude','codex','copilot']),sessionId:z.string().max(200)}).optional()});
+const noteShape=(description:number)=>z.object({id,images:boardImages,title:name,description:z.string().max(description),branch:z.string().max(BOARD_LIMITS.branch),status:z.enum(NOTE_STATUSES),owner:z.string().max(160),assigneeId:z.string().max(200).optional(),assigneeIds:z.array(z.string().min(1).max(200)).max(100).optional(),priority:z.enum(NOTE_PRIORITIES).optional(),x:z.number().min(0).max(BOARD_LIMITS.coordinate),y:z.number().min(0).max(BOARD_LIMITS.coordinate),dependencies:z.array(id).max(BOARD_LIMITS.dependencies),checklist:boardChecklist,statusHistory:boardStatusHistory,chat:z.object({provider:z.enum(['claude','codex','copilot']),sessionId:z.string().max(200)}).optional()});
+const note=noteShape(BOARD_LIMITS.description);
+// A repository board accepts a longer description on input: the host moves older paragraphs to the card history file.
+const noteInput=noteShape(BOARD_LIMITS.descriptionInput);
 const board=z.object({canvas:whiteboardSchema.optional(),id,versionBranches,workspaceId:id.optional(),name,root:z.string(),revision:z.number().int().nonnegative(),versionSource:z.enum(['planned','git']).default('git'),source:z.literal('project-changelog').optional(),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(BOARD_VERSION_LIMIT).default([])});
 const role=z.enum(['host','viewer','developer','reviewer','qa']);
 const member=z.object({id,name,firstName:z.string().optional(),lastName:z.string().optional(),role,tokenHash:z.string(),needsName:z.boolean().optional(),approval:z.enum(['pending','approved','rejected']).optional()});
@@ -47,13 +53,14 @@ export class BoardStore{
   /** Note chats recorded on host boards, keyed provider:sessionId, so chat lists can show their board. */
   chatLinks(){const links=new Map<string,{id:string;root:string;title:string;noteId:string;kind:'note'}>();for(const b of this.data.boards)for(const n of b.notes)if(n.chat?.sessionId&&!n.chat.sessionId.startsWith('pending-'))links.set(n.chat.provider+':'+n.chat.sessionId,{id:b.id,root:b.root,title:(b.name+' · '+n.title).slice(0,200),noteId:n.id,kind:'note'});return links;}
   boardList(){return this.data.boards.map(({id,workspaceId,name,root,notes})=>({id,workspaceId,name,root,noteCount:notes.length}));}
-  mutate<T>(change:(data:Data)=>T|Promise<T>):Promise<T>{const run=this.queue.then(async()=>{const next=this.snapshot(),result=await change(next);database.parse(next);await mkdir(path.dirname(this.file),{recursive:true});const temp=this.file+'.tmp';await writeFile(temp,JSON.stringify(next),{mode:0o600});await rename(temp,this.file);this.data=next;return structuredClone(result);});this.queue=run.then(()=>{},()=>{});return run;}
+  mutate<T>(change:(data:Data)=>T|Promise<T>):Promise<T>{const run=this.queue.then(async()=>{const next=this.snapshot(),result=await change(next);database.parse(next);await mkdir(path.dirname(this.file),{recursive:true});const temp=this.file+'.tmp';await writeFile(temp,JSON.stringify(next),{mode:0o600});await replaceFile(temp,this.file);this.data=next;return structuredClone(result);});this.queue=run.then(()=>{},()=>{});return run;}
   save(id:string,revision:number,notes:BoardNote[],versions:string[]=[],canvas?:z.infer<typeof whiteboardSchema>){return this.mutate(data=>{const found=data.boards.find(b=>b.id===id);if(!found)throw new HttpError(404,'Board not found');if(found.revision!==revision)throw new HttpError(409,'This board changed on another device. Reload before saving.');validateDependencies(notes);assignmentNotices(data,found,notes);found.notes=structuredClone(notes);if(canvas)found.canvas=whiteboardSchema.parse(canvas);found.versions=[...new Set(versions)];found.revision++;return found;});}
 }
 export function validateDependencies(notes:BoardNote[]){
-  const map=new Map(notes.map(n=>[n.id,n]));if(map.size!==notes.length)throw new HttpError(400,'Duplicate note');
+  const map=new Map(notes.map(n=>[n.id,n]));if(map.size!==notes.length)throw new HttpError(400,'Duplicate note: two cards share one id.');
+  const label=(id:string)=>{const n=map.get(id);return n?' (card "'+n.title.slice(0,60)+'", '+id.slice(0,8)+')':' ('+id.slice(0,8)+')';};
   const seen=new Set<string>(),active=new Set<string>();
-  function visit(id:string){if(active.has(id))throw new HttpError(400,'Dependencies cannot form a cycle');if(seen.has(id))return;const n=map.get(id);if(!n)throw new HttpError(400,'Dependency not found');active.add(id);for(const dep of n.dependencies)visit(dep);active.delete(id);seen.add(id);}
+  function visit(id:string,from?:string){if(active.has(id))throw new HttpError(400,'Dependencies cannot form a cycle'+label(id));if(seen.has(id))return;const n=map.get(id);if(!n)throw new HttpError(400,'Dependency not found: '+id+(from?' is referenced by'+label(from):''));active.add(id);for(const dep of n.dependencies)visit(dep,id);active.delete(id);seen.add(id);}
   for(const n of notes)visit(n.id);
 }
 const exec=promisify(execFile);
@@ -97,8 +104,10 @@ export async function createWorkspaceAccess(file:string){
   }
   return {store,identity,current,catalog,publicLogin,pairMember,parseInvitation,invitationIdentity,joinInvitation,verifyInvitationPassword};
 }
-export async function mountBoards(app:Express,roots:string[],access:Awaited<ReturnType<typeof createWorkspaceAccess>>,onWorkspaceCreated?:()=>Promise<void>,boardMcp?:BoardMcpRuntime){
+export async function mountBoards(app:Express,roots:string[],access:Awaited<ReturnType<typeof createWorkspaceAccess>>,onWorkspaceCreated?:()=>Promise<void>,boardMcp?:BoardMcpRuntime,backupDirectory?:string){
   const {store,current,catalog}=access;
+  // Last good copies of repository boards live in private host storage, never in the repository.
+  const boardOptions={backups:backupDirectory?new BoardBackups(backupDirectory):undefined};
   // Only seed this app's own repository; do not inspect unrelated project content.
   for(const root of roots){let appRoot=false;try{appRoot=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).name==='pocket-code';}catch{}if(!appRoot||store.snapshot().hiddenSourceRoots.includes(root))continue;
     const existing=store.boardList().find(b=>!b.workspaceId&&b.root===root&&b.name==='Pocket Code');
@@ -167,7 +176,7 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
     app.post('/api/project-board/mcp',async(req,res)=>{
       if(current())throw new HttpError(403,'Board runtime belongs to the host');
       const input=z.object({root:z.string(),opening:id}).strict().parse(req.body),root=await projectRoot(input.root);
-      if(!await projectBoard(root))throw new HttpError(404,'Project board not found');
+      if(!await projectBoard(root,boardOptions))throw new HttpError(404,'Project board not found');
       const state=boardMcp.open(root,input.opening);res.json({generation:state.generation,queued:true});
     });
   }
@@ -182,7 +191,7 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   });
   app.post('/api/project-board/view/command',async(req,res)=>{
     const input=z.object({root:z.string(),file:liveFile,viewId:id,requestId:id,revision:z.string().regex(/^[a-f0-9]{64}$/),action:boardViewAction}).strict().parse(req.body);
-    const {root,file}=await hostView(input.root,input.file),snapshot=await projectBoard(root);
+    const {root,file}=await hostView(input.root,input.file),snapshot=await projectBoard(root,boardOptions);
     if(!snapshot||snapshot.repositoryFile!==file||snapshot.repositoryRevision!==input.revision)throw new HttpError(409,'Board revision changed; read again');
     if('ids' in input.action){const ids=new Set([...(snapshot.canvas?.items||[]).map(i=>i.id),...snapshot.notes.map(n=>n.id)]);if(input.action.ids.some(id=>!ids.has(id)))throw new HttpError(400,'Board object not found');}
     res.json(await views.execute(root+'|'+file,input.viewId,input.requestId,input.revision,input.action));
@@ -190,11 +199,15 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
   app.get('/api/project-board/live',async(req,res)=>{
     const root=await projectRoot(req.query.root),file=liveFile.parse(req.query.file),known=req.query.known===undefined?undefined:z.string().regex(/^[a-f0-9]{64}$/).parse(req.query.known);
     const after=req.query.after===undefined?undefined:id.parse(req.query.after),wait=req.query.wait===undefined?0:z.coerce.number().int().min(0).max(1000).parse(req.query.wait),key=root+'|'+file;
+    const revision=req.query.revision===undefined?undefined:z.string().regex(/^[a-f0-9]{64}$/).parse(req.query.revision);
     let version=await boardSnapshotStamp(root,file);
     if(known===version&&after&&wait){const cancel=new AbortController(),close=()=>cancel.abort();res.once('close',close);try{await liveActivity.wait(key,after,wait,cancel.signal);}finally{res.off('close',close);}if(res.destroyed)return;version=await boardSnapshotStamp(root,file);}
     const activity=liveActivity.get(key),events=liveActivity.since(key,after);
     if(known===version){res.json({version,unchanged:true,activity,...events});return;}
-    const board=await projectBoard(root);if(board)validateDependencies(board.notes);res.json({version,board,activity,...events});
+    const board=await projectBoard(root,boardOptions);
+    // The viewer's own save already delivered this content: only the file stamp is new.
+    if(board&&revision===board.repositoryRevision){res.json({version,unchanged:true,activity,...events});return;}
+    res.json({version,board,activity,...events});
   });
   app.post('/api/project-board/activity',async(req,res)=>{
     const target=z.object({id,x:z.number().min(0).max(106000),y:z.number().min(0).max(106000),width:z.number().min(0).max(6000),height:z.number().min(0).max(6000)}).strict();
@@ -203,16 +216,21 @@ export async function mountBoards(app:Express,roots:string[],access:Awaited<Retu
     await boardSnapshotStamp(root,input.file);res.json(liveActivity.set(root+'|'+input.file,input.ids,input.phase,{action:input.action,targets:input.targets}));
   });
   const privateNames=()=>store.workspaces().flatMap(w=>[...w.hostPeople,...w.members].map(p=>p.name));
-  app.get('/api/project-board',async(req,res)=>{const root=await projectRoot(req.query.root),result=await projectBoard(root);if(result)validateDependencies(result.notes);res.json({board:result,miro:store.snapshot().miroBoards.find(b=>b.root===root)||null,canEdit:current()?.person.role!=='viewer'});});
+  app.get('/api/project-board',async(req,res)=>{const root=await projectRoot(req.query.root),result=await projectBoard(root,boardOptions);res.json({board:result,miro:store.snapshot().miroBoards.find(b=>b.root===root)||null,canEdit:current()?.person.role!=='viewer'});});
   app.post('/api/project-board/miro',async(req,res)=>{
     const input=z.object({root:z.string(),url:z.string().max(2048).nullable()}).parse(req.body),root=await projectRoot(input.root,true);
     let url:string|null=null;if(input.url!==null){try{url=miroLink(input.url).url;}catch{throw new HttpError(400,'Use a Miro board link: https://miro.com/app/board/…');}}
     const linked=await store.mutate(data=>{data.miroBoards=data.miroBoards.filter(b=>b.root!==root);if(url)data.miroBoards.push({root,url});return url?{root,url}:null;});
     res.json({miro:linked});
   });
-  app.post('/api/project-board/create',async(req,res)=>{const input=z.object({root:z.string(),language:z.enum(['en','ru']).default('en')}).parse(req.body),root=await projectRoot(input.root,true);res.json(await createProjectBoard(root,privateNames(),input.language));});
-  app.post('/api/project-board/delete',async(req,res)=>{const input=z.object({root:z.string(),repositoryRevision:z.string().length(64)}).parse(req.body),root=await projectRoot(input.root,true);await deleteProjectBoard(root,input.repositoryRevision);res.json({ok:true});});
-  app.post('/api/project-board',async(req,res)=>{const input=z.object({canvas:whiteboardSchema.optional(),root:z.string(),repositoryRevision:z.string().length(64),notes:z.array(note).max(500),versions:z.array(z.string().min(1).max(300)).max(BOARD_VERSION_LIMIT)}).parse(req.body),root=await projectRoot(input.root,true);validateDependencies(input.notes);res.json(await updateProjectBoard(root,input.repositoryRevision,input.notes,input.versions,privateNames(),input.canvas));});
+  app.post('/api/project-board/create',async(req,res)=>{const input=z.object({root:z.string(),language:z.enum(['en','ru']).default('en')}).parse(req.body),root=await projectRoot(input.root,true);res.json(await createProjectBoard(root,privateNames(),input.language,boardOptions));});
+  app.post('/api/project-board/delete',async(req,res)=>{const input=z.object({root:z.string(),repositoryRevision:z.string().length(64)}).parse(req.body),root=await projectRoot(input.root,true);await deleteProjectBoard(root,input.repositoryRevision,boardOptions);res.json({ok:true});});
+  app.post('/api/project-board',async(req,res)=>{await assertBoardEditable(await projectRoot(z.object({root:z.string()}).parse(req.body).root,true),boardOptions);const shape=z.object({canvas:whiteboardSchema.optional(),root:z.string(),repositoryRevision:z.string().length(64),notes:z.array(noteInput).max(BOARD_LIMITS.notes),versions:z.array(z.string().min(1).max(300)).max(BOARD_VERSION_LIMIT)});let input:z.infer<typeof shape>;try{input=parseBoardInput(shape,req.body);}catch(error){if(!(error instanceof BoardValidationError))throw error;const known=await projectBoard(await projectRoot(req.body?.root,true),boardOptions).catch(()=>null);throw error.withTitles(new Map((known?.notes||[]).map(n=>[n.id,n.title])));}const root=await projectRoot(input.root,true);validateDependencies(input.notes);res.json(await updateProjectBoard(root,input.repositoryRevision,input.notes,input.versions,privateNames(),input.canvas,boardOptions));});
+  // Repair and rollback change the repository file, so they stay with the PC host.
+  const hostBoard=async(value:unknown)=>{if(current())throw new HttpError(403,'Board repair belongs to the PC host');return projectRoot(value,true);};
+  app.post('/api/project-board/repair',async(req,res)=>{const input=z.object({root:z.string(),repositoryRevision:z.string().length(64)}).strict().parse(req.body),root=await hostBoard(input.root);res.json(await repairProjectBoard(root,input.repositoryRevision,boardOptions));});
+  app.get('/api/project-board/backups',async(req,res)=>{const root=await hostBoard(req.query.root);res.json({backups:await projectBoardBackups(root,boardOptions)});});
+  app.post('/api/project-board/restore',async(req,res)=>{const input=z.object({root:z.string(),repositoryRevision:z.string().length(64),backup:z.string().max(80)}).strict().parse(req.body),root=await hostBoard(input.root);res.json(await restoreProjectBoard(root,input.repositoryRevision,input.backup,boardOptions));});
   app.get('/api/repository-boards',async(req,res)=>{if(current())throw new HttpError(403,'Connect to the PC to browse repository boards');const root=await allowedPath(roots,z.string().parse(req.query.root),true);res.json(await listBoardSnapshots(root,false));});
   app.get('/api/repository-board',async(req,res)=>{if(current())throw new HttpError(403,'Connect to the PC to browse repository boards');const root=await allowedPath(roots,z.string().parse(req.query.root),true),file=z.string().parse(req.query.file),shared=await readBoardSnapshot(root,file,false);const notes=shared.notes.map(n=>({...n,owner:'',assigneeIds:[]}));validateDependencies(notes);res.json({...shared,id:file.slice(6,-5),root,notes,revision:0,versionSource:'planned',source:'project-changelog',repositoryFile:file,branches:[]});});
   app.get('/api/board-snapshots',async(req,res)=>{if(current()||!res.locals.deviceAdmin)throw new HttpError(403,'Use the PC host to load board snapshots');const root=await allowedPath(roots,z.string().parse(req.query.root),true);res.json(await listBoardSnapshots(root));});

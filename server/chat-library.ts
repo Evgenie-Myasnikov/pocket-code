@@ -3,7 +3,9 @@ import path from 'node:path';
 /** The board a chat was started from. Host-private: repository boards never store chat associations. */
 export type BoardLink={id:string;root:string;title:string;noteId?:string;kind?:'discussion'|'note'|'task'};
 type Entry={title?:string;deleted?:boolean;board?:BoardLink;account?:string;accountName?:string};
-type Library={chats:Record<string,Entry>;projects:string[]};
+/** Which chat is a board's current discussion, keyed by board and project folder. Host-private like every chat association. */
+export type BoardChatPointer={provider:string;sessionId:string;at:number};
+type Library={chats:Record<string,Entry>;projects:string[];boardChats?:Record<string,BoardChatPointer>};
 export class ChatLibrary {
  private pending:Promise<unknown>=Promise.resolve();
  constructor(private file:string){}

@@ -77,3 +77,6 @@
 
 
 :root{--canvas-grid:#8885;--sticky-sand:#f0dfa4;--sticky-ink:#302b21;--canvas-shadow:#0002;--sticky-mint:#b5dfce;--sticky-blue:#bdd7ee;--sticky-rose:#edc4c9;--sticky-violet:#d4c9ed;--canvas-frame:#93939a88;--canvas-selection:#4299e1;}
+/* Board charts: a neutral surface and eight series colours in a fixed order, checked for colour-blind separation on both surfaces; the dark steps are chosen, not flipped. */
+:root{--chart-surface:#1a1a19;--chart-ink:#f0efec;--chart-ink-2:#c3c2b7;--chart-muted:#898781;--chart-grid:#2c2c2a;--chart-axis:#383835;--chart-good:#0ca30c;--chart-bad:#d03b3b;--chart-series-1:#3987e5;--chart-series-2:#d95926;--chart-series-3:#199e70;--chart-series-4:#c98500;--chart-series-5:#d55181;--chart-series-6:#008300;--chart-series-7:#9085e9;--chart-series-8:#e66767}
+:root[data-theme=light]{--chart-surface:#fcfcfb;--chart-ink:#0b0b0b;--chart-ink-2:#52514e;--chart-muted:#898781;--chart-grid:#e1e0d9;--chart-axis:#c3c2b7;--chart-good:#0ca30c;--chart-bad:#d03b3b;--chart-series-1:#2a78d6;--chart-series-2:#eb6834;--chart-series-3:#1baf7a;--chart-series-4:#eda100;--chart-series-5:#e87ba4;--chart-series-6:#008300;--chart-series-7:#6250d6;--chart-series-8:#e34948}

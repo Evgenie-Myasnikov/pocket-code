@@ -3,9 +3,9 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import path from 'node:path';
 import {z} from 'zod';
-import {BOARD_VERSION_LIMIT} from '../src/board-limits.js';
+import {versionBranches} from '../src/board-contract.js';
 
-export const versionBranches=z.record(z.string().min(1).max(300),z.string().min(1).max(300)).refine(v=>Object.keys(v).length<=BOARD_VERSION_LIMIT).optional();
+export {versionBranches};
 const exec=promisify(execFile);
 export async function linkBoardVersions(root:string,versions:string[],saved:Record<string,string>={}){
  const links:Record<string,string>={};

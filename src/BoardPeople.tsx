@@ -1,6 +1,7 @@
 import {NoteAssignees,PersonAvatar,assigneeIds} from './NoteAssignees';
 import type {BoardNote,ProjectWorkspace} from '../server/boards';
 import {useLanguage} from './i18n';
+import {checklistProgress,statusAge} from './BoardChecklist';
 
 export const priorityLabels={critical:['Critical','Критический'],high:['High','Высокий'],normal:['Normal','Обычный'],low:['Low','Низкий']} as const;
 const rank={critical:0,high:1,normal:2,low:3};
@@ -13,7 +14,8 @@ export function boardPeople(workspace:ProjectWorkspace|undefined,notes:BoardNote
 export function notesForPerson(notes:BoardNote[],id:string){return notes.filter(n=>(id?assigneeIds(n).includes(id):!assigneeIds(n).length)).sort((a,b)=>rank[a.priority||'normal']-rank[b.priority||'normal']||a.title.localeCompare(b.title)||a.id.localeCompare(b.id));}
 export function BoardTaskMeta({note,status}:{note:BoardNote;status:string}){
   const ru=useLanguage()==='ru',priority=note.priority||'normal';
-  return <span className="board-task-meta"><span className={'task-priority priority-'+priority}>{priorityLabels[priority][ru?1:0]}</span><span className={'task-status status-'+note.status}>{status}</span></span>;
+  const progress=checklistProgress(note.checklist),age=statusAge(note);
+  return <span className="board-task-meta"><span className={'task-priority priority-'+priority}>{priorityLabels[priority][ru?1:0]}</span><span className={'task-status status-'+note.status}>{status}</span>{age&&<span className="task-age" title={(ru?'В этом статусе с ':'In this status since ')+new Date(age.since).toLocaleDateString(ru?'ru-RU':'en-GB',{day:'numeric',month:'long',year:'numeric'})}>{age.days?(ru?age.days+' дн.':age.days+' d'):(ru?'сегодня':'today')}</span>}{progress&&<span className={'task-checklist'+(progress.done===progress.total?' task-checklist-done':'')} title={ru?'Чек-лист приёмки':'Acceptance checklist'}>☑ {progress.done}/{progress.total}</span>}</span>;
 }
 export function BoardPeople({notes,people,statusLabels,onOpen,onAssign,disabled}:{notes:BoardNote[];people:BoardPerson[];statusLabels:Record<string,string>;onOpen(note:BoardNote):void;onAssign?(note:BoardNote,ids:string[]):void;disabled?:boolean}){
   const ru=useLanguage()==='ru';

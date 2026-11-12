@@ -3,7 +3,18 @@ import {z} from 'zod';
 const point=z.number().finite().min(0).max(100000);
 const side=z.enum(['n','e','s','w']);
 export type PortSide=z.infer<typeof side>;
-export const whiteboardItem=z.object({id:z.string().uuid(),kind:z.enum(['sticky','text','frame','card']),text:z.string().max(4000),description:z.string().max(20000).optional(),x:point,y:point,width:z.number().min(120).max(6000),height:z.number().min(80).max(6000),color:z.enum(['sand','mint','blue','rose','violet']).default('sand')}).strict();
+export const CANVAS_KINDS=['sticky','text','frame','card','chart'] as const;
+export const CANVAS_COLORS=['sand','mint','blue','rose','violet'] as const;
+const chartNumber=z.number().finite().min(-1e12).max(1e12);
+/** A chart stores its numbers; the host draws them. Grouped or stacked bars, an optional reference line and before/after deltas. */
+export const whiteboardChart=z.object({type:z.literal('bar'),categories:z.array(z.string().trim().min(1).max(80)).min(1).max(40),series:z.array(z.object({name:z.string().trim().min(1).max(80),values:z.array(chartNumber.nullable()).min(1).max(40)}).strict()).min(1).max(8),unit:z.string().trim().max(24).optional(),stacked:z.boolean().optional(),lowerIsBetter:z.boolean().optional(),reference:z.object({value:chartNumber,label:z.string().trim().min(1).max(60).optional()}).strict().optional()}).strict().superRefine((chart,ctx)=>{
+ if(chart.series.some(series=>series.values.length!==chart.categories.length))ctx.addIssue({code:'custom',message:'Every series needs exactly one value per category'});
+ if(chart.stacked&&chart.series.some(series=>series.values.some(value=>value!==null&&value<0)))ctx.addIssue({code:'custom',message:'Stacked bars need non-negative values'});
+});
+export type WhiteboardChart=z.infer<typeof whiteboardChart>;
+export const whiteboardItem=z.object({id:z.string().uuid(),kind:z.enum(CANVAS_KINDS),text:z.string().max(4000),description:z.string().max(20000).optional(),x:point,y:point,width:z.number().min(120).max(6000),height:z.number().min(80).max(6000),color:z.enum(CANVAS_COLORS).default('sand'),chart:whiteboardChart.optional()}).strict().superRefine((item,ctx)=>{
+ if((item.kind==='chart')!==Boolean(item.chart))ctx.addIssue({code:'custom',path:['chart'],message:item.kind==='chart'?'A chart object needs chart data':'Only chart objects carry chart data'});
+});
 const loosePoint=z.object({x:z.number().finite().min(0).max(106000),y:z.number().finite().min(0).max(106000)}).strict();
 export const whiteboardLink=z.object({id:z.string().uuid(),from:z.string().uuid().optional(),to:z.string().uuid().optional(),fromPoint:loosePoint.optional(),toPoint:loosePoint.optional(),fromSide:side.optional(),toSide:side.optional(),label:z.string().trim().min(1).max(200).optional(),style:z.enum(['arrow','line','dashed']).optional()}).strict().superRefine((link,ctx)=>{
  if(Boolean(link.from)===Boolean(link.fromPoint)||Boolean(link.to)===Boolean(link.toPoint)||!link.from&&link.fromSide||!link.to&&link.toSide)ctx.addIssue({code:'custom',message:'Each endpoint needs exactly one object or free point'});

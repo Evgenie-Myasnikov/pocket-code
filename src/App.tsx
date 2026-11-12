@@ -13,6 +13,7 @@ import {scrollChatToLatest} from './chat-scroll-motion';
 import {matchingBoardSelection,type BoardSelection} from './board-selection-context';
 import {boardImageMime,boardImageFile,takeBoardImageDrag,takeQueuedBoardImages,type BoardImage} from './board-image-drag';
 import {prepareBoardConversation,attachBoardConversation,currentBoardConversation} from './board-conversation';
+import {boardConversationHost} from './board-conversation-host';
 import {captureTextAnchor,restoreTextAnchor} from './chat-text-anchor';
 import {chatHistoryRequest,readHistoryView,writeHistoryView} from './chat-history-cache';
 import './compact-ui.css';
@@ -524,7 +525,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       await saveConnection(connection?{...connection,workspaceAccess:access,workspaceAccesses:accesses}:{...access,workspaceOnly:true,workspaceAccesses:accesses});
     }catch(e){if((e as {status?:number}).status===428)setWorkspacePasswordRequest(c);setError((e as Error).message);}finally{setBusy(false);}
   }
-  useEffect(()=>{if(!boardChat?.conversation||!job)return;try{attachBoardConversation(boardChat.conversation,provider,job.sessionId,job.id);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}},[boardChat?.conversation?.key,boardChat?.conversation?.generation,provider,job?.id,job?.sessionId]);
+  useEffect(()=>{if(!boardChat?.conversation||!job)return;try{// The host learns the board's current chat as soon as its session exists, so other devices resume this one.
+      if(attachBoardConversation(boardChat.conversation,provider,job.sessionId,job.id)&&boardChat.context&&connection&&job.sessionId&&!job.sessionId.startsWith('pending-'))void boardConversationHost(connection).write(boardChat.root,boardChat.boardId,{provider,sessionId:job.sessionId});}catch{setError(t('Не удалось сохранить привязку чата доски.'));}},[boardChat?.conversation?.key,boardChat?.conversation?.generation,provider,job?.id,job?.sessionId]);
   useEffect(()=>{if(embedded&&!embedded.session&&job?.sessionId&&(!boardChat?.conversation||currentBoardConversation(boardChat.conversation)))embedded.onCreated?.({sessionId:job.sessionId,cwd:job.cwd,summary:job.messages.find(m=>m.role==='user')?.blocks.find(b=>b.type==='text')?.text||'New',lastModified:job.startedAt,...(job.account?{account:job.account}:{})},job);},[job?.sessionId]);
   const embeddedTarget=embedded?.session?.sessionId||'new:'+embedded?.cwd;
   const embeddedOpened=useRef<string|null>(null);
@@ -735,17 +737,20 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     } catch (e) {if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);} finally
     {if (epoch === navigation.current) setLoading(false);}
   }
-  async function launchBoardChat(target:BoardChat,replace=false){try{const next=await prepareBoardConversation(connection!,target,provider,replace);if(embedded){embedded.onNewBoardChat?.(next);}else setBoardLaunch(next);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}}
+  async function launchBoardChat(target:BoardChat,replace=false){try{const next=await prepareBoardConversation(connection!,target,provider,replace,boardConversationHost(connection!));if(embedded){embedded.onNewBoardChat?.(next);}else setBoardLaunch(next);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}}
   useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch,resuming=Boolean(target.context&&target.conversation?.generation===boardChat?.conversation?.generation&&target.boardId===boardChat?.boardId);if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()},target.resumeJobId?{id:target.resumeJobId,sessionId:target.note.chat.sessionId}:undefined,target);if(target.followUp)appendDraft(target.prompt);}else{newChat(target.root,target);if(!resuming)setDraft(target.context?t('Discuss this board with me.'):target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
   // A chat started from a board keeps that link in the host chat library, so every chat list marks it and can open the board.
   const boardLinkOf=(target:BoardChat):BoardLink=>({id:target.boardId,root:target.root,title:(target.context?.name||target.note.title||t('Доска')).slice(0,200),kind:target.context?'discussion':target.taskRun?'task':'note',...(target.context?{}:{noteId:target.note.id})});
   const [linkedBoards,setLinkedBoards]=useState<Record<string,BoardLink>>({});
   const linkedSessions=useRef(new Set<string>());
+  // A session that has just started may not be listed by its provider yet; the link is retried instead of being lost.
+  const [linkAttempt,setLinkAttempt]=useState(0),linkRetries=useRef(new Map<string,number>()),linkTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  useEffect(()=>()=>clearTimeout(linkTimer.current),[]);
   useEffect(()=>{const sessionId=job?.sessionId||selected?.sessionId;if(!boardChat||!connection||demo||!sessionId||sessionId.startsWith('pending-'))return;
     const link=boardLinkOf(boardChat),key=provider+':'+sessionId+':'+link.id;if(linkedSessions.current.has(key))return;linkedSessions.current.add(key);
     setLinkedBoards(old=>({...old,[sessionId]:link}));
-    void request(connection,`/sessions/${encodeURIComponent(sessionId)}/manage`,{provider,action:'board',board:link}).catch(()=>{linkedSessions.current.delete(key);});
-  },[job?.sessionId,selected?.sessionId,boardChat,connection,provider,demo]);
+    void request(connection,`/sessions/${encodeURIComponent(sessionId)}/manage`,{provider,action:'board',board:link}).catch(()=>{linkedSessions.current.delete(key);const tries=(linkRetries.current.get(key)||0)+1;linkRetries.current.set(key,tries);if(tries<=8){clearTimeout(linkTimer.current);linkTimer.current=setTimeout(()=>setLinkAttempt(value=>value+1),1500*tries);}});
+  },[job?.sessionId,selected?.sessionId,boardChat,connection,provider,demo,linkAttempt]);
   const chatBoard=boardChat?boardLinkOf(boardChat):selected?(linkedBoards[selected.sessionId]||selected.board):undefined;
   async function openChatBoard(link:BoardLink){
     if(!connection)return;
@@ -1002,7 +1007,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       {chatSurface&&<ChatEdgeGlass/>}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
-        <ChatHeader board={chatBoard?{title:chatBoard.title,disabled:!connection||demo,open:()=>void openChatBoard(chatBoard)}:undefined} hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
+        <ChatHeader board={chatBoard?{title:chatBoard.title,disabled:!connection||demo,open:()=>void openChatBoard(chatBoard)}:undefined} hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} close={embedded&&boardChat?.context?{label:language==='ru'?'Закрыть чат доски':'Close board chat',open:()=>embedded.onBack()}:undefined} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():boardChat?.context?setTab('workspace'):setMobileChat(false)}
           context={undefined}
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>{setReviewPaths(undefined);setReviewOpen(true);},stats:availableReview&&availableReview.files!==undefined?{added:availableReview.added||0,removed:availableReview.removed||0,files:availableReview.files}:undefined}:undefined}

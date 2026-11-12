@@ -1,0 +1,44 @@
+/* Chart objects carry their own neutral surface and a fixed series order; the colours are tokens (tokens.css). */
+.whiteboard-item.wb-chart{background:var(--chart-surface);color:var(--chart-ink);border-color:var(--chart-axis)}
+.whiteboard-text.wb-chart-body{display:flex;flex-direction:column;justify-content:flex-start;gap:6px;padding:12px 14px 8px!important;text-align:left;overflow:hidden}
+.wb-chart-body>span{flex:none;font-size:calc(15px * var(--ui-scale,1));font-weight:var(--fw-semibold);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.wb-chart{display:flex;flex-direction:column;flex:1;min-height:0;gap:4px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.wb-chart-legend{display:flex;flex-wrap:wrap;gap:2px 14px;list-style:none;margin:0;padding:0;font-size:12px;color:var(--chart-ink-2);flex:none}
+.wb-chart-legend li{display:flex;align-items:center;gap:6px;min-width:0}
+.wb-chart-legend i,.wb-chart-tooltip i{flex:none;width:10px;height:10px;border-radius:2px;background:currentColor}
+.wb-chart-tooltip i{width:10px;height:3px;border-radius:1px}
+.wb-chart-plot{position:relative;flex:1;min-height:0}
+.wb-chart-plot svg{display:block;overflow:visible}
+.wb-chart-grid{stroke:var(--chart-grid);stroke-width:1;shape-rendering:crispEdges}
+.wb-chart-axis{stroke:var(--chart-axis);stroke-width:1;shape-rendering:crispEdges}
+.wb-chart-tick,.wb-chart-category{fill:var(--chart-muted);font-size:11px;font-variant-numeric:tabular-nums}
+.wb-chart-category{fill:var(--chart-ink-2);font-size:12px}
+.wb-chart-value{fill:var(--chart-ink);font-size:11px;font-variant-numeric:tabular-nums}
+.wb-chart-bar{fill:currentColor;transition:opacity 120ms ease}
+.wb-chart-bar-hover{opacity:.78}
+.wb-chart-hit{fill:transparent;pointer-events:all}
+.wb-series-1{color:var(--chart-series-1)}.wb-series-2{color:var(--chart-series-2)}.wb-series-3{color:var(--chart-series-3)}.wb-series-4{color:var(--chart-series-4)}.wb-series-5{color:var(--chart-series-5)}.wb-series-6{color:var(--chart-series-6)}.wb-series-7{color:var(--chart-series-7)}.wb-series-8{color:var(--chart-series-8)}
+.wb-chart-reference{stroke:var(--chart-ink-2);stroke-width:1;shape-rendering:crispEdges}
+.wb-chart-reference-label{fill:var(--chart-ink-2);font-size:11px}
+.wb-chart-delta text{fill:var(--chart-ink-2);font-size:11px;font-variant-numeric:tabular-nums}
+.wb-chart-delta path{fill:var(--chart-muted)}
+.wb-chart-delta-good path{fill:var(--chart-good)}.wb-chart-delta-bad path{fill:var(--chart-bad)}
+.wb-chart-tooltip{position:absolute;z-index:6;transform:translate(-50%,-100%);display:flex;flex-direction:column;gap:1px;padding:5px 8px;border-radius:6px;background:var(--chart-ink);color:var(--chart-surface);font-size:11px;line-height:1.35;white-space:nowrap;pointer-events:none;box-shadow:var(--shadow-sm)}
+.wb-chart-tooltip strong{font-size:13px;font-weight:var(--fw-semibold)}
+.wb-chart-tooltip span{display:flex;align-items:center;gap:5px;opacity:.85}
+@media(prefers-reduced-motion:reduce){.wb-chart-bar{transition:none}}
+@media(forced-colors:active){.wb-chart-bar{stroke:CanvasText;stroke-width:1}}
+/* Chart data editor */
+.chart-editor{width:min(720px,calc(100vw - 32px))}
+.chart-editor-grid{overflow:auto;max-height:46vh;border:1px solid var(--line);border-radius:var(--radius-sm,6px)}
+.chart-editor table{border-collapse:collapse;width:100%;font-size:calc(13px * var(--ui-scale,1))}
+.chart-editor th,.chart-editor td{padding:2px;border-bottom:1px solid var(--line);text-align:left}
+.chart-editor td input,.chart-editor th input{width:100%;min-width:72px;min-height:32px;padding:4px 6px;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--text);font:inherit}
+.chart-editor td input:focus,.chart-editor th input:focus{border-color:var(--accent);outline:0}
+.chart-editor td input[inputmode=decimal]{text-align:right;font-variant-numeric:tabular-nums}
+.chart-editor .chart-editor-remove{min-width:32px;min-height:32px;padding:0;border:0;background:transparent;color:var(--muted)}
+.chart-editor-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:end}
+.chart-editor-row label{display:flex;flex-direction:column;gap:4px;font-size:calc(12px * var(--ui-scale,1));color:var(--muted)}
+.chart-editor-row label.chart-editor-check{flex-direction:row;align-items:center;gap:8px;min-height:36px;color:var(--text)}
+.chart-editor-row input[type=checkbox]{width:18px;height:18px;min-height:0;accent-color:var(--accent)}
+.chart-editor-actions{display:flex;gap:8px;flex-wrap:wrap}

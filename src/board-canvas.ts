@@ -7,9 +7,9 @@ export function copyCanvasCards(notes:BoardNote[]):CanvasCardCopy[]{return notes
 
 // Notes remain the canonical task records; canvas stores their visual geometry.
 export function boardCanvas(notes:BoardNote[],canvas?:Whiteboard):Whiteboard {
- const value=canvas||emptyWhiteboard(),ids=new Set(notes.map(n=>n.id));
+ const value=canvas||emptyWhiteboard(),ids=new Set(notes.map(n=>n.id)),stored=new Map(value.items.map(i=>[i.id,i]));
  return {...value,items:[...value.items.filter(i=>!ids.has(i.id)),...notes.map(n=>{
-  const prior=value.items.find(i=>i.id===n.id);
+  const prior=stored.get(n.id);
   return {id:n.id,kind:'card' as const,text:n.title,description:n.description,x:n.x,y:n.y,width:prior?.width||280,height:prior?.height||280,color:prior?.color||'sand' as const};
  })],links:[...value.links]};
 }

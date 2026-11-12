@@ -80,3 +80,77 @@ Git timing is sensitive to process launch and filesystem caching. The reduced co
 - The chat transcript retains loaded message content up to the existing history window limit. It is not a fully virtualized transcript; very large Markdown documents and initial history loading remain workload-dependent. Returning to the 500-message chat after another tab still took about 2.16 seconds in the new build because Markdown is mounted again. This remains a visible cost in the stress case.
 - Foreground WebView and Android service activity polling can overlap. Both are bounded; this audit did not implement a foreground ownership handoff.
 - Tests use synthetic content and predictable local responses. They do not establish performance under mobile packet loss or a slow external AI/Jira service.
+
+## Board canvas and host (unreleased)
+
+Measured 2026-11-12 on one Windows PC with Chrome on its GPU, 1920 × 1080, no CPU
+throttling. Workload: a copy of a real repository board — 74 cards, 257 canvas
+objects, 105 connections, 147 image references, a 1.2 MB file. "Before" is the
+0.28.40 host and UI build; "after" is this working tree. Both runs used the same
+script back to back; each is a single run, not an average across machines.
+
+```sh
+npm run build
+node scripts/benchmark-board.mjs --root <copy of a project folder with a board> --out .local/board.json
+```
+
+The script starts a real host on a synthetic token, serves the production build,
+reads and saves the board through the host API and drives the board in Chrome.
+It changes the board it is given: always pass a copy.
+
+| Scenario | Before | After |
+| --- | ---: | ---: |
+| Host reads the board (p50) | 78 ms | 15 ms |
+| Board response size | 1,162,550 bytes | 660,614 bytes |
+| Host saves the board (p50) | 220 ms | 40 ms |
+| Open the board in the UI | 581 ms | 424 ms |
+| Fit the whole board | 402 ms | 76 ms |
+| Pan with the whole board in view, frame p95 | 41.7 ms | 7.1 ms |
+| Pan with the whole board in view, frames over 25 ms | 34 of 187 | 0 of 181 |
+| Zoom with the whole board in view, frame p95 | 34.6 ms | 7.0 ms |
+| Zoom at 100%, style recalculation for 40 steps | 658 ms | 31 ms |
+| Move a sticky by keyboard, edit to saved (p50) | 314 ms | 93 ms |
+| Drag a card across the board, 30 steps to saved | 2,020 ms | 506 ms |
+| Drag a card, frames over 25 ms | 35 of 126 | 1 of 68 |
+| Reopen the board: image originals downloaded | 9 (15.7 MB) | 0 |
+
+What changed:
+
+- Zoom set one inherited CSS variable on the canvas world, which restyled every
+  object on each step. Only the selected, hovered or marked object follows the
+  zoom now.
+- Every object carried four hidden connection-port buttons (over a thousand on
+  this board). Ports exist only on the object that can use them.
+- Each card had three scroll containers (text, metadata, images): several hundred
+  compositor layers rebuilt on every pan frame. Only the card under the pointer,
+  the selected or the focused card scrolls; the gutter is reserved so text does
+  not reflow.
+- The board screen rebuilt the canvas value and the card renderer on every render,
+  so every object rendered again after each gesture. Both are memoised.
+- The host parsed and validated the file several times per read and per save and
+  asked Git for branch links each time. A read is cached by the file's metadata
+  stamp, branch links for five seconds, and a save validates once.
+- Card descriptions were stored twice (card record and canvas object). They are
+  stored once, which nearly halves the file and every response.
+- After its own save the viewer no longer downloads the board a second time from
+  the live poll.
+- Image previews are made once and kept on the device (IndexedDB, keyed by the
+  content hash in the asset name), so reopening a board does not download the
+  originals again. The first view still reads each visible original once.
+
+Board MCP answers on the same board (characters of the tool result, one call each):
+
+| Tool call | Before | After |
+| --- | ---: | ---: |
+| `read_board` without paging | 836,798 | 157,468 (summary; `detail: "full"` returns everything) |
+| `update_note`, one field | 836,800 | 1,203 |
+| `canvas_patch`, one object | 836,799 | 648 |
+| `read_objects`, one card | 10,107 | 5,459 |
+| `board_overview` | 3,041 | 3,096 |
+
+A write used to answer with the whole board; it now answers with the new revision
+and the objects that changed.
+
+Not measured: the Windows desktop window (WebView2 and its bridge), phones, and
+boards larger than this one. Opening is still dominated by laying out the text of
+every card at once.

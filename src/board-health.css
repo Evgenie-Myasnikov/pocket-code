@@ -1,0 +1,55 @@
+.board-health{display:flex;flex-direction:column;gap:var(--space-1,4px);margin:0 var(--space-3,12px) var(--space-2,8px);padding:8px 12px;border:1px solid var(--line);border-left-width:4px;border-radius:var(--radius-md,8px);background:var(--panel);color:var(--text);font-size:calc(13px * var(--ui-scale,1));max-height:45vh;overflow:auto;flex:none}
+.board-health-error{border-left-color:var(--danger)}
+.board-health-warning{border-left-color:var(--warning-fg)}
+.board-health-notice{border-left-color:var(--success-fg,var(--accent))}
+.board-health header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.board-health header>svg{flex:none;color:var(--danger)}
+.board-health-warning header>svg{color:var(--warning-fg)}
+.board-health header>strong{flex:1;min-width:12rem;font-weight:var(--fw-semibold);overflow-wrap:anywhere}
+.board-health-actions{display:flex;gap:6px;flex-wrap:wrap}
+.board-health button{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 10px;border:1px solid var(--line);border-radius:var(--radius-sm,6px);background:transparent;color:var(--text);font:inherit}
+.board-health button.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.board-health button:hover:not(:disabled){background:var(--surface)}.board-health button.primary:hover:not(:disabled){background:var(--accent);filter:brightness(1.08)}
+.board-health button:focus-visible{outline:2px solid var(--ring,var(--accent));outline-offset:1px}
+.board-health p{margin:0;overflow-wrap:anywhere}
+.board-health-hint{color:var(--muted)}
+.board-health-failure{color:var(--danger);white-space:pre-line}
+.board-health-list{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.board-health-list li{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.board-health-list li>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.board-health-list small{color:var(--muted)}
+.board-health-list code{font-size:calc(11px * var(--ui-scale,1));color:var(--muted);overflow-wrap:anywhere}
+.board-health-list .icon-button{flex:none;min-width:32px;justify-content:center;padding:4px}
+.board-restore-list{list-style:none;margin:0;padding:0;max-height:40vh;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.board-restore-list label{display:flex;align-items:center;gap:10px;min-height:40px;padding:4px 6px;border-radius:var(--radius-sm,6px)}
+.board-restore-list label:hover{background:var(--surface)}
+.board-restore-list input{flex:none;width:18px;height:18px;min-height:0;margin:0;accent-color:var(--accent)}
+.board-restore-list span{flex:1}.board-restore-list small{color:var(--muted)}
+.board-error{white-space:pre-line}
+@media(pointer:coarse){.board-health button{min-height:44px}}
+/* Records outside the board format and records close to a limit are marked on the canvas itself. */
+.whiteboard-item.wb-issue-error{outline:calc(3px * var(--wb-handle-scale,1)) solid var(--danger);outline-offset:calc(2px * var(--wb-handle-scale,1))}
+.whiteboard-item.wb-issue-warning{outline:calc(2px * var(--wb-handle-scale,1)) dashed var(--warning-fg);outline-offset:calc(2px * var(--wb-handle-scale,1))}
+.wb-issue-badge{position:absolute;top:-10px;left:-10px;z-index:4;display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--danger-solid);color:var(--on-danger);font-size:12px;line-height:1;font-weight:var(--fw-display);pointer-events:auto;cursor:help;transform:scale(var(--wb-handle-scale,1));transform-origin:0 0}
+.wb-issue-warning>.wb-issue-badge{background:var(--warning-fg);color:var(--bg)}
+.wb-editor-count{align-self:flex-end;font-size:calc(11px * var(--ui-scale,1));color:var(--muted)}
+.wb-editor-count[data-near=true]{color:var(--warning-fg);font-weight:var(--fw-semibold)}
+/* Acceptance checklist and status history in the card sheet and on the card */
+.board-checklist{min-width:0;margin:0;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius-md,8px)}
+.board-checklist legend{padding:0 4px;font-size:calc(13px * var(--ui-scale,1));color:var(--muted)}
+.board-checklist ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.board-checklist li{display:flex;align-items:center;gap:8px}
+.board-checklist li>input[type=checkbox]{flex:none;width:20px;height:20px;min-height:0;margin:0;padding:0;accent-color:var(--accent)}
+.board-checklist li>input[type=text]{flex:1;min-width:0;min-height:36px}
+.board-checklist li>.icon-button{flex:none;min-width:36px;min-height:36px}
+.board-checklist-add{display:inline-flex;align-items:center;gap:6px;margin-top:6px;min-height:36px;padding:4px 10px;border:1px dashed var(--line);border-radius:8px;background:transparent;color:var(--text)}
+.board-status-history{font-size:calc(13px * var(--ui-scale,1))}
+.board-status-history summary{cursor:pointer;min-height:32px;display:flex;align-items:center;gap:4px;color:var(--muted)}
+.board-status-history ol{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto}
+.board-status-history li{display:flex;justify-content:space-between;gap:12px}
+.board-status-history time{color:var(--muted);font-variant-numeric:tabular-nums}
+.board-task-meta .task-age{color:var(--muted)}
+.board-task-meta .task-checklist{font-variant-numeric:tabular-nums}
+.wb-card-meta .task-age,.wb-card-meta .task-checklist{color:var(--sticky-ink);opacity:.8}
+.wb-card-meta .task-checklist-done{opacity:1;font-weight:var(--fw-semibold)}
+@media(pointer:coarse){.board-checklist li>input[type=text],.board-checklist li>.icon-button,.board-checklist-add{min-height:44px}}
