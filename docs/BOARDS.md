@@ -47,7 +47,7 @@ sticky notes, text and cards. The iframe's login and API authorization remain se
 
 The retired WorkSpace UI is described in [compatibility notes](WORKSPACES.md); it is not required for repository boards.
 
-## Board health, repair and rollback (unreleased)
+## Board health, repair and rollback (0.28.41)
 
 A board file is read record by record. A record outside the format no longer keeps
 the board from opening: every readable card and object is shown, the damaged ones
@@ -84,7 +84,7 @@ canvas object keeps geometry and a readable title. Older files that repeat the
 description on the canvas still open and are rewritten in the compact form on the
 next save.
 
-## Charts, checklist, status history and search (unreleased)
+## Charts, checklist, status history and search (0.28.41)
 
 Right-click empty canvas and choose **Chart** to add a bar chart, or let an agent
 create one with `board_create_chart`. The board stores the numbers; the host draws
@@ -106,10 +106,10 @@ Matches are outlined; Enter and Shift+Enter move the camera to the next and
 previous match.
 
 Charts, checklists and status history are new fields of the version 1 format.
-A host older than this release refuses a file that contains them; update the PC
+A host older than 0.28.41 refuses a file that contains them; update the PC
 host before opening such a board elsewhere.
 
-## Board chat panel (unreleased)
+## Board chat panel (0.28.41)
 
 On the PC the chat beside a board is a compact panel: a one-line header, message
 bubbles across the panel width and a tight composer. Its header has two visible
@@ -125,9 +125,9 @@ histories. Starting a new board chat on one device replaces it for the others th
 next time they open the board chat. The association stays private host data and is
 never written to the repository board.
 
-## Speed (unreleased)
+## Speed (0.28.41)
 
 Opening, panning, zooming and editing a large board are faster; measurements and
-the way to repeat them are in [performance](PERFORMANCE.md#board-canvas-and-host-unreleased).
+the way to repeat them are in [performance](PERFORMANCE.md#board-canvas-and-host-02841).
 Image previews are kept on the device after they are made once, so reopening a
 board does not download every original again.

@@ -95,7 +95,7 @@ Host 0.28.15 raises the bounded version-label and branch-map limit from 40 to 64
 Older hosts require at most 40 entries in each field; update the host before
 loading a larger snapshot. The limit is shared by storage, APIs and the UI.
 
-## Format limits, health and history (unreleased)
+## Format limits, health and history (0.28.41)
 
 Limits of a version 1 board file: title 1–160 characters, description up to
 20,000, image caption up to 160, 12 images, 100 dependencies and 50 checklist

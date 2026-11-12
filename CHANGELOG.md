@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.41 (unreleased)
 
 ### Features
 - boards: a board file is read record by record. A record outside the format no longer stops the board from opening: readable cards and objects are shown, damaged ones are marked, and a panel names the card, field, limit and value of each problem. Such a board is read-only until **Repair** brings the records back inside the format; removed text is appended word for word to `project-boards/history`. The host keeps private copies of each repository board and **Restore…** rolls back to a saved snapshot, also when the file is no longer valid JSON.

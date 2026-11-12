@@ -158,7 +158,7 @@ and history stay in the local encrypted host store. This is text API chat, with
 no project file tools or coding-agent execution. External account access is not
 implied by a model appearing in the catalog.
 
-## Health, repair, charts and compact results (unreleased)
+## Health, repair, charts and compact results (0.28.41)
 
 - A write returns the new revision and only the objects that changed (`changed`,
   `removed`, `totals`), with long text cut and its full length stated. Read

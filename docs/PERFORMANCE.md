@@ -81,12 +81,12 @@ Git timing is sensitive to process launch and filesystem caching. The reduced co
 - Foreground WebView and Android service activity polling can overlap. Both are bounded; this audit did not implement a foreground ownership handoff.
 - Tests use synthetic content and predictable local responses. They do not establish performance under mobile packet loss or a slow external AI/Jira service.
 
-## Board canvas and host (unreleased)
+## Board canvas and host (0.28.41)
 
 Measured 2026-11-12 on one Windows PC with Chrome on its GPU, 1920 × 1080, no CPU
 throttling. Workload: a copy of a real repository board — 74 cards, 257 canvas
 objects, 105 connections, 147 image references, a 1.2 MB file. "Before" is the
-0.28.40 host and UI build; "after" is this working tree. Both runs used the same
+0.28.40 host and UI build; "after" is the 0.28.41 source. Both runs used the same
 script back to back; each is a single run, not an average across machines.
 
 ```sh
