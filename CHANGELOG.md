@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.43 (unreleased)
 
 ### Bug Fixes
 - Windows update: the updated window always starts the PC host, even when the connection switch was turned off while the previous window handed over; before, such an update waited five minutes and rolled back with the host stopped.
