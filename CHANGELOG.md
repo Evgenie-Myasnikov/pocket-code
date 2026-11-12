@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.42 (unreleased)
+## [0.28.42](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.41...v0.28.42) (2026-11-12)
+
+Published [v0.28.42](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.42) from [4b4f06886d2f40ff910d9e6a63992f9c6247d06a](https://github.com/Evgenie-Myasnikov/pocket-code/commit/4b4f06886d2f40ff910d9e6a63992f9c6247d06a) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 129. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the Windows package interface contains the tile size control. Privacy guard passed for the tree. No desktop window, physical-device or live provider check was run on the published packages.
 
 ### Changes
 - Windows sidebar: Rules, Changelog and Settings are icons in the sidebar next to Chats and Board; the More menu is gone.
