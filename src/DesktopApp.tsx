@@ -6,7 +6,6 @@ import {ChatActions,type ChatActionTarget} from './ChatActions';
 import {ChatListActions} from './ChatListActions';
 import {Fragment} from 'react';
 import {PanelResizeHandle} from './PanelResizeHandle';
-import {CardActionMenu} from './CardActionMenu';
 import './desktop-sidebar.css';
 import type {BoardSelection} from './board-selection-context';
 import {prepareBoardConversation,adoptBoardConversation,readBoardConversation} from './board-conversation';
@@ -39,7 +38,7 @@ import {ProviderConnections,HostStatus} from './ProviderConnections';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import QRCode from 'qrcode';
 import {releaseRepository} from './release-update';
-import {Home,LayoutDashboard,PanelLeftClose,PanelLeftOpen,MoreHorizontal,ArrowDown,BookOpen,FileText,Check,ChevronRight,Folder,GitCompareArrows,Keyboard,MessageSquare,Monitor,Plus,RefreshCw,Settings,Smartphone,Wifi,X} from 'lucide-react';
+import {Home,LayoutDashboard,PanelLeftClose,PanelLeftOpen,ArrowDown,BookOpen,FileText,Check,ChevronRight,Folder,GitCompareArrows,Keyboard,MessageSquare,Monitor,Plus,RefreshCw,Settings,Smartphone,Wifi,X} from 'lucide-react';
 import {request,type Connection} from './api';
 import {loadLinkedBoard} from './board-link';
 import {boardChatContext} from './board-chat-context';
@@ -131,7 +130,7 @@ export function DesktopApp(){
   const [boardChat,setBoardChat]=useState<BoardChat|undefined>(),[docDraft,setDocDraft]=useState(''),[docTab,setDocTab]=useState<DocumentKind>('rules');
   const [creating,setCreating]=useState(false);
   const activity=useActivity(state.online?connection:null);
-  const [railCollapsed,setRailCollapsed]=useState(()=>{try{return localStorage.getItem('pocket-desktop-sidebar-collapsed-v1')==='true';}catch{return false;}}),[railMenu,setRailMenu]=useState<{x:number;y:number}|null>(null);
+  const [railCollapsed,setRailCollapsed]=useState(()=>{try{return localStorage.getItem('pocket-desktop-sidebar-collapsed-v1')==='true';}catch{return false;}});
   function collapseRail(value:boolean){setRailCollapsed(value);try{localStorage.setItem('pocket-desktop-sidebar-collapsed-v1',String(value));}catch{}}
   function navigateRail(next:'chats'|'work'|'rules'|'changelog'|'settings'){if(next==='settings'&&(page==='settings'||page==='connection'))setSettingsNonce(value=>value+1);setPage(next);if(next==='rules'||next==='changelog')setDocTab(next);}
   const [shortcutsOpen,setShortcutsOpen]=useState(false),composerPreferences=useComposerPreferences();
@@ -194,7 +193,7 @@ export function DesktopApp(){
   useEffect(()=>{const key=(event:KeyboardEvent)=>{
     if(!(event.ctrlKey||event.metaKey))return;
     // Ctrl+/ closes its own sheet but never stacks it over another dialog.
-    if(event.code==='Slash'&&!event.altKey){event.preventDefault();setRailMenu(null);setShortcutsOpen(open=>open?false:!document.querySelector('[aria-modal="true"]'));return;}
+    if(event.code==='Slash'&&!event.altKey){event.preventDefault();setShortcutsOpen(open=>open?false:!document.querySelector('[aria-modal="true"]'));return;}
     if(document.querySelector('[aria-modal="true"]'))return;
     if(event.code==='KeyN'&&!event.altKey&&!event.shiftKey){event.preventDefault();shortcutActions.current.startChat();}
     else if(event.key==='Tab'&&!event.altKey){event.preventDefault();shortcutActions.current.cycle(event.shiftKey?-1:1);}
@@ -212,7 +211,9 @@ export function DesktopApp(){
       <nav aria-label={label('Navigation','Навигация')}>
        <RailButton className={page==='chats'?'active':''} aria-label={label('Chats','Чаты')} title={label('Chats','Чаты')} aria-current={page==='chats'?'page':undefined} onClick={()=>{navigateRail('chats');if(railCollapsed)collapseRail(false);}}><Home size={18}/><span>{label('Chats','Чаты')}</span></RailButton>
        <RailButton className={page==='work'?'active':''} aria-label={label('Board','Доска')} title={label('Board','Доска')} aria-current={page==='work'?'page':undefined} onClick={()=>navigateRail('work')}><Folder size={18}/><span>{label('Board','Доска')}</span></RailButton>
-       <RailButton className={['rules','changelog','settings','connection'].includes(page)?'active':''} aria-label={label('More','Ещё')} title={label('More','Ещё')} aria-haspopup="menu" aria-expanded={!!railMenu} onPointerDown={event=>{if(railMenu)event.stopPropagation();}} onClick={event=>{const r=event.currentTarget.getBoundingClientRect();setRailMenu(railMenu?null:{x:r.right+6,y:r.top});}}><MoreHorizontal size={18}/><span>{label('More','Ещё')}</span></RailButton>
+       <RailButton className={page==='rules'?'active':''} aria-label={label('Rules','Правила')} title={label('Rules','Правила')} aria-current={page==='rules'?'page':undefined} onClick={()=>navigateRail('rules')}><BookOpen size={18}/><span>{label('Rules','Правила')}</span></RailButton>
+       <RailButton className={page==='changelog'?'active':''} aria-label={label('Changelog','История изменений')} title={label('Changelog','История изменений')} aria-current={page==='changelog'?'page':undefined} onClick={()=>navigateRail('changelog')}><FileText size={18}/><span>{label('Changelog','История изменений')}</span></RailButton>
+       <RailButton className={page==='settings'||page==='connection'?'active':''} aria-label={label('Settings','Настройки')} title={label('Settings','Настройки')} aria-current={page==='settings'||page==='connection'?'page':undefined} onClick={()=>navigateRail('settings')}><Settings size={18}/><span>{label('Settings','Настройки')}</span></RailButton>
       </nav>
       <div className="desktop-rail-content">
       <div className="desktop-rail-heading"><strong hidden={railCollapsed}>Pocket Code</strong><RailButton className="icon-button" aria-label={railCollapsed?label('Expand sidebar','Развернуть панель'):label('Collapse sidebar','Свернуть панель')} title={railCollapsed?label('Expand sidebar','Развернуть панель'):label('Collapse sidebar','Свернуть панель')} aria-expanded={!railCollapsed} onClick={()=>collapseRail(!railCollapsed)}>{railCollapsed?<PanelLeftOpen size={19}/>:<PanelLeftClose size={19}/>}</RailButton></div>
@@ -229,7 +230,6 @@ export function DesktopApp(){
     {page==='workspace'?<DesktopWorkspaces connection={connection} value={projectSpaces} roots={allFolders} addresses={state.addresses} onBoard={()=>{setLocalBoards(false);setPage('work');}}/>:page==='work'?<div className="desktop-board-section">{boardChat?.context&&(selected||creating)&&<BoardChatDivider/>}<WorkBoards revealTarget={boardReveal} onSelection={setBoardSelection} focusTarget={noticeTarget} local connection={connection} roots={allFolders} workspaces={projectSpaces} onChat={target=>void openBoardChat(target)}/></div>:page==='chats'?(selected||creating?null:<div className="desktop-empty"><MessageSquare size={36}/><h1>{label('Your workspace, at a glance','Ваше рабочее пространство')}</h1><p>{label('Choose a conversation to read replies, review changes and explore AI results.','Выберите чат, чтобы читать ответы, смотреть изменения и результаты AI.')}</p><span>{label('Chat here or continue from your phone','Пишите здесь или на телефоне')}</span>{!state.online&&(bridgeAvailable()?<button className="primary" onClick={()=>setPage('connection')}>{label('Set up connection','Настроить подключение')}</button>:<p className="muted">{label('Open Pocket Code for Windows to set up the connection.','Откройте Pocket Code для Windows, чтобы настроить подключение.')}</p>)}</div>):(page==='rules'||page==='changelog')?<div className="desktop-project"><DocumentLibrary connection={connection} kind={docTab} showHeading onKind={kind=>{setDocTab(kind);if(kind!=='files')setPage(kind);}} onChat={state.online?(root,prompt)=>{setNotificationChat(null);setBoardChat(undefined);setProject(root);setDocDraft(prompt);setSelected(null);setCreating(true);setPage('chats');}:undefined}/></div>:<DesktopSettings onShortcuts={()=>setShortcutsOpen(true)} roots={allFolders} key={page+':'+settingsNonce} initialPage={page==='connection'?'connection':'index'} onConnection={()=>setPage('connection')} connectionPanel={connectionPanel} state={state} connection={connection} appearance={appearance} action={action}/>}
     </main>
     {chatAction&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={provider} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{setSessions(old=>{const next=deleted?old.filter(s=>s.sessionId!==session.sessionId):old.map(s=>s.sessionId===session.sessionId?session:s);writeChatCache('desktop-local',provider,'sessions',next);return next;});if(selected?.sessionId===session.sessionId){setSelected(deleted?null:session);if(deleted)setCreating(false);}setRevision(value=>value+1);}}/>}
-    {railMenu&&<CardActionMenu label={label('More','Ещё')} point={railMenu} onClose={()=>setRailMenu(null)} items={[{label:label('Rules','Правила'),Icon:BookOpen,onSelect:()=>navigateRail('rules')},{label:label('Changelog','История изменений'),Icon:FileText,onSelect:()=>navigateRail('changelog')},{label:label('Settings','Настройки'),Icon:Settings,onSelect:()=>navigateRail('settings')}]}/>}
     {shortcutsOpen&&<div className="modal-backdrop" onClick={event=>{if(event.target===event.currentTarget)setShortcutsOpen(false);}}><section ref={shortcutsSheet} className="confirm-modal desktop-shortcuts" role="dialog" aria-modal="true" aria-label={label('Keyboard shortcuts','Сочетания клавиш')}><Keyboard size={32}/><h2>{label('Keyboard shortcuts','Сочетания клавиш')}</h2><dl>{shortcuts.map(([keys,text])=><div key={keys+text}><dt><kbd>{keys}</kbd></dt><dd>{text}</dd></div>)}</dl><button className="secondary" onClick={()=>setShortcutsOpen(false)}>{label('Close','Закрыть')}</button></section></div>}
   </div>;
 }

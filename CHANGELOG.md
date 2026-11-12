@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changes
+- Windows sidebar: Rules, Changelog and Settings are icons in the sidebar next to Chats and Board; the More menu is gone.
+- Board list: boards are shown as glass tiles (frosted fill, light edge) with a square preview and the title below. A size slider next to Refresh makes tiles larger or smaller (140-420 px); the size is remembered on the device. Phones keep two columns, with a plain panel when reduced transparency or forced colours are on.
+
+### Validation
+- TypeScript passes; design token test passes. Browser: navigation-motion, run-notifications and board-resilience specs pass; desktop-sidebar fails at the Windows application settings step exactly as on the 0.28.41 source. Tiles checked on screenshots in dark and light themes.
+
 ## [0.28.41](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.40...v0.28.41) (2026-11-12)
 
 Published [v0.28.41](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.41) from [dad89236f7750d02eaf63372254589c286ce53fd](https://github.com/Evgenie-Myasnikov/pocket-code/commit/dad89236f7750d02eaf63372254589c286ce53fd) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 128. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit; the host package (608 files) contains the board contract, backup and chart sources and the MCP worker with the chart and repair tools; the Windows package contains the same host sources, an interface with the repair, backup and board-chat routes, and a window whose bridge allows them. Privacy guard passed for the tree. Unit, API and browser results are listed under Validation below. No desktop window, physical-device or live provider check was run; live behaviour remains unverified.

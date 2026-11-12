@@ -28,7 +28,7 @@ test('rail labels support hover, keyboard and Escape outside a collapsed sidebar
  for(const theme of ['dark','light']){await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.screenshot({path:`.local/interaction-rail-tooltip-${theme}.png`,animations:'disabled'});}
  await page.keyboard.press('Escape');await expect(tooltip).toHaveCount(0);await expect(board).toBeFocused();await expect(chats).toHaveAttribute('aria-current','page');
  await page.keyboard.press('Enter');await expect(board).toHaveAttribute('aria-current','page');await expect(tooltip).toHaveCount(0);
- await page.emulateMedia({reducedMotion:'reduce'});await page.keyboard.press('Tab');await expect(tooltip).toHaveText('More');expect(await activeAnimations(page,'.rail-tooltip')).toBe(0);
+ await page.emulateMedia({reducedMotion:'reduce'});await page.keyboard.press('Tab');await expect(tooltip).toHaveText('Rules');expect(await activeAnimations(page,'.rail-tooltip')).toBe(0);
  await page.emulateMedia({forcedColors:'active'});expect(await activeAnimations(page,'.rail-tooltip')).toBe(0);await expect(tooltip).toHaveCSS('border-top-style','solid');
 });
 
