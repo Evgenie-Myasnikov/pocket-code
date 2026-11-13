@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.44 (unreleased)
 
 ### Changes
 - Windows window: minimizing keeps the window on the taskbar; only the close button hides it to the tray.

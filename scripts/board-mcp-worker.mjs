@@ -13,7 +13,7 @@ for(const argument of process.argv.slice(2)){const split=argument.indexOf('=');i
 if(!roots.size)throw Error('At least one explicit project root is required');
 const port=Number(process.env.POCKET_PORT||4318);if(!Number.isInteger(port)||port<1||port>65535)throw Error('Invalid host port');
 const token=(await readFile(path.join(process.env.POCKET_DATA_DIR||path.join(homedir(),'.pocket-code'),'connection-key.txt'),'utf8')).trim();
-const server=new McpServer({name:'pocket-code-boards',version:'0.28.43'});
+const server=new McpServer({name:'pocket-code-boards',version:'0.28.44'});
 /** A failure the agent can act on: a stable code, whether retrying can help, and what to do next. */
 class BoardError extends Error{constructor(code,message,{retryable=false,hint,status}={}){super(message);this.code=code;this.retryable=retryable;this.hint=hint;this.status=status;}}
 const READ_AGAIN='Call search_board, read_objects or read_board for the current revision, then retry with it.';
