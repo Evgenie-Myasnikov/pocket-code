@@ -15,7 +15,7 @@ function attach(){if(attached)return;const bridge=view();if(!bridge)throw Error(
   if(data.error)task.reject(Object.assign(Error(bridgeMessage(data.code)||data.error),{status:data.status,...(data.code?{code:data.code,problem:!data.status&&data.code.startsWith('host_')?'unreachable':undefined}:{})}));else task.resolve(data.value);
 });}
 /** The window never shows .NET exception text for a host that does not answer; the code is translated here. */
-export function bridgeMessage(code?:string){return code==='host_stopped'?t('Сервер ПК остановлен. Запустите его: значок Pocket Code в трее → подключение.'):code==='host_unreachable'?t('Сервер ПК не отвечает. Переподключаемся…'):code==='host_timeout'?t('Сервер ПК не ответил вовремя. Повторите.'):'';}
+export function bridgeMessage(code?:string){return code==='host_stopped'?t('Сервер ПК остановлен. Запустите его в Настройках, раздел подключения ПК.'):code==='host_unreachable'?t('Сервер ПК не отвечает. Переподключаемся…'):code==='host_timeout'?t('Сервер ПК не ответил вовремя. Повторите.'):'';}
 export function desktopCall<T>(action:string,args:Record<string,unknown>={}):Promise<T>{
   try{attach();}catch(error){return Promise.reject(error);}
   const id=++sequence;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(Error('The desktop host did not respond.'));},100000);pending.set(id,{resolve:resolve as (value:unknown)=>void,reject,timer});view()!.postMessage({id,action,...args});});

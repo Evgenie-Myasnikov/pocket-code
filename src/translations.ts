@@ -1522,7 +1522,7 @@ export const english: Record<string, string> = {
   "ПК ответил с ошибкой": "The PC answered with an error",
   "Сервер ПК недоступен. Переподключаемся…": "The PC host is unavailable. Reconnecting…",
   "Сервер ПК не отвечает. Переподключаемся…": "The PC host is not answering. Reconnecting…",
-  "Сервер ПК остановлен. Запустите его: значок Pocket Code в трее → подключение.": "The PC host is stopped. Start it from the Pocket Code tray icon → connect.",
+  "Сервер ПК остановлен. Запустите его в Настройках, раздел подключения ПК.": "The PC host is stopped. Start it in Settings, PC connection.",
   "Сервер ПК не ответил вовремя. Повторите.": "The PC host did not answer in time. Try again.",
   "Загрузка обновления": "Update download",
   "{0} / {1} МБ · {2}%": "{0} / {1} MB · {2}%",

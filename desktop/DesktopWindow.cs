@@ -172,11 +172,11 @@ public sealed class PocketDesktop:Form {
         Text="Pocket Code";ClientSize=new Size(1280,850);MinimumSize=new Size(900,640);StartPosition=FormStartPosition.CenterScreen;
         BackColor=Color.FromArgb(17,21,18);AutoScaleMode=AutoScaleMode.Dpi;Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath)??SystemIcons.Application;Controls.Add(web);
         HandleCreated+=(_,e)=>ApplyWindowTheme(true,Color.FromArgb(17,21,18),Color.FromArgb(230,232,227),Color.FromArgb(42,48,43));
-        var menu=new ContextMenuStrip();trayOpen=menu.Items.Add("",null,(_,e)=>RestoreWindow());trayToggle=menu.Items.Add("",null,async(_,e)=>await Toggle());menu.Items.Add(new ToolStripSeparator());trayExit=menu.Items.Add("",null,async(_,e)=>await ExitApp());LocalizeTray();
+        var menu=new ContextMenuStrip();trayOpen=menu.Items.Add("",null,(_,e)=>RestoreWindow());menu.Items.Add(new ToolStripSeparator());trayExit=menu.Items.Add("",null,async(_,e)=>await ExitApp());LocalizeTray();
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         tray.BalloonTipClicked+=(_,e)=>{OpenRunAlert();CompleteRunAlert();};tray.BalloonTipClosed+=(_,e)=>CompleteRunAlert();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
-        Resize+=(_,e)=>{if(WindowState==FormWindowState.Minimized)Hide();};timer.Tick+=async(_,e)=>await Poll();if(!preview&&Array.IndexOf(args,"--updated")>=0)preferences.Connect=true;autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
+        timer.Tick+=async(_,e)=>await Poll();if(!preview&&Array.IndexOf(args,"--updated")>=0)preferences.Connect=true;autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
         Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0&&!reopen)Hide();await InitializeWeb();}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);return;}
             if(preview)return;
             // Host polling must not depend on this write; the next Toggle or settings change saves again.
@@ -225,8 +225,8 @@ public sealed class PocketDesktop:Form {
         }
     }
     // The tray menu follows the interface language the window reports with its alert settings.
-    ToolStripItem trayOpen,trayToggle,trayExit;
-    void LocalizeTray(){bool ru=preferences.RunLanguage=="ru";if(trayOpen==null)return;trayOpen.Text=ru?"Открыть":"Open";trayToggle.Text=ru?"Подключить / отключить":"Connect / disconnect";trayExit.Text=ru?"Выход":"Exit";}
+    ToolStripItem trayOpen,trayExit;
+    void LocalizeTray(){bool ru=preferences.RunLanguage=="ru";if(trayOpen==null)return;trayOpen.Text=ru?"Открыть":"Open";trayExit.Text=ru?"Выход":"Exit";}
     void Log(string line){try{Directory.CreateDirectory(storage);File.AppendAllText(Path.Combine(storage,"desktop-window.log"),DateTime.UtcNow.ToString("o")+" "+line+Environment.NewLine);}catch(IOException){}catch(UnauthorizedAccessException){}}
     async Task Bridge(string source,string payload){
         Uri origin;if(!Uri.TryCreate(source,UriKind.Absolute,out origin)||origin.GetLeftPart(UriPartial.Authority)!=Origin||origin.AbsolutePath!="/index.html")return;
