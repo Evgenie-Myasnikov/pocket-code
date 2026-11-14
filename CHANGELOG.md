@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+- Codex chats with generated images: the next message failed with a server error. History is read in pages of 20 items (10 turns) instead of 100, so eight inline images (4-5 MB each) no longer exceed the Codex protocol line limit and close the Codex connection. Images saved on disk are not counted twice when agents of a chat are loaded.
+- Codex replies are split into lines without rescanning the unfinished line on every chunk; the line limit is 128 MB.
+- An unexpected host error no longer blames Claude Code: the message says the details are in the host log, and the host writes the request and error there.
+
 ## [0.28.47](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.46...v0.28.47) (2026-11-15)
 
 Published [v0.28.47](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.47) from [3d773d91390d689cafa712876a12e8717ba46eb5](https://github.com/Evgenie-Myasnikov/pocket-code/commit/3d773d91390d689cafa712876a12e8717ba46eb5) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 134. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit. Privacy guard passed for the tree. The regrouped settings on a phone, the desktop window and devices were not run on the published packages.
