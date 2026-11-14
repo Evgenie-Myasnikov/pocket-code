@@ -661,7 +661,7 @@ export const english: Record<string, string> = {
   "Предпросмотр доступен для файлов до 2 МБ": "Preview supports files up to 2 MB",
   "Предпросмотр двоичных файлов не поддерживается": "Binary file preview is not supported",
   "Проверьте поля запроса": "Check the request fields",
-  "Ошибка сервера. Проверьте папку проекта и доступ Claude Code.": "Server error. Check the project folder and Claude Code access.",
+  "Ошибка сервера ПК. Подробности записаны в журнал сервера.": "PC host error. The details are in the host log.",
   "Чат Claude Desktop": "Claude Desktop chat",
   "Сервер перезапущен. Проверьте результат в чатах перед повторным запуском.": "Server restarted. Check the result in Chats before running again.",
   "Не удалось прочитать сохранённую очередь Jira. Проверьте файл очереди на ПК.": "Could not read the saved Jira queue. Check the queue file on your PC.",

@@ -79,10 +79,12 @@ export class StdioCodexRpc extends EventEmitter implements CodexRpc {
   }
   private read(chunk: string) {
     if (this.ended) return;
+    // Search only the new chunk: rescanning a long partial line on every chunk made large replies quadratic.
+    const from = this.buffer.length;
     this.buffer += chunk;
-    if (this.buffer.length > 32_000_000) { this.disconnect(new Error('Codex returned too much data. Open a shorter conversation.')); this.child.kill(); return; }
-    let newline: number;
-    while ((newline = this.buffer.indexOf('\n')) >= 0) {
+    if (this.buffer.length > 128_000_000) { this.disconnect(new Error('Codex returned too much data. Open a shorter conversation.')); this.child.kill(); return; }
+    let newline = this.buffer.indexOf('\n', from);
+    for (; newline >= 0; newline = this.buffer.indexOf('\n')) {
       const line = this.buffer.slice(0, newline); this.buffer = this.buffer.slice(newline + 1);
       if (!line.trim()) continue;
       let message: RpcEnvelope;

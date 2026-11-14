@@ -72,6 +72,31 @@ test('paginated Codex history accounts for each raw item once and retains the si
   oversized = true; await assert.rejects(service.messages('chat'), error => (error as any).status === 413);
 });
 
+test('Codex history with generated images reads in small pages and skips inline copies of saved images', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'pocket-perf-images-'));
+  t.after(async () => { await rm(root, { recursive: true, force: true }); });
+  const limits: number[] = [];
+  // Eight synthetic 4 MB images: one page of 100 items used to exceed the protocol line limit.
+  const items = Array.from({ length: 40 }, (_, index) => index % 5 ? { id: String(index), type: 'agentMessage', text: 'Result' }
+    : { id: String(index), type: 'imageGeneration', status: 'completed', result: 'A'.repeat(4_000_000), savedPath: path.join(root, index + '.png') });
+  class Rpc extends EventEmitter {
+    async request(method: string, params: any) {
+      if (method === 'thread/read') return { thread: { id: 'chat', cwd: root, historyMode: 'paginated' } };
+      if (method === 'thread/items/list') {
+        limits.push(params.limit); const offset = Number(params.cursor || 0);
+        return { data: items.slice(offset, offset + params.limit).map(item => ({ item })), nextCursor: offset + params.limit < items.length ? String(offset + params.limit) : null };
+      }
+      return {};
+    }
+    notify() {} respond() {} reject() {} close() {}
+  }
+  const service = new CodexService([root], { rpcFactory: () => new Rpc() });
+  t.after(() => service.close());
+  assert.equal(await service.messageCount('chat'), 40);
+  assert.ok(limits.every(limit => limit <= 20), 'history pages stay small');
+  assert.deepEqual(await service.subagents('chat'), [], 'saved images do not count toward the 16 MB read bound');
+});
+
 test('concurrent API reads share SDK work and the next read revalidates project access', async t => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'pocket-perf-api-'));
   const root = path.join(temp, 'root'), inner = path.join(root, 'inner'), outside = path.join(temp, 'outside'), link = path.join(root, 'linked');

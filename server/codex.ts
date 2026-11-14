@@ -21,6 +21,8 @@ type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acce
 export type CodexSession = { sessionId: string; summary: string; cwd: string; lastModified: number; gitBranch?: string; source: 'codex'; provider: 'codex'; readOnly?: boolean };
 export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexRpc>; approvalTimeoutMs?: number; attachmentRoots?: string[]; allProjectHistory?:boolean };
 
+/** Small history pages: one generated image is 4-5 MB inline, and a page must fit the protocol line limit. */
+const CODEX_ITEM_PAGE = 20, CODEX_TURN_PAGE = 10;
 export class CodexService {
   async refreshAuthentication(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');const old=this.rpc;this.rpc=undefined;this.ready=undefined;old?.close();}
   async usage() { return normalizeCodexUsage(await (await this.connect()).request('account/rateLimits/read', {})); }
@@ -108,8 +110,8 @@ export class CodexService {
     const metadata=await this.readThread(id);
     if(metadata.historyMode!=='paginated')return (await this.readThread(id,true)).turns||[];
     const rpc=await this.connect(),turns:any[]=[],seen=new Set<string>();let cursor:string|null=null,bytes=0;
-    for(let page=0;page<100;page++){
-      const result=await rpc.request('thread/turns/list',{threadId:id,cursor,limit:100,sortDirection:'asc',itemsView:'full'});
+    for(let page=0;page<1000;page++){
+      const result=await rpc.request('thread/turns/list',{threadId:id,cursor,limit:CODEX_TURN_PAGE,sortDirection:'asc',itemsView:'full'});
       if(!Array.isArray(result.data))throw new HttpError(409,'Update Codex to enable conversation branching.');
       bytes+=JSON.stringify(result.data).length;if(bytes>16000000)throw new HttpError(413,'This history is too large to branch safely.');
       turns.push(...result.data);if(!result.nextCursor)return turns;
@@ -148,9 +150,11 @@ export class CodexService {
     let items: any[] = [], serializedSize = 2;
     if (metadata.historyMode === 'paginated') {
       let cursor: string | null = null;
-      for (let page = 0; page < 100; page++) {
-        const result = await rpc.request('thread/items/list', { threadId: id, cursor, limit: 100, sortDirection: 'asc' });
+      for (let page = 0; page < 10000 / CODEX_ITEM_PAGE; page++) {
+        const result = await rpc.request('thread/items/list', { threadId: id, cursor, limit: CODEX_ITEM_PAGE, sortDirection: 'asc' });
         for (const entry of result.data || []) {
+          // A generated image saved on disk is shown from that file; its inline copy only inflates the read.
+          if (entry.item?.type === 'imageGeneration' && entry.item.savedPath) entry.item = { ...entry.item, result: '' };
           // Account for each item once; serializing the growing array each page
           // made large conversation reads quadratic in their history length.
           serializedSize += (JSON.stringify(entry.item) ?? 'null').length + (items.length ? 1 : 0);
@@ -158,7 +162,7 @@ export class CodexService {
           items.push(entry.item);
         }
         if (!result.nextCursor) break;
-        if (result.nextCursor === cursor || page === 99) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
+        if (result.nextCursor === cursor || page === 10000 / CODEX_ITEM_PAGE - 1) throw new HttpError(413, 'This Codex conversation is too large to load on the phone.');
         cursor = result.nextCursor;
       }
     } else {
@@ -181,7 +185,7 @@ export class CodexService {
     const rpc = await this.connect(), seen = new Set<string>();
     let cursor: string | null = null;
     do {
-      const result = await rpc.request('thread/items/list', { threadId: id, cursor, limit: 100, sortDirection: 'asc' });
+      const result = await rpc.request('thread/items/list', { threadId: id, cursor, limit: CODEX_ITEM_PAGE, sortDirection: 'asc' });
       for (const entry of result.data || []) yield entry.item;
       cursor = result.nextCursor || null;
       if (cursor && seen.has(cursor)) throw new HttpError(502, 'Codex history pagination did not advance.');

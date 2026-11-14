@@ -736,7 +736,9 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const status = error instanceof z.ZodError ? 400 : error.status || 500;
     // A per-request spend limit outside the range is a settings problem, not a malformed request; name it so the chat can point to Settings.
     if (error instanceof z.ZodError && error.issues.some(issue => issue.path.includes('maxBudgetUsd'))) { res.status(400).json({ error: 'Лимит стоимости запроса вне диапазона $0.10–$100. Измените его в настройках доступа Claude.', code: 'budget_out_of_range' }); return; }
-    res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера. Проверьте папку проекта и доступ Claude Code.' : error.message, ...(error instanceof HttpError&&error.code?{code:error.code}:{}),...(error instanceof HttpError&&Array.isArray((error as any).issues)?{issues:(error as any).issues.slice(0,40)}:{}) });
+    // Unexpected failures keep their details out of the reply, so the host log is the only place that names them.
+    if (status >= 500 && !(error instanceof HttpError)) console.error(new Date().toISOString(), _req.method, _req.path, error?.name, error?.message);
+    res.status(status).json({ error: error instanceof z.ZodError ? 'Проверьте поля запроса' : status >= 500 && !(error instanceof HttpError) ? 'Ошибка сервера ПК. Подробности записаны в журнал сервера.' : error.message, ...(error instanceof HttpError&&error.code?{code:error.code}:{}),...(error instanceof HttpError&&Array.isArray((error as any).issues)?{issues:(error as any).issues.slice(0,40)}:{}) });
   });
   async function maintainEngines() {
     if(!config.engineUpdates||runtimeStopping||config.hostUpdater?.draining)return;
