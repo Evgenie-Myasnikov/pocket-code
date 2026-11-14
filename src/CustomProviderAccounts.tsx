@@ -36,7 +36,7 @@ function useCustomProfiles(connection:Connection|null,online:boolean){
 export function CustomProviderList({connection,online=true,onOpen}:{connection:Connection|null;online?:boolean;onOpen(id:string|'new'):void}){
   const {profiles,error}=useCustomProfiles(connection,online);
   if(!connection||!online)return null;
-  return <>{(profiles||[]).map(p=><button className="settings-category" key={p.id} aria-labelledby={'custom-provider-'+p.id} aria-describedby={'custom-provider-'+p.id+'-summary'} onClick={()=>onOpen(p.id)}>
+  return <>{(Array.isArray(profiles)?profiles:[]).map(p=><button className="settings-category" key={p.id} aria-labelledby={'custom-provider-'+p.id} aria-describedby={'custom-provider-'+p.id+'-summary'} onClick={()=>onOpen(p.id)}>
       <span><strong id={'custom-provider-'+p.id}>{p.name}</strong><small id={'custom-provider-'+p.id+'-summary'}>{customStatusLabel(p)} · {host(p.url)}</small></span><ChevronRight size={20} aria-hidden="true"/></button>)}
     <button className="settings-category" onClick={()=>onOpen('new')}><span><strong><Plus size={16} aria-hidden="true"/> {t('Добавить свой провайдер')}</strong><small>{t('OpenAI-совместимый API: URL и API-ключ')}</small></span><ChevronRight size={20} aria-hidden="true"/></button>
     {error&&<Notice tone="error">{error}</Notice>}</>;

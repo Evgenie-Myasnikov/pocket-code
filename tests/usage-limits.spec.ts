@@ -23,7 +23,7 @@ async function setup(page: Page, usage: (route: Route, provider: string) => Prom
   });
   await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await openSection(page,'Settings');
-  await page.getByRole('button', { name: 'Usage limits', exact: true }).click();
+  await page.getByRole('button', { name: 'Providers', exact: true }).click();
 }
 
 test('usage shows remaining allowance, actual windows, reset time and English/Russian labels on narrow screens', async ({ page }) => {
@@ -38,7 +38,7 @@ test('usage shows remaining allowance, actual windows, reset time and English/Ru
   await page.evaluate(() => localStorage.setItem('pocket-code-language-v1', 'ru'));
   await page.reload();
   await openSection(page,'Настройки');
-  await page.getByRole('button', { name: 'Лимиты использования', exact: true }).click();
+  await page.getByRole('button', { name: 'Провайдеры', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Лимиты Codex', exact: true }).getByText('Осталось 73%', { exact: true })).toBeVisible();
   const bounds = await page.locator('.codex-usage').evaluate(element => ({ width: element.clientWidth, scroll: element.scrollWidth }));
   expect(bounds.scroll).toBeLessThanOrEqual(bounds.width);
@@ -99,7 +99,7 @@ test('a limit warning above the composer names the tightest window, can be hidde
   await expect(alert).toHaveClass(/limit-alert-warning/);
   await alert.getByRole('button', { name: 'Hide' }).click();
   await expect(alert).toHaveCount(0);
-  remaining = 8;await openSection(page,'Settings');await page.getByRole('button', { name: 'Usage limits', exact: true }).click();await expect(page.locator('.codex-usage').getByText('8% remaining')).toBeVisible();
+  remaining = 8;await openSection(page,'Settings');await page.getByRole('button', { name: 'Providers', exact: true }).click();await expect(page.locator('.codex-usage').getByText('8% remaining')).toBeVisible();
   await openChatList(page);await newChat(page);
   await expect(alert).toContainText('Codex: 8% of the “5 hours” limit left');
   await expect(alert).toHaveClass(/limit-alert-danger/);

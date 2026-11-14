@@ -15,7 +15,7 @@ for(const width of [360,430])test('mobile Miro settings, embedded board and Back
   if(p==='/api/board-notifications'||p==='/api/task-notifications')return r.fulfill({json:{items:[],unread:0}});
   return r.fulfill({json:[]});
  });
- await page.goto('http://127.0.0.1:5173');await openSection(page,'Settings');await page.getByRole('button',{name:'Miro',exact:true}).click();
+ await page.goto('http://127.0.0.1:5173');await openSection(page,'Settings');await page.locator('[data-settings-category="board"]').click();
  await page.getByLabel('Miro board link').fill('https://miro.com/app/board/synthetic_123=/');await page.getByRole('button',{name:'Connect Miro board'}).click();await expect(page.getByRole('status')).toContainText('Miro board connected');
  await openSection(page,'Board');await expect(page.locator('.mobile-workspace-header')).toHaveCount(0);await page.locator('.project-board-row').getByRole('button').click();await expect(page.locator('iframe[title="Miro live board"]')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'.local/miro-mobile-'+width+'.png'});

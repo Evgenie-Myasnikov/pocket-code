@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Changes
+- Settings are grouped by task, the same on the phone and in the Windows window: **Connection** (Connection, Updates), **Agents and board** (Providers, Chat, Board), **Interface** (Appearance and language, Notifications).
+- Providers: sign-in, agent access, the spend limit and the remaining usage of a provider are on one page; the separate Usage limits section is gone.
+- Chat: sending with Enter, permission wait time, the folder for new chats (phone), text reveal speed, read aloud and keyboard shortcuts (Windows) are together. They were split between AI accounts, Windows application and Appearance.
+- Board: the canvas grid, Miro and Jira are together.
+- Windows: startup and tray options are on the Connection page; the version and description are on Updates. Windows application and About are no longer separate sections.
+- Appearance keeps only the look; its reset no longer changes the text speed or the board grid.
+- Links to the former sections open the section that took them in.
+
+### Bug Fixes
+- Settings no longer go blank when the list of custom providers comes back in an unexpected form.
+
+### Validation
+- TypeScript passes; settings registry, translation and token tests pass. Browser: settings-navigation, usage-limits and miro-mobile specs pass with the new sections; the other failures in the settings-related specs are the same as on the 0.28.46 source. Desktop settings checked on screenshots.
+
 ## [0.28.46](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.45...v0.28.46) (2026-11-14)
 
 Published [v0.28.46](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.46) from [47b1419780d2d87423a3cb1607dc402c5b779172](https://github.com/Evgenie-Myasnikov/pocket-code/commit/47b1419780d2d87423a3cb1607dc402c5b779172) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 133. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit. Privacy guard passed for the tree. The update button, a Claude turn and devices were not run on the published packages.
