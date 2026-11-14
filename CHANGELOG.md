@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.47 (unreleased)
+## [0.28.47](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.46...v0.28.47) (2026-11-15)
+
+Published [v0.28.47](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.47) from [3d773d91390d689cafa712876a12e8717ba46eb5](https://github.com/Evgenie-Myasnikov/pocket-code/commit/3d773d91390d689cafa712876a12e8717ba46eb5) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 134. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit. Privacy guard passed for the tree. The regrouped settings on a phone, the desktop window and devices were not run on the published packages.
 
 ### Changes
 - Settings are grouped by task, the same on the phone and in the Windows window: **Connection** (Connection, Updates), **Agents and board** (Providers, Chat, Board), **Interface** (Appearance and language, Notifications).
