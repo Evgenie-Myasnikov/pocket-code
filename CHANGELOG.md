@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.48 (unreleased)
 
 ### Fixes
 - Codex chats with generated images: the next message failed with a server error. History is read in pages of 20 items (10 turns) instead of 100, so eight inline images (4-5 MB each) no longer exceed the Codex protocol line limit and close the Codex connection. Images saved on disk are not counted twice when agents of a chat are loaded.
