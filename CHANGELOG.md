@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.46 (unreleased)
 
 ### Bug Fixes
 - Board chat: each provider (Claude, Codex, Copilot and every custom provider) keeps its own chat of a board. Opening the board chat or switching the provider beside the board opens the selected provider's chat; before, the board always switched back to the provider that started its first chat. The existing Codex board chat stays where it was.

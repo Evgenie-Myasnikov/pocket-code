@@ -25,3 +25,11 @@ Records removed from the board file by Pocket Code repairs, kept word for word; 
 ## Branch link of a version column removed to stay within 64 columns — release 0.28.44
 
 0.28.22 -> release/0.28.1
+
+## Branch link of a version column removed to stay within 64 columns — release 0.28.46
+
+0.25.6 -> codex/project-0.25.6
+
+## Branch link of a version column removed to stay within 64 columns — release 0.28.46
+
+0.28.1 -> release/0.28.1
