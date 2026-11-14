@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.45 (unreleased)
+## [0.28.45](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.44...v0.28.45) (2026-11-14)
+
+Published [v0.28.45](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.45) from [44a53f3eab325432bf7a69ad42f2f51dd902eed7](https://github.com/Evgenie-Myasnikov/pocket-code/commit/44a53f3eab325432bf7a69ad42f2f51dd902eed7) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 132. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit. Privacy guard passed for the tree. The published packages were not installed on a phone or the desktop window.
 
 ### Bug Fixes
 - Chat composer: the exact Claude model ID form, the catalog note, the **+** menu with the project folder picker and voice input notices open above the composer without being clipped by its scrolling panel.
