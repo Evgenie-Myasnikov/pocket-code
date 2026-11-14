@@ -49,7 +49,7 @@
 .prompt-composer .composer-tools select:disabled{opacity:.55;cursor:default}
 .prompt-composer .composer-tools select:disabled:hover{background:transparent;color:var(--muted)}
 .model-picker .model-catalog-hint{width:44px;min-width:44px;height:44px;padding:0;display:grid;place-items:center;border:0;background:transparent;color:var(--muted);border-radius:50%}
-.model-catalog-note{position:absolute;bottom:calc(100% + 6px);left:0;z-index:var(--z-popover);width:min(22em,80vw);margin:0;padding:10px var(--space-3);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--text);font-size:clamp(12px,calc(12px * var(--ui-scale,1)),15px);box-shadow:0 4px 16px var(--shadow-soft)}
+.model-catalog-note{position:fixed;z-index:var(--z-menu);width:min(22em,80vw);margin:0;padding:10px var(--space-3);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--text);font-size:clamp(12px,calc(12px * var(--ui-scale,1)),15px);box-shadow:0 4px 16px var(--shadow-soft)}
 .model-custom .primary{min-height:44px;padding:0 var(--space-4);border-radius:10px}.model-custom .secondary{min-height:44px;padding:0 14px;border-radius:10px}
 /* The chat's access mode is visible where the message is written; Full access carries the warning colour. */
 .access-mode{position:relative;flex:none}
@@ -109,9 +109,9 @@
 .assistant-composer[data-pulsing=true]::before,.assistant-composer[data-pulsing=true] .stop-button::after,.assistant-composer .composer-border-wave{display:none}
 @media(pointer:coarse){:root[data-theme] .assistant-composer .composer-tools :is(.icon-button,.send-button){width:44px;min-width:44px;height:44px;min-height:44px}.assistant-composer .composer-tools{grid-template-columns:44px minmax(0,1fr) auto}.assistant-composer .send-button::before,.assistant-composer .stop-button.stop-primary::before{inset:6px}}
 .composer-add{position:relative}
-.voice-input-notice{position:absolute;bottom:calc(100% + 8px);right:0;max-width:min(320px,90vw);padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);font-size:12px;z-index:var(--z-menu)}
+.voice-input-notice{position:fixed;max-width:min(320px,90vw);padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);font-size:12px;z-index:var(--z-menu)}
 .composer-voice[aria-pressed=true]{color:var(--status-error)!important}
-.composer-add-menu{position:absolute;bottom:calc(100% + 12px);left:0;z-index:var(--z-menu);width:min(300px,calc(100vw - 48px));padding:6px;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:0 8px 24px var(--shadow-soft)}
+.composer-add-menu{position:fixed;z-index:var(--z-menu);width:min(300px,calc(100vw - 48px));padding:6px;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:0 8px 24px var(--shadow-soft)}
 .composer-add-menu>button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px;border:0;background:transparent;color:var(--text);border-radius:10px;text-align:left;font:inherit}
 .composer-add-menu>button:hover{background:var(--bg-hover)}
 .composer-add-menu .chat-project-attach{display:flex;align-items:center;gap:8px;padding:0 8px;font-size:inherit}

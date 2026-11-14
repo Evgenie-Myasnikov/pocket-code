@@ -15,6 +15,10 @@ export type ActivityItem = {
   action?: 'command' | 'files' | 'search' | 'agent' | 'responding' | 'tool';
 };
 export type JobView = {
+  /** Changes whenever the transcript does; token deltas only change `partial`. */
+  messagesRevision?:number;
+  /** A poll that already has this transcript receives only the rest of the job. */
+  messagesUnchanged?:boolean;
   pendingInputIds?:string[];
   queued?:QueuedInput[];
   /** Requests that timed out; the agent received a denial for each. */

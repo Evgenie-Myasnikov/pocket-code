@@ -18,10 +18,10 @@ export function BudgetSettings({value,onChange}:{value:number;onChange(value:num
     if(next!==value)onChange(next);
   }
   return <section className="budget-settings" aria-labelledby={id+'-title'}>
-    <h3 id={id+'-title'}>{t('Лимит стоимости одного запроса')}</h3>
-    <div className="budget-presets" role="group" aria-label={t('Лимит стоимости одного запроса')}>{presets.map(amount=><button type="button" key={amount} className="budget-chip" aria-pressed={!custom&&value===amount} onClick={()=>{setCustom(false);setNote('');if(value!==amount)onChange(amount);}}>{budgetLabel(amount)}</button>)}<button type="button" className="budget-chip" aria-pressed={custom||!presets.includes(value as typeof presets[number])} onClick={()=>setCustom(true)}>{t('Другое')}</button></div>
+    <h3 id={id+'-title'}>{t('Лимит стоимости одного хода')}</h3>
+    <div className="budget-presets" role="group" aria-label={t('Лимит стоимости одного хода')}>{presets.map(amount=><button type="button" key={amount} className="budget-chip" aria-pressed={!custom&&value===amount} onClick={()=>{setCustom(false);setNote('');if(value!==amount)onChange(amount);}}>{budgetLabel(amount)}</button>)}<button type="button" className="budget-chip" aria-pressed={custom||!presets.includes(value as typeof presets[number])} onClick={()=>setCustom(true)}>{t('Другое')}</button></div>
     {(custom||!presets.includes(value as typeof presets[number]))&&<label className="budget-input">{t('Сумма, $')}<input inputMode="decimal" autoComplete="off" value={draft} aria-invalid={invalid||undefined} aria-describedby={id+'-hint'+(invalid||note?' '+id+'-note':'')} onChange={event=>{setDraft(event.target.value);setNote('');}} onBlur={commit} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();commit();}else if(event.key==='Escape'&&draft!==String(value)){event.stopPropagation();setDraft(String(value));setNote('');}}}/></label>}
-    <p className="muted" id={id+'-hint'}>{t('От $0.10 до $100 · сейчас {0}. Это оценка Agent SDK: при входе по API-ключу ограничивает расход, при входе по подписке останавливает слишком долгий запрос. Применяется к следующему сообщению.',budgetLabel(value))}</p>
+    <p className="muted" id={id+'-hint'}>{t('От $0.10 до $100 · сейчас {0}. Это оценка Agent SDK: при входе по API-ключу ограничивает расход, при входе по подписке останавливает слишком долгий ход. Лимит общий для сообщения и уточнений, которые Claude примет до конца хода. Применяется к следующему сообщению.',budgetLabel(value))}</p>
     {(invalid||note)&&<p className={'budget-note'+(invalid?' invalid':'')} id={id+'-note'} role={invalid?'alert':'status'}>{invalid?t('Допустимо от $0.10 до $100. При сохранении значение будет ограничено.'):note}</p>}
   </section>;
 }

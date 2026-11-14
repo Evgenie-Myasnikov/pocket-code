@@ -5,12 +5,14 @@ export type ClaudeCatalog = {models: ProviderModel[]; source: 'sdk' | 'fallback'
 
 export function claudeModels(models: ModelInfo[]): ProviderModel[] {
   const result = new Map<string, ProviderModel>();
+  // The CLI lists the account's own default as `default`; older CLIs without that row keep Sonnet.
+  const defaultId = models.some(model => model.value === 'default') ? 'default' : 'sonnet';
   for (const model of models) {
     if (!validModelId(model.value)) continue;
     result.set(model.value, {
       id: model.value, name: model.displayName || model.value,
       ...(validModelId(model.resolvedModel) ? {resolvedModel: model.resolvedModel} : {}),
-      description: model.description, isDefault: model.value === 'sonnet',
+      description: model.description, isDefault: model.value === defaultId,
       reasoningEfforts: model.supportsEffort === true ? [...new Set((model.supportedEffortLevels||[]).filter(value=>['low','medium','high','xhigh','max'].includes(value)))] : [],
     });
   }
@@ -37,6 +39,8 @@ export class ClaudeModelCatalog {
     try {
       stream = this.run({prompt, options: {
         cwd, abortController: controller, settingSources: ['user', 'project', 'local'],
+        // Settings decide the default and allowed models; MCP servers, tools and a saved session are not needed to list them.
+        tools: [], strictMcpConfig: true, mcpServers: {}, persistSession: false,
         ...(process.env.CLAUDE_EXECUTABLE ? {pathToClaudeCodeExecutable: process.env.CLAUDE_EXECUTABLE} : {}),
       }});
       const raw = await Promise.race([

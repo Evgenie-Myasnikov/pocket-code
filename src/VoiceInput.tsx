@@ -1,4 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
+import {useAnchoredPlace} from './anchored-popup';
 import {Capacitor,registerPlugin} from '@capacitor/core';
 import {Mic,Square} from 'lucide-react';
 import {useLanguage} from './i18n';
@@ -8,6 +10,7 @@ const NativeVoice=registerPlugin<{recognize(options:{language:string}):Promise<{
 type Recognition={lang:string;continuous:boolean;interimResults:boolean;onresult:((e:any)=>void)|null;onerror:((e:any)=>void)|null;onend:(()=>void)|null;start():void;stop():void;abort():void};
 export function VoiceInput({disabled,onText,focus}:{disabled?:boolean;onText(text:string):void;focus():void}){
  const ru=useLanguage()==='ru',[active,setActive]=useState(false),[error,setError]=useState(''),[hint,setHint]=useState('');
+ const button=useRef<HTMLButtonElement>(null),place=useAnchoredPlace(Boolean(error||hint),button,320,'right');
  const recognition=useRef<Recognition|null>(null),generation=useRef(0),append=useRef(onText);append.current=onText;
  useEffect(()=>()=>{generation.current++;recognition.current?.abort();recognition.current=null;},[]);
  const start=async()=>{
@@ -24,5 +27,5 @@ export function VoiceInput({disabled,onText,focus}:{disabled?:boolean;onText(tex
    speech.onend=()=>{if(token===generation.current){setActive(false);recognition.current=null;}};speech.start();setActive(true);
   }catch(e){if(token===generation.current){setActive(false);setError((e as Error).message);}}
  };
- return <><button type="button" className="icon-button composer-voice" disabled={disabled||active&&Capacitor.isNativePlatform()} aria-label={active?(ru?'Остановить диктовку':'Stop dictation'):(ru?'Голосовой ввод':'Voice input')} aria-pressed={active} title={ru?'Голосовой ввод':'Voice input'} onPointerDown={e=>e.preventDefault()} onClick={()=>void start()}>{active?<Square size={15}/>:<Mic size={18}/>}</button>{(error||hint)&&<span className="voice-input-notice" role={error?'alert':'status'} onClick={()=>{setError('');setHint('');}}>{error||hint}</span>}</>;
+ return <><button ref={button} type="button" className="icon-button composer-voice" disabled={disabled||active&&Capacitor.isNativePlatform()} aria-label={active?(ru?'Остановить диктовку':'Stop dictation'):(ru?'Голосовой ввод':'Voice input')} aria-pressed={active} title={ru?'Голосовой ввод':'Voice input'} onPointerDown={e=>e.preventDefault()} onClick={()=>void start()}>{active?<Square size={15}/>:<Mic size={18}/>}</button>{(error||hint)&&createPortal(<span className="voice-input-notice" style={place} role={error?'alert':'status'} onClick={()=>{setError('');setHint('');}}>{error||hint}</span>,document.body)}</>;
 }

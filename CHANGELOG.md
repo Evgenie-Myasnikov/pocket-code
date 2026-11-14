@@ -1,6 +1,31 @@
 # Changelog
 
-## 0.28.44 (unreleased)
+## 0.28.45 (unreleased)
+
+### Bug Fixes
+- Chat composer: the exact Claude model ID form, the catalog note, the **+** menu with the project folder picker and voice input notices open above the composer without being clipped by its scrolling panel.
+- Claude: the default model is the `default` row of the installed Claude catalog (the account or settings default) instead of a fixed Sonnet; the effort check uses that model. Older CLIs without the row keep Sonnet.
+- Claude: an API failure (login, limits, overload, prompt too long) shows its own reason instead of a generic error.
+- Claude: a turn whose live view grows past 4 MB keeps running; the view drops its oldest messages and the full session stays on the PC. Before, the run was killed.
+- Claude model catalog is read without MCP servers, tools or a saved session.
+- Claude: **Stop** interrupts the turn the way Esc does in Claude Code: the CLI ends its tools and the shells they started and saves the turn. The process is killed only if it does not finish within 5 seconds. Before, Stop killed the CLI, which on Windows could leave its shells running.
+- Claude: API retries, slash-command output (`/context`, `/cost`) and context compaction appear in the chat as system rows; the retry row disappears when the answer arrives.
+- Claude: while an answer streams, a phone poll downloads only the new text; the transcript is resent only when it changes. Before, every poll (900 ms) downloaded the whole turn.
+- Chats: after a stopped or failed turn the chat keeps syncing messages written from the PC or another device.
+- Chats: **Edit** and **Send now** on a queued message no longer drop its files when they are not on this device (after a reload or when queued elsewhere); the message stays queued and the app says why.
+- Chats: a new chat shows its own title after the first turn instead of a temporary placeholder.
+- Chats: a finished turn with no answer (a slash command) hands over to the chat history instead of leaving the chat without updates.
+- Chats: each chat keeps its own Claude model, like its access mode; the last choice is the default of a new chat. Effort stays per model.
+- Settings: the spend limit is labelled per run, which is how it works: it covers the message and the follow-ups Claude takes before the run ends.
+
+### Validation
+- TypeScript passes. Unit: 487 of 494 pass, 1 skipped; the 6 failures (activity feed, activity rows, Windows host replies, compatibility trigger, host packager, board evidence) fail the same way on the 0.28.44 source. The settings translation check was updated for the new spend-limit label. New unit checks pass: the `default` catalog row, the API error text, a turn over the display limit, Stop by interrupt, the kill fallback, an error exit after interrupt, system rows for retries, slash-command output and compaction, and an unchanged transcript revision during token deltas.
+- Browser: Claude model, follow-up composer, chat library, board chat and settings specs pass; new checks that the model ID field and the folder picker are on screen and on top pass (the model ID check fails on the 0.28.44 source). codex-effort at 320px fails the same way on the 0.28.44 source.
+- Live on Windows: a metadata-only catalog read returned the `default` row; a Sonnet turn running `ping` was stopped in about 2 s with status stopped, no error, the `ping` process gone and the session kept. No phone check.
+
+## [0.28.44](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.43...v0.28.44) (2026-11-13)
+
+Published [v0.28.44](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.44) from [ffc170462f0ede68b9da7f88603dc43e68407520](https://github.com/Evgenie-Myasnikov/pocket-code/commit/ffc170462f0ede68b9da7f88603dc43e68407520) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 131. The tag resolves to the source commit; GitHub SHA-256 digests of the APK, Windows and host packages match the local artifacts. The tray behaviour was not run live on the published packages.
 
 ### Changes
 - Windows window: minimizing keeps the window on the taskbar; only the close button hides it to the tray.

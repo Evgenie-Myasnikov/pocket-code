@@ -58,7 +58,7 @@ export function DesktopSettings({state,connection,appearance,action,connectionPa
     notifications:[alerts?t('Вкл.: завершение, ошибки, вопросы'):t('Чаты: выключены'),limitAlerts?t('предупреждения о лимитах'):''].filter(Boolean).join(' · '),
     about:t('Версия {0}',pkg.version),
   };
-  const providerSummary=(id:Provider)=>id==='claude'?claudeAccessLabel(claudeAccess)+' · '+t('до {0} за запрос',budgetLabel(device.budget)):id==='codex'?codexAccessLabel(device.codexAccess):t('Разрешения подтверждаются в чате');
+  const providerSummary=(id:Provider)=>id==='claude'?claudeAccessLabel(claudeAccess)+' · '+t('до {0} за ход',budgetLabel(device.budget)):id==='codex'?codexAccessLabel(device.codexAccess):t('Разрешения подтверждаются в чате');
   const nav=<nav className="settings-index" aria-label={t('Разделы настроек')}>{groups.map(group=><div className="settings-group" role="group" aria-labelledby={'desktop-settings-group-'+group.id} key={group.id}><h3 className="settings-group-title" id={'desktop-settings-group-'+group.id}>{t(group.title)}</h3>{group.items.map(item=><SettingsCategoryButton key={item.id} category={item} platform="desktop" current={wide&&current===item.id} summary={summaries[item.id]||t(categoryHint(item,'desktop'))} badge={item.id==='updates'&&updateBadge} onOpen={()=>open(item.id)}/>)}</div>)}</nav>;
   const title=custom?(custom==='new'?t('Новый провайдер'):t('Свой провайдер')):provider?providerNames[provider]:category?t(categoryTitle(category,'desktop')):t('Настройки');
   const scope=custom?t('Ключ и адрес хранятся на ПК; провайдер доступен с каждого устройства'):provider?t('Вход — на ПК; режим доступа и лимит стоимости — на этом устройстве'):category?.storage&&t(category.storage);

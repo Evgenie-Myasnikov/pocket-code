@@ -21,7 +21,7 @@ test('settings screens do not branch on the language for their own text',()=>{
 });
 test('settings strings render in English without Cyrillic',()=>{
   setLanguage('en');
-  for(const key of ['Разрешать изменения файлов','Подтверждать за меня','Полный доступ','Запрашивать подтверждение','Назад','Все настройки','Аккаунты AI','Доступ агента','Лимит стоимости одного запроса','Ближе всего к лимиту','Сменить аккаунт'])assert.doesNotMatch(t(key),/[А-Яа-яЁё]/,key);
+  for(const key of ['Разрешать изменения файлов','Подтверждать за меня','Полный доступ','Запрашивать подтверждение','Назад','Все настройки','Аккаунты AI','Доступ агента','Лимит стоимости одного хода','Ближе всего к лимиту','Сменить аккаунт'])assert.doesNotMatch(t(key),/[А-Яа-яЁё]/,key);
   assert.equal(t('Сброс через {0} · {1}','1 h 48 min','today at 00:55'),'Resets in 1 h 48 min · today at 00:55');
 });
 test('connection and update screens use t() for text and codes from native shells',()=>{

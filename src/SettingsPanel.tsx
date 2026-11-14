@@ -60,7 +60,7 @@ export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,sub
     if(previous.current===page)return;const prior=previous.current;previous.current=page;
     if(content.current){content.current.scrollTop=page==='index'?indexScroll.current:0;const target=page==='index'?content.current.querySelector<HTMLButtonElement>(`[data-settings-category="${prior}"]`):content.current.querySelector<HTMLButtonElement>('.settings-back');target?.focus({preventScroll:true});}
   },[page]);
-  const accessSummary=provider==='copilot'?t('Разрешения подтверждаются в чате'):provider==='codex'?codexAccessLabel(codexAccess):claudeAccessLabel(claudeAccess)+' · '+t('до {0} за запрос',budgetLabel(budget));
+  const accessSummary=provider==='copilot'?t('Разрешения подтверждаются в чате'):provider==='codex'?codexAccessLabel(codexAccess):claudeAccessLabel(claudeAccess)+' · '+t('до {0} за ход',budgetLabel(budget));
   const summaries:Record<string,ReactNode>={
     connection:connection&&!connection.workspaceOnly?<><span className={'connect-dot '+(online?'online':'offline')} aria-hidden="true"/>{computerName} · {online?t('Подключено'):t('Нет связи')}</>:t('Не подключено · отсканируйте QR'),
     updates:live.update?t('Доступно {0}',live.update):t('Установлена версия {0}',pkg.version),

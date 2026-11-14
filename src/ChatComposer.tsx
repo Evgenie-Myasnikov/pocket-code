@@ -7,6 +7,8 @@ import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode,typ
 import {ArrowUp,Plus,Paperclip,Square,LoaderCircle,ListPlus,CornerDownRight,Clock,RefreshCw} from 'lucide-react';
 import {AttachmentTray,type DraftAttachment} from './AttachmentTray';
 import {t} from './i18n';
+import {createPortal} from 'react-dom';
+import {useAnchoredPlace} from './anchored-popup';
 import './composer-controls.css';
 
 /** A paste this long becomes a text attachment that can be put back into the message. */
@@ -38,8 +40,8 @@ function useShortScreen(){
 
 /** Shared Windows/Android input. Resizing never changes the draft or selection. */
 export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,text,label,placeholder,disabled,uploading,canSend,attachments,controls,projectPicker,usage,stopLabel,busy=false,stopping=false,mode='send',blockedReason,stopRetry=false,enterSends=false,keyHint=false,onText,onRemove,onFiles,onBoardImage,onRetry,onInsertText,onRecall,onSend,onStop}:Props){
-  const [addOpen,setAddOpen]=useState(false),addMenu=useRef<HTMLDivElement>(null);
-  useEffect(()=>{if(!addOpen)return;const close=(event:Event)=>{if(event instanceof KeyboardEvent){if(event.key!=='Escape')return;event.stopPropagation();}else if(addMenu.current?.contains(event.target as Node))return;setAddOpen(false);};document.addEventListener('pointerdown',close);document.addEventListener('keydown',close);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',close);};},[addOpen]);
+  const [addOpen,setAddOpen]=useState(false),addMenu=useRef<HTMLDivElement>(null),addPopup=useRef<HTMLDivElement>(null),addPlace=useAnchoredPlace(addOpen,addMenu,300);
+  useEffect(()=>{if(!addOpen)return;const close=(event:Event)=>{if(event instanceof KeyboardEvent){if(event.key!=='Escape')return;event.stopPropagation();}else if(addMenu.current?.contains(event.target as Node)||addPopup.current?.contains(event.target as Node))return;setAddOpen(false);};document.addEventListener('pointerdown',close);document.addEventListener('keydown',close);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',close);};},[addOpen]);
   const input=useRef<HTMLTextAreaElement>(null),files=useRef<HTMLInputElement>(null),hadFocus=useRef(false),focusAtPress=useRef(false);
   const [wave,setWave]=useState<{id:number;x:number;y:number}|null>(null),waveSequence=useRef(0),wavePointer=useRef(0);
   const ripple=()=>{if(disabled||matchMedia('(prefers-reduced-motion: reduce), (forced-colors: active)').matches)return;const rect=input.current?.closest('.prompt-composer')?.getBoundingClientRect();if(rect?.width&&rect.height)setWave({id:++waveSequence.current,x:1+16/rect.width,y:1+16/rect.height});};
@@ -98,7 +100,7 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
       <div className="composer-add" ref={addMenu}><button type="button" className="icon-button composer-attach" aria-label={t('Прикрепить файлы')} aria-expanded={addOpen} disabled={disabled} onClick={()=>projectPicker?setAddOpen(value=>!value):files.current?.click()}>
         {uploading?<LoaderCircle size={20} className="composer-uploading"/>:<Plus size={20}/>}
       </button>
-      {addOpen&&<div className="composer-add-menu" role="group" aria-label={t('Прикрепить файлы')}><button type="button" onClick={()=>{setAddOpen(false);files.current?.click();}}><Paperclip size={16}/>{t('Прикрепить файлы')}</button><div onChange={()=>setAddOpen(false)}>{projectPicker}</div></div>}</div>
+      {addOpen&&createPortal(<div ref={addPopup} className="composer-add-menu" style={addPlace} role="group" aria-label={t('Прикрепить файлы')}><button type="button" onClick={()=>{setAddOpen(false);files.current?.click();}}><Paperclip size={16}/>{t('Прикрепить файлы')}</button><div onChange={()=>setAddOpen(false)}>{projectPicker}</div></div>,document.body)}</div>
       <div className="composer-models">{controls}</div>
       <div className="composer-actions">
         <VoiceInput key={scopeKey} disabled={disabled} focus={()=>input.current?.focus({preventScroll:true})} onText={value=>onText(text+(text&&!/\s$/.test(text)?' ':'')+value)}/>

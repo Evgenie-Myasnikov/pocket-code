@@ -185,7 +185,11 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const returnToChats=()=>{setTab('chats');setMobileChat(boardChat?.context?false:chatViewOpen);};
   const liveSettings=useLiveSettings();
   const [settingsPage,setSettingsPage]=useState<SettingsPage>('index'),[settingsSubpage,setSettingsSubpage]=useState<'access'|null>(null);
-  const [draft, setDraft] = useStateForWorkspace(''),[search, setSearch] = useStateForWorkspace(''),[model, setModel] = useStateForWorkspace(id=>preferences(id).model);
+  const [draft, setDraft] = useStateForWorkspace(''),[search, setSearch] = useStateForWorkspace(''),[lastModel, setLastModel] = useStateForWorkspace(id=>preferences(id).model);
+  // Each chat keeps its own model, like its access mode; the last choice is the default of a new chat. Effort follows the model.
+  const [modelChoices,setModelChoices] = useStateForWorkspace<Record<string,string>>({});
+  const modelKey=job?.sessionId||selected?.sessionId||`new:${cwd}`,model=modelChoices[modelKey]??lastModel;
+  const setModel=(value:string)=>{setModelChoices(old=>({...old,[modelKey]:value}));setLastModel(value);};
   const codexEffort=useCodexEffort(provider==='codex'?providerInfo?.models:undefined,model);
   const claudeAccess=useClaudeAccess();
   const [codexAccess,setCodexAccess]=useStateForWorkspace(id=>preferences(id).codexAccess);
@@ -197,6 +201,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const claudeCatalog=useClaudeModels(demo?null:connection,provider,cwd);
   // A custom provider runs this Claude agent with its own URL, key and model catalog.
   const customAccount=useCustomAccount(),account=provider==='claude'&&!demo?customAccount:'',customModels=useCustomModels(demo?null:connection,account);
+  const claudeDefaultModel=claudeCatalog.models.find(item=>item.isDefault)?.id||'sonnet';
   const claudeEffort=useCodexEffort(provider==='claude'?claudeCatalog.models:undefined,model,'claude');
   const localActivity=useActivity(demo||embedded?.activity?null:connection);
   const activity=embedded?.activity||localActivity;
@@ -254,7 +259,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const historyExpanded=useRefForWorkspace(false);
   const scrollAnchor=useRefForWorkspace<{height:number;top:number;epoch:number;prepend:boolean;messageId?:string;offset?:number}|null>(null);
   useEffect(()=>saveSelectedWorkspace(provider),[provider]);
-  useEffect(()=>savePreferences(provider,{model,mode:"default",budget,codexAccess}),[provider,model,budget,codexAccess]);
+  useEffect(()=>savePreferences(provider,{model:lastModel,mode:"default",budget,codexAccess}),[provider,lastModel,budget,codexAccess]);
   // Desktop settings change the device defaults while this chat stays mounted; follow them instead of saving stale values back.
   useEffect(()=>{const handle=(event:Event)=>{const change=(event as CustomEvent<PreferenceChange>).detail;if(!change||change.provider!==provider)return;if(change.budget!==undefined)setBudget(clampBudget(change.budget));if(change.codexAccess)setCodexAccess(change.codexAccess);};window.addEventListener('pocket-code-preferences',handle);return()=>window.removeEventListener('pocket-code-preferences',handle);},[provider,setBudget,setCodexAccess]);
   useEffect(()=>{
@@ -282,6 +287,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [runLost,setRunLost] = useStateForWorkspace<number|null>(null);
   const runUnknown = running && (runLost!==null || unreachable);
   const [sessionsLoaded,setSessionsLoaded] = useStateForWorkspace(false);
+  // Effects that outlive a list refresh read the current chats, not the list from when they started.
+  const sessionsNow=useRef(sessions);sessionsNow.current=sessions;
   /** Follow-ups written while the PC was away; they leave in order when it answers again (kept in memory, for at most a day). */
   const [offlineQueue,setOfflineQueue] = useStateForWorkspace<(PendingSend&{id:string;at:number})[]>([]);
   // Only a chat this phone already continues can wait for the PC; a new chat or a takeover needs the PC to answer first.
@@ -308,6 +315,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     // A new chat keeps the mode chosen before its first message.
     if(!job?.sessionId)return;const from=`new:${job.cwd}`;
     setAccessChoices(old=>old[from]&&!old[job.sessionId!]?(({[from]:moved,...rest})=>({...rest,[job.sessionId!]:moved}))(old):old);
+    setModelChoices(old=>Object.hasOwn(old,from)&&!Object.hasOwn(old,job.sessionId!)?(({[from]:moved,...rest})=>({...rest,[job.sessionId!]:moved}))(old):old);
   },[job?.sessionId]);
   useEffect(()=>{
     // An approved plan switches the chat to the mode chosen on the plan card.
@@ -327,10 +335,11 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const outbox:OutboxItem[]=[
     ...(pendingSend&&pendingSend.key===currentDraftKey()?[{id:'pending',text:pendingSend.text,attachments:pendingSend.attachments.length,caption:t('Отправится, когда {0} закончит ход',engineName),onEdit:()=>releasePending(),onRemove:()=>setPendingSend(null),removeLabel:t('Не отправлять')}]:[]),
     ...(job?.queued||[]).map(item=>({id:item.id,text:item.text,attachments:item.attachments,caption:running?t('После завершения ответа'):t('Не доставлено'),
-      onEdit:async()=>{if(await withdrawQueued(item.id))mergeDraft(currentDraftKey(),item.text,sentFollowups.current!.get(item.id)||[]);},
+      // The files of a queued message live only in the screen that sent it; never withdraw it without them.
+      onEdit:async()=>{const files=sentFollowups.current!.get(item.id);if(item.attachments&&!files){setError(t('Файлы этого сообщения остались на устройстве, с которого оно отправлено. Оно уйдёт после ответа как есть.'));return;}if(await withdrawQueued(item.id))mergeDraft(currentDraftKey(),item.text,files||[]);},
       onRemove:()=>void withdrawQueued(item.id),
       // "Send now" stops the turn and sends this message first, as it was written.
-      onSendNow:async()=>{const current=job;if(!current||!await withdrawQueued(item.id))return;setPendingSend({jobId:current.id,key:currentDraftKey(),text:item.text,attachments:sentFollowups.current!.get(item.id)||[]});if(current.status==='running'){setStopping(true);try{await api(`/jobs/${current.id}/stop`,{});}catch(e){setStopping(false);setError((e as Error).message);}}}})),
+      onSendNow:async()=>{const current=job,files=sentFollowups.current!.get(item.id);if(item.attachments&&!files){setError(t('Файлы этого сообщения остались на устройстве, с которого оно отправлено. Оно уйдёт после ответа как есть.'));return;}if(!current||!await withdrawQueued(item.id))return;setPendingSend({jobId:current.id,key:currentDraftKey(),text:item.text,attachments:files||[]});if(current.status==='running'){setStopping(true);try{await api(`/jobs/${current.id}/stop`,{});}catch(e){setStopping(false);setError((e as Error).message);}}}})),
   ...offlineQueue.filter(item=>item.key===currentDraftKey()).map(item=>({id:item.id,text:item.text,attachments:item.attachments.length,caption:t('Отправится, когда ПК будет на связи'),
     onEdit:()=>{setOfflineQueue(old=>old.filter(other=>other.id!==item.id));mergeDraft(item.key,item.text,item.attachments);},onRemove:()=>setOfflineQueue(old=>old.filter(other=>other.id!==item.id)),removeLabel:t('Не отправлять')}))];
   /** Up in an empty field brings back the last message the person wrote. */
@@ -342,7 +351,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if(!embedded)return;
     const key=(event:KeyboardEvent)=>{
       const root=scroll.current?.closest<HTMLElement>('.app');if(!root||!root.getClientRects().length||event.defaultPrevented)return;
-      if(document.querySelector('[aria-modal="true"],dialog[open],.access-menu,.chat-menu'))return;
+      if(document.querySelector('[aria-modal="true"],dialog[open],.access-menu,.model-custom,.chat-menu'))return;
       if(event.key==='Escape'&&running&&!reviewOpen&&!agentPanel&&!outputsOpen&&!taskPanel){event.preventDefault();keyActions.current.stop();return;}
       if(!(event.ctrlKey||event.metaKey)||!event.shiftKey||event.altKey)return;
       if(event.code==='KeyD'){const button=root.querySelector<HTMLButtonElement>('.review-button:not(:disabled)');if(button){event.preventDefault();button.click();}return;}
@@ -603,12 +612,13 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   }, [connection, demo, provider, Boolean(providerInfo),cacheScope]);
   useEffect(() => {
     if (!connection || !job || demo || job.status !== 'running') return;
-    let cancelled = false,revision = -1;
+    let cancelled = false,revision = -1,transcript = -1;
     async function poll() {
       let finished = false;
       try {
-        const updated = await request<JobView | null>(connection!, `/jobs/${job!.id}?revision=${revision}`);
-        if (!cancelled) {setNetworkError('');jobContact.current={at:Date.now(),failures:0};setRunLost(null);if (updated) {revision = updated.revision;setJob(old=>shareSnapshot(old,updated));finished = updated.status !== 'running';}}
+        // `messages` names the transcript this screen holds, so a streaming answer sends only its new text.
+        const updated = await request<JobView | null>(connection!, `/jobs/${job!.id}?revision=${revision}&messages=${transcript}`);
+        if (!cancelled) {setNetworkError('');jobContact.current={at:Date.now(),failures:0};setRunLost(null);if (updated) {revision = updated.revision;transcript = updated.messagesRevision ?? -1;setJob(old=>updated.messagesUnchanged&&old?.id===updated.id?shareSnapshot(old,{...updated,messages:old.messages,messagesUnchanged:undefined}):shareSnapshot(old,updated));finished = updated.status !== 'running';}}
       } catch (e) {if (!cancelled) {setNetworkError(connectivityError(e)?'':(e as Error).message);
         // After two missed polls the run is shown as "status unknown" instead of a live "writing" state.
         if(++jobContact.current.failures>=2)setRunLost(jobContact.current.at);}}
@@ -618,7 +628,11 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const stop=startVisiblePoll(poll,900,true,document,hostGate(connection.url));return () => {cancelled = true;stop();};
   }, [connection, job?.id, job?.status, demo, provider]);
   useEffect(() => {
-    if (!connection || !selected || job && job.errorCode !== 'codex_thread_busy' || demo || loading || loadingOlder || busy || tab !== 'chats') return;
+    // A stopped or failed turn never hands over to history (that waits for "done"), so its chat keeps syncing:
+    // replies written from the PC or another device still appear. Messages are merged by ID, without duplicates.
+    // A finished turn with no answer (a slash command) has nothing to hand over either.
+    const settled = job?.status === 'stopped' || job?.status === 'error' || job?.status === 'done' && !job.messages.some(message => message.role === 'assistant'), target = settled && job?.sessionId || selected?.sessionId;
+    if (!connection || !target || target.startsWith('pending-') || job && job.errorCode !== 'codex_thread_busy' && !settled || demo || loading || loadingOlder || busy || tab !== 'chats') return;
     let cancelled = false;
     const epoch = navigation.current;
     async function sync() {
@@ -627,13 +641,13 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       if(historyExpanded.current&&(fromStart||!nearBottom.current))return;
       try {
         const window=historyWindow.current;
-        const data = await chatHistoryRequest(connection!, `/sessions/${encodeURIComponent(selected!.sessionId)}/messages?provider=${provider}&window=${window}${fromStart ? '&from=start' : ''}`,cacheScope);
+        const data = await chatHistoryRequest(connection!, `/sessions/${encodeURIComponent(target!)}/messages?provider=${provider}&window=${window}${fromStart ? '&from=start' : ''}`,cacheScope);
         if (!cancelled && epoch === navigation.current && !sending.current && !paging.current && window===historyWindow.current && !(historyExpanded.current&&(fromStart||!nearBottom.current))) {setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore((fromStart ? data.next : data.previous)??null);setHistoryError('');}
       } catch (e) {if (!cancelled) setHistoryError((e as Error).message);}
     }
     const stop=startVisiblePoll(sync,3000,false,document,hostGate(connection.url));
     return () => {cancelled = true;stop();};
-  }, [connection, selected?.sessionId, job?.id, job?.errorCode, demo, loading, loadingOlder, busy, tab, fromStart, provider]);
+  }, [connection, selected?.sessionId, job?.id, job?.errorCode, job?.status, job?.sessionId, demo, loading, loadingOlder, busy, tab, fromStart, provider]);
   useEffect(() => {
     // Keep the live answer until the host has flushed it to session history.
     // Only then can normal desktop history polling take over without duplicates.
@@ -650,7 +664,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         if (cancelled || epoch !== navigation.current || sending.current || paging.current || window!==historyWindow.current || historyExpanded.current&&(fromStart||!nearBottom.current)) return;
         if (data.messages.some(message => message.id === lastAnswer!.id)) {
           setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(data.previous??null);setHistoryError('');setJob(null);
-          setSelected(old => old?.sessionId === completed.sessionId ? old : sessions.find(session => session.sessionId === completed.sessionId) || {sessionId:completed.sessionId!,provider,cwd:completed.cwd,summary:t("Текущая задача"),lastModified:completed.startedAt});
+          setSelected(old => old?.sessionId === completed.sessionId ? old : sessionsNow.current.find(session => session.sessionId === completed.sessionId) || {sessionId:completed.sessionId!,provider,cwd:completed.cwd,summary:t("Текущая задача"),lastModified:completed.startedAt});
           return false;
         }
       } catch (error) {if (!cancelled && epoch === navigation.current) setHistoryError((error as Error).message);}
@@ -884,7 +898,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       }catch(e){setError((e as Error).message);sending.current=false;setBusy(false);return;}
       if(epoch!==navigation.current){sending.current=false;setBusy(false);return;}
     }
-    const data = { provider, cwd, sessionId, ...(taskRun&&!payload?.branch?{taskRunId:taskRun.id}:{}), text, attachments: ids, model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):account?customModels.model:(model||'sonnet'), mode: provider==='claude'&&access==='plan'?'plan':'default', ...(provider==='claude'?{maxBudgetUsd:clampBudget(budget),claudeAccess:access==='plan'?claudeAccess:access as ClaudeAccess,...(account?{account}:{claudeEffort:claudeEffort.value||undefined})}:provider==='codex'?{codexAccess:access as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), ...(timeout?{approvalTimeoutMinutes:timeout}:{}), takeoverConfirmed: true };
+    const data = { provider, cwd, sessionId, ...(taskRun&&!payload?.branch?{taskRunId:taskRun.id}:{}), text, attachments: ids, model:provider==='copilot'?(model||'auto'):provider==='codex'?(codexEffort.options.length?codexEffort.modelId||model:model):account?customModels.model:(model||claudeDefaultModel), mode: provider==='claude'&&access==='plan'?'plan':'default', ...(provider==='claude'?{maxBudgetUsd:clampBudget(budget),claudeAccess:access==='plan'?claudeAccess:access as ClaudeAccess,...(account?{account}:{claudeEffort:claudeEffort.value||undefined})}:provider==='codex'?{codexAccess:access as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined}:{}), ...(timeout?{approvalTimeoutMinutes:timeout}:{}), takeoverConfirmed: true };
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {
@@ -1064,7 +1078,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             stopLabel={runUnknown?t("Повторить связь"):t("Остановить {0}",engineName)} stopRetry={runUnknown} onStop={running?runUnknown?()=>retryNow():()=>void stopRun():undefined}
             projectPicker={!selected&&!job&&!taskRun&&!boardChat?.context&&<label className="chat-project-attach"><span>{language==='ru'?'Папка':'Folder'}</span><select aria-label={language==='ru'?'Добавить папку проекта':'Add project folder'} value="" disabled={busy||uploading||demo} onChange={event=>{const root=event.target.value;if(!root)return;void api('/chat-library/projects',{cwd:root}).then(()=>{projectChosen.current=true;setCwd(root);window.dispatchEvent(new Event('pocket-chat-project-added'));}).catch(e=>setError(e.message));}}><option value="">{basename(cwd)||'?'}</option>{(projects||health.roots).map(root=><option key={root} value={root}>{root}</option>)}</select></label>}
             controls={<>{(provider==='claude'||provider==='codex')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}{account?<ModelPicker provider="custom" name={engineName} models={customModels.models} value={customModels.model} onChange={customModels.setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>:<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>}{(provider==='codex'||provider==='claude'&&!account)&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
-            usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||'sonnet')).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']}/>}/>
+            usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||claudeDefaultModel)).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']}/>}/>
         </div></ChatOverlay>
       </>}
     </main>

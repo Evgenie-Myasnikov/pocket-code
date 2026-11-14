@@ -576,6 +576,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/jobs/:id', (req, res) => {
     const job = jobView(uuid.parse(req.params.id));if(!visibleRoot(job.cwd))throw new HttpError(404,"Chat not found");
     if (String(job.revision) === req.query.revision) { res.status(204).end(); return; }
+    // While Claude streams, the revision moves with every token; resend the transcript only when it changed.
+    if (job.messagesRevision !== undefined && String(job.messagesRevision) === req.query.messages) { res.json({ ...job, messages: [], messagesUnchanged: true }); return; }
     res.json(job);
   });
   app.post('/api/jobs', async (req, res) => {
@@ -604,7 +606,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(body.claudeEffort){
       if(body.provider!=='claude')throw new HttpError(400,'Claude effort is only available for Claude');
       const catalog=await claudeCatalog.read(cwd);
-      const selected=catalog.models.find(model=>model.id===(body.model||'sonnet'));
+      const selected=catalog.models.find(model=>body.model?model.id===body.model:model.isDefault);
       if(catalog.source!=='sdk'||!selected?.reasoningEfforts?.includes(body.claudeEffort))throw new HttpError(400,'This Claude model does not advertise the selected effort. Refresh its model catalog.');
     }
     if (body.sessionId) {

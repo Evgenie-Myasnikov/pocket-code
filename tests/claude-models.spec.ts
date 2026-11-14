@@ -31,7 +31,11 @@ test('Claude versions are selectable, persisted and sent; an explicit version ca
  await openChatList(page);await page.getByRole('button',{name:'New chat',exact:true}).click();
  await expect(models).toHaveValue('claude-sonnet-fixture');
  await page.getByLabel('Message Claude').fill('Synthetic pinned model request');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect.poll(()=>sent[0]?.model).toBe('claude-sonnet-fixture');
- await models.selectOption('__custom__');await page.getByLabel('Claude model ID').fill('claude-custom-fixture[1m]');await page.getByRole('button',{name:'Apply',exact:true}).click();await expect(models).toHaveValue('claude-custom-fixture[1m]');
+ await models.selectOption('__custom__');
+ // The form sits above the composer; its field must be on screen and on top, not clipped by the scrolling overlay.
+ await expect.poll(()=>page.getByLabel('Claude model ID').evaluate(input=>{const r=input.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&hit===input;})).toBe(true);
+ await page.screenshot({path:'.local/claude-model-id-form.png'});
+ await page.getByLabel('Claude model ID').fill('claude-custom-fixture[1m]');await page.getByRole('button',{name:'Apply',exact:true}).click();await expect(models).toHaveValue('claude-custom-fixture[1m]');
  await page.screenshot({path:'.local/claude-model-picker-mobile.png'});
 });
 test('an older host still offers aliases and a custom ID without blocking the composer',async({page})=>{
