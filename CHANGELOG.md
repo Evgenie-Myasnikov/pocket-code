@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.47 (unreleased)
 
 ### Changes
 - Settings are grouped by task, the same on the phone and in the Windows window: **Connection** (Connection, Updates), **Agents and board** (Providers, Chat, Board), **Interface** (Appearance and language, Notifications).
