@@ -1,4 +1,5 @@
 import os from 'node:os';
+import {claudeExecutableOption} from './claude-executable.js';
 import { query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { normalizeCodexUsage, type CodexUsageSnapshot, type CodexUsageWindow } from './codex-usage.js';
 import { HttpError } from './security.js';
@@ -56,7 +57,7 @@ export class ClaudeUsageReader {
       stream = this.run({ prompt, options: {
         cwd: os.tmpdir(), abortController: controller, persistSession: false,
         tools: [], strictMcpConfig: true, mcpServers: {}, settingSources: [], permissionMode: 'plan',
-        ...(process.env.CLAUDE_EXECUTABLE ? { pathToClaudeCodeExecutable: process.env.CLAUDE_EXECUTABLE } : {}),
+        ...claudeExecutableOption(),
       } });
       const read = stream.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
       if (typeof read !== 'function') throw new Error('Usage API unavailable');

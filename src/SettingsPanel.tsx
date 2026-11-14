@@ -1,4 +1,5 @@
 import {CustomProviderAccount,CustomProviderList} from './CustomProviderAccounts';
+import {ClaudeEngineUpdate} from './ClaudeEngineUpdate';
 import {ClaudeAccessSettings,claudeAccessLabel} from './ClaudeAccessSettings';
 import {ComposerSettings} from './ComposerSettings';
 import {MiroSettings} from './MiroSettings';
@@ -92,7 +93,7 @@ export function SettingsPanel({connectionPanel,workspaceSelector,page,onPage,sub
       {page==='usage'&&<UsageLimits connection={connection} provider={provider}/>}
       {page==='miro'&&<MiroSettings connection={connection} roots={roots}/>}
       {page==='jira'&&jiraEnabled()&&<JiraSettings key={provider} connection={connection} provider={provider}/>}
-      {page==='updates'&&<><div id="settings-updates"/><EngineUpdates connection={connection} provider={provider}/></>}
+      {page==='updates'&&<><div id="settings-updates"/><EngineUpdates connection={connection} provider={provider}/><ClaudeEngineUpdate connection={connection}/></>}
       {page==='notifications'&&<><RunAlertsToggle/><LimitAlertsToggle/></>}{page==='connection'&&connectionPanel}
       {page==='about'&&<div className="settings-about"><span className="logo"><Terminal size={24}/></span><h3>Pocket Code</h3><span className="version">BETA</span><p>{t('Версия {0}',pkg.version)}</p><p className="muted">{t('Claude Code и Codex с вашего ПК — на телефоне.')}</p></div>}
     </>}</div>

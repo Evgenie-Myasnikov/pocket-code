@@ -1,4 +1,5 @@
 import {setCustomAccount,useCustomAccount,useCustomModels} from './custom-account';
+import {ClaudeEngineUpdate,claudeOutdated} from './ClaudeEngineUpdate';
 import {chatTitle} from './chat-title';
 import {MessageBranch,type BranchTarget} from './MessageBranch';
 import {createPortal} from 'react-dom';
@@ -12,7 +13,7 @@ import {ChatHistorySkeleton} from './ChatHistorySkeleton';
 import {scrollChatToLatest} from './chat-scroll-motion';
 import {matchingBoardSelection,type BoardSelection} from './board-selection-context';
 import {boardImageMime,boardImageFile,takeBoardImageDrag,takeQueuedBoardImages,type BoardImage} from './board-image-drag';
-import {prepareBoardConversation,attachBoardConversation,currentBoardConversation} from './board-conversation';
+import {prepareBoardConversation,attachBoardConversation,currentBoardConversation,boardChatLane} from './board-conversation';
 import {boardConversationHost} from './board-conversation-host';
 import {captureTextAnchor,restoreTextAnchor} from './chat-text-anchor';
 import {chatHistoryRequest,readHistoryView,writeHistoryView} from './chat-history-cache';
@@ -535,7 +536,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     }catch(e){if((e as {status?:number}).status===428)setWorkspacePasswordRequest(c);setError((e as Error).message);}finally{setBusy(false);}
   }
   useEffect(()=>{if(!boardChat?.conversation||!job)return;try{// The host learns the board's current chat as soon as its session exists, so other devices resume this one.
-      if(attachBoardConversation(boardChat.conversation,provider,job.sessionId,job.id)&&boardChat.context&&connection&&job.sessionId&&!job.sessionId.startsWith('pending-'))void boardConversationHost(connection).write(boardChat.root,boardChat.boardId,{provider,sessionId:job.sessionId});}catch{setError(t('Не удалось сохранить привязку чата доски.'));}},[boardChat?.conversation?.key,boardChat?.conversation?.generation,provider,job?.id,job?.sessionId]);
+      if(attachBoardConversation(boardChat.conversation,provider,job.sessionId,job.id)&&boardChat.context&&connection&&job.sessionId&&!job.sessionId.startsWith('pending-'))void boardConversationHost(connection).write(boardChat.root,boardChat.boardId,{provider,sessionId:job.sessionId},boardChatLane(provider,account));}catch{setError(t('Не удалось сохранить привязку чата доски.'));}},[boardChat?.conversation?.key,boardChat?.conversation?.generation,provider,job?.id,job?.sessionId]);
   useEffect(()=>{if(embedded&&!embedded.session&&job?.sessionId&&(!boardChat?.conversation||currentBoardConversation(boardChat.conversation)))embedded.onCreated?.({sessionId:job.sessionId,cwd:job.cwd,summary:job.messages.find(m=>m.role==='user')?.blocks.find(b=>b.type==='text')?.text||'New',lastModified:job.startedAt,...(job.account?{account:job.account}:{})},job);},[job?.sessionId]);
   const embeddedTarget=embedded?.session?.sessionId||'new:'+embedded?.cwd;
   const embeddedOpened=useRef<string|null>(null);
@@ -751,7 +752,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     } catch (e) {if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);} finally
     {if (epoch === navigation.current) setLoading(false);}
   }
-  async function launchBoardChat(target:BoardChat,replace=false){try{const next=await prepareBoardConversation(connection!,target,provider,replace,boardConversationHost(connection!));if(embedded){embedded.onNewBoardChat?.(next);}else setBoardLaunch(next);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}}
+  async function launchBoardChat(target:BoardChat,replace=false){try{const next=await prepareBoardConversation(connection!,target,provider,replace,boardConversationHost(connection!),account);if(embedded){embedded.onNewBoardChat?.(next);}else setBoardLaunch(next);}catch{setError(t('Не удалось сохранить привязку чата доски.'));}}
   useEffect(()=>{if(!boardLaunch||!health||busy||uploading)return;const target=boardLaunch,resuming=Boolean(target.context&&target.conversation?.generation===boardChat?.conversation?.generation&&target.boardId===boardChat?.boardId);if(!connection||target.connectionUrl&&target.connectionUrl!==connection.url){setError(t('Подключите ПК этой доски через Connection, чтобы открыть её чат.'));setBoardLaunch(null);return;}const targetProvider=target.taskRun?.provider||target.note.chat?.provider;if(targetProvider&&targetProvider!==provider){setProvider(targetProvider);return;}setBoardLaunch(null);setBoardChat(target);if(target.note.chat){void openSession({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()},target.resumeJobId?{id:target.resumeJobId,sessionId:target.note.chat.sessionId}:undefined,target);if(target.followUp)appendDraft(target.prompt);}else{newChat(target.root,target);if(!resuming)setDraft(target.context?t('Discuss this board with me.'):target.prompt);}},[boardLaunch,provider,health,busy,uploading]);
   // A chat started from a board keeps that link in the host chat library, so every chat list marks it and can open the board.
   const boardLinkOf=(target:BoardChat):BoardLink=>({id:target.boardId,root:target.root,title:(target.context?.name||target.note.title||t('Доска')).slice(0,200),kind:target.context?'discussion':target.taskRun?'task':'note',...(target.context?{}:{noteId:target.note.id})});
@@ -1054,7 +1055,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={job.messages} partialText={job.partial} streaming={running&&!runUnknown} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>}
             {job?.expiredApprovals?.map((item,index)=><p key={`expired-${index}`} className="approval-expired transcript-event" role="status">{t('Время ожидания истекло — агенту отправлен отказ')} · {item.tool}</p>)}
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers, extra) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers, ...extra });if(allow&&a.tool==='ExitPlanMode'&&extra?.mode){const key=currentDraftKey(),mode=extra.mode;setAccessChoices(old=>({...old,[key]:mode}));}}} />)}
-            {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error-banner">{t(job.error)}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
+            {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error-banner">{t(job.error)}{provider==='claude'&&claudeOutdated(job.error)&&<ClaudeEngineUpdate connection={connection} compact/>}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
             {job?.status === 'done' && <div className="turn-complete" role="status"><ShieldCheck size={14} />{t(" Готово ")}{turnEnd?.id===job.id&&<><span>· <time dateTime={new Date(turnEnd.at).toISOString()}>{new Date(turnEnd.at).toLocaleTimeString(locale(),{hour:'2-digit',minute:'2-digit'})}</time></span><span className="turn-duration">· {elapsed(turnEnd.at-job.startedAt)}</span></>}{job.cost !== undefined && <span>· ${job.cost.toFixed(4)}</span>}</div>}
             <div ref={bottom} />
           </div>

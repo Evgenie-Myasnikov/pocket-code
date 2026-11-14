@@ -1,4 +1,5 @@
 import {DeviceRegistry} from './devices.js';
+import {warmClaudeExecutable} from './claude-executable.js';
 import {RunMonitor} from './run-monitor.js';
 import {CopilotService} from './copilot.js';
 import { randomBytes } from 'node:crypto';
@@ -109,3 +110,4 @@ function shutdown(preserveTunnel = false): Promise<void> {
   return shutdownPromise;
 }
 process.on('SIGINT', () => { void shutdown(); }); process.on('SIGTERM', () => { void shutdown(); });
+void warmClaudeExecutable();

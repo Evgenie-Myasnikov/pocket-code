@@ -1,4 +1,5 @@
 import {query, type ModelInfo} from '@anthropic-ai/claude-agent-sdk';
+import {claudeExecutableOption} from './claude-executable.js';
 import {PromptStream} from './prompt-stream.js';
 import {claudeFallbackModels, validModelId, type ProviderModel} from './provider-model.js';
 export type ClaudeCatalog = {models: ProviderModel[]; source: 'sdk' | 'fallback'; error?: string};
@@ -41,7 +42,7 @@ export class ClaudeModelCatalog {
         cwd, abortController: controller, settingSources: ['user', 'project', 'local'],
         // Settings decide the default and allowed models; MCP servers, tools and a saved session are not needed to list them.
         tools: [], strictMcpConfig: true, mcpServers: {}, persistSession: false,
-        ...(process.env.CLAUDE_EXECUTABLE ? {pathToClaudeCodeExecutable: process.env.CLAUDE_EXECUTABLE} : {}),
+        ...claudeExecutableOption(),
       }});
       const raw = await Promise.race([
         stream.supportedModels(),

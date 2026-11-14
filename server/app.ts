@@ -1,4 +1,5 @@
 import {mountSpeech} from './speech.js';
+import {claudeRuntime,updateInstalledClaude} from './claude-executable.js';
 import {ChatLibrary} from './chat-library.js';
 import {BoardMcpRuntime} from './board-mcp-runtime.js';
 import {ChatPageSync} from './chat-page-sync.js';
@@ -168,6 +169,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const sourceRoot = await pocketSource(roots);
   const engineStatus = async () => config.engineUpdates ? { supported: true, sourceRoot, ...(await config.engineUpdates.status()) } : { supported: false };
   app.get('/api/engine-updates', async (_req,res) => res.json(await engineStatus()));
+  // Claude Code on this PC: which copy runs the turns, and the installed copy's own updater.
+  app.get('/api/engine-updates/claude', async (_req,res) => res.json(await claudeRuntime()));
+  app.post('/api/engine-updates/claude', async (_req,res) => {
+    if(workspaceAccess.current())throw new HttpError(403,'Only the PC owner updates its AI engines');
+    const result=await updateInstalledClaude();res.json({...result,...(await claudeRuntime(true))});
+  });
   app.post('/api/engine-updates/check', async (_req,res) => { if(config.engineUpdates)await config.engineUpdates.check();res.json(await engineStatus()); });
   app.post('/api/engine-updates/settings', async (req,res) => {
     const body=z.object({provider:providerSchema,enabled:z.boolean().optional()}).parse(req.body);
@@ -420,17 +427,19 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({cwd});
   });
   // The board's current discussion chat is host state: the PC window and every phone resume the same conversation.
-  const boardChatKey=(root:string,board:string)=>board+'|'+(process.platform==='win32'?root.toLowerCase():root);
-  const boardChatTarget=z.object({root:z.string().min(1).max(4096),board:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/)});
+  // One pointer per provider lane; Codex keeps the key of the single-chat era so existing board chats stay found.
+  const boardChatKey=(root:string,board:string,lane?:string)=>board+'|'+(process.platform==='win32'?root.toLowerCase():root)+(lane&&lane!=='codex'?'|'+lane:'');
+  const boardChatTarget=z.object({root:z.string().min(1).max(4096),board:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),lane:z.string().regex(/^(claude|codex|copilot)(:[A-Za-z0-9_-]{1,128})?$/).optional()});
   app.get('/api/project-board/chat',async(req,res)=>{
     if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
-    const query=boardChatTarget.parse(req.query),root=await allowedPath(accessRoots(),query.root,true),data=await chatLibrary.read(),saved=data.boardChats?.[boardChatKey(root,query.board)];
-    res.json({chat:saved&&!data.chats[saved.provider+':'+saved.sessionId]?.deleted?{provider:saved.provider,sessionId:saved.sessionId}:null});
+    const query=boardChatTarget.parse(req.query),root=await allowedPath(accessRoots(),query.root,true),data=await chatLibrary.read(),saved=data.boardChats?.[boardChatKey(root,query.board,query.lane)];
+    res.json({chat:saved&&(!query.lane||query.lane.split(':')[0]===saved.provider)&&!data.chats[saved.provider+':'+saved.sessionId]?.deleted?{provider:saved.provider,sessionId:saved.sessionId}:null});
   });
   app.post('/api/project-board/chat',async(req,res)=>{
     if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
-    const body=boardChatTarget.extend({provider:providerSchema.optional(),sessionId:uuid.nullable()}).parse(req.body),root=await allowedPath(accessRoots(),body.root,true),key=boardChatKey(root,body.board);
+    const body=boardChatTarget.extend({provider:providerSchema.optional(),sessionId:uuid.nullable()}).parse(req.body),root=await allowedPath(accessRoots(),body.root,true),key=boardChatKey(root,body.board,body.lane);
     if(body.sessionId&&!body.provider)throw new HttpError(400,'A provider is required');
+    if(body.sessionId&&body.lane&&body.lane.split(':')[0]!==body.provider)throw new HttpError(400,'The chat belongs to another provider');
     await chatLibrary.edit(data=>{const next={...data.boardChats};if(body.sessionId)next[key]={provider:body.provider!,sessionId:body.sessionId,at:Date.now()};else delete next[key];const keys=Object.keys(next);if(keys.length>500)for(const old of keys.sort((a,b)=>next[a].at-next[b].at).slice(0,keys.length-500))delete next[old];data.boardChats=next;});
     res.json({ok:true});
   });

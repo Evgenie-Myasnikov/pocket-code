@@ -1,4 +1,5 @@
 import type {BoardMcpConfiguration} from './board-mcp-runtime.js';
+import {claudeExecutableOption} from './claude-executable.js';
 import { userInputBlocks } from './user-input-blocks.js';
 import { randomUUID } from 'node:crypto';
 import { query, type PermissionResult, type PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
@@ -110,7 +111,7 @@ export class Jobs {
         abortController: job.controller, includePartialMessages: true,
         settingSources: ['user', 'project', 'local'],...(Object.keys(mcpServers).length?{mcpServers}:{}),
         systemPrompt: { type: 'preset', preset: 'claude_code', append: await projectBoardInstructions(input.cwd) },
-        ...(process.env.CLAUDE_EXECUTABLE ? { pathToClaudeCodeExecutable: process.env.CLAUDE_EXECUTABLE } : {}),
+        ...claudeExecutableOption(),
         ...(input.env ? { env: input.env } : {}),
         canUseTool: async (tool, toolInput, options) => this.ask(job, tool, toolInput, options.signal, options.suggestions),
       } });

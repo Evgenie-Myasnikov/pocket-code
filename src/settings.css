@@ -44,3 +44,4 @@
  .settings-category,.settings-category>svg:last-child,.settings-back>svg{transition:none;transform:none}
 }
 @media(forced-colors:active){:root[data-theme] .settings-list-detail>.settings-index .settings-category.current{outline:2px solid Highlight;outline-offset:-2px}}
+.claude-engine-update{display:grid;gap:8px;justify-items:start;margin-block:12px}.claude-engine-update.compact{margin-block:8px 0}.claude-engine-update button{display:inline-flex;align-items:center;gap:8px}

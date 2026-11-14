@@ -152,6 +152,8 @@ export function DesktopApp(){
     const alertTarget=notificationChat?.provider===provider?notificationChat:null;
     if(!boardTarget&&!alertTarget){setSelected(null);setCreating(false);}
     setProject('');setProjectFilter('');
+    // A board chat open beside the board switches to this provider's chat of the same board.
+    if(!boardTarget&&boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));
   },[provider]);
   useEffect(()=>{if(!state.online)return;let active=true;setLoading(true);
     const stop=startVisiblePoll(async()=>{try{const list=await request<Session[]>(connection,`/sessions?provider=${provider}`);if(!active)return;setSessions(old=>shareSnapshot(old,list));writeChatCache('desktop-local',provider,'sessions',list);setError('');}catch(e){if(active&&!(e as {code?:string}).code?.startsWith('host_'))setError((e as Error).message);}finally{if(active)setLoading(false);}},10000);return()=>{active=false;stop();};
@@ -160,7 +162,7 @@ export function DesktopApp(){
   useEffect(()=>{if(!state.online)return;let active=true;const stop=startVisiblePoll(async()=>{try{const runs=await request<JobView[]>(connection,`/jobs?provider=${provider}`);if(active)setJobs(old=>shareSnapshot(old,runs));}catch{/* Keep the last known run state during a transient disconnect. */}},1000);return()=>{active=false;stop();};},[state.online,provider,revision]);
   // Custom providers share the Claude workspace; each lists only its own chats, the PC's Claude sign-in lists the rest.
   const customAccount=useCustomAccount(),account=provider==='claude'?customAccount:'';
-  const previousAccount=useRef(account);useEffect(()=>{if(previousAccount.current===account)return;previousAccount.current=account;if(!selected?.account&&!account||selected?.account===account)return;setSelected(null);setCreating(false);},[account]);
+  const previousAccount=useRef(account);useEffect(()=>{if(previousAccount.current===account)return;previousAccount.current=account;if(!selected?.account&&!account||selected?.account===account)return;setSelected(null);setCreating(false);if(boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));},[account]);
   const latestJobs=useMemo(()=>{const map=new Map<string,JobView>();for(const job of [...jobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[jobs]);
   const chatSessions=useMemo(()=>{const map=new Map(sessions.map(item=>[item.sessionId,item]));for(const job of latestJobs.values())if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,{sessionId:job.sessionId,cwd:job.cwd,summary:name(job.cwd),lastModified:job.startedAt,...(job.account?{account:job.account}:{})});return [...map.values()].filter(item=>provider!=='claude'||(item.account||'')===account).sort((a,b)=>Number(latestJobs.get(b.sessionId)?.status==='running')-Number(latestJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[sessions,latestJobs,provider,account]);
   const allFolders=useMemo(()=>Array.from(new Set([...projects,...sessions.map(item=>item.cwd||'').filter(Boolean)])).sort(),[projects,sessions]);
@@ -170,8 +172,9 @@ export function DesktopApp(){
   const projectRoot=project||selected?.cwd||allFolders[0]||'';
   const visible=chatSessions.filter(item=>!projectFilter||item.cwd===projectFilter);
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
+  const laneTarget=(target:BoardChat):BoardChat=>({...target,conversation:undefined,resumeJobId:undefined,note:{...target.note,chat:undefined}});
   async function openBoardChat(target:BoardChat,prepared=false){
-    try{if(!prepared)target=await prepareBoardConversation(connection,target,provider,false,boardConversationHost(connection));setNotificationChat(null);setDocDraft('');setBoardChat(target);setProject(target.root);if(target.conversation){const saved=readBoardConversation(target.conversation.key);if(saved)setProvider(saved.provider);}if(target.taskRun)setProvider(target.taskRun.provider);if(target.note.chat){setProvider(target.note.chat.provider);setSelected({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now()});setCreating(false);}else{setSelected(null);setCreating(true);}setPage(target.context?'work':'chats');}catch{setError(label('Could not save the board chat association.','Не удалось сохранить привязку чата доски.'));}
+    try{if(!prepared)target=await prepareBoardConversation(connection,target,provider,false,boardConversationHost(connection),account);setNotificationChat(null);setDocDraft('');setBoardChat(target);setProject(target.root);if(target.taskRun)setProvider(target.taskRun.provider);if(target.note.chat){if(target.note.chat.provider!==provider)setProvider(target.note.chat.provider);setSelected({sessionId:target.note.chat.sessionId,cwd:target.root,summary:target.note.title,lastModified:Date.now(),...(target.note.chat.provider==='claude'&&account?{account}:{})});setCreating(false);}else{setSelected(null);setCreating(true);}setPage(target.context?'work':'chats');}catch{setError(label('Could not save the board chat association.','Не удалось сохранить привязку чата доски.'));}
   }
   function startChat(){if(!state.online||!projectRoot)return;setDocDraft('');setNotificationChat(null);setBoardChat(undefined);setCreating(true);setSelected(null);setPage('chats');}
   function openChat(session:Session){if(session.board?.kind==='discussion'&&state.online){void openDiscussion(session,session.board);return;}openPlainChat(session);}
@@ -182,7 +185,7 @@ export function DesktopApp(){
       const board=await loadLinkedBoard(connection,link);
       const target:BoardChat={root:board.root,boardId:board.id,connectionUrl:connection.url,context:{name:board.name,revision:(board as {repositoryRevision?:string}).repositoryRevision||String(board.revision)},prompt:boardChatContext(board,[]),note:{id:board.id,title:board.name,description:'',owner:'',status:'idea',priority:'normal',branch:'',x:0,y:0,dependencies:[]}};
       // The chat picked from the list becomes the board's chat, so the board and the list keep one history.
-      const prepared=await adoptBoardConversation(connection,target,provider,session.sessionId,boardConversationHost(connection));
+      const prepared=await adoptBoardConversation(connection,target,provider,session.sessionId,boardConversationHost(connection),session.account||account);
       setNotificationChat(null);setDocDraft('');setBoardChat({...prepared,note:{...prepared.note,chat:{provider,sessionId:session.sessionId}}});setProject(board.root);setSelected(session);setCreating(false);
       setNoticeTarget({board,connection,noteId:'',message:'',requestId:Date.now()});setPage('work');
     }catch{openPlainChat(session);}

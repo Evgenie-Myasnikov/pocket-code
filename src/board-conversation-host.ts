@@ -7,17 +7,17 @@ const providers=['claude','codex','copilot'];
 export function boardConversationHost(connection:Connection):BoardConversationHost{
  const scope=JSON.stringify([connection.url,connection.token,Boolean(connection.desktop),connection.workspaceId||'']);
  return {
-  async read(root,boardId){
+  async read(root,boardId,lane){
    try{
     // Opening a board chat never waits long for this: an older or busy host answers "unknown".
-    const result=await Promise.race([request<{chat?:SharedConversation|null}>(connection,'/project-board/chat?'+new URLSearchParams({root,board:boardId})),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4000))]);
+    const result=await Promise.race([request<{chat?:SharedConversation|null}>(connection,'/project-board/chat?'+new URLSearchParams({root,board:boardId,...(lane?{lane}:{})})),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4000))]);
     if(!result||typeof result!=='object'||!('chat' in result))return undefined;
     const chat=result.chat;return chat&&providers.includes(chat.provider)&&typeof chat.sessionId==='string'&&chat.sessionId&&!chat.sessionId.startsWith('pending-')?{provider:chat.provider,sessionId:chat.sessionId}:null;
    }catch{return undefined;}
   },
-  async write(root,boardId,value){
-   const key=scope+'|'+root+'|'+boardId,next=value?value.provider+':'+value.sessionId:'';if(published.get(key)===next)return;published.set(key,next);
-   try{await request(connection,'/project-board/chat',{root,board:boardId,sessionId:value?value.sessionId:null,...(value?{provider:value.provider}:{})});}catch{published.delete(key);/* Older hosts keep the association on this device only. */}
+  async write(root,boardId,value,lane){
+   const key=scope+'|'+root+'|'+boardId+'|'+(lane||''),next=value?value.provider+':'+value.sessionId:'';if(published.get(key)===next)return;published.set(key,next);
+   try{await request(connection,'/project-board/chat',{root,board:boardId,...(lane?{lane}:{}),sessionId:value?value.sessionId:null,...(value?{provider:value.provider}:{})});}catch{published.delete(key);/* Older hosts keep the association on this device only. */}
   }
  };
 }

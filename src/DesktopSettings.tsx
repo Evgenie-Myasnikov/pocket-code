@@ -1,4 +1,5 @@
 import {CustomProviderAccount,CustomProviderList} from './CustomProviderAccounts';
+import {ClaudeEngineUpdate} from './ClaudeEngineUpdate';
 import {ClaudeAccessSettings,claudeAccessLabel} from './ClaudeAccessSettings';
 import {CodexAccessSettings,codexAccessLabel} from './CodexAccessSettings';
 import {ComposerSettings} from './ComposerSettings';
@@ -72,7 +73,7 @@ export function DesktopSettings({state,connection,appearance,action,connectionPa
     {current==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance} connection={connection}/></>}
     {current==='workspace'&&(custom?<CustomProviderAccount connection={connection} online={state.online} id={custom} onSaved={setCustom} onRemoved={()=>setCustom(null)}/>:provider?<><ProviderConnections connection={connection} online={state.online} only={provider}/>{provider==='claude'&&<><ClaudeAccessSettings/><BudgetSettings value={device.budget} onChange={device.setBudget}/></>}{provider==='codex'&&<CodexAccessSettings value={device.codexAccess} onChange={device.setCodexAccess}/>}{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}</>:<nav className="settings-index" aria-label={t('Провайдеры AI')}>{(['claude','codex','copilot'] as const).map(id=><button className="settings-category" key={id} aria-labelledby={'desktop-provider-'+id} aria-describedby={'desktop-provider-'+id+'-summary'} onClick={()=>setProvider(id)}><span><strong id={'desktop-provider-'+id}>{providerNames[id]}</strong><small id={'desktop-provider-'+id+'-summary'}>{providerSummary(id)}</small></span><ChevronRight size={20} aria-hidden="true"/></button>)}<CustomProviderList connection={connection} online={state.online} onOpen={setCustom}/></nav>)}
     {current==='usage'&&<UsageLimits connection={state.online?connection:null} provider="claude"/>}
-    {current==='updates'&&<DesktopUpdates state={state} action={action} onConnection={onConnection||(()=>open('connection'))}/>}
+    {current==='updates'&&<><DesktopUpdates state={state} action={action} onConnection={onConnection||(()=>open('connection'))}/><h3>{t('AI на этом ПК')}</h3><ClaudeEngineUpdate connection={state.online?connection:null}/></>}
     {current==='about'&&<><h3>Pocket Code</h3><p>{pkg.version}</p><p>{t('Личные AI-чаты и общие проектные доски на вашем ПК.')}</p></>}
    </>}</div></section>;
 }

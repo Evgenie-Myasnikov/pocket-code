@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+- Board chat: each provider (Claude, Codex, Copilot and every custom provider) keeps its own chat of a board. Opening the board chat or switching the provider beside the board opens the selected provider's chat; before, the board always switched back to the provider that started its first chat. The existing Codex board chat stays where it was.
+- Claude: the bundled Claude Code is 2.1.325 (was 2.1.285, which newer models refuse). Turns, the model list and usage run with the newest Claude Code on the PC, bundled or installed.
+
+### Features
+- **Update Claude Code** runs the updater of the Claude Code installed on the PC. The button is on the Updates page of both apps and under a chat error that says the Claude Code is too old for the model.
+
+### Validation
+- TypeScript passes; the desktop window compiles. Unit tests: the board chat tests cover one chat per provider on the device and on the host. On this PC the host found bundled 2.1.325 and installed 2.1.319 and chose the bundled one. The update button and a Claude turn were not run live.
+
 ## [0.28.45](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.44...v0.28.45) (2026-11-14)
 
 Published [v0.28.45](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.45) from [44a53f3eab325432bf7a69ad42f2f51dd902eed7](https://github.com/Evgenie-Myasnikov/pocket-code/commit/44a53f3eab325432bf7a69ad42f2f51dd902eed7) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 132. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit. Privacy guard passed for the tree. The published packages were not installed on a phone or the desktop window.

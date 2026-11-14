@@ -17,7 +17,8 @@ const connection={url:'http://127.0.0.1:4318',token:'synthetic-account'},phone={
 /** One host shared by two devices, as the PC is. */
 function sharedHost(){
  const pointers=new Map<string,SharedConversation>(),writes:(SharedConversation|null)[]=[];
- const host:BoardConversationHost={async read(root,boardId){return pointers.get(root+'|'+boardId)||null;},async write(root,boardId,value){writes.push(value);if(value)pointers.set(root+'|'+boardId,value);else pointers.delete(root+'|'+boardId);}};
+ const id=(root:string,boardId:string,lane?:string)=>root+'|'+boardId+(lane&&lane!=='claude'?'|'+lane:'');
+ const host:BoardConversationHost={async read(root,boardId,lane){return pointers.get(id(root,boardId,lane))||null;},async write(root,boardId,value,lane){writes.push(value);if(value)pointers.set(id(root,boardId,lane),value);else pointers.delete(id(root,boardId,lane));}};
  return {host,pointers,writes};
 }
 
@@ -27,7 +28,7 @@ test('two devices resume one board chat: the host says which conversation is cur
  const desktop=await prepareBoardConversation(connection,board,'claude',false,host);assert.equal(desktop.note.chat,undefined);
  assert.equal(attachBoardConversation(desktop.conversation!,'claude','session-desktop','job-1'),true);await host.write(board.root,board.boardId,{provider:'claude',sessionId:'session-desktop'});
  // The phone has no local association: it resumes the same conversation instead of starting a second one.
- const mobile=await prepareBoardConversation(phone,board,'codex',false,host);assert.deepEqual(mobile.note.chat,{provider:'claude',sessionId:'session-desktop'});assert.notEqual(mobile.conversation!.key,desktop.conversation!.key);
+ const mobile=await prepareBoardConversation(phone,board,'claude',false,host);assert.deepEqual(mobile.note.chat,{provider:'claude',sessionId:'session-desktop'});assert.notEqual(mobile.conversation!.key,desktop.conversation!.key);
  // The phone starts a new board chat; the PC follows it the next time the board chat opens.
  const fresh=await prepareBoardConversation(phone,board,'claude',true,host);assert.equal(fresh.note.chat,undefined);assert.equal(pointers.size,0);
  assert.equal(attachBoardConversation(fresh.conversation!,'claude','session-phone'),true);await host.write(board.root,board.boardId,{provider:'claude',sessionId:'session-phone'});
@@ -42,7 +43,7 @@ test('a device that already knows the board chat tells a host that does not; an 
  const published=await prepareBoardConversation(connection,board,'claude',false,host);assert.equal(published.conversation!.generation,local.conversation!.generation);await Promise.resolve();
  assert.deepEqual(pointers.get(board.root+'|'+board.boardId),{provider:'claude',sessionId:'session-known'});
  const before=writes.length,offline:BoardConversationHost={read:async()=>undefined,write:async()=>{throw Error('Synthetic host unavailable');}};
- const kept=await prepareBoardConversation(connection,board,'codex',false,offline);assert.equal(kept.note.chat?.sessionId,'session-known');assert.equal(kept.conversation!.generation,local.conversation!.generation);assert.equal(writes.length,before);
+ const kept=await prepareBoardConversation(connection,board,'claude',false,offline);assert.equal(kept.note.chat?.sessionId,'session-known');assert.equal(kept.conversation!.generation,local.conversation!.generation);assert.equal(writes.length,before);
 });
 
 test('a discussion opened from the chat list becomes the board chat on this device and on the host',async()=>{
@@ -76,4 +77,18 @@ test('the host keeps one current chat per board and project, hides a deleted cha
   assert.equal((await call('/project-board/chat',{root,board,provider:'claude',sessionId:'not-a-session'})).status,400);assert.equal((await call('/project-board/chat',{root,board:'../escape',provider:'claude',sessionId})).status,400);
   assert.equal((await call('/project-board/chat',{root:outside,board,provider:'claude',sessionId})).status,403);assert.equal((await call(query,undefined,'wrong')).status,401);
  }finally{jobs.close();terminals.close();await new Promise<void>(r=>server.close(()=>r()));await rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:100});await rm(outside,{recursive:true,force:true});}
+});
+
+test('each provider keeps its own board chat: picking another provider opens that provider\'s chat, not the first one',async()=>{
+ const {host,pointers}=sharedHost(),board=target(randomUUID());
+ const codex=await prepareBoardConversation(connection,board,'codex',false,host);assert.equal(attachBoardConversation(codex.conversation!,'codex','session-codex'),true);await host.write(board.root,board.boardId,{provider:'codex',sessionId:'session-codex'},'codex');
+ // Claude, a custom provider account and Copilot each start their own chat of the same board.
+ const claude=await prepareBoardConversation(connection,board,'claude',false,host);assert.equal(claude.note.chat,undefined);assert.notEqual(claude.conversation!.key,codex.conversation!.key);
+ const custom=await prepareBoardConversation(connection,board,'claude',false,host,'account-1');assert.equal(custom.note.chat,undefined);assert.notEqual(custom.conversation!.key,claude.conversation!.key);
+ const copilot=await prepareBoardConversation(phone,board,'copilot',false,host);assert.equal(copilot.note.chat,undefined);
+ assert.equal(attachBoardConversation(claude.conversation!,'claude','session-claude'),true);await host.write(board.root,board.boardId,{provider:'claude',sessionId:'session-claude'},'claude');
+ // Back on Codex the Codex chat is still the board chat; Claude on the phone resumes the Claude one.
+ assert.equal((await prepareBoardConversation(connection,board,'codex',false,host)).note.chat?.sessionId,'session-codex');
+ assert.deepEqual((await prepareBoardConversation(phone,board,'claude',false,host)).note.chat,{provider:'claude',sessionId:'session-claude'});
+ assert.equal(pointers.size,2);
 });
