@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Preparing 0.28.55 (Android version code 142). Web, Windows, PC host and Android packages built successfully. Publication requires the signing identity used by 0.28.54 and GitHub Releases write access.
+
 ### Features
 - Chat activity (2026-11-22). The default brief view folds successful shell commands from each user turn into one expandable history. Output stays available and running commands, failures and approval requests remain visible. Desktop and phone browser checks covered turn boundaries, the detailed view and retained command output.
 - Turn results (2026-11-22). On Windows the output and working folder buttons open Explorer after the local host verifies the directory. Phones browse the connected PC inside Pocket Code. Native path tests and desktop and phone browser tests covered scoped navigation, failure recovery and file previews.
