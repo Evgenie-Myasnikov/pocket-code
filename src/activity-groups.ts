@@ -6,7 +6,7 @@ import {startsTurn} from './turn-changes';
 
 /** Brief folds a turn's routine activity into one line; detailed groups it by meaning. Errors, questions and running calls always stay visible. */
 export type DetailMode='brief'|'detailed';
-export type ActivityBlock={block:Block;result?:Block;index:number;messageId:string;running:boolean;live?:boolean};
+export type ActivityBlock={block:Block;result?:Block;index:number;messageId:string;running:boolean;live?:boolean;retained?:boolean};
 /** `live` marks the newest message of a running turn: its trailing reasoning is still being written and stays open, outside any group. */
 export function visibleMessageBlocks(message:ChatMessage,results?:Map<string,Block>,running=false,live=false):ActivityBlock[]{
  const items=message.blocks.flatMap((block,index):ActivityBlock[]=>{
@@ -36,6 +36,7 @@ const joins=(key:string|undefined,current:string|undefined)=>{
 };
 export type ActivityRun={key:string;items:ActivityBlock[]};
 export type CommandSlots=Map<number,ActivityBlock[]>;
+export const commandKey=(messageId:string,callId:string)=>JSON.stringify([messageId,callId]);
 export function groupActivityBlocks(blocks:ActivityBlock[],mode:DetailMode='detailed',commandSlots?:CommandSlots):ActivityRun[]{
  const runs:ActivityRun[]=[];
  let current:string|undefined;
@@ -46,22 +47,23 @@ export function groupActivityBlocks(blocks:ActivityBlock[],mode:DetailMode='deta
  return runs;
 }
 export type TranscriptRun={key:string;message?:ChatMessage;items?:ActivityBlock[];commandSlots?:CommandSlots};
-export function groupActivityMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null,mode:DetailMode='detailed'):TranscriptRun[]{
+export function groupActivityMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null,mode:DetailMode='detailed',retained?:Set<string>):TranscriptRun[]{
  const runs:TranscriptRun[]=[];
  let current:string|undefined;
  let history:ActivityBlock[]|undefined;
  for(const message of messages){
   if(mode==='brief'&&startsTurn(message))history=undefined;
   const items=visibleMessageBlocks(message,results,running?.has(message),message===messages.at(-1));
-  if(!items.length)continue;
-  if(mode==='brief'&&message.role==='assistant'){
+  if(!items.length){if(!message.blocks.length)runs.push({key:message.id,message});continue;}
+  if((mode==='brief'||retained?.size)&&message.role==='assistant'){
    // Keep all transcript messages and block indexes. The first completed command
    // owns the history and the other slots become scroll anchors in their original messages.
    const commandSlots:CommandSlots=new Map();
    for(const item of items){
     if(item.block.type!=='tool_use')continue;
     const view=describeTool(item.block,item.result,item.running);
-    if(view.kind!=='command'||(view.status!=='done'&&view.status!=='nomatch'))continue;
+    if(item.block.id&&retained?.has(commandKey(message.id,item.block.id))){commandSlots.set(item.index,[{...item,retained:true}]);continue;}
+    if(mode!=='brief'||view.kind!=='command'||(view.status!=='done'&&view.status!=='nomatch'))continue;
     if(!history){history=[];commandSlots.set(item.index,history);}
     else commandSlots.set(item.index,[]);
     history.push(item);

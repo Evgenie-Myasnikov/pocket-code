@@ -47,7 +47,10 @@ test('desktop brief mode collects each turn once and detailed mode restores the 
  await expect(histories.first().locator(':scope>summary')).toHaveText('Ran 2 commands');
  await expect(histories.last().locator(':scope>summary')).toHaveText('Ran 1 command');
  await expect(page.getByText('Running the first check.')).toBeVisible();
- await expect(page.locator('[data-message-id=next] details.thinking')).toBeVisible();
+ await expect(page.locator('[data-message-id=next]')).toHaveCount(1);
+ const reason=page.locator('details.thinking');
+ await expect(reason).toBeVisible();
+ expect(await reason.evaluate(el=>Boolean(el.compareDocumentPosition(document.querySelector('[data-command-history=true]')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
  await expect(page.locator('[data-message-id=failure] summary')).toContainText('check-missing');
  await histories.first().locator(':scope>summary').click();
  await expect(histories.first().locator('.activity-group-items>details')).toHaveCount(2);
@@ -65,4 +68,59 @@ test('desktop brief mode collects each turn once and detailed mode restores the 
    await expect(histories.first()).toHaveJSProperty('open',false);
    await page.screenshot({path:process.env.POCKET_COMMAND_HISTORY_CAPTURE,animations:'disabled'});
  }
+});
+
+test('reasoning resumes above command and file updates and resets on the next user turn',async({page})=>{
+  await page.addInitScript(()=>{
+    localStorage.setItem('pocket-code-language-v1','en');
+    localStorage.setItem('pocket-code-background-v1',JSON.stringify({enabled:false}));
+    (window as any).testHistoryPage=()=>({messages:[],previous:null,next:null});
+    (window as any).testRuns=[{id:'turn-fixture',provider:'claude',sessionId:'alpha',cwd:'C:\\Demo\\Atlas',
+      status:'running',startedAt:Date.now(),baseMessageCount:0,approvals:[],revision:1,partial:'',
+      messages:[
+        {id:'ask',role:'user',blocks:[{type:'text',text:'Check the example.'}]},
+        {id:'plan',role:'assistant',blocks:[{type:'thinking',thinking:'Inspect the sample.'}]},
+        {id:'shell',role:'assistant',blocks:[{type:'tool_use',id:'check',name:'Bash',input:{command:'npm test'}}]},
+        {id:'shell-result',role:'user',blocks:[{type:'tool_result',tool_use_id:'check',content:'Tests passed.'}]}
+      ],writePreviews:[{id:'write',tool:'Write',path:'sample.ts',content:'const ok =',totalBytes:10,totalLines:1}]}];
+  });
+  await desktop(page);
+  await page.locator('.desktop-sessions>button').first().click();
+  const reason=page.locator('details.thinking'),commands=page.locator('[data-command-history=true]'),file=page.locator('.edit-activity');
+  await expect(reason).toHaveCount(1);
+  if(!await reason.evaluate(el=>(el as HTMLDetailsElement).open))await reason.locator('summary').click();
+  await expect(reason.locator('.reasoning-content')).toHaveText('Inspect the sample.');
+  await reason.evaluate(el=>{(window as any).originalReason=el;});
+  await expect(file.locator('.edit-live-snippet')).toHaveText('const ok =');
+  await page.evaluate(()=>{
+    const run=(window as any).testRuns[0];
+    run.messages.push({id:'resume',role:'assistant',blocks:[{type:'thinking',thinking:'Verify the written file.'}]});
+    run.writePreviews[0].content+=' true;';run.writePreviews[0].totalBytes+=6;run.revision++;
+  });
+  await expect(file.locator('.edit-live-snippet')).toHaveText('const ok = true;');
+  await expect(reason).toHaveCount(1);
+  await expect(reason.locator('.reasoning-content')).toContainText('Inspect the sample.');
+  await expect(reason.locator('.reasoning-content')).toContainText('Verify the written file.');
+  expect(await reason.evaluate(el=>el===(window as any).originalReason)).toBe(true);
+  await expect(commands).toHaveCount(1);
+  await expect(commands.locator(':scope>summary')).toHaveText('Ran 1 command');
+  expect(await commands.evaluate(el=>Boolean((window as any).originalReason.compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+  await page.evaluate(()=>{
+    const run=(window as any).testRuns[0];
+    run.writePreviews=[];
+    run.messages.push({id:'write-complete',role:'assistant',blocks:[
+      {type:'tool_use',id:'write',name:'Write',input:{file_path:'sample.ts',content:'const ok = true;'}},
+      {type:'tool_result',tool_use_id:'write',content:'File created.'}
+    ]},{id:'next',role:'user',blocks:[{type:'text',text:'Check another example.'}]},
+    {id:'next-plan',role:'assistant',blocks:[{type:'thinking',thinking:'Inspect the second example.'}]});
+    run.revision++;
+  });
+  await expect(reason).toHaveCount(2);
+  await expect(reason.first()).not.toContainText('Inspect the second example.');
+  const next=reason.last();
+  if(!await next.evaluate(el=>(el as HTMLDetailsElement).open))await next.locator('summary').click();
+  await expect(next.locator('.reasoning-content')).toHaveText('Inspect the second example.');
+  await expect(commands).toHaveCount(1);
+  await expect(file).toHaveCount(1);
+  await expect(file).toHaveAttribute('data-status','done');
 });

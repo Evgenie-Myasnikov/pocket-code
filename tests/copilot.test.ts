@@ -44,6 +44,37 @@ test('Copilot permits independent histories in one project and rejects duplicate
  }finally{await f.service.close();}
 });
 
+test('Copilot updates interleaved timeline reasoning, command output, file input and reply independently',async()=>{
+ const f=fixture(),i=input();
+ try{
+  f.service.start(i);await waitFor(()=>!!f.config());
+  const job=f.service.get(i.id);
+  const reasoning=(reasoningId:string,deltaContent:string,agentId?:string)=>f.emit({type:'assistant.reasoning_delta',agentId,data:{reasoningId,deltaContent}});
+  const shell=(toolCallId:string)=>f.emit({id:toolCallId,type:'tool.execution_start',data:{toolCallId,toolName:'powershell',arguments:{command:'echo test'}}});
+  const output=(toolCallId:string,partialOutput:string,agentId?:string)=>f.emit({type:'tool.execution_partial_result',agentId,data:{toolCallId,partialOutput}});
+  const commandInput=(id:string)=>job.messages.find(message=>message.id===id)?.blocks[0].input as {output?:string};
+  reasoning('a','Checking ');reasoning('b','Formatting');reasoning('a','files');reasoning('a','child','nested');
+  shell('one');shell('two');
+  output('one','first ');output('two','x'.repeat(20_000));output('one','line');output('one','child','nested');
+  f.emit({type:'assistant.tool_call_delta',data:{toolName:'create',toolCallId:'file',inputDelta:'{"path":"example.ts","file_text":"start'}});
+  f.emit({type:'assistant.message_delta',data:{deltaContent:'Reply'}});
+  assert.deepEqual(job.reasoningPreviews?.map(row=>row.blocks[0].thinking),['Checking files','Formatting']);
+  assert.equal(f.service.list()[0].reasoningPreviews,undefined);
+  assert.equal(commandInput('one').output,'first line');assert.equal(commandInput('two').output?.length,16_384);
+  assert.equal(job.writePreviews?.[0].content,'start');assert.equal(job.partial,'Reply');
+  const final={id:'final-b',type:'assistant.reasoning',data:{reasoningId:'b',content:'Formatted'}};
+  f.emit(final);reasoning('b','late');output('one',' still running');
+  assert.deepEqual(job.reasoningPreviews?.map(row=>row.blocks[0].thinking),['Checking files']);
+  assert.deepEqual(job.messages.at(-1),copilotMessage(final as any));
+  f.emit({id:'done',type:'tool.execution_complete',data:{toolCallId:'one',success:true,result:{content:'Complete'}}});
+  output('one','late');
+  assert.equal(commandInput('one').output,undefined);assert.equal(commandInput('two').output?.length,16_384);
+  assert.equal(job.messages.at(-1)?.blocks[0].content,'Complete');
+  f.emit({type:'session.error',data:{message:'Synthetic provider failure'}});
+  assert.equal(job.reasoningPreviews,undefined);assert.equal(commandInput('two').output,undefined);
+ }finally{f.finish();await f.service.close();}
+});
+
 test('Copilot forwards actual usage through live jobs and final persistence without treating streamed text as tokens',async()=>{
  const f=fixture(),i=input();
  let persisted:unknown;

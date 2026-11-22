@@ -48,7 +48,7 @@ export class Jobs {
     const { controller, pending, inputs, waiting, followups, acceptingInput, query, approvalTimeoutMs, stopRequested, ...view } = job;
     return view;
   }
-  list() { return [...this.jobs.values()].map(j => ({ ...this.view(j), messages: [], partial: '', writePreviews:undefined })); }
+  list() { return [...this.jobs.values()].map(j => ({ ...this.view(j), messages: [], partial: '', writePreviews:undefined, reasoningPreviews:undefined })); }
   forgetSession(id:string) {
     for(const [jobId,job] of this.jobs)if(job.sessionId===id&&job.status!=='running')this.jobs.delete(jobId);
   }
@@ -99,7 +99,7 @@ export class Jobs {
       controller: new AbortController(), pending: new Map(),inputs:new PromptStream(),waiting:[],followups:new Followups(),acceptingInput:true,approvalTimeoutMs:input.approvalTimeoutMs??0,
       permissionMode: input.mode==='plan'?'plan':input.claudeAccess||'default' };
     job.inputs.push(job.messages[0].id,input.text,input.sessionId);
-    job.controller.signal.addEventListener('abort',()=>{job.acceptingInput=false;job.inputs.close();delete job.writePreviews;job.revision++;},{once:true});
+    job.controller.signal.addEventListener('abort',()=>{job.acceptingInput=false;job.inputs.close();delete job.writePreviews;delete job.reasoningPreviews;job.revision++;},{once:true});
     this.jobs.set(job.id, job);
     void this.execute(job, input);
     return this.view(job);
@@ -108,6 +108,14 @@ export class Jobs {
     let stream: ReturnType<Run> | undefined;
     const previews=new ToolInputPreviews();
     const generation=new ClaudeGeneration();
+    let streamMessage='';
+    const reasoning=new Map<number,ChatMessage>();
+    function publishReasoning(){
+      if(job.stopRequested||job.controller.signal.aborted){delete job.reasoningPreviews;return;}
+      const rows=[...reasoning.values()].filter(message=>message.blocks[0].thinking);
+      if(rows.length)job.reasoningPreviews=rows;
+      else delete job.reasoningPreviews;
+    }
     let historySize = JSON.stringify(job.messages).length;
     let historyCount = job.messages.length;
     try {
@@ -133,7 +141,22 @@ export class Jobs {
         generation.observe(job,event);
         if (event.type==='stream_event' && !job.stopRequested && !job.controller.signal.aborted) {
           const part=event.event;
-          if (part.type==='message_start') previews.clear(job);
+          if (part.type==='message_start'){
+            previews.clear(job);
+            streamMessage=part.message.id;
+            reasoning.clear();delete job.reasoningPreviews;
+          }
+          if(part.type==='content_block_start'&&part.content_block.type==='thinking'&&streamMessage){
+            reasoning.set(part.index,{id:'claude-summary:'+streamMessage+':'+part.index,role:'assistant',blocks:[{type:'thinking',thinking:part.content_block.thinking}]});
+            publishReasoning();
+          }
+          if(part.type==='content_block_delta'&&part.delta.type==='thinking_delta'){
+            const row=reasoning.get(part.index);
+            if(row){
+              row.blocks[0].thinking=((row.blocks[0].thinking||'')+part.delta.thinking).slice(0,64*1024);
+              publishReasoning();
+            }
+          }
           if (part.type==='content_block_start' && part.content_block.type==='tool_use' && ['Write','Edit'].includes(part.content_block.name))
             previews.start(part.content_block.id,part.content_block.name,part.index);
           if (part.type==='content_block_delta' && part.delta.type==='input_json_delta')
@@ -147,6 +170,15 @@ export class Jobs {
         const msg = normalize(event);
         // The initial prompt is already visible; tool-result user events are kept.
         if (msg && !(msg.role === 'user' && msg.blocks.every(b => b.type === 'text'))) {
+          if(event.type==='assistant'&&event.message.id===streamMessage){
+            for(const block of msg.blocks){
+              if(block.type==='redacted_thinking'){reasoning.clear();break;}
+              if(block.type!=='thinking')continue;
+              const index=reasoning.keys().next().value;
+              if(index!==undefined)reasoning.delete(index);
+            }
+            publishReasoning();
+          }
           for (const block of msg.blocks) {
             if (block.type==='tool_use') previews.remove(job,block.id);
             if (block.type==='tool_result') previews.remove(job,block.tool_use_id);
@@ -159,7 +191,7 @@ export class Jobs {
         if (event.type === 'stream_event' && event.event.type === 'content_block_delta' && event.event.delta.type === 'text_delta')
           job.partial += event.event.delta.text;
         if (event.type === 'result') {
-          previews.clear(job);
+          previews.clear(job);reasoning.clear();delete job.reasoningPreviews;
           job.cost = event.total_cost_usd;
           if (job.stopRequested) job.status = 'stopped';
           else if (event.is_error) {
@@ -193,7 +225,7 @@ export class Jobs {
       if (job.status === 'error') job.error = error instanceof Error ? error.message : 'Не удалось запустить Claude';
       job.controller.abort();
     } finally {
-      previews.clear(job);
+      previews.clear(job);delete job.reasoningPreviews;
       job.acceptingInput=false;job.inputs.close();
       job.query=undefined;
       try {stream?.close?.();} catch { /* Preserve the original job outcome. */ }
@@ -236,7 +268,7 @@ export class Jobs {
    */
   stop(id: string, graceMs = 5000) {
     const job = this.get(id); job.revision++;
-    delete job.writePreviews;
+    delete job.writePreviews;delete job.reasoningPreviews;
     if (job.status !== 'running') return;
     const query = job.query;
     if (job.stopRequested || !query?.interrupt) { job.controller.abort(); return; }

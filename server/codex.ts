@@ -19,7 +19,7 @@ import { coalesceReads } from './read-coalescer.js';
 
 type StartInput = { id: string; cwd: string; sessionId?: string; text: string; model?: string; reasoningEffort?: string; mode: 'default' | 'plan'; codexAccess?: CodexAccess; maxBudgetUsd: number; approvalTimeoutMs?: number; displayText?: string; baseMessageCount?: number; attachmentPaths?: string[]; jira?: JobView['jira'] };
 type Pending = { finish: (allow: boolean, answers?: Record<string, string>, remember?: boolean) => void };
-type CodexJob = JobView & { pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void>; followups?:Followups; approvalTimeoutMs?: number };
+type CodexJob = JobView & { liveSummaries?:Map<string,string[]>; pending: Map<string, Pending>; turnId?: string; acceptingEvents: boolean; cancelled: boolean; eventQueue: Promise<void>; followups?:Followups; approvalTimeoutMs?: number };
 export type CodexSession = { sessionId: string; summary: string; cwd: string; lastModified: number; gitBranch?: string; source: 'codex'; provider: 'codex'; readOnly?: boolean };
 export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexRpc>; approvalTimeoutMs?: number; attachmentRoots?: string[]; allProjectHistory?:boolean };
 
@@ -308,7 +308,7 @@ export class CodexService {
     return this.messages(child);
   }
   view(job: CodexJob): JobView {
-    const { pending, turnId, acceptingEvents, cancelled, eventQueue, followups, approvalTimeoutMs, ...view } = job; return view;
+    const { liveSummaries, pending, turnId, acceptingEvents, cancelled, eventQueue, followups, approvalTimeoutMs, ...view } = job; return view;
   }
   async followup(id:string,input:FollowupInput){
     const job=this.get(id);job.followups??=new Followups();
@@ -411,6 +411,25 @@ export class CodexService {
       switch (message.method) {
         case 'turn/started': job.turnId = p.turn.id; break;
         case 'item/agentMessage/delta': job.partial += p.delta || ''; break;
+        case 'item/commandExecution/outputDelta': {
+          const call=job.messages.find(row=>row.id===p.itemId)?.blocks[0];
+          const input=call?.input as {status?:string;output?:string;outputTruncated?:boolean}|undefined;
+          if(call?.type==='tool_use'&&call.name==='Command'&&input?.status==='inProgress'&&typeof p.delta==='string'){
+            const output=(input.output||'')+p.delta;
+            input.output=output.slice(-16_384);
+            if(output.length>16_384)input.outputTruncated=true;
+          }
+          break;
+        }
+        case 'item/reasoning/summaryTextDelta': {
+          const parts=job.liveSummaries?.get(p.itemId);
+          if(!parts||typeof p.delta!=='string'||!p.delta||!Number.isSafeInteger(p.summaryIndex)||p.summaryIndex<0||p.summaryIndex>parts.length)break;
+          parts[p.summaryIndex]=(parts[p.summaryIndex]||'')+p.delta;
+          const summary:ChatMessage={id:p.itemId,role:'assistant',blocks:[{type:'thinking',thinking:parts.join('\n\n')}]};
+          const index=job.messages.findIndex(message=>message.id===summary.id);
+          if(index<0)job.messages.push(summary);else job.messages[index]=summary;
+          break;
+        }
         case 'thread/tokenUsage/updated':
           if(typeof p.turnId==='string'&&p.turnId===job.turnId){
             job.generation=meter.update(p.tokenUsage,job.generation);
@@ -425,7 +444,20 @@ export class CodexService {
           meter.modelItem(p.item,message.method==='item/completed',receivedAt,job.generation);
           if(message.method==='item/started'&&p.item?.type==='fileChange'&&!job.cancelled)
             updatePatchPreviews(job,p.item.id,p.item.changes);
-          const item = await codexMessage(p.item, [...this.roots, ...(this.options.attachmentRoots || [])], true);
+          if(p.item?.type==='reasoning'&&typeof p.item.id==='string'){
+            if(message.method==='item/started'){
+              (job.liveSummaries??=new Map()).set(p.item.id,[...(p.item.summary||[])]);
+            }else{
+              job.liveSummaries?.delete(p.item.id);
+              if(!p.item.summary?.length)job.messages=job.messages.filter(row=>row.id!==p.item.id);
+            }
+          }
+          let snapshot=p.item;
+          if(message.method==='item/completed'&&snapshot?.type==='commandExecution'&&snapshot.aggregatedOutput==null){
+            const input=job.messages.find(row=>row.id===snapshot.id)?.blocks[0]?.input as {output?:string}|undefined;
+            if(input?.output)snapshot={...snapshot,aggregatedOutput:input.output};
+          }
+          const item = await codexMessage(snapshot, [...this.roots, ...(this.options.attachmentRoots || [])], true);
           if (message.method === 'item/completed' && p.item?.type === 'fileChange') removeWritePreview(job,p.item.id);
           if (item) { const index = job.messages.findIndex(m => m.id === item.id); if (index < 0) job.messages.push(item); else job.messages[index] = item; }
           if (p.item?.type === 'agentMessage') job.partial = '';
@@ -445,6 +477,7 @@ export class CodexService {
   }
   private finish(job: CodexJob, status: JobView['status'], error?: string) {
     delete job.writePreviews;
+    delete job.liveSummaries;
     job.status = status; job.acceptingEvents = false;
     if (status === 'error') job.error = error || 'Codex stopped with an error.';
     for (const pending of [...job.pending.values()]) pending.finish(false);

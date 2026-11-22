@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useMemo, useEffect, useId, type ComponentProps, type ReactNode } from 'react';
+import { memo, useState, useRef, useMemo, useEffect, useLayoutEffect, useId, type ComponentProps, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
@@ -168,11 +168,11 @@ export const Markdown=memo(function Markdown({text,streaming=false,animateInitia
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.
-export function Disclosure({className,summary,children,defaultOpen=false}:{className:string;summary:ReactNode;children:()=>ReactNode;defaultOpen?:boolean}){
+export function Disclosure({className,summary,children,defaultOpen=false,onManualToggle}:{className:string;summary:ReactNode;children:()=>ReactNode;defaultOpen?:boolean;onManualToggle?(open:boolean):void}){
   const [open,setOpen]=useState(false),element=useRef<HTMLDetailsElement|null>(null);
-  // Opened once on mount; afterwards the person alone decides.
-  useEffect(()=>{if(defaultOpen&&element.current)element.current.open=true;},[]);
-  return <details ref={element} className={className} onToggle={event=>setOpen(event.currentTarget.open)}><summary>{summary}</summary>{open&&children()}</details>;
+  const manual=useRef(false);
+  useEffect(()=>{if(defaultOpen&&!manual.current&&element.current)element.current.open=true;},[defaultOpen]);
+  return <details ref={element} className={className} onToggle={event=>setOpen(event.currentTarget.open)}><summary onClick={()=>{manual.current=true;onManualToggle?.(!element.current?.open);}}>{summary}</summary>{open&&children()}</details>;
 }
 function Document({block}:{block:Block}) {
   const [error,setError]=useState(''); const source=block.source;
@@ -180,11 +180,26 @@ function Document({block}:{block:Block}) {
   const title=block.title || t('Документ');
   return <section className="document-card"><strong>📎 {title}</strong>{source?.text && <pre>{source.text}</pre>}{pdf && (Capacitor.isNativePlatform()?<button className="secondary" onClick={()=>void Documents.openDocument({data:pdf,name:title}).catch(e=>setError(e.message))}>{t('Открыть PDF')}</button>:<a href={`data:application/pdf;base64,${pdf}`} download="document.pdf">{t('Скачать PDF')}</a>)}{safeWebUrl(source?.url) && <a href={safeWebUrl(source?.url)!} target="_blank" rel="noopener noreferrer">{t('Открыть документ')}</a>}{error && <p className="error-banner">{t(error)}</p>}</section>;
 }
+function ReasoningBody({paragraphs,live,label}:{paragraphs:string[];live:boolean;label:string}){
+  const body=useRef<HTMLDivElement>(null),follow=useRef(true);
+  const speed=useStreamSpeed();
+  const text=paragraphs.join('\n\n');
+  const visible=usePacedText(text,false,live?speed:0,live);
+  useLayoutEffect(()=>{
+    if(live&&follow.current&&body.current)body.current.scrollTop=body.current.scrollHeight;
+  },[visible,live]);
+  let offset=0;
+  return <div ref={body} onScroll={event=>{const el=event.currentTarget;follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<12;}} role="region" aria-label={label} tabIndex={0} className="reasoning-content">{paragraphs.map((paragraph,index)=>{
+    const part=visible.slice(offset,offset+paragraph.length);
+    offset+=paragraph.length+2;
+    return part&&<p key={index}>{part}</p>;
+  })}</div>;
+}
 export function ReasoningDisclosure({paragraphs,live=false}:{paragraphs:string[];live?:boolean}){
   const label=t('Рассуждения');
   if(!paragraphs.some(text=>text.trim()))return null;
   return <Disclosure className="thinking" defaultOpen={live} summary={<><Lightbulb size={15} aria-hidden="true"/><span>{label}</span><ChevronRight size={12} className="chat-disclosure-chevron" aria-hidden="true"/></>}>
-    {()=> <div role="region" aria-label={label} tabIndex={0} className="reasoning-content">{paragraphs.map((text,index)=>text&&<p key={index}>{text}</p>)}</div>}
+    {()=> <ReasoningBody paragraphs={paragraphs} live={live} label={label}/>}
   </Disclosure>;
 }
 const TAIL=12;
@@ -238,7 +253,7 @@ export function ToolFields({input}:{input:unknown}){
   if(!entries.length)return null;
   return <dl className="tool-fields">{entries.map(([key,value])=><div key={key}><dt>{key}</dt><dd>{typeof value==='string'?value:JSON.stringify(value,null,2)}</dd></div>)}</dl>;
 }
-function ToolRow({block,result,running,depth}:{block:Block;result?:Block;running:boolean;depth:number}){
+function ToolRow({block,result,running,depth,onCommandToggle}:{block:Block;result?:Block;running:boolean;depth:number;onCommandToggle?(open:boolean):void}){
   const view=describeTool(block,result,running),Icon=toolIcon(view),input=(block.input&&typeof block.input==='object'?block.input:{}) as Record<string,unknown>;
   if(view.kind==='edit')return <EditActivity view={view} input={input} name={(block.name||'').toLowerCase()}
     created={!!result&&!result.is_error&&/^File created successfully at:/i.test(toolText(result.content).trim())}
@@ -246,13 +261,14 @@ function ToolRow({block,result,running,depth}:{block:Block;result?:Block;running
     result={result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}/>;
   const prose=view.kind==='agent'||view.kind==='web';
   const commandRow=view.kind==='command';
-  return <Disclosure className={`tool-card activity-row ${commandRow?'command-row':''} ${result?'combined':''} ${view.failed?'failed':''}`} summary={<>
+  return <Disclosure defaultOpen={commandRow&&view.active} onManualToggle={commandRow?onCommandToggle:undefined} className={`tool-card activity-row ${commandRow?'command-row':''} ${result?'combined':''} ${view.failed?'failed':''}`} summary={<>
     {commandRow?<><ChevronDown size={14} className="command-chevron" aria-hidden="true"/><span className="command-label">{view.status==='failed'?t('Команда не выполнилась'):view.title}</span>
       {view.command&&<><span className="command-separator" aria-hidden="true">·</span><span className="tool-title mono" title={view.command}>{view.command}</span></>}</>:
       <><Icon size={16} aria-hidden="true"/><span className={'tool-title'+(view.mono?' mono':'')}>{view.title}</span></>}
     {commandRow&&view.status==='failed'?<span className="tool-state" data-status="failed"><X size={13} aria-hidden="true"/><span>{t('Не удалось')}</span></span>:<ToolState view={view}/>}
   </>}>{()=> <div className="activity-details">
     {commandRow?view.command&&<pre className="tool-command">{view.command}</pre>:view.plan?<PlanChecklist items={view.plan}/>:<ToolFields input={block.input}/>}
+    {commandRow&&!result&&typeof input.output==='string'&&input.output&&<ToolOutput text={input.output} failed={false} command={view.command}/>}
     {result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth} command={view.command} prose={prose}/></div>}
   </div>}</Disclosure>;
 }
@@ -267,7 +283,7 @@ export function TaskNotificationEvent({notification}:{notification:ClaudeTaskNot
   </details>;
 }
 export const notificationSummary=(notification:ClaudeTaskNotification)=>t(notificationTitles[notification.status])+': '+notification.summary;
-export function RichBlock({block,depth=0,result,onSubagent,running=false,streaming=false,animateInitial=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;animateInitial?:boolean;onSubagent?(agent:SubagentView):void}) {
+export function RichBlock({block,depth=0,result,onSubagent,onCommandToggle,running=false,streaming=false,animateInitial=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;animateInitial?:boolean;onSubagent?(agent:SubagentView):void;onCommandToggle?(open:boolean):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;
   if(block.type==='text'){
     const text=block.text || '', notification=parseClaudeTaskNotification(text);
@@ -282,7 +298,7 @@ export function RichBlock({block,depth=0,result,onSubagent,running=false,streami
   if(block.type==='image'){const src=imageSource(block);return src?<Picture src={src} alt={block.title||t('Изображение')}/>:<span className="attachment-chip">📎 {t('Изображение недоступно в сохранённой истории')}</span>;}
   if(block.type==='document')return <Document block={block}/>;
   if(block.type==='tool_result')return <Disclosure className={`tool-card result ${block.is_error?'failed':''}`} summary={block.is_error?t('Ошибка инструмента'):t('Результат инструмента')}>{()=> <ToolResultContent block={block} depth={depth}/>}</Disclosure>;
-  if(block.type==='tool_use')return <ToolRow block={block} result={result} running={running} depth={depth}/>;
+  if(block.type==='tool_use')return <ToolRow block={block} result={result} running={running} depth={depth} onCommandToggle={onCommandToggle}/>;
   // Reasoning stays open while it is being written and folds once the turn moves on.
   if(block.type==='thinking')return <ReasoningDisclosure key={streaming&&running?'live':'done'} live={streaming&&running} paragraphs={[block.thinking||'']}/>;
   if(block.type==='redacted_thinking')return <p className="muted">{t('Этот блок размышлений скрыт провайдером')}</p>;

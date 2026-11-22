@@ -67,8 +67,8 @@ export async function codexMessage(item: any, roots: string[], live = false): Pr
       if (!item.summary?.length) return null;
       blocks = [{ type: 'thinking', thinking: item.summary.join('\n\n') }]; break;
     case 'commandExecution':
-      blocks = [{ type: 'tool_use', id: item.id, name: 'Command', input: { command: item.command, cwd: item.cwd, status: item.status } }];
-      if (item.aggregatedOutput != null) blocks.push({ type: 'tool_result', tool_use_id: item.id, content: item.aggregatedOutput, is_error: item.status === 'failed' || (item.exitCode != null && item.exitCode !== 0) });
+      blocks = [{ type: 'tool_use', id: item.id, name: 'Command', input: { command: item.command, cwd: item.cwd, status: item.status, ...(item.status==='inProgress'&&item.aggregatedOutput?{output:item.aggregatedOutput.slice(-16_384)}:{}) } }];
+      if (item.status!=='inProgress' && item.aggregatedOutput != null) blocks.push({ type: 'tool_result', tool_use_id: item.id, content: item.aggregatedOutput, is_error: item.status === 'failed' || (item.exitCode != null && item.exitCode !== 0) });
       break;
     case 'fileChange': blocks = [{ type: 'tool_use', id: item.id, name: 'File changes', input: { changes: item.changes, status: item.status } }]; break;
     case 'mcpToolCall':

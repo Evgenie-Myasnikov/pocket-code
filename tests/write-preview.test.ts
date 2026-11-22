@@ -48,6 +48,30 @@ for(const account of [undefined,'synthetic-custom']){
     }finally{jobs.close();source.destroy();}
   });
 }
+test('Claude exposes only parent thinking previews and replaces them with the authoritative message',async()=>{
+  const source=new PassThrough({objectMode:true});
+  const jobs=new Jobs((()=>source) as any),id='thinking-fixture';
+  const view=()=>jobs.view(jobs.get(id));
+  const preview=()=>view().reasoningPreviews?.[0]?.blocks[0]?.thinking;
+  const think=(index:number,thinking:string,parent?:string)=>streamEvent({type:'content_block_delta',index,delta:{type:'thinking_delta',thinking}},parent);
+  try{
+    jobs.start({id,cwd:process.cwd(),mode:'default',text:'Synthetic',maxBudgetUsd:1});
+    source.write(streamEvent({type:'message_start',message:{id:'m1',model:'fixture',usage:{}}}));
+    source.write(streamEvent({type:'content_block_start',index:0,content_block:{type:'redacted_thinking',data:'opaque'}}));
+    source.write(think(0,'hidden'));
+    source.write(streamEvent({type:'content_block_start',index:1,content_block:{type:'thinking',thinking:''}}));
+    source.write(think(1,'From child','child'));
+    source.write(think(1,'Checking'));source.write(think(1,' inputs'));
+    await waitFor(()=>preview()==='Checking inputs');
+    assert.equal(view().reasoningPreviews?.length,1);
+    assert.equal(view().messages.length,1);
+    assert.equal(jobs.list()[0].reasoningPreviews,undefined);
+    source.write({uuid:'canonical',type:'assistant',message:{id:'m1',content:[{type:'thinking',thinking:'Checked'}]}});
+    await waitFor(()=>view().messages.length===2);
+    assert.equal(view().reasoningPreviews,undefined);
+    assert.equal(view().messages[1].blocks[0].thinking,'Checked');
+  }finally{jobs.close();source.destroy();}
+});
 test('file-input decoder retains a bounded tail and exact received counts across escaped fragments',()=>{
   const job={} as JobView, tracker=new ToolInputPreviews();
   const content='x\n'.repeat(20_000)+'🚀';

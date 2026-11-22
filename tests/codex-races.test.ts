@@ -40,6 +40,46 @@ async function setup(t: any) {
   return { root, service, first, second, input: { id: 'first-job', cwd: root, text: 'Synthetic', mode: 'default' as const, maxBudgetUsd: 1 } };
 }
 
+test('Codex streams bounded output to the originating command and prefers its completed result',async t=>{
+  const {service,first,input}=await setup(t);
+  service.start(input);await until(()=>Boolean(service.get(input.id).turnId));
+  const job=service.get(input.id);
+  const command=(id:string,status:string,aggregatedOutput?:string)=>({id,type:'commandExecution',status,command:'fixture',aggregatedOutput});
+  const output=(itemId:string,delta:string)=>first.notification('item/commandExecution/outputDelta',{itemId,delta});
+  const blocks=(id:string)=>job.messages.find(row=>row.id===id)!.blocks;
+  first.notification('item/started',{item:command('one','inProgress','a')});
+  first.notification('item/started',{item:command('two','inProgress')});
+  output('one','bc');output('two','x'.repeat(20_000)+'z');
+  await job.eventQueue;
+  assert.equal(blocks('one').length,1);
+  assert.equal((blocks('one')[0].input as any).output,'abc');
+  assert.equal((blocks('two')[0].input as any).output.length,16_384);
+  assert.equal((blocks('two')[0].input as any).outputTruncated,true);
+  first.notification('item/completed',{item:command('one','completed','authoritative result')});
+  first.notification('item/completed',{item:command('two','completed')});
+  output('one','late');
+  await job.eventQueue;
+  assert.equal(blocks('one')[1].content,'authoritative result');
+  assert.equal((blocks('one')[0].input as any).output,undefined);
+  assert.ok((blocks('two')[1].content as string).endsWith('z'));
+});
+
+test('Codex streams indexed public summary parts into the same item and accepts its final snapshot',async t=>{
+  const {service,first,input}=await setup(t);
+  service.start(input);await until(()=>Boolean(service.get(input.id).turnId));
+  const job=service.get(input.id), id='reason', rows=()=>job.messages.filter(message=>message.id===id);
+  first.notification('item/started',{item:{id,type:'reasoning',summary:[]}});
+  first.notification('item/reasoning/textDelta',{itemId:id,delta:'Opaque content'});
+  const part=(summaryIndex:number,delta:string)=>first.notification('item/reasoning/summaryTextDelta',{itemId:id,summaryIndex,delta});
+  part(0,'Reviewing');part(1,'Checking');part(1,' files');
+  await until(()=>rows()[0]?.blocks[0].thinking==='Reviewing\n\nChecking files');
+  first.notification('item/completed',{item:{id,type:'reasoning',summary:['Checks complete']}});
+  part(1,'stale');
+  await job.eventQueue;
+  assert.deepEqual(rows(),[{id,role:'assistant',blocks:[{type:'thinking',thinking:'Checks complete'}]}]);
+  assert.ok(!JSON.stringify(job.messages).includes('Opaque content'));
+});
+
 test('Codex replaces provider patch snapshots per item and commits each file change only once',async t=>{
   const {service,first,input}=await setup(t);
   service.start(input);await until(()=>Boolean(service.get(input.id).turnId));

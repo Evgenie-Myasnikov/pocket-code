@@ -1,4 +1,5 @@
 import type {Block,ChatMessage,WritePreview} from '../server/types';
+import {startsTurn} from './turn-changes';
 
 function fileBlock(preview:WritePreview):Block{
   const {tool,id,path,content,totalBytes,totalLines,truncated}=preview;
@@ -16,16 +17,22 @@ export function withLiveWrites(messages:ChatMessage[],previews?:WritePreview[]):
     const blocks=byTool.get(preview.id)||[];
     blocks.push(fileBlock(preview));byTool.set(preview.id,blocks);
   }
-  for(const {blocks} of messages)for(const block of blocks){
+  const latestSnapshot=new Map<string,ChatMessage>();
+  let start=messages.length;
+  while(start>0){start--;if(startsTurn(messages[start]))break;}
+  for(let index=start;index<messages.length;index++)for(const block of messages[index].blocks){
     if(block.type==='tool_result'&&block.tool_use_id)byTool.delete(block.tool_use_id);
+    if(block.type==='tool_use'&&block.id)latestSnapshot.set(block.id,messages[index]);
   }
   if(!byTool.size)return messages;
   const display=messages.map(message=>{
-    if(!message.blocks.some(block=>block.type==='tool_use'&&block.id&&byTool.has(block.id)))return message;
+    if(!message.blocks.some(block=>block.type==='tool_use'&&block.id&&byTool.has(block.id)&&latestSnapshot.get(block.id)===message))return message;
+    const replaced=new Set<string>();
     const blocks=message.blocks.flatMap(block=>{
-      const replacement=block.type==='tool_use'&&block.id?byTool.get(block.id):undefined;
+      if(block.type==='tool_use'&&block.id&&replaced.has(block.id))return [];
+      const replacement=block.type==='tool_use'&&block.id&&latestSnapshot.get(block.id)===message?byTool.get(block.id):undefined;
       if(!replacement)return [block];
-      byTool.delete(block.id!);
+      byTool.delete(block.id!);replaced.add(block.id!);
       return replacement;
     });
     return {...message,blocks};

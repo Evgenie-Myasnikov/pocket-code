@@ -2,8 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {toolActivity} from '../src/tool-activity.js';
 import {describeTool,stripAnsi} from '../src/tool-registry.js';
-import {turnChanges} from '../src/turn-changes.js';
-import type {ChatMessage} from '../server/types';
+import {canonicalCalls,turnChanges} from '../src/turn-changes.js';
+import type {Block,ChatMessage} from '../server/types';
 test('activity rows name the object of the action and keep an explicit state',()=>{
  assert.equal(toolActivity({type:'tool_use',name:'Command',input:{command:'npm run lint',status:'inProgress'}}).label,'npm run lint');
  assert.equal(toolActivity({type:'tool_use',name:'Command',input:{status:'inProgress'}}).status,'running');
@@ -54,4 +54,30 @@ test('turn results use confirmed scoped files and omit line counts for partial e
  ]}),{files:['src/new.ts','src/old.ts'],added:2,removed:1,deleted:['src/old.ts']});
  assert.equal(read('Write',{status:'completed',file_path:'src/a.ts',content:'replacement'})?.countsUnknown,true);
  assert.equal(read('delete_file',{status:'completed',path:'src/a.ts'})?.countsUnknown,true);
+});
+
+test('turns reconcile file snapshots by invocation and preserve unrelated calls',()=>{
+ const create=(path:string,content:string):Block=>({id:'save',type:'tool_use',name:'Create',input:{file_path:path,content,status:'completed'}});
+ const command=(id:string):Block=>({id,type:'tool_use',name:'Bash',input:{command:'npm test',status:'completed'}});
+ const first=command('one'),second=command('two'),head:Block={type:'text',text:'Working on the examples.'};
+ const finalA=create('a.ts','one\ntwo'),finalB=create('b.ts','three');
+ const messages:ChatMessage[]=[
+  {id:'ask',role:'user',blocks:[{type:'text',text:'Create two examples.'}]},
+  {id:'initial',role:'assistant',blocks:[head,create('a.ts','one'),first,create('b.ts','draft')]},
+  {id:'update',role:'assistant',blocks:[create('a.ts','one\ntwo'),second]},
+  {id:'settled',role:'assistant',blocks:[finalA,finalB]},
+  {id:'ask-again',role:'user',blocks:[{type:'text',text:'Create another example.'}]},
+  {id:'more',role:'assistant',blocks:[create('c.ts','four'),command('one')]}
+ ];
+ const projected=canonicalCalls(messages);
+ assert.deepEqual(projected.map(m=>m.id),messages.map(m=>m.id));
+ assert.deepEqual(projected[1].blocks,[head,finalA,finalB,first]);
+ assert.deepEqual(projected[2].blocks,[second]);
+ assert.deepEqual(projected[3].blocks,[]);
+ assert.deepEqual(projected[5].blocks,messages[5].blocks);
+ assert.equal(messages[1].blocks.length,4);
+ assert.deepEqual([...turnChanges(messages)],[
+  ['settled',{files:['a.ts','b.ts'],added:3,removed:0}],
+  ['more',{files:['c.ts'],added:1,removed:0}]
+ ]);
 });

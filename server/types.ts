@@ -22,6 +22,7 @@ export type JobView = {
   taskChat?:boolean;
   generation?:GenerationMetrics;
   writePreviews?:WritePreview[];
+  reasoningPreviews?:ChatMessage[];
   /** Changes whenever the transcript does; token deltas only change `partial`. */
   messagesRevision?:number;
   /** A poll that already has this transcript receives only the rest of the job. */

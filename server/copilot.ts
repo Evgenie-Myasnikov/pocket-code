@@ -6,7 +6,7 @@ import {projectBoardInstructions} from './project-rules.js';
 import {CopilotLogin} from './copilot-login.js';
 import {CopilotClient,type CopilotSession,type SessionEvent} from '@github/copilot-sdk';
 import {allowedPath,HttpError} from './security.js';
-import type {ChatMessage,JobView} from './types.js';
+import type {Block,ChatMessage,JobView} from './types.js';
 import {Followups,type FollowupInput} from './followups.js';
 import {coalesceReads} from './read-coalescer.js';
 import {ToolInputPreviews} from './write-preview.js';
@@ -16,6 +16,8 @@ import type {CodexUsageSnapshot} from './codex-usage.js';
 
 export function copilotMessage(event:SessionEvent):ChatMessage|null{
  const data=event.data as any;
+ if(event.type==='assistant.reasoning'&&!event.agentId&&data.content)
+   return{id:'copilot-reasoning:'+data.reasoningId,role:'assistant',blocks:[{type:'thinking',thinking:data.content}]};
  if(event.type==='user.message'||event.type==='assistant.message')return{id:event.id,role:event.type==='user.message'?'user':'assistant',blocks:[{type:'text',text:data.content||''}]};
  if(event.type==='tool.execution_start')return{id:event.id,role:'assistant',blocks:[{type:'tool_use',id:data.toolCallId,name:data.toolName,input:data.arguments}]};
  if(event.type==='tool.execution_complete')return{id:event.id,role:'assistant',blocks:[{type:'tool_result',tool_use_id:data.toolCallId,content:data.result?.content||data.error?.message||'',is_error:!data.success}]};
@@ -104,7 +106,7 @@ export class CopilotService{
   const client=await this.connect();const session=await client.resumeSession(id,{onPermissionRequest:()=>({kind:'denied-interactively-by-user'}),onUserInputRequest:()=>({answer:'',wasFreeform:true})});
   try{return(await session.getEvents()).map(copilotMessage).filter((message):message is ChatMessage=>!!message);}finally{await session.disconnect();}
  }
- list(){return [...this.runs.values()].map(run=>({...run.view,messages:[],partial:'',writePreviews:undefined}));}
+ list(){return [...this.runs.values()].map(run=>({...run.view,messages:[],partial:'',writePreviews:undefined,reasoningPreviews:undefined}));}
  get(id:string){const run=this.runs.get(id);if(!run)throw new HttpError(404,'Copilot task not found.');return run.view;}
  view(job:JobView){return job;}
  start(input:Input){
@@ -121,7 +123,15 @@ export class CopilotService{
   const finish=(allow:boolean,answers?:Record<string,string>)=>{clearTimeout(timer);run.pending.delete(id);run.view.approvals=run.view.approvals.filter(item=>item.id!==id);run.view.revision++;resolve({allow,answers});};
   run.pending.set(id,finish);run.view.approvals.push({id,tool,input,expiresAt:timeout>0?Date.now()+timeout:0});run.view.revision++;
  });}
- private async execute(run:Run,input:Input){let unsubscribe:(()=>void)|undefined;try{
+ private async execute(run:Run,input:Input){let unsubscribe:(()=>void)|undefined;
+  const commands=new Map<string,{block:Block;arguments:Record<string,unknown>}>();
+  function clearStreaming(){
+    delete run.view.reasoningPreviews;
+    delete run.view.writePreviews;
+    for(const command of commands.values())command.block.input=command.arguments;
+    commands.clear();
+  }
+  try{
   const client=await this.connect();await allowedPath(this.roots,input.cwd,true);if(run.view.status!=='running')return;
   const mcpServers=this.boardMcp(input.cwd);
   const config={workingDirectory:input.cwd,...(Object.keys(mcpServers).length?{mcpServers}:{}),model:input.model||'auto',streaming:true,systemMessage:{mode:'append' as const,content:await projectBoardInstructions(input.cwd)},
@@ -140,19 +150,53 @@ export class CopilotService{
         if(!toolName||toolName==='create'||toolName==='edit') previews.append(run.view,toolCallId,inputDelta,toolName);
       }
       if(event.type==='tool.execution_start'||event.type==='tool.execution_complete') previews.remove(run.view,event.data.toolCallId);
+      if(event.type==='assistant.reasoning_delta'){
+        const {reasoningId,deltaContent}=event.data;
+        const id='copilot-reasoning:'+reasoningId;
+        if(reasoningId&&deltaContent&&!run.view.messages.some(message=>message.id===id)){
+          const rows=run.view.reasoningPreviews??=[];
+          let row=rows.find(message=>message.id===id);
+          if(!row){row={id,role:'assistant',blocks:[{type:'thinking',thinking:''}]};rows.push(row);}
+          row.blocks[0].thinking=((row.blocks[0].thinking||'')+deltaContent).slice(0,65_536);
+        }
+      }
+      if(event.type==='assistant.reasoning'&&run.view.reasoningPreviews){
+        const id='copilot-reasoning:'+event.data.reasoningId;
+        run.view.reasoningPreviews=run.view.reasoningPreviews.filter(message=>message.id!==id);
+        if(!run.view.reasoningPreviews.length)delete run.view.reasoningPreviews;
+      }
+      if(event.type==='tool.execution_partial_result'){
+        const command=commands.get(event.data.toolCallId);
+        if(command&&event.data.partialOutput){
+          const input=command.block.input as Record<string,unknown>;
+          const output=(typeof input.output==='string'?input.output:'')+event.data.partialOutput;
+          command.block.input={...command.arguments,output:output.slice(-16_384)};
+        }
+      }
+      if(event.type==='tool.execution_complete'){
+        const command=commands.get(event.data.toolCallId);
+        if(command){command.block.input=command.arguments;commands.delete(event.data.toolCallId);}
+      }
     }
     if(event.type==='assistant.message_delta')run.view.partial+=event.data.deltaContent||'';
     const message=copilotMessage(event);
-    if(message&&message.role!=='user'){run.view.messages.push(message);if(event.type==='assistant.message')run.view.partial='';}
-    if(event.type==='session.error'){previews.clear(run.view);run.view.error=event.data.message||'Copilot failed';run.view.status='error';}
+    if(message&&message.role!=='user'){
+      run.view.messages.push(message);
+      if(event.type==='assistant.message')run.view.partial='';
+      if(!event.agentId&&event.type==='tool.execution_start'&&['shell','bash','powershell'].includes(event.data.toolName)){
+        const block=message.blocks[0];
+        if(block.input&&typeof block.input==='object')commands.set(event.data.toolCallId,{block,arguments:block.input as Record<string,unknown>});
+      }
+    }
+    if(event.type==='session.error'){clearStreaming();run.view.error=event.data.message||'Copilot failed';run.view.status='error';}
     run.view.revision++;
   });
   await run.session.sendAndWait({prompt:input.text,attachments:input.attachmentPaths?.map(file=>({type:'file' as const,path:file}))},3600000);
   if(run.view.status==='running')run.view.status='done';
  }catch(error){if(run.view.status!=='stopped'){run.view.status='error';run.view.error=error instanceof Error?error.message:'Copilot failed';}}
- finally{unsubscribe?.();if(this.runs.get(run.view.id)===run)this.recordGeneration?.(run.view);delete run.view.writePreviews;for(const finish of run.pending.values())finish(false);run.view.partial='';run.view.revision++;await run.session?.disconnect().catch(()=>{});}}
+ finally{unsubscribe?.();clearStreaming();if(this.runs.get(run.view.id)===run)this.recordGeneration?.(run.view);for(const finish of run.pending.values())finish(false);run.view.partial='';run.view.revision++;await run.session?.disconnect().catch(()=>{});}}
  async followup(id:string,input:FollowupInput){const run=this.runs.get(id);if(!run)throw new HttpError(404,'Copilot task not found');await run.followups.run(input,async()=>{if(run.view.status!=='running'||!run.session)throw new HttpError(409,'Copilot is not ready for a follow-up. Your draft is preserved.');await run.session.send({prompt:input.text,mode:'enqueue',attachments:input.attachmentPaths?.map(file=>({type:'file' as const,path:file}))});run.view.messages.push({id:input.id,role:'user',blocks:userInputBlocks(input)});run.view.revision++;});return run.view;}
- stop(id:string){const run=this.runs.get(id);if(!run)return;delete run.view.writePreviews;run.view.status='stopped';run.view.revision++;for(const finish of run.pending.values())finish(false);void run.session?.abort().catch(()=>{});}
+ stop(id:string){const run=this.runs.get(id);if(!run)return;delete run.view.writePreviews;delete run.view.reasoningPreviews;run.view.status='stopped';run.view.revision++;for(const finish of run.pending.values())finish(false);void run.session?.abort().catch(()=>{});}
  approve(id:string,approval:string,allow:boolean,answers?:Record<string,string>,_decision?:{message?:string;remember?:boolean;mode?:string}){const run=this.runs.get(id),finish=run?.pending.get(approval);if(!finish)throw new HttpError(404,'This question is no longer pending');finish(allow,answers);}
  loginStatus(){return this.authLogin.status();}
  async login(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Finish Copilot jobs before signing in.');if((await this.status()).authenticated)return{state:'connected',error:''};return this.authLogin.start();}

@@ -3,13 +3,14 @@ import './chat-motion.css';
 import {MessageAttachment} from './MessageAttachment';
 import {userAttachmentBlocks} from './user-attachments';
 import type {Connection} from './api';
-import { RichBlock, TaskNotificationEvent } from './RichBlocks';
+import { RichBlock, TaskNotificationEvent, ReasoningDisclosure } from './RichBlocks';
 import {parseClaudeTaskNotification} from './claude-task-notification';
 import type {TurnChanges} from './turn-changes';
 import {TurnResult} from './TurnResult';
 import {ActivityGroup} from './ActivityGroup';
-import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode,type CommandSlots} from './activity-groups';
-import { t, useLanguage } from "./i18n";import { Fragment, memo, useMemo, useRef, useState } from 'react';
+import {commandKey,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode,type CommandSlots} from './activity-groups';
+import {turnTranscript} from './turn-transcript';
+import { t, useLanguage } from "./i18n";import { Fragment, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import type { ChatMessage, SubagentView, Block } from '../server/types';
 import './messages.css';
@@ -18,38 +19,53 @@ function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" data-copied={copied||undefined} aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
 }
-type MessageProps={connection?:Connection|null;cwd?:string;message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean;mode?:DetailMode;live?:boolean;commandSlots?:CommandSlots};
+type MessageProps={connection?:Connection|null;cwd?:string;message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean;mode?:DetailMode;live?:boolean;commandSlots?:CommandSlots;onCommandToggle?(key:string,open:boolean):void};
 export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'animateInitial'>&{text:string}){
   const startedEmpty=useRef(!text);
   return text?<Message {...shared} animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
 }
-export const MessageList=memo(function MessageList({messages,partialText,runningMessages,turnChanges,onReview,resultRoot,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];partialText?:string;runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;resultRoot?:string;onReview?:(changes:TurnChanges)=>void}){
+export const MessageList=memo(function MessageList({messages,partialText,runningMessages,jobId,turnChanges,onReview,resultRoot,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];partialText?:string;runningMessages?:Set<ChatMessage>|null;jobId?:string;turnChanges?:Map<string,TurnChanges>;resultRoot?:string;onReview?:(changes:TurnChanges)=>void}){
   // Messages already present when this transcript mounts are a snapshot, even
   // if their run is still active. Only newly arriving messages start from empty.
   const initialIds=useRef(new Set(messages.map(message=>message.id)));
   const sequence=useRef(0),mounted=useRef(false);
+  const lastJob=useRef(jobId),newJob=!!jobId&&jobId!==lastJob.current;
+  lastJob.current=jobId;
+  if(newJob)initialIds.current=new Set(messages.map(message=>message.id));
   const textOf=(message:ChatMessage)=>message.blocks.filter(block=>block.type==='text').map(block=>block.text||'').join('\n');
   const pending=useRef<{text:string;key:string;animate:boolean;seen:Map<string,string>}|null>(null),delivered=useRef(new Map<string,{key:string;animate:boolean}>());
+  if(newJob)pending.current=null;
   let completed:ChatMessage|undefined;
   if(pending.current){
     const prior=pending.current;
     completed=[...messages].reverse().find(message=>message.role==='assistant'&&prior.seen.get(message.id)!==textOf(message)&&message.blocks.some(block=>block.type==='text'&&block.text&&(block.text.startsWith(prior.text)||!partialText)));
     if(completed){delivered.current.set(completed.id,prior);pending.current=null;}
+    else if(!shared.streaming&&!partialText)pending.current=null;
   }
   if(partialText&&(!completed||!completed.blocks.some(block=>block.type==='text'&&block.text?.startsWith(partialText)))){
     if(pending.current)pending.current.text=partialText;
-    else pending.current={text:partialText,key:`live-response:${++sequence.current}`,animate:mounted.current,seen:new Map(messages.map(message=>[message.id,textOf(message)]))};
+    else pending.current={text:partialText,key:`live-response:${++sequence.current}`,animate:mounted.current&&!newJob,seen:new Map(messages.map(message=>[message.id,textOf(message)]))};
   }
   mounted.current=true;
-  const runs=useMemo(()=>groupActivityMessages(messages,shared.toolResults,runningMessages,shared.mode),[messages,shared.toolResults,runningMessages,shared.mode]);
+  const [openCommands,setOpenCommands]=useState(()=>new Set<string>());
+  const rememberCommand=useCallback((key:string,open:boolean)=>setOpenCommands(previous=>{
+    if(previous.has(key)===open)return previous;
+    const next=new Set(previous);
+    if(open)next.add(key);else next.delete(key);
+    return next;
+  }),[]);
+  const previousKeys=useRef(new Map<string,string>());
+  const {runs,activeMessages,reasoningKeys}=useMemo(()=>turnTranscript(messages,shared.toolResults,runningMessages,shared.mode,openCommands,previousKeys.current),[messages,shared.toolResults,runningMessages,shared.mode,openCommands]);
+  useLayoutEffect(()=>{previousKeys.current=reasoningKeys;},[reasoningKeys]);
   const visibleIds=new Set(runs.flatMap(run=>run.message?[run.message.id]:[]));
   const content=runs.map(run=>{
+    if(run.reasoning)return <article key={run.key} className="message assistant tool-result"><ReasoningDisclosure paragraphs={run.reasoning.paragraphs} live={!!shared.streaming&&run.reasoning.live}/></article>;
     const anchors=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))].filter(id=>!visibleIds.has(id));
     for(const id of anchors)visibleIds.add(id);
     const ids=anchors.length?anchors:[run.key];
     const delivery=run.message?delivered.current.get(run.message.id):undefined,key=delivery?.key||run.key;
     const body=run.message?
-    <Message key={key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} commandSlots={run.commandSlots} animateInitial={delivery?.animate??!initialIds.current.has(run.message.id)}/>:
+    <Message key={key} message={run.message} running={activeMessages.has(run.message)} live={run.message===messages.at(-1)} {...shared} streaming={shared.streaming&&(!runningMessages||activeMessages.has(run.message))} onCommandToggle={rememberCommand} commandSlots={run.commandSlots} animateInitial={delivery?.animate??!initialIds.current.has(run.message.id)}/>:
     <article tabIndex={-1} data-enter={shared.streaming&&ids.some(id=>!initialIds.current.has(id))||undefined} key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
       {ids.slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
@@ -66,7 +82,7 @@ export const MessageList=memo(function MessageList({messages,partialText,running
   }
   return content;
 });
-export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false,commandSlots }: MessageProps) {
+export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false,commandSlots,onCommandToggle }: MessageProps) {
   useLanguage();
   const assistantChat=useAssistantChat();
   // A message made only of background-task notices is an event line, not the person's bubble.
@@ -82,11 +98,13 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   const content = groupActivityBlocks(visibleMessageBlocks(displayMessage,toolResults,running,live),mode,commandSlots).map(run => {
       const {block,result}=run.items[0];
       const history=commandSlots?.get(run.items[0].index);
+      const toggle=block.type==='tool_use'&&block.id&&onCommandToggle?(open:boolean)=>onCommandToggle(commandKey(message.id,block.id!),open):undefined;
+      if(history?.[0]?.retained)return <RichBlock key={run.key} running={running} block={block} result={result} onCommandToggle={toggle}/>;
       if(history)return history.length?<ActivityGroup key={run.key} items={history} commandHistory/>:null;
       if(activityGroupKey(run.items[0],mode))return <ActivityGroup key={run.key} items={run.items}/>;
-      return <RichBlock key={block.type==='text'?`text:${message.blocks.slice(0,run.items[0].index).filter(item=>item.type==='text').length}`:run.key} running={running} streaming={streaming&&message.role==='assistant'&&(block.type!=='thinking'||run.items[0].live)} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
+      return <RichBlock key={block.type==='text'?`text:${message.blocks.slice(0,run.items[0].index).filter(item=>item.type==='text').length}`:run.key} running={running} streaming={streaming&&message.role==='assistant'&&(block.type!=='thinking'||run.items[0].live)} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent} onCommandToggle={toggle}/>;
     });
-  if(!content.some(Boolean)&&!attachments.length)return commandSlots?<span className="command-history-anchor" data-message-id={message.id} aria-hidden="true"/>:null;
+  if(!content.some(Boolean)&&!attachments.length)return (commandSlots||!message.blocks.length)?<span className="command-history-anchor" data-message-id={message.id} aria-hidden="true"/>:null;
   return <article tabIndex={-1} data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):message.role==='assistant'?provider:undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {isUser ? <>{plain && !assistantChat && <CopyButton text={plain}/>}<div className="user-message-content">{attachments.length>0&&<div className="message-attachments">{attachments.map((block,index)=><MessageAttachment key={block.attachmentPath||index} block={block} connection={connection} cwd={cwd}/>)}</div>}{content}</div>{plain&&assistantChat&&<AssistantMessageActions id={message.id} text={plain} user/>}</> : <>
       {!toolOnly && message.role!=='assistant' && <div className="message-label">{t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}

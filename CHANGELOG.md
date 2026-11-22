@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (0.28.57)
+
+### Bug Fixes
+
+- Chat streaming (2026-11-23). Keep the public reasoning summary in one expandable block per user turn, including when commands or file writes arrive between updates. Independent commands and file edits update in place from provider events. Completed commands fold into the turn history. Reproduced the duplicate on 0.28.56 and verified simultaneous updates to two files in the browser.
+
 ## [0.28.56](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.55...v0.28.56) (2026-11-22)
 
 Published from [fe5c63c](https://github.com/Evgenie-Myasnikov/pocket-code/commit/fe5c63c4cd92208d111c9ec5b7043e0f8919f95d) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Verified the tag, all four public download hashes, the packaged UI and Android signature continuity. Physical device installation remains untested.

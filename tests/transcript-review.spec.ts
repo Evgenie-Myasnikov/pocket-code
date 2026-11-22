@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import type {ChatMessage} from '../server/types';
 import {openChatList} from './chat-navigation';
 
 const messages=[
@@ -70,17 +71,33 @@ test('the round latest button replaces the two pills and the beginning lives in 
  await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(more).toBeFocused();
  await expect(page.getByRole('button',{name:'Back to chats',exact:true})).toBeVisible();
 });
-test('reasoning stays open while it is the newest block of a running turn and folds when the turn moves on',async({page})=>{
- await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
+test('live reasoning and commands open automatically and respect manual toggles as the turn completes',async({page})=>{
+ await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
  await page.evaluate(async()=>{
-  const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{MessageList}=await import('/src/Messages.tsx' as string);
-  const ask={id:'ask',role:'user',blocks:[{type:'text',text:'Check the sample'}]},think={id:'think',role:'assistant',blocks:[{type:'thinking',thinking:'Synthetic reasoning in progress.'}]},read={id:'read',role:'assistant',blocks:[{type:'tool_use',id:'r1',name:'Read',input:{file_path:'C:/Sample/a.ts'}}]};
-  const root=document.createElement('div');root.id='live-fixture';document.body.append(root);const view=createRoot(root);
-  const render=(messages:unknown[],running:boolean)=>view.render(React.createElement(MessageList,{messages,streaming:running,runningMessages:running?new Set(messages):null,mode:'brief'}));
-  (window as unknown as {renderLive:typeof render}).renderLive=render;(window as unknown as {liveMessages:unknown[]}).liveMessages=[ask,think,read];render([ask,think],true);
+   const React=(await import('/node_modules/.vite/deps/react.js' as string)).default,{createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js' as string)).default,{MessageList}=await import('/src/Messages.tsx' as string);
+   const root=document.createElement('div');root.id='live-fixture';document.body.append(root);const view=createRoot(root);
+   const render=(phase:number)=>{
+     const messages:ChatMessage[]=[{id:'ask',role:'user',blocks:[{type:'text',text:'Check the sample.'}]},
+       {id:'think',role:'assistant',blocks:[{type:'thinking',thinking:phase===0?'Inspect the sample.':'Inspect the sample. Run the check.'}]}];
+     if(phase>=1)messages.push({id:'check',role:'assistant',blocks:[{type:'tool_use',id:'check',name:'Bash',input:{command:'npm test',status:phase===3?'completed':'running'}}]});
+     if(phase===3)messages.push({id:'result',role:'user',blocks:[{type:'tool_result',tool_use_id:'check',content:'All checks passed.'}]});
+     const running=phase<3,toolResults=new Map(phase===3?[['check',messages.at(-1)!.blocks[0]]]:[]);
+     view.render(React.createElement(MessageList,{messages,toolResults,streaming:running,runningMessages:running?new Set(messages):null,mode:'brief'}));
+   };
+   (window as any).renderLive=render;render(0);
  });
- const fixture=page.locator('#live-fixture');
- await expect(fixture.locator('details.thinking')).toHaveJSProperty('open',true);await expect(fixture.locator('details.thinking p')).toHaveText('Synthetic reasoning in progress.');
- await page.evaluate(()=>{const w=window as unknown as {renderLive(m:unknown[],r:boolean):void;liveMessages:unknown[]};w.renderLive(w.liveMessages,true);});
- await expect(fixture.locator('details.thinking')).toHaveJSProperty('open',false);await expect(fixture.locator('.tool-card .tool-title',{hasText:'Reading a.ts'})).toBeVisible();
+ const fixture=page.locator('#live-fixture'),reason=fixture.locator('details.thinking'),command=fixture.locator('.command-row');
+ await expect(reason.locator('.reasoning-content')).toBeVisible();
+ await reason.locator('summary').click();
+ await page.evaluate(()=>(window as any).renderLive(1));
+ await expect(command.locator('.tool-command')).toBeVisible();
+ await expect(reason).toHaveJSProperty('open',false);
+ await command.locator('summary').click();
+ await page.evaluate(()=>(window as any).renderLive(2));
+ await expect(command).toHaveJSProperty('open',false);
+ await command.locator('summary').click();await reason.locator('summary').click();
+ await page.evaluate(()=>(window as any).renderLive(3));
+ await expect(reason.locator('.reasoning-content')).toHaveText('Inspect the sample. Run the check.');
+ await expect(command.locator('.tool-output')).toHaveText('All checks passed.');
+ await expect(command.locator('.tool-output')).toBeVisible();
 });

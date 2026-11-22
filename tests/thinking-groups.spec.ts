@@ -37,16 +37,17 @@ for(const width of [390,1280])test(`public reasoning opens in one click and fail
    endpoint.endsWith('/messages')?{messages,previous:null,next:null}:endpoint==='/api/jobs'||endpoint.endsWith('/subagents')?[]:undefined;
   return typeof json==='undefined'?route.fulfill({status:404,json:{error:'Synthetic route'}}):route.fulfill({json});
  });
- await page.goto('http://127.0.0.1:5173');await openChatList(page);
+ await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
  await page.getByRole('button',{name:/Проверка ссылок/}).click();
- const work=page.locator('[data-message-id="work"]'),reason=work.locator('details.thinking'),failed=work.locator('.activity-row.failed');
+ const work=page.locator('[data-message-id="work"]'),reason=page.locator('.conversation details.thinking'),failed=work.locator('.activity-row.failed');
  await expect(reason.locator('summary')).toHaveText('Рассуждения');
  await expect(reason.locator('p')).toHaveCount(0);
  await expect(failed.locator('summary')).toContainText(command);await expect(failed.locator('summary')).toContainText('Команда не выполнилась');
  await expect(failed.locator('summary .tool-state')).toHaveText('Не удалось');
  await expect(failed.locator('summary')).toHaveCSS('color',await reason.locator('summary').evaluate(el=>getComputedStyle(el).color));
  await expect(page.locator('[data-message-id="answer"] .markdown')).toBeVisible();await expect(page.locator('.image-preview img')).toBeVisible();
- expect(await work.locator('details').evaluateAll(elements=>elements.map(el=>el.classList.contains('thinking')))).toEqual([true,false,false]);
+ await expect(work.locator('details')).toHaveCount(2);
+ expect(await reason.evaluate(el=>Boolean(el.compareDocumentPosition(document.querySelector('[data-message-id=work]')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
  await expect(work.locator('.activity-group>summary')).toHaveText('Изучил 2 файла');
  await reason.locator('summary').click();const text=reason.getByRole('region',{name:'Рассуждения'});
  await expect(text).toContainText('Для проверки руководства');await text.focus();await page.keyboard.press('End');
@@ -66,8 +67,8 @@ for(const width of [390,1280])test(`public reasoning opens in one click and fail
   await work.scrollIntoViewIfNeeded();await text.evaluate(el=>el.scrollTop=0);await page.mouse.move(2,2);
   await page.evaluate(()=>(document.activeElement as HTMLElement)?.blur());
   await expect(failed.locator('.tool-output-actions')).toHaveCSS('opacity','0');
-  const box=await work.boundingBox();
-  if(!box)throw Error('Transcript is not visible');
-  await page.screenshot({path:'docs/images/chat-activity.ru.png',animations:'disabled',clip:{x:Math.floor(box.x)-36,y:Math.floor(box.y)-14,width:Math.ceil(box.width)+72,height:Math.ceil(box.height)+28}});
+  const box=await work.boundingBox(),before=await reason.boundingBox();
+  if(!box||!before)throw Error('Transcript is not visible');
+  await page.screenshot({path:process.env.POCKET_REASONING_PREVIEW||'docs/images/chat-activity.ru.png',animations:'disabled',clip:{x:Math.floor(box.x)-36,y:Math.max(0,Math.floor(before.y)-14),width:Math.ceil(box.width)+72,height:Math.ceil(box.y+box.height-Math.max(0,before.y))+28}});
  }
 });
