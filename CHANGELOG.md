@@ -2,6 +2,8 @@
 
 ## 0.28.51 (unreleased)
 
+Release candidate for Android (version code 138), Windows and the PC host.
+
 ### Features
 - Task text authoring (2026-11-22). Improve an existing task field or fill an empty one with a signed-in Claude or GitHub Copilot provider. Each field uses a stable template and related task context. Review and edit the suggestion before applying it. Covers chat drafts, branch edits, board card titles and descriptions, acceptance criteria, and manually entered or imported Markdown plans. [User guide](docs/USER_GUIDE.md#attachments-and-history)
   Validation included provider and permission tests, Windows bridge checks, Edge editing flows, narrow-screen hit targets, the TypeScript/Vite build, Windows build and Android debug build. No live model or physical phone was used. The broader integration run had 411 passes, 61 failures and one skip before a CSS token fix. The token suite passed after correction. The Windows minimize smoke check and several existing fixture failures also reproduced on the parent commit. Some Git and test workers failed to launch. Review opened through its current menu on both revisions.
