@@ -2,7 +2,7 @@ import {SpeechSettingsPanel} from './SpeechSettings';
 import type {Connection} from './api';
 import {BackgroundSettings} from './background-settings';
 import './visual-system.css';
-import { t, useLanguage } from "./i18n";import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { t, useLanguage } from "./i18n";import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowUp, ChevronDown, RotateCcw } from 'lucide-react';
 import { Notice } from './Notice';
 import { useStreamSpeed, setStreamSpeed } from './stream-speed';
@@ -17,8 +17,11 @@ import {EdgeFadeSettings} from './EdgeFadeSettings';
 import {useApplyEdgeFade} from './chat-edge-fade';
 
 type Swatch = { dark: [string, string]; light: [string, string] };
-/** Named palettes use Radix scales; previews match the applied tokens. */
-export const palettes: { id: string; name: string; hue: number; hslHue: number; swatch: Swatch }[] = [
+type Palette = { id: string; name: string; hue: number; hslHue: number; swatch: Swatch; preferredTheme?: 'dark' | 'light' };
+export const palettes: Palette[] = [
+{ id: 'graphite', name: 'Графит', hue: 78, hslHue: 38, preferredTheme: 'dark', swatch: { dark: ['#191917', '#efb864'], light: ['#f6f4ef', '#77531d'] } },
+{ id: 'slate', name: 'Сланец', hue: 237, hslHue: 202, preferredTheme: 'dark', swatch: { dark: ['#202831', '#9dd4f4'], light: ['#eef3f7', '#285e7e'] } },
+{ id: 'ink', name: 'Тушь', hue: 327, hslHue: 301, preferredTheme: 'light', swatch: { dark: ['#201d23', '#d6acd8'], light: ['#f8f5ef', '#713f70'] } },
 { id: 'neutral', name: 'Нейтральная', hue: 0, hslHue: 0, swatch: {"dark": ["#111110", "#b4b4b4"], "light": ["#fdfdfc", "#646464"]} },
 { id: 'codex', name: 'Codex', hue: 0, hslHue: 0, swatch: {"dark": ["#111111", "#b4b4b4"], "light": ["#fcfcfc", "#646464"]} },
 { id: 'claude', name: 'Claude', hue: 0, hslHue: 25, swatch: {"dark": ["#111110", "#d4b3a5"], "light": ["#fdfdfc", "#7d5e54"]} },
@@ -32,13 +35,17 @@ export const palettes: { id: string; name: string; hue: number; hslHue: number; 
 
 type Contrast = 'auto' | 'normal' | 'more';
 type Appearance = {chatFont:'golos'|'manrope'|'system';chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
-const defaults: Appearance = { chatFont:'golos',chatAlign:'center', palette: 'sage', theme: 'dark', textSize: 14, scale: 100, spacing: 1.85, compact: false, contrast: 'auto', colorblind: false };
+const defaults: Appearance = { chatFont:'golos',chatAlign:'center', palette: 'graphite', theme: 'dark', textSize: 14, scale: 100, spacing: 1.85, compact: false, contrast: 'auto', colorblind: false };
 const storageKey = 'pocket-code-appearance-v1';
 const bounded = (value: unknown, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 function load(): Appearance {
   try {
-    const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
-    return { chatFont:['golos','manrope','system'].includes(data.chatFont)?data.chatFont:'golos',chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette: palettes.some((p) => p.id === data.palette) ? data.palette : defaults.palette,
+    const saved = localStorage.getItem(storageKey);
+    if (saved === null) return defaults;
+    const data = JSON.parse(saved);
+    // Older partial preferences used Sage whenever no palette was recorded.
+    const palette = palettes.some((p) => p.id === data.palette) ? data.palette : 'sage';
+    return { chatFont:['golos','manrope','system'].includes(data.chatFont)?data.chatFont:'golos',chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette,
       theme: ['dark', 'light', 'system'].includes(data.theme) ? data.theme : defaults.theme,
       textSize: bounded(data.textSize, 8, 22, 14), scale: bounded(data.scale, 60, 130, 100),
       spacing: bounded(data.spacing, 1.1, 2.2, 1.85), compact: data.compact === true,
@@ -50,12 +57,13 @@ export function appearanceSummary(value: Appearance) {
   const theme = value.theme === 'light' ? t("Светлая") : value.theme === 'system' ? t("Системная") : t("Тёмная");
   return [theme, t(palettes.find((p) => p.id === value.palette)?.name || ''), `${value.textSize} px`].filter(Boolean).join(' · ');
 }
-export function useAppearance() {
+export function useAppearance(ownsDocument = true) {
   useApplyEdgeFade();
-  useEffect(()=>{const wheel=(event:WheelEvent)=>{if(event.ctrlKey||event.metaKey)event.preventDefault();};document.addEventListener('wheel',wheel,{passive:false,capture:true});return()=>document.removeEventListener('wheel',wheel,true);},[]);
+  useEffect(()=>{if(!ownsDocument)return;const wheel=(event:WheelEvent)=>{if(event.ctrlKey||event.metaKey)event.preventDefault();};document.addEventListener('wheel',wheel,{passive:false,capture:true});return()=>document.removeEventListener('wheel',wheel,true);},[ownsDocument]);
   const [appearance, setAppearance] = useState(load);
   const [saveError, setSaveError] = useState('');
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!ownsDocument) return;
     const root = document.documentElement,system = matchMedia('(prefers-color-scheme: light)');
     const applyTheme = () => {root.dataset.theme = appearance.theme === 'system' ? system.matches ? 'light' : 'dark' : appearance.theme;};
     applyTheme();system.addEventListener('change', applyTheme);
@@ -74,7 +82,7 @@ export function useAppearance() {
     try {localStorage.setItem(storageKey, JSON.stringify(appearance));setSaveError('');}
     catch {setSaveError(t("Настройки применены, но сохранить их на устройстве не удалось."));}
     return () => system.removeEventListener('change', applyTheme);
-  }, [appearance]);
+  }, [appearance, ownsDocument]);
   return { appearance, setAppearance, saveError };
 }
 type Sizing = Pick<Appearance, 'textSize' | 'scale' | 'spacing' | 'compact'>;
@@ -99,7 +107,16 @@ export function AppearanceSettings({ appearance, setAppearance, saveError,connec
   const restore = (value: Snapshot) => { setAppearance({ ...value.appearance }); try { setStreamSpeed(value.speed); setEdgeFade(value.fade); setBoardGrid(value.grid); } catch { /* Appearance still applies; the save error explains storage problems. */ } };
   const changed = { textSize: appearance.textSize !== defaults.textSize, scale: appearance.scale !== defaults.scale, spacing: Math.abs(appearance.spacing - defaults.spacing) > 0.001 };
   const pageChanged = appearance.chatAlign !== defaults.chatAlign || !matchesPreset(appearance, sizePresets[1].value) || appearance.theme !== defaults.theme || appearance.palette !== defaults.palette || appearance.contrast !== defaults.contrast || appearance.colorblind !== defaults.colorblind || fade !== 100;
-  const light = appearance.theme === 'light' || appearance.theme === 'system' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches;
+  function paletteButton(palette: Palette) {
+    const selected = appearance.palette === palette.id;
+    const previewMode = selected ? undefined : palette.preferredTheme;
+    const [darkBg, darkAccent] = palette.swatch[previewMode ?? 'dark'];
+    const [lightBg, lightAccent] = palette.swatch[previewMode ?? 'light'];
+    return <button type="button" key={palette.id} aria-pressed={selected} onClick={() => setAppearance((old) => ({ ...old, palette: palette.id, theme: palette.preferredTheme ?? old.theme }))}>
+      <span className="palette-swatch" aria-hidden="true" style={{ '--swatch-dark-bg': darkBg, '--swatch-dark-accent': darkAccent, '--swatch-light-bg': lightBg, '--swatch-light-accent': lightAccent } as CSSProperties} />
+      {t(palette.name)}{selected && <b aria-hidden="true">✓</b>}
+    </button>;
+  }
   return <section className="appearance-settings" aria-label={t("Настройки интерфейса")}>
     <div className="appearance-preview" role="group" aria-label={t("Пример переписки")}>
       <div className="appearance-preview-user">{t("Почему падает тест входа?")}</div>
@@ -108,11 +125,12 @@ export function AppearanceSettings({ appearance, setAppearance, saveError,connec
       <div className="appearance-preview-composer" aria-hidden="true"><span>{t("Ответить агенту…")}</span><span className="appearance-preview-send"><ArrowUp size={16} /></span></div>
     </div>
     <p className="muted">{t("Изменения видны сразу и сохраняются на этом устройстве.")}</p>
+    <fieldset className="palette-field"><legend>{t("Готовые темы")}</legend><div className="palette-options theme-presets">{palettes.filter((p) => p.preferredTheme).map(paletteButton)}</div></fieldset>
     <fieldset className="appearance-segmented"><legend>{t("Тема")}</legend><div className="segmented-options">{([['dark', 'Тёмная'], ['light', 'Светлая'], ['system', 'Системная']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-theme" value={id} checked={appearance.theme === id} onChange={() => setAppearance((p) => ({ ...p, theme: id }))} /><span>{t(title)}</span></label>)}</div></fieldset>
     <label className="appearance-row">{language==='ru'?'Положение чата':'Chat position'}<select aria-label={language==='ru'?'Положение чата':'Chat position'} value={appearance.chatAlign} onChange={event=>setAppearance({...appearance,chatAlign:event.target.value as Appearance['chatAlign']})}><option value="center">{language==='ru'?'По центру':'Center'}</option><option value="left">{language==='ru'?'Слева':'Left'}</option><option value="right">{language==='ru'?'Справа':'Right'}</option></select></label>
     <label className="appearance-row">{language==='ru'?'\u0428\u0440\u0438\u0444\u0442 \u0447\u0430\u0442\u0430':'Chat font'}<select aria-label={language==='ru'?'\u0428\u0440\u0438\u0444\u0442 \u0447\u0430\u0442\u0430':'Chat font'} value={appearance.chatFont} onChange={event=>setAppearance({...appearance,chatFont:event.target.value as Appearance['chatFont']})}><option value="golos">Golos Text</option><option value="manrope">Manrope</option><option value="system">{language==='ru'?'\u0421\u0438\u0441\u0442\u0435\u043c\u043d\u044b\u0439':'System'}</option></select></label>
       <BackgroundSettings/>
-    <fieldset className="palette-field"><legend>{t("Цветовая палитра")}</legend><div className="palette-options">{palettes.map((p) => <button type="button" key={p.id} aria-pressed={appearance.palette === p.id} onClick={() => setAppearance((old) => ({ ...old, palette: p.id }))}><span className="palette-swatch" aria-hidden="true" style={{ '--swatch-bg': p.swatch[light ? 'light' : 'dark'][0], '--swatch-accent': p.swatch[light ? 'light' : 'dark'][1] } as CSSProperties} />{t(p.name)}{appearance.palette === p.id && <b aria-hidden="true">✓</b>}</button>)}</div></fieldset>
+    <fieldset className="palette-field"><legend>{t("Цветовая палитра")}</legend><div className="palette-options">{palettes.filter((p) => !p.preferredTheme).map(paletteButton)}</div></fieldset>
     <fieldset className="appearance-segmented"><legend>{t("Размер")}</legend><div className="segmented-options">{sizePresets.map((item) => <label key={item.id}><input type="radio" name="appearance-size" checked={preset?.id === item.id} onChange={() => setAppearance((p) => ({ ...p, ...item.value }))} /><span>{t(item.title)}</span></label>)}</div>{!preset && <p className="muted">{t("Сейчас выбраны свои значения в разделе «Дополнительно».")}</p>}</fieldset>
     <fieldset className="appearance-segmented"><legend>{t("Контраст")}</legend><div className="segmented-options">{([['auto', 'Как в системе'], ['normal', 'Обычный'], ['more', 'Высокий']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-contrast" value={id} checked={appearance.contrast === id} onChange={() => setAppearance((p) => ({ ...p, contrast: id }))} /><span>{t(title)}</span></label>)}</div><p className="muted">{t("Высокий контраст усиливает рамки полей и второстепенный текст.")}</p></fieldset>
     <label className="desktop-toggle appearance-colorblind"><input type="checkbox" role="switch" checked={appearance.colorblind} onChange={(e) => setAppearance((p) => ({ ...p, colorblind: e.target.checked }))} /><span>{t("Цвета для дальтоников")}<small>{t("Синий и оранжевый вместо зелёного и красного в статусах и Review")}</small></span></label>

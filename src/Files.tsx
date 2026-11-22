@@ -1,5 +1,6 @@
 import { t } from "./i18n";import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {useModal} from './navigation';
+import {useBackAction,useModal} from './navigation';
+import './file-preview.css';
 import {Markdown} from './RichBlocks';
 import {ImageViewer} from './ImageViewer';
 import { ArrowLeft, Folder, FileText, ChevronRight, X, Image as ImageIcon, Search, WrapText } from 'lucide-react';
@@ -11,7 +12,12 @@ export function FilePreview({connection,root,path,onClose,scoped=false}:{connect
   const name=path.split(/[\\/]/).pop()||path,markdown=/\.md$/i.test(name),image=imageFile.test(name);
   const [text,setText]=useState<string|null>(null),[picture,setPicture]=useState(''),[error,setError]=useState(''),[raw,setRaw]=useState(!markdown),[wrap,setWrap]=useState(true),[query,setQuery]=useState(''),[match,setMatch]=useState(0);
   const panel=useRef<HTMLElement|null>(null),body=useRef<HTMLDivElement|null>(null);
+  const [finding,setFinding]=useState(false);
+  const searchInput=useRef<HTMLInputElement>(null),searchButton=useRef<HTMLButtonElement>(null);
+  function closeSearch(){setFinding(false);setQuery('');searchButton.current?.focus();}
   useModal(panel,!image||!picture,onClose);
+  useBackAction(()=>{closeSearch();return true;},110,finding);
+  useEffect(()=>{if(finding)searchInput.current?.focus();},[finding]);
   useEffect(()=>{let valid=true;setText(null);setPicture('');setError('');
     (image?request<{mimeType:string;data?:string}>(connection,`/project-artifact?cwd=${encodeURIComponent(root)}&path=${encodeURIComponent(path)}`).then(value=>{if(valid&&value.data&&/^image\//.test(value.mimeType))setPicture(`data:${value.mimeType};base64,${value.data}`);else if(valid)setError(t('Этот файл нельзя показать'));})
       :request<{text:string}>(connection,'/file?path='+encodeURIComponent(path)+(scoped?'&cwd='+encodeURIComponent(root):'')).then(value=>{if(valid)setText(value.text);})).catch(e=>{if(valid)setError(t((e as Error).message));});
@@ -20,12 +26,18 @@ export function FilePreview({connection,root,path,onClose,scoped=false}:{connect
   useEffect(()=>{setMatch(0);},[query]);
   useEffect(()=>{if(!parts?.count)return;const marks=body.current?.querySelectorAll('mark');marks?.forEach((mark,index)=>mark.classList.toggle('current',index===match));marks?.[match]?.scrollIntoView({block:'center'});},[match,parts]);
   if(image&&picture)return <ImageViewer src={picture} title={name} onClose={onClose}/>;
-  return <div className="modal-backdrop"><section ref={panel} className="file-preview" role="dialog" aria-modal="true" aria-label={name}>
-    <header><strong>{name}</strong><button className="icon-button" aria-label={t("Закрыть файл")} onClick={onClose}><X size={20} /></button></header>
-    {text!==null&&<div className="file-preview-tools">
+  return <div className="modal-backdrop file-reader-backdrop"><section ref={panel} className="file-preview file-reader" role="dialog" aria-modal="true" aria-label={name}
+    onKeyDown={event=>{if(text!==null&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='f'){event.preventDefault();setFinding(true);searchInput.current?.select();}}}>
+    <header className="file-reader-header"><FileText size={17} aria-hidden="true"/><strong title={path}>{name}</strong>
+      {text!==null&&<>
+        {raw&&<button className="file-reader-action" aria-label={t('Перенос строк')} title={t('Перенос строк')} aria-pressed={wrap} onClick={()=>setWrap(value=>!value)}><WrapText size={17}/></button>}
+        <button ref={searchButton} className="file-reader-action" aria-label={t('Найти в файле')} title={t('Найти в файле')} aria-expanded={finding} onClick={()=>finding?closeSearch():setFinding(true)}><Search size={17}/></button>
+      </>}
+      <button className="file-reader-action" title={t('Закрыть файл')} aria-label={t('Закрыть файл')} onClick={onClose}><X size={18}/></button>
+    </header>
+    {text!==null&&(markdown||finding)&&<div className="file-reader-toolbar">
       {markdown&&<div className="segmented" role="group" aria-label={t('Вид файла')}><button aria-pressed={!raw} onClick={()=>{setRaw(false);setQuery('');}}>{t('Оформленный')}</button><button aria-pressed={raw} onClick={()=>setRaw(true)}>{t('Исходный')}</button></div>}
-      {raw&&<button className="file-preview-toggle" aria-pressed={wrap} onClick={()=>setWrap(value=>!value)}><WrapText size={16}/>{t('Перенос строк')}</button>}
-      <label className="file-preview-find"><Search size={16} aria-hidden="true"/><input type="search" aria-label={t('Найти в файле')} placeholder={t('Найти в файле')} value={query} onChange={event=>{setQuery(event.target.value);if(event.target.value)setRaw(true);}} onKeyDown={event=>{if(event.key==='Enter'&&parts?.count){event.preventDefault();setMatch(value=>(value+(event.shiftKey?parts.count-1:1))%parts.count);}}}/>{query.trim()&&<span role="status">{parts?.count?t('{0} из {1}',match+1,parts.count):t('Нет совпадений')}</span>}</label>
+      {finding&&<label className="file-reader-search"><Search size={15} aria-hidden="true"/><input ref={searchInput} type="search" aria-label={t('Найти в файле')} placeholder={t('Найти в файле')} value={query} onChange={event=>{setQuery(event.target.value);if(event.target.value)setRaw(true);}} onKeyDown={event=>{if(event.key==='Enter'&&parts?.count){event.preventDefault();setMatch(value=>(value+(event.shiftKey?parts.count-1:1))%parts.count);}}}/>{query.trim()&&<span role="status">{parts?.count?t('{0} из {1}',match+1,parts.count):t('Нет совпадений')}</span>}</label>}
     </div>}
     <div className="file-preview-body" ref={body}>
       {error&&<p className="project-docs-error" role="alert">{error}</p>}

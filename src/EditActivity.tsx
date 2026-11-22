@@ -1,4 +1,4 @@
-import {useId,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {Fragment,useId,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {ChevronRight,FileCode2} from 'lucide-react';
 import {useLanguage} from './i18n';
 import type {ToolView} from './tool-registry';
@@ -12,17 +12,24 @@ const lineForms:Record<string,string>={one:'строка',few:'строки',man
 const ruPlural=new Intl.PluralRules('ru');
 function diffText(file:EditFile){return file.content??file.lines.map(row=>signs[row.kind]+row.text).join('\n');}
 
-function LiveWriteSnippet({text}:{text:string}){
+function LiveWriteSnippet({text,totalLines}:{text:string;totalLines:number|undefined}){
   const viewport=useRef<HTMLSpanElement>(null);
   const speed=useStreamSpeed();
-  const visible=usePacedText(text.slice(-4000),false,speed);
+  const excerpt=text.slice(-4000);
+  const visible=usePacedText(excerpt,false,speed);
   const lines=visible.split(/\r?\n/);
   if(lines.at(-1)==='')lines.pop();
-  const tail=lines.slice(-4).join('\n');
+  const tail=lines.slice(-4);
+  const excerptLines=useMemo(()=>excerpt.split('\n').length-(excerpt.endsWith('\n')?1:0),[excerpt]);
+  // The host may send only a suffix. Anchor its first line to the full received count.
+  const first=totalLines!==undefined && excerpt.startsWith(visible)
+    ? Math.max(1,totalLines-excerptLines+1)+lines.length-tail.length : undefined;
   useLayoutEffect(()=>{
     if(viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight;
-  },[tail]);
-  return <span ref={viewport} className="edit-live-snippet" aria-hidden="true"><code>{tail}</code></span>;
+  },[visible]);
+  return <span ref={viewport} className="edit-live-snippet" aria-hidden="true"><code>{tail.map((line,i)=>
+    <Fragment key={first===undefined?i:first+i}>{i>0&&'\n'}<span className="edit-live-line" data-number={first===undefined?undefined:first+i}><span>{line}</span></span></Fragment>
+  )}</code></span>;
 }
 
 export function EditActivity({view,input,name,result,copy,fallback,created=false}:{
@@ -70,7 +77,7 @@ export function EditActivity({view,input,name,result,copy,fallback,created=false
           {running&&<><i className="edit-live-dot" aria-hidden="true"/><span className="visually-hidden">{l('In progress','Выполняется')}</span></>}
         </span>
       </span>
-      {preview&&<LiveWriteSnippet text={preview}/>}
+      {preview&&<LiveWriteSnippet text={preview} totalLines={truncated&&input.preview_lines===undefined?undefined:count}/>}
     </summary>
     {open&&<div className="edit-expanded">
       {truncated&&<small>{l('Showing the latest received part','Показана последняя полученная часть')}</small>}

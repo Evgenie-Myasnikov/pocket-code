@@ -37,7 +37,7 @@ test('brief transcript folds routine work, keeps errors, plan, changes and notic
  await failed.locator('summary').click();await expect(failed.locator('.tool-output')).toContainText('> sample lint');
  await expect(failed.getByRole('button',{name:'Copy output'})).toBeVisible();await expect(failed.getByRole('button',{name:'Copy command'})).toBeVisible();
  await expect(page.locator('.turn-changes')).toHaveCount(0);
- await expect(page.locator('.code-block-bar')).toContainText('ts');
+ await expect(page.getByRole('button',{name:'Code actions · ts'})).toHaveAttribute('aria-expanded','false');
  const notice=page.locator('.transcript-event-message');await expect(notice).toContainText('Background tasks completed');await expect(page.locator('.message.user .claude-task-notification')).toHaveCount(0);
  await expect(page.locator('.plan-bar')).toContainText('Plan 1/3');await expect(page.locator('.plan-bar')).toContainText('Fixing the check');
  await page.locator('.plan-bar-toggle').click();await expect(page.locator('.plan-bar .plan-checklist li')).toHaveCount(3);

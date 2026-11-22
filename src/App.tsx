@@ -141,7 +141,7 @@ export function App({embedded}:{embedded?:EmbeddedChat}={}) {
 }
 function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:EmbeddedChat}) {
   const language=useLanguage();
-  const appearanceSettings = useAppearance();
+  const appearanceSettings = useAppearance(!embedded);
   const [provider, setProvider] = useState<WorkspaceProvider>(()=>embedded?.provider||selectedWorkspace());
   const [providers, setProviders] = useState<ProviderInfo[]>([{id:'claude',name:'Claude',available:true}]);
   const providerInfo = providers.find(item => item.id === provider);
@@ -442,7 +442,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const jobTranscript=useMemo(()=>withLiveWrites(job?.messages||[],job?.status==='running'?job.writePreviews:undefined),[job?.messages,job?.writePreviews,job?.status]);
   const runningMessages=useMemo(()=>job?.status==='running'?new Set(jobTranscript):null,[jobTranscript,job?.status]);
   const toolResults=useMemo(()=>{const blocks=outputMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b]));},[outputMessages]);
-  const detail=useDetailMode(embedded?'detailed':'brief');
+  const detail=useDetailMode();
   const resultRoot=!selected?.readOnly&&!demo?(selected?.cwd||job?.cwd||cwd):undefined;
   const changesByTurn=useMemo(()=>resultRoot?computeTurnChanges(outputMessages,toolResults,running,resultRoot):undefined,[outputMessages,toolResults,running,resultRoot]);
   const plan=useMemo(()=>latestPlan(outputMessages),[outputMessages]);

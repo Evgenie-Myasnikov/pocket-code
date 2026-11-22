@@ -20,6 +20,7 @@ test('live file writes display received code and resolve into one completed edit
   await expect(row.locator('.edit-metrics')).toContainText(Buffer.byteLength(source)+' Б · 5 строк');
   await expect(row.locator('.edit-live-snippet')).toHaveText(source.split('\n').slice(-4).join('\n'),{useInnerText:false});
   const snippet=row.locator('.edit-live-snippet'),title=row.locator('.edit-summary-line');
+  expect(await snippet.locator('.edit-live-line').evaluateAll(lines=>lines.map(line=>line.getAttribute('data-number')))).toEqual(['2','3','4','5']);
   const metrics=page.getByRole('group',{name:'Статистика токенов'});
   await expect(metrics).toContainText('Сгенерировано 111');await expect(metrics).toContainText('55 токенов/с');
   await expect(metrics).toContainText('68% контекста');

@@ -2,7 +2,7 @@ import { memo, useState, useRef, useMemo, useEffect, useId, type ComponentProps,
 import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
-import {ChevronDown,Lightbulb,WrapText,X} from 'lucide-react';
+import {ChevronDown,Ellipsis,Lightbulb,WrapText,X} from 'lucide-react';
 import {useStreamingReveal} from './useStreamingReveal';
 import {usePacedText} from './usePacedText';
 import {useStreamSpeed} from './stream-speed';
@@ -66,8 +66,19 @@ export function CopyAction({text,label,compact=false}:{text:string|(()=>string);
 /** Chat and project documents use the same code reader. Wrapping only changes presentation. */
 export function CodeBlock({children}:{children?:ReactNode}){
   const pre=useRef<HTMLPreElement>(null);
+  const block=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
+  const [actionsOpen,setActionsOpen]=useState(false);
+  const actionsId=useId();
   const [wrap,setWrap]=useState(false);
   const [moreToRight,setMoreToRight]=useState(false);
+  useEffect(()=>{
+    if(!actionsOpen)return;
+    const outside=(event:PointerEvent)=>{
+      if(!block.current?.contains(event.target as Node))setActionsOpen(false);
+    };
+    document.addEventListener('pointerdown',outside);
+    return ()=>document.removeEventListener('pointerdown',outside);
+  },[actionsOpen]);
   useEffect(()=>{
     const element=pre.current;
     if(!element)return;
@@ -83,16 +94,24 @@ export function CodeBlock({children}:{children?:ReactNode}){
     };
   },[]);
   const language=codeLanguage(children);
-  return <div className="code-block reader-code">
-    <div className="code-block-bar">
-      <span className="code-language" title={language}>{language||t('Код')}</span>
-      <div className="reader-code-actions">
+  const label=[t('Действия с кодом'),language].filter(Boolean).join(' · ');
+  return <div className="code-block reader-code" ref={block} onBlur={event=>{
+    if(!event.currentTarget.contains(event.relatedTarget))setActionsOpen(false);
+  }} onKeyDown={event=>{
+    if(actionsOpen&&event.key==='Escape'){
+      event.preventDefault();event.stopPropagation();trigger.current?.focus();setActionsOpen(false);
+    }
+  }}>
+    <button type="button" ref={trigger} className="code-options-trigger" aria-label={label} title={label}
+      aria-expanded={actionsOpen} aria-controls={actionsOpen?actionsId:undefined} onClick={()=>setActionsOpen(value=>!value)}>
+      <Ellipsis size={18} aria-hidden="true"/>
+    </button>
+    {actionsOpen&&<div id={actionsId} role="group" aria-label={label} className="reader-code-actions">
         <button type="button" className="copy-action code-wrap" aria-pressed={wrap} onClick={()=>setWrap(value=>!value)}>
           <WrapText size={15} aria-hidden="true"/><span>{t('Перенос')}</span>
         </button>
         <CopyAction text={()=>pre.current?.textContent?.replace(/\n$/,'')||''} label={t('Копировать')}/>
-      </div>
-    </div>
+    </div>}
     <div className={'reader-code-scroll'+(moreToRight&&!wrap?' overflowing':'')}>
       <pre ref={pre} className={wrap?'wrap':undefined}>{children}</pre>
     </div>

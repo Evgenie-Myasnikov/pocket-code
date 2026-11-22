@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- Chat activity (2026-11-22). The default brief view folds successful shell commands from each user turn into one expandable history. Output stays available and running commands, failures and approval requests remain visible. Desktop and phone browser checks covered turn boundaries, the detailed view and retained command output.
+- Turn results (2026-11-22). On Windows the output and working folder buttons open Explorer after the local host verifies the directory. Phones browse the connected PC inside Pocket Code. Native path tests and desktop and phone browser tests covered scoped navigation, failure recovery and file previews.
+- Appearance (2026-11-22). Graphite, Slate and Ink are available in desktop and phone settings. Each preset sets the surfaces, accents and control shapes across the app. Graphite is the default for new installs. Existing choices and reading preferences survive the upgrade. Live file previews show line numbers when the received line count is known.
+  - Validation covered 20 Edge scenarios, including 320 px and 390 px phone layouts, saved preferences, live edits and navigation. All 26 palette/mode combinations passed the contrast check. The production web build and Windows shell compilation passed. Physical Android verification remains open.
+
+### Bug Fixes
+- Code readers (2026-11-22). Fenced code now uses a single surface with copy and wrapping behind a compact disclosure. File previews keep search, wrapping and close beside the file name even when opened directly from chat. Search opens on demand or with Ctrl+F. Verified both readers with keyboard and touch-sized layouts. Desktop and Android preview archives matched the production web assets.
+  - Four legacy glass-effect scenarios still fail on the prior release branch commit and the preview. They expect different blur values on the composer and menus.
+
 ## [0.28.54](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.53...v0.28.54) (2026-11-22)
 
 Published [0.28.54](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.54) from [b466d9331c0e1fb062a81becb14c61e65d50dd1d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/b466d9331c0e1fb062a81becb14c61e65d50dd1d) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). All four public downloads matched the audited SHA-256 hashes, all 163 UI files matched across packages, and the APK signer matched 0.28.53. Android version code 141. Physical-device verification remains open.

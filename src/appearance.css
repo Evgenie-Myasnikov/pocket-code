@@ -4,7 +4,7 @@
 /* Older WebViews without OKLCH keep the previous HSL formulas. */
 @supports not (color:oklch(0 0 0)){:root[data-theme]{--bg:hsl(var(--palette-hsl-hue) 12% 7%);--panel:hsl(var(--palette-hsl-hue) 12% 10%);--surface:hsl(var(--palette-hsl-hue) 15% 14%);--line:hsl(var(--palette-hsl-hue) 14% 24%);--muted:hsl(var(--palette-hsl-hue) 12% 65%);--text:hsl(var(--palette-hsl-hue) 14% 90%);--accent:hsl(var(--palette-hsl-hue) 50% 78%);--accent-dark:hsl(var(--palette-hsl-hue) 40% 12%);color:var(--text);background:var(--bg);color-scheme:dark}:root[data-theme=light]{--bg:hsl(var(--palette-hsl-hue) 22% 97%);--panel:hsl(var(--palette-hsl-hue) 22% 94%);--surface:hsl(var(--palette-hsl-hue) 24% 89%);--line:hsl(var(--palette-hsl-hue) 16% 72%);--muted:hsl(var(--palette-hsl-hue) 12% 35%);--text:hsl(var(--palette-hsl-hue) 20% 13%);--accent:hsl(var(--palette-hsl-hue) 46% 30%);--accent-dark:white;color-scheme:light}}
 :root[data-theme] :is(.sidebar,.workspace,.mobile-nav,.chat-header,.connect-page){background:var(--bg);color:var(--text)}
-:root[data-theme] :is(.host-card,.search,.composer,.message.user,.approval-card,.confirm-modal,.secret-input,.appearance-preview,label>select,label>input,.markdown pre,.secondary,.branch,.suggestions button,.attachment-chip){background:var(--panel);color:var(--text);border-color:var(--line)}
+:root[data-theme] :is(.host-card,.search,.composer,.message.user,.approval-card,.confirm-modal,.secret-input,.appearance-preview,label>select,label>input,.markdown pre:not(:where(.reader-code pre)),.secondary,.branch,.suggestions button,.attachment-chip){background:var(--panel);color:var(--text);border-color:var(--line)}
 /* Field boundaries use --input (at least 3:1, WCAG 1.4.11); decorative dividers keep the quieter --line. */
 :root[data-theme] :is(.search,.secret-input,select,input:not([type=range],[type=checkbox],[type=radio]),textarea){border-color:var(--input)}
 :root[data-theme] :is(.session-row.selected,.session-row:hover,.icon-button:hover,.secondary:hover,.host-icon){background:var(--surface);border-color:var(--line)}
@@ -53,6 +53,37 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border:3px solid var(
 .appearance-advanced{margin:8px 0 16px}.appearance-advanced>summary{min-height:48px}.appearance-row{display:flex;align-items:flex-end;gap:4px;min-width:0}.appearance-row>label{flex:1;min-width:0}.appearance-reset-one{flex-shrink:0;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}.appearance-changed-dot{display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;background:var(--accent);vertical-align:middle}.appearance-reset{display:inline-flex;align-items:center;gap:8px;min-height:44px;margin-top:8px}.appearance-reset:disabled{opacity:.5;cursor:default}
 .appearance-settings label{line-height:1.5;}
 .appearance-settings .palette-options button{font-size:clamp(11px,calc(12px * var(--ui-scale,1)),16px);}
+.palette-swatch{--swatch-bg:var(--swatch-dark-bg);--swatch-accent:var(--swatch-dark-accent)}
+:root[data-theme=light] .palette-swatch{--swatch-bg:var(--swatch-light-bg);--swatch-accent:var(--swatch-light-accent)}
+.theme-presets {
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,6rem),1fr));
+ max-width:480px;
+}
+.theme-presets button {
+ display:grid;
+ grid-template-columns:minmax(0,1fr) auto;
+ text-align:start;
+ gap:8px;
+}
+.theme-presets button>.palette-swatch {
+ grid-column:1/-1;
+ width:100%;
+ height:30px;
+ border-radius:var(--radius-sm);
+ background:var(--swatch-bg);
+ box-shadow:inset 0 0 0 1px var(--border);
+ display:flex;
+ align-items:center;
+}
+.theme-presets .palette-swatch::before {
+ content:"";
+ width:26%;
+ height:4px;
+ margin-inline-start:10px;
+ border-radius:var(--radius-pill);
+ background:var(--swatch-accent);
+}
 .chat-scroll-actions{display:flex;justify-content:center;gap:8px;flex-shrink:0;padding:6px 12px;background:var(--bg);border-top:1px solid var(--line)}
 .chat-scroll-actions button{min-height:40px;padding:8px 14px;border-radius:24px;box-shadow:0 3px 12px var(--shadow-soft)}
 :root[data-compact=true] .conversation-inner{padding-top:12px}:root[data-compact=true] .message{margin-bottom:14px}:root[data-compact=true] .message.user{padding:10px 14px}:root[data-compact=true] .session-row{padding-top:8px;padding-bottom:8px}

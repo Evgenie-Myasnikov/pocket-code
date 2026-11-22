@@ -38,7 +38,7 @@
 :root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{
  background-color:color-mix(in srgb,var(--panel) 66%,transparent);
  background-image:linear-gradient(145deg,color-mix(in srgb,var(--text) 7%,transparent),transparent 28%,color-mix(in srgb,var(--accent) 4%,transparent));
- border-color:color-mix(in srgb,var(--text) 8%,transparent);border-radius:28px;
+ border-color:color-mix(in srgb,var(--text) 8%,transparent);border-radius:var(--composer-radius,28px);
  -webkit-backdrop-filter:blur(14px) saturate(110%);backdrop-filter:blur(14px) saturate(110%);
  box-shadow:inset 0 4px 9px color-mix(in srgb,var(--text) 6%,transparent),inset 0 -3px 8px color-mix(in srgb,var(--text) 7%,transparent),inset 3px 0 8px color-mix(in srgb,var(--text) 6%,transparent),0 12px 32px var(--shadow-soft);
 }
@@ -53,7 +53,7 @@
 @media(forced-colors:active){:root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{background:Canvas;border-color:CanvasText}}
 
 :root[data-theme][data-theme] header.chat-header-conversation :is(.header-title,.chat-header-actions>.chat-menu-button){
- border:1px solid var(--ui-material-edge);border-radius:22px;
+ border:1px solid var(--ui-material-edge);border-radius:var(--header-radius,22px);
  background:var(--ui-material-fill);
  -webkit-backdrop-filter:blur(14px) saturate(110%);backdrop-filter:blur(14px) saturate(110%);
  box-shadow:var(--ui-material-shadow);
@@ -117,7 +117,7 @@
 .speech-settings{display:grid;gap:12px;border:0;padding:0;margin-block:24px;min-width:0}.speech-settings label{display:grid;gap:8px}.speech-settings select{max-width:100%;min-height:44px}.speech-settings legend{font-weight:var(--fw-semibold)}
 
 /* Keep frosting separate from the form so floating controls do not inherit a backdrop root. */
-.chat-canvas .composer-with-usage{position:relative;isolation:isolate;border-radius:28px}
+.chat-canvas .composer-with-usage{position:relative;isolation:isolate;border-radius:var(--composer-radius,28px)}
 .chat-canvas .composer-with-usage::before{content:'';position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:var(--panel)}
 :root[data-theme][data-theme] .chat-canvas .prompt-composer.assistant-composer.assistant-composer{background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
 @supports(backdrop-filter:blur(1px)){

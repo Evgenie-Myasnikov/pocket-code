@@ -49,15 +49,30 @@ test('a phone reader can wrap one code example and copy its original indentation
   const blocks = page.locator('[data-message-id="typography-message"] .code-block');
   const first = blocks.first(), pre = first.locator('pre');
   const wrap = first.getByRole('button', {name:'Wrap', exact:true});
+  const actions=first.getByRole('button',{name:'Code actions · js'});
+  await expect(first).toHaveCSS('border-top-width','1px');
+  await expect(pre).toHaveCSS('border-top-width','0px');
+  await expect(pre).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  await expect(wrap).toHaveCount(0);
   await expect.poll(()=>pre.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeGreaterThan(50);
+  await actions.focus();await actions.press('Enter');
   await wrap.focus();await page.keyboard.press('Space');
   await expect(wrap).toHaveAttribute('aria-pressed','true');
   await expect.poll(()=>pre.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
-  await expect(blocks.nth(1).getByRole('button',{name:'Wrap',exact:true})).toHaveAttribute('aria-pressed','false');
+  await expect(blocks.nth(1).locator('pre')).not.toHaveClass(/wrap/);
   await first.getByRole('button',{name:'Copy',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).copiedExample)).toBe(source);
   await wrap.click();
+  await wrap.press('Escape');
+  await expect(actions).toBeFocused();
+  await expect(actions).toHaveAttribute('aria-expanded','false');
   await expect.poll(()=>pre.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeGreaterThan(50);
+  await page.setViewportSize({width:1280,height:900});
+  await actions.click();
+  await blocks.nth(1).getByRole('button',{name:'Code actions · js'}).click();
+  await expect(actions).toHaveAttribute('aria-expanded','false');
+  await expect(pre).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  await expect(pre).toHaveCSS('border-top-width','0px');
 });
 
 test('a denied code copy explains manual copying and a retry announces success',async({page})=>{
@@ -70,6 +85,7 @@ test('a denied code copy explains manual copying and a retry announces success',
   });
   await openChat(page,'claude','en');
   const code=page.locator('[data-message-id="typography-message"] .code-block').first();
+  await code.getByRole('button',{name:'Code actions · ts'}).click();
   const copy=code.getByRole('button',{name:'Copy',exact:true});
   await copy.focus();await copy.press('Enter');
   const status=code.getByRole('status');
@@ -123,7 +139,7 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
     const selectors = [
       '.markdown p', '.tool-card.combined summary', '.tool-card.combined .tool-command',
       '.tool-card.combined .tool-title', '.tool-card.combined .tool-output', '.tool-result-content .copy-action',
-      '.tool-card.activity-row:not(.combined)>summary', '.tool-diff', '.markdown .code-block pre code', '.code-language', '.markdown table',
+      '.tool-card.activity-row:not(.combined)>summary', '.tool-diff', '.markdown .code-block pre code', '.code-options-trigger', '.markdown table',
       '.document-card>strong', '.document-card>pre', '.thinking summary', '.thinking p',
       '.subagent-inline > summary, .subagent-card strong', '.subagent-inline p, .subagent-card small',
     ];

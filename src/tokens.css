@@ -1,8 +1,8 @@
 /* Design tokens: the one place for raw colours, type, spacing, radii, elevation, layers and motion.
    Component CSS uses roles from here (and --bg/--panel/--surface/--line/--muted/--text/--accent from the palette files); tests/design-tokens.test.ts blocks new hex literals elsewhere. */
 
-/* Fallback palette (dark Sage) until Appearance sets data-theme and data-palette; appearance.css and neutral-themes.css define the real roles. */
-:root{--bg:#111512;--panel:#171b18;--surface:#202620;--line:#2a302b;--muted:#8a958b;--text:#e6e8e3;--accent:#c3dda8;--accent-dark:#1b2a16}
+/* Match the initial Graphite window until the saved appearance is applied. */
+:root{--bg:#191917;--panel:#21211e;--surface:#2b2b27;--line:#41403a;--muted:#bcb8ae;--text:#f1eee7;--accent:#efb864;--accent-dark:#211b12}
 
 /* Semantic families. Each has -fg (text and icons, at least 4.5:1 on --bg and on its own -bg), -bg (a tinted pill or banner surface) and -border (at least 3:1 on --bg).
    Status is never colour alone: components pair it with a glyph and a word (run-status.tsx). */

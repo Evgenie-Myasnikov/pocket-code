@@ -9,6 +9,12 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
   const reply=(id:number,value:unknown)=>queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,value:structuredClone(value)}})));
   (window as any).chrome={...((window as any).chrome||{}),webview:{addEventListener(_type:string,fn:(event:{data:unknown})=>void){listeners.push(fn);},postMessage(message:any){
    if(message.action==='restart-host'){calls.push(message);state={...state,online:true,statusCode:'connected'};reply(message.id,state);return;}
+   if(message.action==='open-project-folder'){
+     calls.push(message);
+     const error=(window as any).folderOpenError;
+     if(error)listeners.forEach(listener=>listener({data:{id:message.id,error}}));else reply(message.id,true);
+     return;
+   }
    calls.push(message);const {id,action}=message;if(action==='state'||action==='pairing-role'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){(window as any).testDevices=(window as any).testDevices.filter((d:any)=>d.id!==message.deviceId);reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
    const url=new URL('https://example.invalid'+message.endpoint),p=url.pathname,provider=url.searchParams.get('provider')||'claude';
    if(p==='/chat-library/bulk-delete'){reply(id,(window as any).testBulkHost(message.data));return;}

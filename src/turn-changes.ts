@@ -5,7 +5,7 @@ import {resultPath} from './project-path';
 
 export type TurnChanges={files:string[];added:number;removed:number;countsUnknown?:boolean;deleted?:string[]};
 /** A turn starts with something the person wrote; tool results and background notices do not start one. */
-const startsTurn=(message:ChatMessage)=>message.role==='user'&&message.blocks.some(block=>block.type==='text'&&!parseClaudeTaskNotification(block.text||'')||block.type==='image'||block.type==='document'||block.type==='attachment');
+export const startsTurn=(message:ChatMessage)=>message.role==='user'&&message.blocks.some(block=>block.type==='text'&&!parseClaudeTaskNotification(block.text||'')||block.type==='image'||block.type==='document'||block.type==='attachment');
 /** Files changed in each finished turn, keyed by the turn's last message, from the edit calls' own input. */
 export function turnChanges(messages:ChatMessage[],results?:Map<string,Block>,running=false,cwd?:string):Map<string,TurnChanges>{
  const changes=new Map<string,TurnChanges>(),files=new Map<string,boolean>();let added=0,removed=0,last='',countsUnknown=false;

@@ -1,6 +1,11 @@
 # UI color roles
 
-Named palettes use [Radix Colors](https://github.com/radix-ui/colors), with the
+Graphite pairs warm graphite surfaces with amber. Slate pairs blue-gray surfaces
+with a blue accent and tighter corners. Ink pairs paper and charcoal surfaces
+with plum and softer corners. Each design defines eight color roles in both
+light and dark modes and shares its component shapes across desktop and phone.
+
+The original ten palettes use [Radix Colors](https://github.com/radix-ui/colors), with the
 upstream license in `RADIX-COLORS-LICENSE.txt`. Values were retrieved on 2026-10-24.
 The source files are `src/light.ts` and `src/dark.ts` in that repository.
 
@@ -32,5 +37,5 @@ they are not mixed samples from screenshots of those products.
 
 `tests/palette-contrast.test.ts` checks WCAG contrast of primary, secondary and
 accent text against all three surfaces and of primary button labels in all
-20 theme combinations. This numeric check does not replace visual inspection
+26 theme combinations. This numeric check does not replace visual inspection
 or certify accessibility of every application state.

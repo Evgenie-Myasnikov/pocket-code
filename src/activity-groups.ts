@@ -2,6 +2,7 @@ import type {Block,ChatMessage} from '../server/types';
 import {describeTool,basename} from './tool-registry';
 import {plural} from './plural';
 import {t} from './i18n';
+import {startsTurn} from './turn-changes';
 
 /** Brief folds a turn's routine activity into one line; detailed groups it by meaning. Errors, questions and running calls always stay visible. */
 export type DetailMode='brief'|'detailed';
@@ -34,22 +35,39 @@ const joins=(key:string|undefined,current:string|undefined)=>{
  return key===current||(key!=='thinking'&&current!=='thinking'&&(key==='plan'||current==='plan'));
 };
 export type ActivityRun={key:string;items:ActivityBlock[]};
-export function groupActivityBlocks(blocks:ActivityBlock[],mode:DetailMode='detailed'):ActivityRun[]{
+export type CommandSlots=Map<number,ActivityBlock[]>;
+export function groupActivityBlocks(blocks:ActivityBlock[],mode:DetailMode='detailed',commandSlots?:CommandSlots):ActivityRun[]{
  const runs:ActivityRun[]=[];
  let current:string|undefined;
- for(const item of blocks){const key=activityGroupKey(item,mode),last=runs.at(-1);
+ for(const item of blocks){const key=commandSlots?.has(item.index)?undefined:activityGroupKey(item,mode),last=runs.at(-1);
   if(last&&joins(key,current)){last.items.push(item);if(current==='plan')current=key;}
   else {runs.push({key:`${item.messageId}:${item.index}`,items:[item]});current=key;}
  }
  return runs;
 }
-export type TranscriptRun={key:string;message?:ChatMessage;items?:ActivityBlock[]};
+export type TranscriptRun={key:string;message?:ChatMessage;items?:ActivityBlock[];commandSlots?:CommandSlots};
 export function groupActivityMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null,mode:DetailMode='detailed'):TranscriptRun[]{
  const runs:TranscriptRun[]=[];
  let current:string|undefined;
+ let history:ActivityBlock[]|undefined;
  for(const message of messages){
+  if(mode==='brief'&&startsTurn(message))history=undefined;
   const items=visibleMessageBlocks(message,results,running?.has(message),message===messages.at(-1));
   if(!items.length)continue;
+  if(mode==='brief'&&message.role==='assistant'){
+   // Keep all transcript messages and block indexes. The first completed command
+   // owns the history and the other slots become scroll anchors in their original messages.
+   const commandSlots:CommandSlots=new Map();
+   for(const item of items){
+    if(item.block.type!=='tool_use')continue;
+    const view=describeTool(item.block,item.result,item.running);
+    if(view.kind!=='command'||(view.status!=='done'&&view.status!=='nomatch'))continue;
+    if(!history){history=[];commandSlots.set(item.index,history);}
+    else commandSlots.set(item.index,[]);
+    history.push(item);
+   }
+   if(commandSlots.size){runs.push({key:message.id,message,commandSlots});current=undefined;continue;}
+  }
   const keys=items.map(item=>activityGroupKey(item,mode));
   if(keys.includes(undefined)){runs.push({key:message.id,message});current=undefined;continue;}
   for(const [index,item] of items.entries()){const last=runs.at(-1),key=keys[index];

@@ -39,7 +39,14 @@ for(const width of [390,1440])test(`visible atmosphere and glass preserve intera
  const inputBox=(await input.boundingBox())!,usageBox=(await page.locator('.composer-input>.usage-indicator').boundingBox())!;
  expect(inputBox.x+inputBox.width).toBeLessThanOrEqual(usageBox.x-7);
  expect(inputBox.width).toBeGreaterThan(100);
- if(width>600){await expect(page.locator('.desktop-rail')).toHaveCSS('backdrop-filter','blur(24px)');await expect(page.locator('.code-block').first()).toHaveCSS('backdrop-filter','blur(12px)');await expect(page.locator('.code-block>pre').first()).toHaveCSS('background-color','rgba(0, 0, 0, 0)');}
+ if(width>600){
+  await expect(page.locator('.desktop-rail')).toHaveCSS('backdrop-filter','blur(24px)');
+  const code=page.locator('.code-block').first();
+  await expect(code).toHaveCSS('backdrop-filter','blur(12px)');
+  await expect(code).toHaveCSS('border-top-width','1px');
+  await expect(code.locator('.reader-code-scroll>pre')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  await expect(code.locator('.reader-code-scroll>pre')).toHaveCSS('border-top-width','0px');
+ }
  await page.screenshot({path:`.local/chat-glass-${width}.png`});
  await page.evaluate(()=>document.documentElement.dataset.chatEdgeFade='off');await expect(page.locator('.chat-edge-glass')).toBeHidden();
  await page.emulateMedia({reducedMotion:'reduce'});await expect(atmosphere.locator('canvas')).toHaveCount(0);await expect(atmosphere).toBeVisible();

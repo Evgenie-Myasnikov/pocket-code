@@ -10,8 +10,6 @@
  :root[data-theme] .chat-canvas .chat-header-actions>.chat-menu-button{background:color-mix(in srgb,var(--panel) 64%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-radius:50%}
  .chat-canvas .message.user .user-message-content{background:color-mix(in srgb,var(--panel) 78%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
  :root[data-theme] .chat-canvas .code-block{background:color-mix(in srgb,var(--panel) 65%,transparent);border:1px solid color-mix(in srgb,var(--text) 7%,transparent);border-radius:16px;overflow:hidden;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
- :root[data-theme] .chat-canvas .code-block>pre{background:transparent;border:0;border-radius:0;box-shadow:none;margin:0!important}
- .chat-canvas .code-block-bar{padding:6px 14px;background:transparent}
  :root[data-theme] .desktop-app{background:radial-gradient(ellipse at 0 35%,color-mix(in srgb,var(--accent) 14%,var(--bg)),var(--bg) 65%)}
  :root[data-theme] .desktop-app>.desktop-rail{background:color-mix(in srgb,var(--bg) 72%,transparent);-webkit-backdrop-filter:blur(22px) saturate(115%);backdrop-filter:blur(22px) saturate(115%);border-right-color:color-mix(in srgb,var(--text) 7%,transparent)}
 }

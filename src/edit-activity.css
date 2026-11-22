@@ -28,3 +28,21 @@
 :root[data-theme] .edit-activity:is([data-status=failed],[data-status=denied])>summary .tool-title{color:var(--status-error)}
 @media(max-width:570px){.edit-expanded{padding-inline-start:.4em}.edit-live-snippet{margin-inline-start:.4em}}
 @media(forced-colors:active){.edit-live-dot{background:Highlight}.edit-live-snippet,.tool-card .edit-diff{border:1px solid CanvasText}}
+
+/* The gutter belongs to the preview. Generated numbers stay out of the source text. */
+:root:is([data-palette=graphite],[data-palette=slate],[data-palette=ink]) .edit-live-snippet code{display:block;white-space:normal}
+:root:is([data-palette=graphite],[data-palette=slate],[data-palette=ink]) .edit-live-snippet code::after{display:none}
+:root:is([data-palette=graphite],[data-palette=slate],[data-palette=ink]) .edit-live-line{display:flex;min-height:1.5em;white-space:pre-wrap}
+:root:is([data-palette=graphite],[data-palette=slate],[data-palette=ink]) .edit-live-line[data-number]::before{
+  content:attr(data-number);flex:none;min-width:2ch;margin-inline-end:1ch;padding-inline-end:1ch;
+  text-align:end;font-variant-numeric:tabular-nums;color:var(--muted);border-inline-end:1px solid var(--line);user-select:none
+}
+:root:is([data-palette=graphite],[data-palette=slate],[data-palette=ink]) .edit-live-line>span{min-width:0;color:var(--text)}
+:root:is([data-palette=graphite],[data-palette=slate],[data-palette=ink]) .edit-live-line:last-child>span::after{
+  content:"";display:inline-block;height:.94em;border-inline-end:2px solid var(--accent);vertical-align:-.13em
+}
+:root[data-theme][data-palette=slate] .edit-activity>summary .edit-live-snippet{border:1px solid var(--line);border-radius:4px}
+:root[data-theme][data-palette=ink] .edit-activity>summary .edit-live-snippet{border-inline-start:3px solid var(--accent);border-radius:5px}
+@media(max-width:570px){
+  :root[data-theme] .edit-activity>summary .edit-live-snippet{margin-inline-start:0}
+}

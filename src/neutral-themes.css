@@ -1,3 +1,34 @@
+/* Workspace designs. Keep the same semantic roles in both luminosity modes. */
+:root[data-theme=dark][data-palette=graphite]{--bg:#191917;--panel:#21211e;--surface:#2b2b27;--line:#41403a;--muted:#bcb8ae;--text:#f1eee7;--accent:#efb864;--accent-dark:#211b12;}
+:root[data-theme=light][data-palette=graphite]{--bg:#f6f4ef;--panel:#fcfaf6;--surface:#eae7df;--line:#cfcac0;--muted:#605e54;--text:#25251f;--accent:#77531d;--accent-dark:#ffffff;}
+:root[data-theme=dark][data-palette=slate]{--bg:#202831;--panel:#26323d;--surface:#303e4a;--line:#475967;--muted:#b7c6d1;--text:#e8f0f6;--accent:#9dd4f4;--accent-dark:#182734;}
+:root[data-theme=light][data-palette=slate]{--bg:#eef3f7;--panel:#f8fafc;--surface:#dfe8ef;--line:#b7c7d1;--muted:#4f606b;--text:#202e38;--accent:#285e7e;--accent-dark:#ffffff;}
+:root[data-theme=dark][data-palette=ink]{--bg:#201d23;--panel:#28242b;--surface:#332e36;--line:#4c434f;--muted:#c4b8c3;--text:#f3ebef;--accent:#d6acd8;--accent-dark:#281d2a;}
+:root[data-theme=light][data-palette=ink]{--bg:#f8f5ef;--panel:#fdfbf8;--surface:#eee7e5;--line:#d4c8cb;--muted:#655a61;--text:#302632;--accent:#713f70;--accent-dark:#ffffff;}
+
+:root[data-palette=graphite] {
+ --radius:10px;
+ --ui-radius-control:8px;
+ --ui-radius-card:12px;
+ --ui-radius-panel:18px;
+}
+:root[data-palette=slate] {
+ --radius:7px;
+ --ui-radius-control:5px;
+ --ui-radius-card:8px;
+ --ui-radius-panel:10px;
+}
+:root[data-palette=ink] {
+ --radius:12px;
+ --ui-radius-control:12px;
+ --ui-radius-card:16px;
+ --ui-radius-panel:20px;
+}
+:root:is([data-palette=graphite], [data-palette=slate], [data-palette=ink]) {
+ --composer-radius:var(--ui-radius-panel);
+ --header-radius:var(--ui-radius-control);
+}
+
 /* Radix Colors: neutral scale 1/2/3/6/11/12 and accent text 11. See docs/UI-COLORS.md. */
 :root[data-theme=dark][data-palette=neutral]{--bg:#111110;--panel:#191918;--surface:#222221;--line:#3b3a37;--muted:#b5b3ad;--text:#eeeeec;--accent:#b4b4b4;--accent-dark:#111110;}
 :root[data-theme=light][data-palette=neutral]{--bg:#fdfdfc;--panel:#f9f9f8;--surface:#f1f0ef;--line:#dad9d6;--muted:#63635e;--text:#21201c;--accent:#646464;--accent-dark:#ffffff;}

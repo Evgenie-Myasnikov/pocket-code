@@ -2,6 +2,7 @@ import type {MarkdownChainScope} from './markdown-chain';
 import {setCustomAccount,useCustomAccount} from './custom-account';
 import {chatTitle} from './chat-title';
 import {RailButton} from './RailButton';
+import {RunStatusIcon,runStatusLabel} from './run-status';
 import {ChatAtmosphere} from './ChatAtmosphere';
 import {ChatActions,type ChatActionTarget} from './ChatActions';
 import {DesktopChatFolders} from './DesktopChatFolders';
@@ -257,7 +258,7 @@ export function DesktopApp(){
     if(document.querySelector('[aria-modal="true"]'))return;
     if(event.code==='KeyN'&&!event.altKey&&!event.shiftKey){event.preventDefault();shortcutActions.current.startChat();}
     else if(event.key==='Tab'&&!event.altKey){event.preventDefault();shortcutActions.current.cycle(event.shiftKey?-1:1);}
-    else if(event.code==='KeyO'&&!event.altKey&&!event.shiftKey){event.preventDefault();setDetailMode(detailMode('detailed')==='brief'?'detailed':'brief');}
+    else if(event.code==='KeyO'&&!event.altKey&&!event.shiftKey){event.preventDefault();setDetailMode(detailMode()==='brief'?'detailed':'brief');}
   };document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[]);
   const shortcuts:[string,string][]=[['Ctrl+N',label('New chat in the current project','Новый чат в текущем проекте')],['Ctrl+,',label('Open Settings','Открыть настройки')],['Ctrl+Tab',label('Next chat','Следующий чат')],['Ctrl+Shift+Tab',label('Previous chat','Предыдущий чат')],['Ctrl+O',label('Brief or detailed transcript','Кратко или подробно')],['Ctrl+/',label('Show keyboard shortcuts','Показать сочетания клавиш')],['Ctrl+A',label('Select the conversation','Выделить переписку')],['Ctrl+V',label('Paste into the message','Вставить в сообщение')],
     [enterSends(composerPreferences,true)?'Enter':'Ctrl+Enter',label('Send the message (Settings → Windows application)','Отправить сообщение (Настройки → Приложение Windows)')],['Shift+Enter',label('New line in the message','Новая строка в сообщении')],['↑',label('Edit the last message (empty field)','Вернуть последнее сообщение (пустое поле)')],
@@ -283,8 +284,11 @@ export function DesktopApp(){
        <RailButton className={page==='work'?'active':''} aria-label={label('Board','Доска')} title={label('Board','Доска')} aria-current={page==='work'?'page':undefined} onClick={()=>navigateRail('work')}><Folder size={18}/><span>{label('Board','Доска')}</span></RailButton>
        {railCollapsed&&<div className="rail-quick-chats">{visible.slice(0,6).map((item,index)=>{
          const title=item.customTitle||chatTitle(item.summary,label('Untitled chat','Без названия'));
-         return <RailButton key={item.sessionId} aria-label={title} title={title} aria-pressed={page==='chats'&&selected?.sessionId===item.sessionId} onClick={()=>openChat(item)}>
-           <MessageSquare aria-hidden="true" size={17}/><small aria-hidden="true">{index+1}</small>
+         const job=latestJobs.get(item.sessionId);
+         const status=job?.status==='running'?(job.approvals?.length?'needs_input':'running'):undefined;
+         const description=status?runStatusLabel(status):undefined;
+         return <RailButton key={item.sessionId} aria-label={title} aria-description={description} title={description?title+' · '+description:title} aria-pressed={page==='chats'&&selected?.sessionId===item.sessionId} onClick={()=>openChat(item)}>
+           {status?<RunStatusIcon status={status} size={17}/>:<MessageSquare aria-hidden="true" size={17}/>}<small aria-hidden="true">{index+1}</small>
          </RailButton>;
        })}</div>}
        <RailButton data-rail-utility className={page==='rules'?'active':''} aria-label={label('Rules','Правила')} title={label('Rules','Правила')} aria-current={page==='rules'?'page':undefined} onClick={()=>navigateRail('rules')}><BookOpen size={18}/><span>{label('Rules','Правила')}</span></RailButton>

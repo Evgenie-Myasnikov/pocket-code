@@ -6,7 +6,9 @@ function contrast(a:string,b:string){const x=luminance(a),y=luminance(b);return 
 test('all named light and dark palettes keep readable text and primary buttons',()=>{
  const css=readFileSync('src/neutral-themes.css','utf8');
  const palettes=[...css.matchAll(/:root\[data-theme=(\w+)\]\[data-palette=(\w+)\]\{([^}]+)\}/g)];
- assert.equal(palettes.length,20);
+ const names=['graphite','slate','ink','neutral','codex','claude','copilot','sage','ocean','lilac','rose','amber','mint'];
+ const expected=names.flatMap(name=>['dark','light'].map(mode=>`${mode}/${name}`));
+ assert.deepEqual(palettes.map(([,mode,name])=>`${mode}/${name}`).sort(),expected.sort());
  for(const [,mode,name,body] of palettes){const tokens=Object.fromEntries([...body.matchAll(/--([\w-]+):(#[a-f\d]{6});/g)].map(m=>[m[1],m[2]]));
   for(const fg of ['text','muted','accent'])for(const bg of ['bg','panel','surface'])assert.ok(contrast(tokens[fg],tokens[bg])>=4.5,`${mode}/${name}: ${fg} on ${bg}`);
   assert.ok(contrast(tokens.accent,tokens['accent-dark'])>=4.5,`${mode}/${name}: primary button`);

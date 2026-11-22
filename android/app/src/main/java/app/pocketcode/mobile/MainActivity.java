@@ -24,7 +24,7 @@ public class MainActivity extends BridgeActivity {
         androidx.activity.EdgeToEdge.enable(this);
         android.content.SharedPreferences theme = getSharedPreferences(THEME_PREFERENCES, MODE_PRIVATE);
         if (theme.contains(THEME_BACKGROUND)) {
-            int background = theme.getInt(THEME_BACKGROUND, 0xff111512);
+            int background = theme.getInt(THEME_BACKGROUND, 0xff191917);
             applySystemBars(this, theme.getBoolean(THEME_DARK, true), background);
             getBridge().getWebView().setBackgroundColor(background);
         }

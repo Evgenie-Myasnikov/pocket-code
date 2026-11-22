@@ -79,8 +79,13 @@ test('relative links open project documents with Back to the source, anchors scr
 test('Files is a document tab with a themed preview, raw view and find in file',async({page})=>{
  await host(page);await openRules(page);await page.getByRole('button',{name:'Files',exact:true}).click();
  await page.getByRole('button',{name:'notes.md'}).click();const preview=page.getByRole('dialog',{name:'notes.md'});await expect(preview.getByRole('heading',{name:'Rendered file notes'})).toBeVisible();
- await preview.getByRole('button',{name:'Raw'}).click();await expect(preview.locator('pre')).toContainText('# Rendered file notes');await preview.getByRole('searchbox',{name:'Find in file'}).fill('readable');await expect(preview.getByRole('status')).toHaveText('1 of 1');
+ await preview.getByRole('button',{name:'Raw'}).click();await expect(preview.locator('pre')).toContainText('# Rendered file notes');
+ await expect(preview.getByRole('searchbox')).toHaveCount(0);
+ await preview.getByRole('button',{name:'Find in file'}).click();
+ await preview.getByRole('searchbox',{name:'Find in file'}).fill('readable');await expect(preview.getByRole('status')).toHaveText('1 of 1');
  const colors=await preview.evaluate(element=>{const style=getComputedStyle(element);return {background:style.backgroundColor,panel:getComputedStyle(document.documentElement).getPropertyValue('--panel').trim()};});expect(colors.background).not.toBe('rgb(27, 36, 24)');
+ await page.keyboard.press('Escape');await expect(preview.getByRole('searchbox')).toHaveCount(0);
+ await expect(preview.getByRole('button',{name:'Find in file'})).toBeFocused();
  await page.keyboard.press('Escape');await expect(preview).toHaveCount(0);
 });
 test('document errors use the danger token, not the text color',async({page})=>{

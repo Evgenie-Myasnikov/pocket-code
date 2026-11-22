@@ -20,14 +20,42 @@ test('a running call stays alone and calls group by meaning, not by tool name',(
  assert.equal(runs.length,3);assert.deepEqual(runs[2].items?.map(i=>i.block.name),['Grep','Read']);
  assert.equal(summarizeActivity(runs[2].items!),'Explored 1 file · 1 search');
 });
-test('a plan update joins the surrounding group and brief mode folds a turn into one summary',()=>{
+test('a plan update joins surrounding work while brief command history stays separate from edits',()=>{
  const read=(id:string,file:string):Block=>({type:'tool_use',id,name:'Read',input:{file_path:file}});
  const todo:Block={type:'tool_use',id:'t',name:'TodoWrite',input:{todos:[{content:'Fix',status:'completed'},{content:'Test',status:'in_progress',activeForm:'Testing'}]}};
  const edit:Block={type:'tool_use',id:'e',name:'Edit',input:{file_path:'src/a.ts',old_string:'a\nb',new_string:'a\nc\nd'}};
  const messages=[msg('1',[read('r1','src/a.ts')]),msg('2',[todo]),msg('3',[read('r2','src/b.ts')]),msg('4',[call('x')]),msg('5',[edit])];
  assert.deepEqual(groupActivityMessages(messages).map(r=>r.items?.length),[3,1,1]);
- const brief=groupActivityMessages(messages,undefined,null,'brief');assert.equal(brief.length,1);
- assert.equal(summarizeActivity(brief[0].items!),'Explored 2 files · ran 1 command · edited 1 file +2 −1');
+ const brief=groupActivityMessages(messages,undefined,null,'brief');assert.equal(brief.length,3);
+ assert.equal(summarizeActivity(brief[0].items!),'Explored 2 files');
+ assert.equal(summarizeActivity(brief[1].commandSlots!.get(0)!),'Ran 1 command');
+ assert.equal(summarizeActivity(brief[2].items!),'Edited 1 file +2 −1');
+});
+
+test('brief history follows real turns across prose, reasoning, notices and provider result messages',()=>{
+ const result:Block={type:'tool_result',tool_use_id:'first',content:'check passed'};
+ const messages=[
+  msg('request',[{type:'text',text:'Run checks'}],'user'),
+  msg('mixed',[{type:'text',text:'First check'},{type:'tool_use',id:'first',name:'Bash',input:{command:'check'}}]),
+  msg('response',[result],'user'),
+  msg('reason',[{type:'thinking',thinking:'Checking more'}]),
+  msg('notice',[{type:'text',text:'<task-notification><task-id>background</task-id><status>completed</status><summary>Finished</summary></task-notification>'}],'user'),
+  msg('more',[call('second','Command'),{type:'text',text:'Follow-up'},call('third','powershell')]),
+  msg('active',[{...call('running'),input:{status:'running',command:'wait'}}]),
+  msg('error',[{...call('failed'),input:{status:'failed'}}]),
+  msg('denied',[{...call('declined'),input:{status:'declined'}}]),
+  msg('question',[call('ask','ask_user')]),
+  msg('next',[{type:'image',source:{url:'https://example.org/next.png'}}],'user'),
+  msg('single',[call('last','exec_command')]),
+ ];
+ const results=new Map([['first',result]]);
+ const runs=groupActivityMessages(messages,results,null,'brief');
+ const histories=runs.flatMap(run=>[...(run.commandSlots?.values()||[])].filter(items=>items.length));
+ assert.deepEqual(histories.map(history=>history.map(item=>item.block.id)),[['first','second','third'],['last']]);
+ assert.equal(histories[0][0].result,result);
+ for(const id of ['active','error','denied','question'])assert.equal(runs.find(run=>run.message?.id===id)?.commandSlots,undefined);
+ assert.deepEqual(runs.find(run=>run.message?.id==='more')?.commandSlots?.get(2),[]);
+ assert.ok(groupActivityMessages(messages,results,null,'detailed').every(run=>!run.commandSlots));
 });
 test('within-message groups preserve adjacent results, thinking and text order',()=>{
  const m=msg('one',[call('a'),{type:'tool_result',tool_use_id:'a',content:'ok'},call('b'),{type:'text',text:'Summary'},{type:'thinking',thinking:'one'},{type:'thinking',thinking:'two'}]);

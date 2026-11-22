@@ -1,9 +1,44 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {readFileSync,mkdirSync,mkdtempSync,symlinkSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+
+test('Explorer only receives a verified local directory as one argument',{skip:process.platform!=='win32'},()=>{
+ const source=readFileSync('desktop/DesktopWindow.cs','utf8');
+ const policy=source.slice(source.indexOf('public static class DesktopProjectFolder'),source.indexOf('public static class DesktopReadPolicy'));
+ const work=mkdtempSync(path.join(tmpdir(),'pocket-explorer-test-')),project=path.join(work,'Project & Demo');
+ try{
+   const output=path.join(project,'build output'),outside=path.join(work,'Project & Demo Two'),link=path.join(project,'redirect');
+   mkdirSync(output,{recursive:true});mkdirSync(outside);symlinkSync(outside,link,'junction');
+   const file=path.join(work,'Probe.cs'),exe=path.join(work,'Probe.exe');
+   const probe=String.raw`
+using System;using System.IO;using System.Diagnostics;using System.Text.RegularExpressions;
+${policy}
+public class Probe{
+ static void Reject(Action action){try{action();}catch(ArgumentException){return;}catch(IOException){return;}throw new Exception("Unexpected folder accepted");}
+ public static int Main(string[] args){
+  string root=args[0],folder=args[1];
+  if(DesktopProjectFolder.ScopedRead(root,folder)!="/files?cwd="+Uri.EscapeDataString(root)+"&path="+Uri.EscapeDataString(folder))throw new Exception("Missing project scope");
+  foreach(string target in new[]{args[2],@"\\host\share",@"\\?\C:\folder",@"\\.\C:\folder",@"shell:downloads",@"child",@"C:relative",Path.Combine(root,"..","other"),root+"\\bad\"name",root+"\\bad\nname",root+"\\file:stream",root+"\\NUL"})
+    Reject(()=>DesktopProjectFolder.ScopedRead(root,target));
+  Reject(()=>DesktopProjectFolder.Explorer(args[3]));
+  Reject(()=>DesktopProjectFolder.Explorer(Path.Combine(root,"missing")));Reject(()=>DesktopProjectFolder.Explorer(args[4]));
+  foreach(string target in new[]{folder,Path.GetPathRoot(root)}){
+    var start=DesktopProjectFolder.Explorer(target);
+    if(start.UseShellExecute||start.FileName!=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe")
+      ||start.Arguments!=(target.Length==3?target:"\""+target+"\""))throw new Exception("Incorrect Explorer arguments");
+  }
+  Console.WriteLine("Scoped directories passed");return 0;
+ }
+}`;
+   writeFileSync(file,probe);
+   const compiler=path.join(process.env.WINDIR!,'Microsoft.NET/Framework64/v4.0.30319/csc.exe');
+   execFileSync(compiler,['/nologo','/out:'+exe,file]);
+   assert.match(execFileSync(exe,[project,output,outside,link,file],{encoding:'utf8'}),/Scoped directories passed/);
+ }finally{rmSync(work,{recursive:true,force:true});}
+});
 test('Windows host replies retain HTTP status without becoming connectivity failures',{skip:process.platform!=='win32'},()=>{
  const source=readFileSync('desktop/DesktopWindow.cs','utf8');
  const preferences=source.slice(source.indexOf('public sealed class DesktopPreferences'),source.indexOf('public static class DesktopRunAlertBatch'));

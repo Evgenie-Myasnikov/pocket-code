@@ -88,6 +88,40 @@ public static class DesktopRunAlertBatch {
         preferences.NotificationSeen=retained.ToArray();preferences.PendingRunAlerts=waiting.ToArray();return true;
     }
 }
+public static class DesktopProjectFolder {
+    static string LocalPath(string value){
+        if(String.IsNullOrEmpty(value)||value.Length>8192||!Regex.IsMatch(value,@"^[A-Za-z]:[\\/]"))
+            throw new ArgumentException("Choose an absolute local project folder.");
+        string normalized=value.Replace('/','\\');
+        string tail=normalized.Substring(3).TrimEnd('\\');
+        if(tail.Length>0){
+            foreach(string part in tail.Split('\\')){
+                if(part.Length==0||part.EndsWith(".")||part.EndsWith(" ")||part.IndexOfAny(Path.GetInvalidFileNameChars())>=0||
+                    Regex.IsMatch(part,@"^(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant))
+                    throw new ArgumentException("Invalid local folder path.");
+            }
+        }
+        return Path.GetFullPath(normalized.Substring(0,3)+tail);
+    }
+    public static string ScopedRead(string cwd,string path){
+        string root=LocalPath(cwd),folder=LocalPath(path);
+        if(!String.Equals(root,folder,StringComparison.OrdinalIgnoreCase)&&!folder.StartsWith(root.TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("The folder is outside this project.");
+        return "/files?cwd="+Uri.EscapeDataString(root)+"&path="+Uri.EscapeDataString(folder);
+    }
+    // /files returns the real directory after resolving and checking both the host roots and the conversation cwd.
+    public static ProcessStartInfo Explorer(string verified){
+        string folder=LocalPath(verified);
+        string drive=Path.GetPathRoot(folder);
+        if(new DriveInfo(drive).DriveType==DriveType.Network)throw new IOException("Select a local folder.");
+        if(!Directory.Exists(folder))throw new DirectoryNotFoundException("The project folder no longer exists.");
+        for(var directory=new DirectoryInfo(folder);directory!=null;directory=directory.Parent)
+            if((directory.Attributes&FileAttributes.ReparsePoint)!=0)throw new IOException("The project folder has been redirected.");
+        // A bare drive root has no spaces. Quoting a trailing backslash would escape the closing quote.
+        string argument=folder.Length==3?folder:"\""+folder+"\"";
+        return new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe"),argument){UseShellExecute=false};
+    }
+}
 public static class DesktopReadPolicy {
     public static bool AllowsMiroResource(string value,bool document){
         Uri uri;if(!Uri.TryCreate(value,UriKind.Absolute,out uri)||uri.Scheme!="https"||!String.IsNullOrEmpty(uri.UserInfo)||!uri.IsDefaultPort)return false;
@@ -177,7 +211,8 @@ public sealed class PocketDesktop:Form {
     readonly SemaphoreSlim reads=new SemaphoreSlim(8);
     readonly NotifyIcon tray=new NotifyIcon();
     readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer{Interval=4000};
-    static WebView2 NewWebView(){return new WebView2{Dock=DockStyle.Fill,DefaultBackgroundColor=Color.FromArgb(17,21,18)};}
+    static readonly Color InitialBackground=Color.FromArgb(25,25,23);
+    static WebView2 NewWebView(){return new WebView2{Dock=DockStyle.Fill,DefaultBackgroundColor=InitialBackground};}
     WebView2 web=NewWebView();
     readonly TaskCompletionSource<bool> initialized=new TaskCompletionSource<bool>();
     DesktopPreferences preferences;
@@ -220,8 +255,8 @@ public sealed class PocketDesktop:Form {
         else if(File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"host","package.json")))preferences.Source=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"host");
         if(String.IsNullOrEmpty(preferences.Source))preferences.Source=AppDomain.CurrentDomain.BaseDirectory;
         Text="Pocket Code";ClientSize=new Size(1280,850);MinimumSize=new Size(900,640);StartPosition=FormStartPosition.CenterScreen;
-        BackColor=Color.FromArgb(17,21,18);AutoScaleMode=AutoScaleMode.Dpi;Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath)??SystemIcons.Application;Controls.Add(web);
-        HandleCreated+=(_,e)=>ApplyWindowTheme(true,Color.FromArgb(17,21,18),Color.FromArgb(230,232,227),Color.FromArgb(42,48,43));
+        BackColor=InitialBackground;AutoScaleMode=AutoScaleMode.Dpi;Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath)??SystemIcons.Application;Controls.Add(web);
+        HandleCreated+=(_,e)=>ApplyWindowTheme(true,InitialBackground,Color.FromArgb(241,238,231),Color.FromArgb(65,64,58));
         var menu=new ContextMenuStrip();trayOpen=menu.Items.Add("",null,(_,e)=>RestoreWindow());menu.Items.Add(new ToolStripSeparator());trayExit=menu.Items.Add("",null,async(_,e)=>await ExitApp());LocalizeTray();
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         tray.BalloonTipClicked+=(_,e)=>{OpenRunAlert();CompleteRunAlert();};tray.BalloonTipClosed+=(_,e)=>CompleteRunAlert();
@@ -288,6 +323,13 @@ public sealed class PocketDesktop:Form {
                 web.Focus();keybd_event(0x5B,0,0,UIntPtr.Zero);keybd_event(0x48,0,0,UIntPtr.Zero);keybd_event(0x48,0,2,UIntPtr.Zero);keybd_event(0x5B,0,2,UIntPtr.Zero);result=true;
             }else if(action=="window-theme"){
                 ApplyWindowTheme(message.ContainsKey("dark")&&message["dark"] is bool&&(bool)message["dark"],ThemeColor(message,"background"),ThemeColor(message,"foreground"),ThemeColor(message,"border"));result=true;
+            }else if(action=="open-project-folder"){
+                if(preview)throw new InvalidOperationException("Open folders from the desktop application.");
+                string endpoint=DesktopProjectFolder.ScopedRead(Field(message,"cwd"),Field(message,"path"));
+                var listing=await Send(reader,endpoint,false) as Dictionary<string,object>;
+                if(listing==null)throw new InvalidOperationException("The host could not confirm this folder.");
+                using(Process.Start(DesktopProjectFolder.Explorer(Field(listing,"path")))){}
+                result=true;
             }else if(action=="run-alerts"){
                 if(preview){result=true;}else{
                     preferences.RunAlerts=message.ContainsKey("enabled")&&message["enabled"] is bool&&(bool)message["enabled"];
