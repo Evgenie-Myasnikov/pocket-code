@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Preparing 0.28.53 (Android version code 140) from the integrated release branch.
+
 ### Bug Fixes
 - Markdown task chains (2026-11-22). A finished chat without its completion marker now schedules another attempt at the same step with the previous report. Delays increase to one minute. User stops and provider failures remain terminal. Eight scheduler tests and TypeScript passed.
 
