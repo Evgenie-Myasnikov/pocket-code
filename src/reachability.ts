@@ -31,6 +31,9 @@ export function setPrimaryHost(url:string,check:(()=>Promise<unknown>)|null){
   probe=check;schedule();
 }
 const tracked=(url?:string)=>!!primary&&(!url||url===primary);
+/** The PC's own window talks to its host over loopback: Windows network state (Wi-Fi, VPN) never decides whether it is reachable. */
+const loopback=(url:string)=>{try{const host=new URL(url).hostname;return host==='127.0.0.1'||host==='localhost'||host==='[::1]';}catch{return false;}};
+const deviceOffline=()=>!loopback(primary)&&typeof navigator!=='undefined'&&navigator.onLine===false;
 export function reportOk(url?:string){
   if(!tracked(url))return;
   const wasDown=state.status!=='online';
@@ -44,7 +47,7 @@ export function reportOk(url?:string){
 /** A transport error, a tunnel 5xx or a host restart: the first failure retries at once, later ones back off. */
 export function reportFail(url:string|undefined,failure:{cause:ReachabilityCause;httpStatus?:number;detail?:string;restarting?:boolean}){
   if(!tracked(url))return;
-  const failures=state.failures+1,offlineDevice=typeof navigator!=='undefined'&&navigator.onLine===false;
+  const failures=state.failures+1,offlineDevice=deviceOffline();
   const status:ReachabilityStatus=offlineDevice?'no-network':failure.restarting?'restarting':failures<2?'connecting':'unreachable';
   set({status,lastOkAt:lastOk,cause:failure.cause,httpStatus:failure.httpStatus,detail:failure.detail,failures,since:state.status==='online'?now():state.since,nextRetryAt:now()+backoff(failures)});
   schedule();
@@ -61,7 +64,8 @@ export function subscribeReachability(listener:()=>void){listeners.add(listener)
 export function useReachability(){return useSyncExternalStore(subscribeReachability,getReachability,getReachability);}
 if(typeof window!=='undefined'){
   window.addEventListener('online',()=>{if(state.status==='no-network')set({status:'connecting'});retryNow();});
-  window.addEventListener('offline',()=>{if(primary)set({status:'no-network',since:state.status==='online'?now():state.since});});
+  // A loopback host keeps answering without a network; a remote one is probed again so a short drop cannot freeze the status.
+  window.addEventListener('offline',()=>{if(!primary||loopback(primary))return;set({status:'no-network',since:state.status==='online'?now():state.since,nextRetryAt:now()+backoff(state.failures+1)});schedule();});
   if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='hidden')retryNow();else{clearTimeout(timer);timer=undefined;}});
 }
 /** Test hook: forget the primary host and every report. */

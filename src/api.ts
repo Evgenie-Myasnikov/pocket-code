@@ -58,8 +58,23 @@ async function offlineRead<T>(connection:Connection,endpoint:string,data:unknown
   const cached=await readOfflineEntry(connection,endpoint);if(!cached||cached.value===undefined)return undefined;
   reportCached(connection.url,cached.at);window.dispatchEvent(new CustomEvent('pocket-offline-read',{detail:{at:cached.at,endpoint}}));return {value:cached.value as T};
 }
+/** The PC window reaches its own host through the native bridge. Only a host that is stopped or refuses connections is "down":
+ * one slow request (host_timeout) is that request's failure, not the PC's. Reads keep a saved copy for a host restart. */
+async function desktopRequest<T>(connection:Connection,endpoint:string,data?:unknown):Promise<T>{
+  try{
+    const value=await desktopCall<T>(data===undefined?'read':'write',{endpoint,...(data===undefined?{}:{data})});
+    reportOk(connection.url);
+    if(data===undefined&&cacheable(endpoint)&&value!==null&&typeof value==='object'){await writeOffline(connection,endpoint,value);window.dispatchEvent(new CustomEvent('pocket-online-read'));}
+    return value;
+  }catch(error){
+    const {status,code}=error as {status?:number;code?:string};
+    if(status)reportOk(connection.url);
+    else if(code==='host_unreachable'||code==='host_stopped'){reportFail(connection.url,{cause:'host'});const cached=await offlineRead<T>(connection,endpoint,data);if(cached)return cached.value;}
+    throw error;
+  }
+}
 export async function request<T>(connection: Connection, endpoint: string, data?: unknown): Promise<T> {
-  if(connection.desktop)return desktopCall<T>(data===undefined?'read':'write',{endpoint,...(data===undefined?{}:{data})}).then(value=>{reportOk(connection.url);return value;},error=>{if((error as {status?:number}).status)reportOk(connection.url);else if((error as {code?:string}).code?.startsWith('host_'))reportFail(connection.url,{cause:'host'});throw error;});
+  if(connection.desktop)return desktopRequest<T>(connection,endpoint,data);
   const timeout = endpoint.startsWith('/speech/') ? 95000 : endpoint.startsWith('/jira/workflow') ? 300000 : endpoint === '/devices/pair' ? 150000 : endpoint.startsWith('/jira/') || endpoint.startsWith('/updates/') || endpoint.startsWith('/providers') || endpoint.endsWith('/usage') || endpoint.includes('provider=codex') ? 95000 : 30000;
   const url = normalizeUrl(connection.url) + '/api' + endpoint;
   const headers = { Authorization: `Bearer ${connection.token}`, 'Content-Type': 'application/json' };

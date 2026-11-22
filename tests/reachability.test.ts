@@ -63,6 +63,32 @@ test('a tunnel 502/530 for a cacheable read returns the saved copy; a host JSON 
   }finally{globalThis.fetch=original;resetReachability();clearOffline();}
 });
 
+test('the PC window: Windows network state and one slow request never mark its own host away; a stopped host shows the saved copy',async()=>{
+  // Synthetic WebView2 bridge: each posted request is answered by the current responder.
+  let respond:(message:{id:number;endpoint?:string})=>Record<string,unknown>=({id})=>({id,value:{name:'Synthetic PC',roots:[],version:'0.0.0',protocol:1}});
+  let deliver:(event:{data:unknown})=>void=()=>{};
+  Object.assign(events,{chrome:{webview:{addEventListener:(_name:string,listener:typeof deliver)=>{deliver=listener;},postMessage:(message:{id:number})=>queueMicrotask(()=>deliver({data:respond(message)}))}}});
+  const desktop={url:'http://127.0.0.1:4318',token:'',desktop:true};
+  const navigatorDescriptor=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+  Object.defineProperty(globalThis,'navigator',{value:{onLine:false},configurable:true});
+  resetReachability();setPrimaryHost(desktop.url,null);
+  try{
+    await request(desktop,'/health');
+    events.dispatchEvent(new Event('offline'));
+    assert.equal(getReachability().status,'online','a loopback host does not depend on the PC network');
+    respond=({id})=>({id,error:'timeout',code:'host_timeout'});
+    await assert.rejects(request(desktop,'/sessions?provider=codex'));await assert.rejects(request(desktop,'/sessions?provider=codex'));
+    assert.equal(getReachability().status,'online','a slow request is not a host that is away');
+    respond=({id})=>({id,error:'stopped',code:'host_unreachable'});
+    assert.equal((await request<{name:string}>(desktop,'/health')).name,'Synthetic PC','a restarting host still shows the saved copy');
+    await assert.rejects(request(desktop,'/sessions?provider=codex'));
+    assert.equal(getReachability().status,'unreachable');assert.notEqual(getReachability().status,'no-network');
+  }finally{
+    if(navigatorDescriptor)Object.defineProperty(globalThis,'navigator',navigatorDescriptor);else delete (globalThis as {navigator?:unknown}).navigator;
+    resetReachability();clearOffline();
+  }
+});
+
 test('offline cache keeps its age, skips unchanged writes and evicts without parsing values',async()=>{
   clearOffline();
   await writeOffline(host,'/health',{name:'Synthetic PC'});
