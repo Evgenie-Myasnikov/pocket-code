@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [0.28.54](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.53...v0.28.54) (2026-11-22)
 
-Preparing 0.28.54 (Android version code 141) from the integrated release branch.
+Published [0.28.54](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.54) from [b466d9331c0e1fb062a81becb14c61e65d50dd1d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/b466d9331c0e1fb062a81becb14c61e65d50dd1d) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). All four public downloads matched the audited SHA-256 hashes, all 163 UI files matched across packages, and the APK signer matched 0.28.53. Android version code 141. Physical-device verification remains open.
 
 ### Features
 - File changes and token usage (2026-11-22). Chats display native partial writes, measured generation statistics and the last saved response metrics. A per-response result card opens the verified working and output folders and lists changed files and available diff counts. Validation covered actual adapter event handlers with synthetic events, five Edge scenarios for streaming and file results, and the production TypeScript/Vite build.
