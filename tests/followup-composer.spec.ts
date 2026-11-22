@@ -50,7 +50,18 @@ for(const provider of ['claude','codex'])test(`${provider} accepts clarification
   expect(await stop.evaluate(el=>parseFloat(getComputedStyle(el,'::before').width))).toBeLessThanOrEqual(36);
   await draft.fill('Focus on tests');await expect(send).toHaveAccessibleName(provider==='codex'?'Steer':'Queue');await expect(send).toBeEnabled();
   expect(await stop.evaluate(el=>parseFloat(getComputedStyle(el,'::before').width))).toBeLessThan(await send.evaluate(el=>parseFloat(getComputedStyle(el,'::before').width)));
-  await send.click();await expect(draft).toHaveValue('');
+  let acknowledge!:()=>void;
+  const gate=new Promise<void>(resolve=>{acknowledge=resolve;});
+  await page.route('**/api/jobs/*/messages',async route=>{await gate;await route.fallback();},{times:1});
+  await send.click();
+  try{
+    await expect(page.locator('.message.user[aria-busy="true"]')).toHaveText('Focus on tests');
+    await expect(draft).toHaveValue('');
+    await draft.fill('Next thought');
+  }finally{acknowledge();}
+  await expect(page.locator('.message.user[aria-busy="true"]')).toHaveCount(0);
+  await expect(draft).toHaveValue('Next thought');
+  await draft.fill('');
   // The field never becomes disabled while sending, so the phone keyboard stays open.
   await expect(draft).toBeEnabled();await expect(draft).toBeFocused();
   expect(f.sent[0].text).toBe('Focus on tests');await expect(page.locator('.conversation')).toContainText('Focus on tests');

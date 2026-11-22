@@ -4,6 +4,9 @@
 
 Built local 0.28.56 packages from release/0.28.1 at 8df6a1d139fb4d45919723331f669e94fc69e2bb. Verified all three package hashes, 163 shared web assets and Android signing continuity (version code 143). Physical installation remains untested.
 
+### Bug Fixes
+- Chat delivery (2026-11-22). Show the submitted message immediately and clear the composer while the host acknowledges it. Retain subsequent typing and recover rejected submissions. Verified the production build and five browser scenarios, including delayed Claude and Codex acknowledgements.
+
 ### Features
 - Tasks (2026-11-22). Start a task from a typed description or a text file. The title defaults to its first line and AI can suggest a title or refine the description before launch. Open step chats and prior attempts beside the task, or full-width on phones, with drafts and task context retained on return. Linked chats are excluded from the ordinary chat library and folder deletion. Verified the production build, host filtering, notification routing, task creation and desktop and phone-sized browser flows with synthetic data.
 

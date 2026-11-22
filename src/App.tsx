@@ -280,6 +280,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   if(!submissions.current)submissions.current=new Map();
   const [rejectedDrafts,setRejectedDrafts]=useStateForWorkspace<Record<string,RejectedDraft>>({});
   const currentDraftKey=()=>job?.sessionId||selected?.sessionId||`new:${cwd}`;
+  const [outgoing,setOutgoing]=useStateForWorkspace<{key:string;text:string;files:Attachment[]}|null>(null);
+  const draftLocation=useRefForWorkspace(currentDraftKey());
+  draftLocation.current=currentDraftKey();
+  const visibleOutgoing=outgoing?.key===currentDraftKey()?outgoing:null;
   const rejectedDraft=rejectedDrafts[currentDraftKey()];
   const embeddedDraftReady=useRef(false);
   const rememberDraft=()=>{if(embedded&&!embeddedDraftReady.current)return;drafts.current!.set(currentDraftKey(),{text:draft,attachments});};
@@ -1061,6 +1065,28 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     // Without the PC a follow-up to a chat this phone already continues waits in "Waiting to send"; nothing else asks for a takeover first.
     if (!payload && unreachable && canQueue && !sending.current && !uploading && (text.trim() || files.length) && files.every(attachmentReady)) {setOfflineQueue(old=>[...old,{id:crypto.randomUUID(),at:Date.now(),jobId:job?.id||'',key,text,attachments:files,boardSelection:selection}]);consume();return;}
     if (sending.current || loading || uploading || demo || !canRun || selected?.readOnly || !text.trim() && !files.length || !files.every(attachmentReady)) return;
+    const submittedFiles=[...files], store=drafts.current!;
+    let accepted=false;
+    if(!payload){
+      consume();
+      nearBottom.current=true;
+      setOutgoing({key,text,files:submittedFiles});
+      requestAnimationFrame(()=>bottom.current?.scrollIntoView({block:'end'}));
+    }
+    function finishSubmission(){
+      if(payload)return;
+      setOutgoing(null);
+      if(accepted)return;
+      const restoreText=(current:string)=>[text,current].filter(Boolean).join('\n\n');
+      const restoreFiles=(current:Attachment[])=>[...submittedFiles,...current.filter(item=>!submittedFiles.some(sent=>sent.id===item.id))];
+      if(draftLocation.current===key){
+        setDraft(restoreText);
+        setAttachments(restoreFiles);
+      }else{
+        const stored=store.get(key);
+        store.set(key,{text:restoreText(stored?.text||''),attachments:restoreFiles(stored?.attachments||[])});
+      }
+    }
     if(running&&job){
       sending.current=true;setBusy(true);setError('');
       const epoch=navigation.current;
@@ -1069,8 +1095,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         const data={text,attachments:ids},signature=JSON.stringify({jobId:job.id,...data});
         const id=retry.current?.signature===signature?retry.current.id:crypto.randomUUID();retry.current={signature,id};
         const next=await api<JobView>(`/jobs/${job.id}/messages`,{...data,id});
+        accepted=true;
         if(epoch!==navigation.current)return;
-        setJob(next);consume();sentFollowups.current!.set(id,files);retry.current=null;nearBottom.current=true;
+        setJob(next);sentFollowups.current!.set(id,files);retry.current=null;nearBottom.current=true;
       }catch(error){
         if(provider==='claude'&&epoch===navigation.current&&(error as {status?:number}).status===409){
           try{
@@ -1079,45 +1106,46 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
               setJob(latest);
               // The SDK can close input before the final status is observable. This exact message
               // waits beside the composer and is sent after this job ends; the field is free at once.
-              setPendingSend({jobId:job.id,key,text,attachments:files});consume();retry.current=null;
+              setPendingSend({jobId:job.id,key,text,attachments:files});accepted=true;retry.current=null;
               return;
             }
           }catch{/* Preserve the original rejection when refreshing fails. */}
         }
         if(epoch===navigation.current)setError(connectivityError(error)?t('Не отправлено: нет связи с ПК. Сообщение осталось в поле ввода.'):(error as Error).message);
       }
-      finally{sending.current=false;setBusy(false);}
+      finally{finishSubmission();sending.current=false;setBusy(false);}
       return;
     }
     const sessionId = payload?.branch ? payload.branch.sessionId||undefined : job?.sessionId || selected?.sessionId;
     sending.current = true;setBusy(true);setError('');
     const epoch = ++navigation.current;
     // The chat's access chip overrides the device default from Settings; Plan is a Claude mode of its own.
-    try{await appendSelection();}catch(e){setError((e as Error).message);sending.current=false;setBusy(false);return;}
-    if(epoch!==navigation.current){sending.current=false;setBusy(false);return;}
+    try{await appendSelection();}catch(e){setError((e as Error).message);finishSubmission();sending.current=false;setBusy(false);return;}
+    if(epoch!==navigation.current){finishSubmission();sending.current=false;setBusy(false);return;}
     if(boardChat?.context&&!sessionId&&!payload?.branch){
       try{
         if(ids.length>=10)throw new Error('Board context needs one attachment slot.');
         if(!boardContextFile.current){const file=new File([boardChat.prompt],'Board context.txt',{type:'text/plain'});boardContextFile.current=await api<Attachment>('/uploads',{cwd,name:file.name,base64:await fileBase64(file)});}
         ids.push(boardContextFile.current.id);
-      }catch(e){setError((e as Error).message);sending.current=false;setBusy(false);return;}
-      if(epoch!==navigation.current){sending.current=false;setBusy(false);return;}
+      }catch(e){setError((e as Error).message);finishSubmission();sending.current=false;setBusy(false);return;}
+      if(epoch!==navigation.current){finishSubmission();sending.current=false;setBusy(false);return;}
     }
     const data = {...launchOptions(),sessionId,...(taskRun&&!payload?.branch?{taskRunId:taskRun.id}:{}),text,attachments:ids,takeoverConfirmed:true};
     const signature = JSON.stringify(data);
     const id = retry.current?.signature === signature ? retry.current.id : crypto.randomUUID();retry.current = { signature, id };
     try {
       const next = await api<JobView>('/jobs', { ...data, id });
+      accepted=true;
       if (epoch !== navigation.current) return;
       // Freeze the displayed history before the next turn; the server saves full history independently.
       if(payload?.branch){setHistory(payload.branch.history);setSelected(sessionId?{sessionId,cwd,summary:text.slice(0,200),lastModified:Date.now(),...(account?{account}:{})}:null);setHasMore(null);setBoardChat(null);rememberDraft();if(embedded&&next.sessionId)embedded.onCreated?.({sessionId:next.sessionId,cwd,summary:text.slice(0,200),lastModified:Date.now(),...(next.account?{account:next.account}:{})},next);}
       else if (job && job.errorCode!=='codex_thread_busy') setHistory((old) => [...old, ...job.messages]);
       if(provider==='codex')submissions.current!.set(next.id,{key,text,attachments:files});
       setRejectedDrafts(old=>{const next={...old};delete next[key];return next;});
-      setJob(next);setTakeover(true);consume();retry.current = null;nearBottom.current = true;
+      setJob(next);setTakeover(true);retry.current = null;nearBottom.current = true;
       if(sessionId)for(const item of activity.items)if(item.status==='error'&&item.provider===provider&&item.sessionId===sessionId)activity.markViewed(item);
       return true;
-    } catch (e) {if (epoch === navigation.current) setError(connectivityError(e)?t('Не отправлено: нет связи с ПК. Сообщение осталось в поле ввода.'):(e as Error).message);} finally {sending.current = false;setBusy(false);}
+    } catch (e) {if (epoch === navigation.current) setError(connectivityError(e)?t('Не отправлено: нет связи с ПК. Сообщение осталось в поле ввода.'):(e as Error).message);} finally {finishSubmission();sending.current = false;setBusy(false);}
   }
   /** Updates one draft file wherever its draft is kept, so a finished upload is never lost. */
   function patchAttachment(id:string,change:(item:Attachment)=>Attachment){
@@ -1265,7 +1293,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;markScrolling();rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner" tabIndex={-1}>{selected&&!demo&&unreachable&&history.length>0&&<p className="muted history-meta" role="status">{t("Офлайн · сохранённая копия")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
             {loading && (!history.length?<ChatHistorySkeleton/>:<p className="history-page-status muted" role="status">{t("Загружаем историю с ПК…")}</p>)}
-            {!loading && !history.length && !job && !selected && taskRun && <section className="task-chat-card" aria-label={t('Задача')}><button type="button" className={'task-chat-stage task-stage-text task-stage-'+taskDisplayStage(taskRun)} onClick={()=>setTaskPanel(true)}>{taskRunStageLabel(taskRun)}</button><h2>{taskRun.title}</h2>{taskRun.worktree&&<p className="task-chat-branch"><code>{taskRun.worktree.branch}</code></p>}{(taskRun.noteSnapshot?.description||'').trim()&&<p className="task-chat-criteria">{(taskRun.noteSnapshot?.description||'').trim().split('\n').slice(0,4).join('\n')}</p>}<p className="muted">{t('Проверьте подготовленный запрос и отправьте его, чтобы агент начал. Сам он не отправляется.')}</p></section>}
+            {!loading && !visibleOutgoing && !history.length && !job && !selected && taskRun && <section className="task-chat-card" aria-label={t('Задача')}><button type="button" className={'task-chat-stage task-stage-text task-stage-'+taskDisplayStage(taskRun)} onClick={()=>setTaskPanel(true)}>{taskRunStageLabel(taskRun)}</button><h2>{taskRun.title}</h2>{taskRun.worktree&&<p className="task-chat-branch"><code>{taskRun.worktree.branch}</code></p>}{(taskRun.noteSnapshot?.description||'').trim()&&<p className="task-chat-criteria">{(taskRun.noteSnapshot?.description||'').trim().split('\n').slice(0,4).join('\n')}</p>}<p className="muted">{t('Проверьте подготовленный запрос и отправьте его, чтобы агент начал. Сам он не отправляется.')}</p></section>}
             {!loading && !history.length && !job && !selected && !taskRun && <div className={'welcome'+(draft.trim()||attachments.length?' welcome-collapsed':'')}><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={16} /></button>)}</div></div>}
             {!loading && selected && !history.length && !job && (unreachable||historyError&&hostDown(reach)?<div className="offline-empty muted" role="status"><p>{embedded?t('История чата загрузится, когда локальный сервер будет доступен.'):t("Этот чат ещё не сохранён на телефоне. Он загрузится, когда ПК будет доступен.")}</p><button className="secondary" onClick={()=>{retryNow();if(selected)void openSession(selected);}}>{t("Повторить")}</button></div>:<p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>)}
             {selected&&!loading&&(history.length>0||!unreachable)&&(loadingOlder||historyError||hasMore!==null&&(unreachable||!fromStart))&&<p className="history-page-status muted" role="status" aria-live="polite">{loadingOlder?<span className="history-loading"><LoaderCircle size={16} aria-hidden="true"/>{t('Загружаем сообщения…')}</span>:historyError?<>{t('Не удалось обновить историю')}{!unreachable&&<small className="history-error-reason">{t(historyError)}</small>}</>:unreachable?t('Остальная история загрузится, когда ПК будет на связи'):t('Выше есть ещё сообщения · прокрутите вверх')}{historyError&&hasMore!==null&&!unreachable&&<button className="text-button" onClick={()=>void extendHistory()}>{t('Повторить загрузку')}</button>}</p>}
@@ -1276,6 +1304,10 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers, extra) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers, ...extra });if(allow&&a.tool==='ExitPlanMode'&&extra?.mode){const key=currentDraftKey(),mode=extra.mode;setAccessChoices(old=>({...old,[key]:mode}));}}} />)}
             {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error-banner">{t(job.error)}{provider==='claude'&&claudeOutdated(job.error)&&<ClaudeEngineUpdate connection={connection} compact/>}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
             {job?.status === 'done' && <div className="turn-complete" role="status"><ShieldCheck size={14} />{t(" Готово ")}{turnEnd?.id===job.id&&<><span>· <time dateTime={new Date(turnEnd.at).toISOString()}>{new Date(turnEnd.at).toLocaleTimeString(locale(),{hour:'2-digit',minute:'2-digit'})}</time></span><span className="turn-duration">· {elapsed(turnEnd.at-job.startedAt)}</span></>}{job.cost !== undefined && <span>· ${job.cost.toFixed(4)}</span>}</div>}
+            {visibleOutgoing&&<article className="message user" aria-busy="true"><div className="user-message-content">
+              {visibleOutgoing.files.map(file=><div key={file.id}>{file.name}</div>)}
+              <div style={{whiteSpace:'pre-wrap'}}>{visibleOutgoing.text}</div>
+            </div></article>}
             <div ref={bottom} />
           </div>
         </div>
