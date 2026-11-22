@@ -12,6 +12,9 @@
 .tool-output-more{min-height:48px;padding:4px 0;color:var(--muted);font-size:.85em}
 .tool-output-empty{margin:4px 0;color:var(--muted);font-size:.88em}
 .tool-output-actions{display:flex;flex-wrap:wrap;gap:4px}
+.copy-control{display:inline-flex;flex-direction:column;align-items:start;min-width:0;max-width:100%}
+.code-block-bar>.copy-control{font-family:inherit;text-transform:none}
+.copy-error{max-width:22ch;padding:0 6px 6px;color:var(--danger-fg);font:var(--type-copy-13);text-align:start;overflow-wrap:anywhere}
 .copy-action{display:inline-flex;align-items:center;gap:6px;min-height:48px;padding:4px 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:.82em}
 .copy-action:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 9%,transparent);color:var(--text)}
 .tool-command{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 6px;font:.88em/1.5 var(--font-mono);color:var(--text)}
@@ -33,14 +36,40 @@
 .plan-bar-chevron{flex:none;margin-left:auto;color:var(--muted);transition:transform .15s}.plan-bar[data-open=true] .plan-bar-chevron{transform:rotate(180deg)}
 .plan-bar>.plan-checklist{max-height:40dvh;overflow:auto;margin:0;padding:0 12px 10px}
 @media(pointer:coarse){.plan-bar-toggle{min-height:48px}}
-/* Markdown: tables scroll instead of breaking words; code blocks carry their language and a copy action. */
-.markdown :is(th,td){overflow-wrap:normal;word-break:normal;hyphens:auto;min-width:6ch}
-.markdown th{white-space:nowrap}
-.markdown table{-webkit-overflow-scrolling:touch}
+/* Keep each cell readable in the available width; wide comparisons pan inside the message. */
+.markdown-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.markdown-table-scroll:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.markdown .markdown-table-scroll > table {
+  display: table;
+  width: 100%;
+  overflow: visible;
+}
+.markdown-table-scroll :is(th, td) {
+  min-width: 11ch;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.markdown-table-scroll th {background: var(--panel); color: var(--text);}
+.markdown-table-scroll th:not([align]) {text-align: start;}
 .code-block{margin:14px 0;min-width:0}
 .code-block-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 2px 0 4px;color:var(--muted);font-size:.8em}
-.code-block-bar>span{font-family:var(--font-mono);text-transform:lowercase}
-.code-block>pre{margin-top:2px!important}
+.code-language{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);text-transform:lowercase}
+.reader-code-actions{display:inline-flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:2px}
+.reader-code-scroll{position:relative;min-width:0}
+.reader-code-scroll pre{margin-top:2px}
+.reader-code-scroll pre>code{display:block;width:max-content;min-width:100%;box-sizing:border-box}
+.reader-code-scroll pre.wrap,.reader-code-scroll pre.wrap>code{white-space:pre-wrap;overflow-wrap:anywhere}
+.reader-code-scroll pre.wrap>code{width:auto}
+.reader-code-scroll.overflowing::after{content:"";position:absolute;inset:1px 1px 1px auto;width:20px;pointer-events:none;background:linear-gradient(to right,transparent,var(--panel))}
+.code-wrap[aria-pressed=true]{background:var(--bg-active);color:var(--text);box-shadow:inset 0 -2px var(--accent)}
+@media(forced-colors:active){.code-wrap[aria-pressed=true]{border-block-end:2px solid Highlight}.reader-code-scroll.overflowing::after{display:none}}
 /* Background-task notices are centred events, not the person's bubble. */
 :root .message.transcript-event-message,:root[data-theme] article.message.transcript-event-message{display:block;width:100%;max-width:100%;margin:10px auto;padding:0;border:0;background:transparent}
 .claude-task-notification.transcript-event{margin:6px auto;max-width:min(560px,100%);padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:.9em}
@@ -59,7 +88,8 @@ button.turn-changes:hover{color:var(--text);border-color:var(--accent)}
 .turn-complete .turn-duration,.turn-complete time{font-variant-numeric:tabular-nums}
 /* One round "latest" button replaces the two wide pills; it fades out while the person scrolls. */
 .scroll-latest{position:absolute;z-index:4;right:max(16px,var(--safe-area-inset-right,env(safe-area-inset-right)));bottom:calc(var(--chat-overlay-bottom,170px) + 12px);display:flex;align-items:center;justify-content:center;width:48px;height:48px;min-width:48px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--text);box-shadow:0 3px 14px var(--shadow-soft);transition:opacity .2s}
-.scroll-latest[data-scrolling]{opacity:0;pointer-events:none}
+.scroll-latest[data-scrolling]:not(:focus-visible){opacity:0;pointer-events:none}
+.conversation .message:focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
 .scroll-latest-count{position:absolute;top:-6px;right:-4px;min-width:18px;padding:1px 5px;border-radius:10px;background:var(--accent);color:var(--bg);font-size:calc(11px * var(--ui-scale,1));font-weight:var(--fw-semibold);line-height:1.4;font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){.scroll-latest{transition:none}.tool-spinner{animation:none}}
 /* Rare actions live in a menu; the title is a shortcut to the beginning of the chat. */

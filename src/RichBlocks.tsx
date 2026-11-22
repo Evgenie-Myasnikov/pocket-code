@@ -1,7 +1,8 @@
-import { memo, useState, useRef, useMemo, useEffect, type ReactNode } from 'react';
+import { memo, useState, useRef, useMemo, useEffect, useId, type ComponentProps, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
+import {WrapText} from 'lucide-react';
 import {useStreamingReveal} from './useStreamingReveal';
 import {usePacedText} from './usePacedText';
 import {useStreamSpeed} from './stream-speed';
@@ -33,20 +34,112 @@ function Picture({src,alt}:{src:string;alt:string}) {
 }
 /** A labelled copy action; the text is read when pressed, so streamed or revealed content is copied in full. */
 export function CopyAction({text,label}:{text:string|(()=>string);label:string}){
-  const [copied,setCopied]=useState(false);
-  return <button type="button" className="copy-action" data-copied={copied||undefined} aria-label={label} title={label} onClick={async()=>{try{await navigator.clipboard.writeText(typeof text==='function'?text():text);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{setCopied(false);}}}>{copied?<Check size={14}/>:<Copy size={14}/>}<span>{copied?t('Скопировано'):label}</span></button>;
+  const [result,setResult]=useState<'idle'|'copied'|'failed'>('idle');
+  const attempt=useRef(0), reset=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  const statusId=useId();
+  const copied=result==='copied', failed=result==='failed';
+  const message=failed?t('Не удалось скопировать. Выделите текст и скопируйте его вручную.'):copied?t('Скопировано'):'';
+  useEffect(()=>()=>{attempt.current++;clearTimeout(reset.current);},[]);
+
+  async function copy(){
+    const current=++attempt.current;
+    clearTimeout(reset.current);
+    try{
+      await navigator.clipboard.writeText(typeof text==='function'?text():text);
+      if(current!==attempt.current)return;
+      setResult('copied');
+      reset.current=setTimeout(()=>setResult('idle'),1500);
+    }catch{
+      if(current===attempt.current)setResult('failed');
+    }
+  }
+  return <span className="copy-control">
+    <button type="button" className="copy-action" data-copied={copied||undefined}
+      aria-label={label} aria-describedby={failed?statusId:undefined} title={label} onClick={copy}>
+      {copied?<Check size={14} aria-hidden="true"/>:<Copy size={14} aria-hidden="true"/>}
+      <span>{copied?t('Скопировано'):label}</span>
+    </button>
+    <span id={statusId} role="status" className={failed?'copy-error':'visually-hidden'}>{message}</span>
+  </span>;
 }
-/** Fenced code keeps its language visible and has its own copy action. */
-function CodeBlock({language,children}:{language?:string;children:ReactNode}){
-  const pre=useRef<HTMLPreElement|null>(null);
-  return <div className="code-block"><div className="code-block-bar"><span>{language||t('Код')}</span><CopyAction text={()=>pre.current?.innerText.replace(/\n$/,'')||''} label={t('Копировать')}/></div><pre ref={pre}>{children}</pre></div>;
+/** Chat and project documents use the same code reader. Wrapping only changes presentation. */
+export function CodeBlock({children}:{children?:ReactNode}){
+  const pre=useRef<HTMLPreElement>(null);
+  const [wrap,setWrap]=useState(false);
+  const [moreToRight,setMoreToRight]=useState(false);
+  useEffect(()=>{
+    const element=pre.current;
+    if(!element)return;
+    const measure=()=>setMoreToRight(element.scrollWidth-element.clientWidth-element.scrollLeft>1);
+    const observer=new ResizeObserver(measure);
+    observer.observe(element);
+    if(element.firstElementChild)observer.observe(element.firstElementChild);
+    element.addEventListener('scroll',measure,{passive:true});
+    measure();
+    return ()=>{
+      observer.disconnect();
+      element.removeEventListener('scroll',measure);
+    };
+  },[]);
+  const language=codeLanguage(children);
+  return <div className="code-block reader-code">
+    <div className="code-block-bar">
+      <span className="code-language" title={language}>{language||t('Код')}</span>
+      <div className="reader-code-actions">
+        <button type="button" className="copy-action code-wrap" aria-pressed={wrap} onClick={()=>setWrap(value=>!value)}>
+          <WrapText size={15} aria-hidden="true"/><span>{t('Перенос')}</span>
+        </button>
+        <CopyAction text={()=>pre.current?.textContent?.replace(/\n$/,'')||''} label={t('Копировать')}/>
+      </div>
+    </div>
+    <div className={'reader-code-scroll'+(moreToRight&&!wrap?' overflowing':'')}>
+      <pre ref={pre} className={wrap?'wrap':undefined}>{children}</pre>
+    </div>
+  </div>;
 }
 const codeLanguage=(children:ReactNode)=>{const child=(Array.isArray(children)?children[0]:children) as {props?:{className?:string}}|undefined;return /language-([\w+#.-]+)/.exec(child?.props?.className||'')?.[1];};
 // Keep a single AST so character-reveal offsets remain global across paragraphs.
 const singleMarkdownBlock=(text:string)=>[text];
+
+function MarkdownTable({children}:{children?:ReactNode}) {
+  const viewport=useRef<HTMLDivElement>(null);
+  const table=useRef<HTMLTableElement>(null);
+  const [scrollable,setScrollable]=useState(false);
+  useEffect(()=>{
+    const container=viewport.current, content=table.current;
+    if(!container||!content)return;
+    const measure=()=>setScrollable(container.scrollWidth>container.clientWidth+1);
+    const observer=new ResizeObserver(measure);
+    observer.observe(container);
+    observer.observe(content);
+    measure();
+    return ()=>observer.disconnect();
+  },[]);
+  return <div ref={viewport} className="markdown-table-scroll" tabIndex={scrollable?0:undefined}
+    role={scrollable?'group':undefined} aria-label={scrollable?t('Таблица с горизонтальной прокруткой'):undefined}>
+    <table ref={table}>{children}</table>
+  </div>;
+}
+
+const markdownElements:NonNullable<ComponentProps<typeof Streamdown>['components']>={
+  strong:'strong', em:'em', p:'p', h1:'h1', h2:'h2', h3:'h3', h4:'h4', h5:'h5', h6:'h6',
+  ul:'ul', ol:'ol', li:'li', blockquote:'blockquote', hr:'hr', thead:'thead', tbody:'tbody', tr:'tr',
+  th:'th', td:'td', sup:'sup', sub:'sub', section:'section',
+  code:({children,className})=><code className={className}>{children}</code>,
+  table:({children})=><MarkdownTable>{children}</MarkdownTable>,
+  pre:({children})=><CodeBlock>{children}</CodeBlock>,
+  a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,
+  img:({src,alt})=>{
+    const url=safeWebUrl(typeof src==='string'?src:undefined);
+    return url?<Picture key={url} src={url} alt={alt||t('Изображение')}/>:<span>📎 {alt||t('Изображение')}</span>;
+  },
+};
+
 const MarkdownBody=memo(function MarkdownBody({text,reveal,streaming=false}:{text:string;reveal?:RevealOptions;streaming?:boolean}) {
   useLanguage();
-  return <div className="markdown"><Streamdown key={reveal?"revealing":"settled"} mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={false} remarkPlugins={[remarkGfm]} rehypePlugins={reveal?[[rehypeStreamingReveal,reveal]]:[]} components={{strong:'strong',em:'em',p:'p',h1:'h1',h2:'h2',h3:'h3',h4:'h4',h5:'h5',h6:'h6',ul:'ul',ol:'ol',li:'li',blockquote:'blockquote',hr:'hr',thead:'thead',tbody:'tbody',tr:'tr',th:'th',td:'td',sup:'sup',sub:'sub',section:'section',code:({children,className})=><code className={className}>{children}</code>,table:({children})=><table>{children}</table>,pre:({children})=><CodeBlock language={codeLanguage(children)}>{children}</CodeBlock>,a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,img:({src,alt})=>safeWebUrl(typeof src==='string'?src:undefined)?<Picture src={safeWebUrl(src as string)!} alt={alt||t('Изображение')}/>:<span>📎 {alt||t('Изображение')}</span>}}>{text}</Streamdown></div>;
+  // Streamdown's memo comparison includes data attributes. Expire glyph spans without
+  // remounting the table a reader has focused or scrolled while a reply is streaming.
+  return <div className="markdown"><Streamdown data-revealing={reveal?true:undefined} mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={false} remarkPlugins={[remarkGfm]} rehypePlugins={reveal?[[rehypeStreamingReveal,reveal]]:[]} components={markdownElements}>{text}</Streamdown></div>;
 });
 function StreamingMarkdown({text,animateInitial,streaming}:{text:string;animateInitial:boolean;streaming:boolean}){const speed=useStreamSpeed(),visible=usePacedText(text,animateInitial,speed,streaming);return <MarkdownBody text={visible} streaming={streaming||visible!==text} reveal={useStreamingReveal(visible,speed!==0,animateInitial)}/>;}
 export const Markdown=memo(function Markdown({text,streaming=false,animateInitial=false}:{text:string;streaming?:boolean;animateInitial?:boolean}){

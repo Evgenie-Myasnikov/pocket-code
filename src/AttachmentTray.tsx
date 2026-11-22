@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useId,useRef,useState,type MouseEvent} from 'react';
 import {FileText,Image as ImageIcon,X,LoaderCircle,RotateCw,TriangleAlert,TextCursorInput,ChevronRight} from 'lucide-react';
 import {t} from './i18n';
 import {plural} from './plural';
@@ -6,7 +6,8 @@ import './attachment-tray.css';
 /** status is absent once the PC has the file; a pasted long text can be put back into the message. */
 export type DraftAttachment={id:string;name:string;size:number;file?:File;status?:'uploading'|'failed';error?:string;pastedText?:boolean};
 export const attachmentReady=(a:DraftAttachment)=>!a.status;
-function AttachmentCard({attachment:a,disabled,onRemove,onRetry,onInsertText}:{attachment:DraftAttachment;disabled:boolean;onRemove:()=>void;onRetry?:()=>void;onInsertText?:()=>void}){
+type CardAction=(event:MouseEvent<HTMLButtonElement>)=>void;
+function AttachmentCard({attachment:a,disabled,onRemove,onRetry,onInsertText}:{attachment:DraftAttachment;disabled:boolean;onRemove:CardAction;onRetry?:CardAction;onInsertText?:CardAction}){
   const [preview,setPreview]=useState(''),[failed,setFailed]=useState(false);
   const isImage=!!a.file&&(/^(image\/(png|jpeg|gif|webp|avif|bmp))$/i.test(a.file.type)||(!a.file.type&&/\.(png|jpe?g|gif|webp|avif|bmp)$/i.test(a.name)));
   useEffect(()=>{
@@ -25,12 +26,52 @@ function AttachmentCard({attachment:a,disabled,onRemove,onRetry,onInsertText}:{a
   </div>;
 }
 /** On a short screen (keyboard open) the tray folds into a "N files ›" chip so Send stays visible. */
-export function AttachmentTray({attachments,disabled=false,compact=false,onRemove,onRetry,onInsertText}:{attachments:DraftAttachment[];disabled?:boolean;compact?:boolean;onRemove:(id:string)=>void;onRetry?:(id:string)=>void;onInsertText?:(id:string)=>void}){
+export function AttachmentTray({attachments,disabled=false,compact=false,onRemove,onRetry,onInsertText,focusDraft}:{attachments:DraftAttachment[];disabled?:boolean;compact?:boolean;onRemove:(id:string)=>void;onRetry?:(id:string)=>void;onInsertText?:(id:string)=>void;focusDraft:()=>void}){
   const [expanded,setExpanded]=useState(false);
-  const count=plural(attachments.length,['{0} файл','{0} файла','{0} файлов']),uploading=attachments.filter(a=>a.status==='uploading').length,failed=attachments.filter(a=>a.status==='failed').length;
-  if(compact&&!expanded)return <button type="button" className="attachment-summary" aria-expanded="false" onClick={()=>setExpanded(true)}>{count}{uploading>0&&<> · {t('загрузка')}</>}{failed>0&&<> · {t('ошибка')}</>}<ChevronRight size={16} aria-hidden="true"/></button>;
+  const count=plural(attachments.length,['{0} файл','{0} файла','{0} файлов']);
+  const uploading=attachments.some(a=>a.status==='uploading');
+  const failed=attachments.filter(a=>a.status==='failed');
+  const errors=failed.filter(a=>a.error);
+  const trayId=useId();
+  const tray=useRef<HTMLDivElement>(null);
+  const visible=!compact||expanded;
+  function draftAction(action:((id:string)=>void)|undefined,id:string):CardAction|undefined{
+    if(!action)return;
+    return event=>{
+      // Retry and Insert as text both remove the activated button.
+      if(event.detail===0)focusDraft();
+      action(id);
+    };
+  }
+  function remove(event:MouseEvent<HTMLButtonElement>,id:string){
+    // Keyboard and assistive activation leave focus on a control that is about to disappear.
+    if(event.detail===0&&tray.current){
+      const buttons=Array.from(tray.current.querySelectorAll<HTMLButtonElement>('.attachment-remove'));
+      const index=buttons.indexOf(event.currentTarget);
+      const neighbor=buttons[index+1]||buttons[index-1];
+      if(neighbor)neighbor.focus();
+      else focusDraft();
+    }
+    onRemove(id);
+  }
   return <div className="attachment-tray-wrap">
-    {(attachments.length>2||compact)&&<p className="attachment-count">{count}{compact&&<button type="button" className="text-button" onClick={()=>setExpanded(false)}>{t('Свернуть')}</button>}</p>}
-    <div className="attachment-tray">{attachments.map(a=><AttachmentCard key={a.id} attachment={a} disabled={disabled} onRemove={()=>onRemove(a.id)} onRetry={onRetry?()=>onRetry(a.id):undefined} onInsertText={onInsertText?()=>onInsertText(a.id):undefined}/>)}</div>
+    {compact?<button type="button" className="attachment-summary" aria-expanded={expanded}
+      aria-controls={trayId} onClick={()=>setExpanded(value=>!value)}>
+      <ChevronRight size={16} aria-hidden="true"/>{count}
+      {uploading&&<> · {t('загрузка')}</>}{failed.length>0&&<> · {t('ошибка')}</>}
+    </button>:attachments.length>2&&<p className="attachment-count">{count}</p>}
+    <div id={trayId} hidden={!visible}>
+      {visible&&<div ref={tray} className="attachment-tray">
+        {attachments.map(a=><AttachmentCard key={a.id} attachment={a} disabled={disabled}
+          onRemove={event=>remove(event,a.id)}
+          onRetry={draftAction(onRetry,a.id)}
+          onInsertText={draftAction(onInsertText,a.id)}/>)}
+      </div>}
+      <div aria-live="polite">
+        {visible&&errors.length>0&&<ul className="attachment-errors">
+          {errors.map(a=><li key={a.id}><strong>{a.name}</strong> — {t(a.error!)}</li>)}
+        </ul>}
+      </div>
+    </div>
   </div>;
 }

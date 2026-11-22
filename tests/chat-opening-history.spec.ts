@@ -27,6 +27,29 @@ test('cached opening reaches the latest reply before slow history refresh',async
  expect(await page.locator('.conversation').evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
 });
 
+test('keyboard jump continues from the latest reply while the transcript is scrolling',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await saveChat(page);
+ await page.locator('.desktop-sessions button').filter({hasText:'Interface review'}).click();
+ const transcript=page.locator('.conversation');
+ const reply=transcript.locator('article[data-message-id="saved-39"]');
+ await expect(reply).toBeAttached();
+ await expect.poll(()=>transcript.evaluate(el=>el.scrollTop)).toBeGreaterThan(160);
+ await transcript.evaluate(el=>{el.scrollTop-=350;});
+ const jump=page.getByRole('button',{name:'Jump to latest messages',exact:true});
+ await page.keyboard.press('Tab');
+ await jump.focus();
+ await transcript.evaluate(el=>el.dispatchEvent(new Event('scroll')));
+ await expect(jump).toHaveAttribute('data-scrolling','true');
+ expect(await jump.evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
+ await page.keyboard.press('Enter');
+ await expect(jump).toHaveCount(0);
+ await expect(reply).toBeFocused();
+ await expect.poll(()=>transcript.evaluate(el=>el.scrollHeight-el.scrollTop-el.clientHeight)).toBeLessThan(3);
+ await page.keyboard.press('Tab');
+ await expect(reply.getByRole('button').first()).toBeFocused();
+});
+
 test('opening an active chat retains cached earlier replies during base-history refresh',async({page})=>{
  await saveChat(page);
  await page.evaluate(()=>{
@@ -60,8 +83,18 @@ for(const beginning of [false,true])test(`Codex keeps expanded ${beginning?'begi
  await page.waitForTimeout(3600);
  await expect(page.getByText('Paged reply 0',{exact:true})).toHaveCount(1);await expect(page.getByText('Paged reply 59',{exact:true})).toHaveCount(1);
  await page.evaluate(()=>{(window as any).testHistoryPage=()=>({messages:[{id:'latest-server',role:'assistant',blocks:[{type:'text',text:'Authoritative refreshed reply'}]}],previous:null,next:null});});
- await page.getByRole('button',{name:'Jump to latest messages',exact:true}).click();
+ const jump=page.getByRole('button',{name:'Jump to latest messages',exact:true});
+ if(beginning){
+  await jump.focus();
+  await page.keyboard.press('Space');
+ }else await jump.click();
  await expect(page.getByText('Authoritative refreshed reply',{exact:true})).toBeVisible();
+ const latest=scroll.locator('article[data-message-id="latest-server"]');
+ if(beginning){
+  await expect(latest).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(latest.getByRole('button').first()).toBeFocused();
+ }else await expect(latest).not.toBeFocused();
  await expect(page.getByText('Paged reply 0',{exact:true})).toHaveCount(0);await expect(page.getByText('Paged reply 59',{exact:true})).toHaveCount(0);
 });
 

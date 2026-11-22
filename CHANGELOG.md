@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.28.51 (unreleased)
+
+### Fixes
+- Long replies and keyboard focus (2026-11-22). Jump to latest places keyboard focus on the last message, including after a history refresh. Code examples wrap individually and preserve indentation when copied. Clipboard errors explain how to copy manually. Retrying an attachment or inserting it as text returns keyboard focus to the draft. [Usability review](USABILITY.md)
+  All 22 targeted Edge scenarios passed across runs. Four ran separately after two browser-test workers exited during startup. Nine unit checks and the TypeScript/Vite build passed. Physical Android and packaged-app checks remain open.
+- Reading and composing (2026-11-22). Table cells wrap on narrow screens, and wide tables retain keyboard focus and scroll position during streaming. IME confirmation preserves the draft. The attachment picker and compact file list restore focus, and failed uploads show the reason on touch screens. [Review and references](USABILITY.md)
+  Validation covered 12 targeted Edge scenarios and nine unit checks. One attachment test passed on retry and in four consecutive reruns. The TypeScript/Vite build passed. Physical IME and Android verification remain open. Target integration rechecked both passes together. All 22 Edge scenarios passed, one after a browser crash. Nine unit checks and the production build passed.
+
 ## 0.28.50 (unreleased)
 
 ### Fixes

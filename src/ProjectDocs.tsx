@@ -1,11 +1,11 @@
 import {useEffect,useMemo,useRef,useState,type ReactNode,type CSSProperties} from 'react';
-import {ArrowLeft,BookOpen,FileText,RefreshCw,ListTree,ArrowUp,ExternalLink,WrapText,Image as ImageIcon,X,ChevronsDownUp,ChevronsUpDown,ShieldCheck} from 'lucide-react';
+import {ArrowLeft,BookOpen,FileText,RefreshCw,ListTree,ArrowUp,ExternalLink,Image as ImageIcon,X,ChevronsDownUp,ChevronsUpDown,ShieldCheck} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {request,type Connection} from './api';
 import {t,useLanguage} from './i18n';
 import {useBackAction,useModal} from './navigation';
-import {safeWebUrl,CopyAction} from './RichBlocks';
+import {safeWebUrl,CodeBlock} from './RichBlocks';
 import {ImageViewer} from './ImageViewer';
 import {FilePreview} from './Files';
 import './project-docs.css';
@@ -58,12 +58,6 @@ function changelogSections(content:string){
     if(!fence&&!marker&&/^##\s+/.test(line)){sections.push({heading:line.replace(/^##\s+/,''),body:[]});continue;}
     (sections.at(-1)?.body||preamble).push(line);}
   return {preamble:preamble.join('\n'),sections:sections.map(item=>({heading:item.heading,body:item.body.join('\n')}))};
-}
-function ReaderCode({children}:{children:ReactNode}){
-  const pre=useRef<HTMLPreElement|null>(null),[wrap,setWrap]=useState(false),[overflow,setOverflow]=useState(false);
-  useEffect(()=>{const element=pre.current;if(!element)return;const check=()=>setOverflow(element.scrollWidth>element.clientWidth+1);check();const observer=new ResizeObserver(check);observer.observe(element);return()=>observer.disconnect();},[wrap]);
-  const child=(Array.isArray(children)?children[0]:children) as {props?:{className?:string}}|undefined,language=/language-([\w+#.-]+)/.exec(child?.props?.className||'')?.[1];
-  return <div className="code-block reader-code"><div className="code-block-bar"><span>{language||t('Код')}</span><span className="reader-code-actions"><button type="button" className="copy-action" aria-pressed={wrap} onClick={()=>setWrap(value=>!value)}><WrapText size={14}/><span>{t('Перенос')}</span></button><CopyAction text={()=>pre.current?.innerText.replace(/\n$/,'')||''} label={t('Копировать')}/></span></div><div className={'reader-code-scroll'+(overflow&&!wrap?' overflowing':'')}><pre ref={pre} className={wrap?'wrap':''}>{children}</pre></div></div>;
 }
 function RepoImage({connection,root,path,alt}:{connection:Connection;root:string;path:string;alt:string}){
   const [src,setSrc]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[expanded,setExpanded]=useState(false);
@@ -155,7 +149,7 @@ function ProjectDocuments({refreshRevision=0,category,connection,root,onRefreshP
   const markdownComponents=useMemo(()=>({
     a:({href,children}:{href?:string;children?:ReactNode})=>{const web=safeWebUrl(href);if(web)return <a href={web} target="_blank" rel="noopener noreferrer">{children}</a>;if(!href||/^[a-z][a-z\d+.-]*:/i.test(href)||selected?.builtIn&&!href.startsWith('#'))return <span>{children}</span>;return <a href={href} className="project-docs-internal-link" onClick={event=>{event.preventDefault();followLink(href);}}>{children}</a>;},
     img:({src,alt}:{src?:unknown;alt?:string})=>{const value=typeof src==='string'?src:undefined,web=safeWebUrl(value);if(web)return <a className="project-docs-image-link" href={web} target="_blank" rel="noopener noreferrer">{t('Открыть ссылку на изображение')}{alt?` · ${alt}`:''}</a>;const target=value&&selected&&!selected.builtIn&&!/^[a-z][a-z\d+.-]*:/i.test(value)?resolveRelative(selected.path,value):null;return target?.path?<RepoImage connection={connection} root={root} path={target.path} alt={alt||''}/>:<span>📎 {alt||t('Изображение')}</span>;},
-    pre:({children}:{children?:ReactNode})=><ReaderCode>{children}</ReaderCode>,
+    pre:({children}:{children?:ReactNode})=><CodeBlock>{children}</CodeBlock>,
     table:({children}:{children?:ReactNode})=><div className="project-docs-table"><table>{children}</table></div>,
   }),[selected?.path,index,root,connection,versionIds,open]);
   const body=useMemo(()=>{

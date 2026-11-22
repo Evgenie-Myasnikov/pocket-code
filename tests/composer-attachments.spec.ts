@@ -30,7 +30,19 @@ test('on a short screen the files fold into a chip and Send stays visible',async
   const chip=page.getByRole('button',{name:/2 files/});await expect(chip).toBeVisible();await expect(page.locator('.attachment-tray')).toHaveCount(0);
   const send=page.getByRole('button',{name:'Send message',exact:true});const box=(await send.boundingBox())!;expect(box.y+box.height).toBeLessThanOrEqual(420);
   await expect(page.locator('.welcome')).toBeHidden();
-  await chip.click();await expect(page.locator('.attachment-tray .draft-attachment')).toHaveCount(2);
+  await chip.focus();await page.keyboard.press('Enter');
+  await expect(page.locator('.attachment-tray .draft-attachment')).toHaveCount(2);
+  await expect(chip).toBeFocused();
+  await expect(chip).toHaveAttribute('aria-expanded','true');
+  const region=await chip.getAttribute('aria-controls');
+  expect(await page.locator('.attachment-tray').evaluate(element=>element.parentElement?.id)).toBe(region);
+  await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'Remove one.md'})).toBeFocused();
+  await page.keyboard.press('Shift+Tab');await page.keyboard.press('Space');
+  await expect(chip).toHaveAttribute('aria-expanded','false');await expect(chip).toBeFocused();
+  await expect(page.locator('.attachment-tray')).toHaveCount(0);
+  await chip.press('Enter');await page.keyboard.press('Tab');await page.keyboard.press('Enter');
+  await expect(page.getByRole('button',{name:'Remove two.md'})).toBeFocused();
+  await page.keyboard.press('Enter');await expect(page.getByRole('textbox',{name:'Message Claude'})).toBeFocused();
 });
 test('each file has its own card: a failed upload names the file and retries, a long paste becomes text that can be put back',async({page})=>{
   await page.setViewportSize({width:390,height:844});
@@ -49,6 +61,8 @@ test('each file has its own card: a failed upload names the file and retries, a 
   await page.locator('input[type=file]').setInputFiles([{name:'notes.md',mimeType:'text/markdown',buffer:Buffer.from('# Notes')},{name:'flaky.md',mimeType:'text/markdown',buffer:Buffer.from('# Flaky')}]);
   const tray=page.locator('.attachment-tray'),flaky=tray.locator('.draft-attachment',{hasText:'flaky.md'});
   await expect(flaky).toContainText('Upload failed');await expect(flaky).toHaveAttribute('title',/flaky\.md: Synthetic upload failure/);
+  const reason=page.locator('.attachment-errors li');
+  await expect(reason).toHaveText('flaky.md — Synthetic upload failure');await expect(reason).toBeInViewport();
   // The card text fits inside the card and Retry is a card-sized target, not a 32px line.
   const card=(await flaky.boundingBox())!,name=(await flaky.locator('strong').boundingBox())!,retry=(await flaky.getByRole('button',{name:'Retry'}).boundingBox())!;
   expect(name.y).toBeGreaterThanOrEqual(card.y+6);expect(retry.y+retry.height).toBeLessThanOrEqual(card.y+card.height-6);
@@ -56,12 +70,15 @@ test('each file has its own card: a failed upload names the file and retries, a 
   for(const [x,y] of [[card.x+16,card.y+12],[card.x+card.width-60,card.y+card.height-10]])expect(await page.evaluate(([x,y])=>document.elementFromPoint(x,y)?.closest('button')?.textContent,[x,y])).toBe('Retry');
   const draft=page.getByRole('textbox',{name:'Message Claude'}),send=page.getByRole('button',{name:'Send message',exact:true});
   await draft.fill('Review these');await expect(send).toBeDisabled();
-  await flaky.getByRole('button',{name:'Retry'}).click();await expect(flaky).not.toContainText('Upload failed');await expect(send).toBeEnabled();
+  await flaky.getByRole('button',{name:'Retry'}).press('Enter');await expect(flaky).not.toContainText('Upload failed');await expect(send).toBeEnabled();
+  await expect.soft(draft).toBeFocused();
+  await expect(reason).toHaveCount(0);
   // A long paste is attached as text and can be inserted back into the message.
   const long='Synthetic log line\n'.repeat(700);
   await draft.focus();await page.evaluate(text=>{const data=new DataTransfer();data.setData('text/plain',text);document.querySelector('.prompt-composer textarea')!.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}));},long);
   const pasted=tray.locator('.draft-attachment',{hasText:'Pasted text'});await expect(pasted.getByRole('button',{name:'Insert as text'})).toBeVisible();
   await expect(page.locator('.attachment-count')).toContainText('3 files');
-  await pasted.getByRole('button',{name:'Insert as text'}).click();await expect(pasted).toHaveCount(0);await expect(draft).toHaveValue(/^Review these\n\nSynthetic log line/);
+  await pasted.getByRole('button',{name:'Insert as text'}).press('Space');await expect(pasted).toHaveCount(0);await expect(draft).toHaveValue(/^Review these\n\nSynthetic log line/);
+  await expect.soft(draft).toBeFocused();
   await send.click();await expect.poll(()=>started.length).toBe(1);expect(started[0].attachments).toEqual(['upload-1','upload-2']);
 });

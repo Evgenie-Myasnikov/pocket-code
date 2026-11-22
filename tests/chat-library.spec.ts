@@ -42,6 +42,19 @@ test('streaming Markdown completes emphasis and keeps code, links and images saf
  await expect(markdown.locator('img,script')).toHaveCount(0);
  await expect(markdown.getByRole('button',{name:/Load external image/})).toBeVisible();
  await expect(markdown.locator('pre .stream-glyph')).toHaveCount(0);
+ const tableText='| First | Second | Third | Fourth | Fifth |\n| --- | --- | --- | --- | --- |\n| A | B | C | D | E |';
+ await page.evaluate(text=>{
+   document.getElementById('markdown-test')!.style.width='260px';
+   (window as any).renderMarkdown(text);
+ },tableText);
+ const scroll=markdown.getByRole('group',{name:'Horizontally scrollable table'});
+ await scroll.focus();
+ const left=await scroll.evaluate(el=>{el.scrollLeft=48;return el.scrollLeft;});
+ expect(left).toBeGreaterThan(0);
+ await page.evaluate(text=>(window as any).renderMarkdown(text+'\n\nAdditional detail.'),tableText);
+ await expect(markdown).toContainText('Additional detail.');
+ await expect(scroll).toBeFocused();
+ expect(await scroll.evaluate(el=>el.scrollLeft)).toBe(left);
 });
 
 test('only an explicitly added composer folder becomes a sidebar project',async({page})=>{
@@ -55,4 +68,26 @@ test('only an explicitly added composer folder becomes a sidebar project',async(
  await expect(page.locator('.desktop-project-links button')).toHaveText('Garden');
  await expect(page.locator('.desktop-sessions>button')).toHaveCount(2);
  await page.screenshot({path:'.local/chat-library-desktop.png'});
+});
+
+test('keyboard and Back keep the composer attachment picker within the draft',async({page})=>{
+ await desktop(page);
+ await page.getByRole('button',{name:'New chat',exact:true}).click();
+ const draft=page.getByRole('textbox',{name:'Message Claude',exact:true});
+ const trigger=page.locator('.composer-attach');
+ const attach=page.getByRole('group',{name:'Attach files'}).getByRole('button',{name:'Attach files'});
+ const folder=page.getByRole('combobox',{name:'Add project folder'});
+ await draft.fill('Synthetic draft');
+ await trigger.focus();await page.keyboard.press('Enter');
+ await expect(attach).toBeFocused();await page.keyboard.press('Tab');await expect(folder).toBeFocused();
+ await page.keyboard.press('Escape');await expect(attach).toHaveCount(0);await expect(trigger).toBeFocused();
+ await trigger.press('Enter');await page.keyboard.press('Shift+Tab');await expect(trigger).toBeFocused();await expect(attach).toHaveCount(0);
+ await trigger.press('Enter');await page.keyboard.press('Tab');await page.keyboard.press('Tab');
+ await expect(page.getByRole('button',{name:/^Access mode:/})).toBeFocused();await expect(attach).toHaveCount(0);
+ await trigger.focus();
+ await page.keyboard.press('Space');await expect(attach).toBeFocused();
+ await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
+ await expect(attach).toHaveCount(0);await expect(trigger).toBeFocused();
+ await page.keyboard.press('Enter');await folder.selectOption('C:\\Demo\\Garden');
+ await expect(attach).toHaveCount(0);await expect(trigger).toBeFocused();await expect(draft).toHaveValue('Synthetic draft');
 });

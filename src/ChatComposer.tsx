@@ -4,11 +4,10 @@ import {VoiceInput} from './VoiceInput';
 import {BoardSelectionPreview} from './BoardSelectionPreview';
 import {boardImageMime} from './board-image-drag';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode,type CSSProperties} from 'react';
-import {ArrowUp,Plus,Paperclip,Square,LoaderCircle,ListPlus,CornerDownRight,Clock,RefreshCw} from 'lucide-react';
+import {ArrowUp,Square,LoaderCircle,ListPlus,CornerDownRight,Clock,RefreshCw} from 'lucide-react';
 import {AttachmentTray,type DraftAttachment} from './AttachmentTray';
 import {t} from './i18n';
-import {createPortal} from 'react-dom';
-import {useAnchoredPlace} from './anchored-popup';
+import {ComposerAttachButton} from './ComposerAttachButton';
 import './composer-controls.css';
 
 /** A paste this long becomes a text attachment that can be put back into the message. */
@@ -40,8 +39,6 @@ function useShortScreen(){
 
 /** Shared Windows/Android input. Resizing never changes the draft or selection. */
 export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,text,label,placeholder,disabled,uploading,canSend,attachments,controls,projectPicker,usage,stopLabel,busy=false,stopping=false,mode='send',blockedReason,stopRetry=false,enterSends=false,keyHint=false,onText,onRemove,onFiles,onBoardImage,onRetry,onInsertText,onRecall,onSend,onStop}:Props){
-  const [addOpen,setAddOpen]=useState(false),addMenu=useRef<HTMLDivElement>(null),addPopup=useRef<HTMLDivElement>(null),addPlace=useAnchoredPlace(addOpen,addMenu,300);
-  useEffect(()=>{if(!addOpen)return;const close=(event:Event)=>{if(event instanceof KeyboardEvent){if(event.key!=='Escape')return;event.stopPropagation();}else if(addMenu.current?.contains(event.target as Node)||addPopup.current?.contains(event.target as Node))return;setAddOpen(false);};document.addEventListener('pointerdown',close);document.addEventListener('keydown',close);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',close);};},[addOpen]);
   const input=useRef<HTMLTextAreaElement>(null),files=useRef<HTMLInputElement>(null),hadFocus=useRef(false),focusAtPress=useRef(false);
   const [wave,setWave]=useState<{id:number;x:number;y:number}|null>(null),waveSequence=useRef(0),wavePointer=useRef(0);
   const ripple=()=>{if(disabled||matchMedia('(prefers-reduced-motion: reduce), (forced-colors: active)').matches)return;const rect=input.current?.closest('.prompt-composer')?.getBoundingClientRect();if(rect?.width&&rect.height)setWave({id:++waveSequence.current,x:1+16/rect.width,y:1+16/rect.height});};
@@ -64,7 +61,8 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
   const keepFocus=(event:React.PointerEvent)=>{focusAtPress.current=document.activeElement===input.current;if(focusAtPress.current)event.preventDefault();};
   const empty=!text.trim()&&!attachments.length,stopOnly=Boolean(onStop)&&empty;
   const sendLabel=mode==='later'?t('Отправить, когда ПК будет на связи'):mode==='queue'?t('В очередь'):mode==='steer'?t('Направить'):t('Отправить сообщение');
-  const shortcut=enterSends?'Enter':'Ctrl+Enter';
+  const shortcutKeys=enterSends?'Enter Control+Enter Meta+Enter':'Control+Enter Meta+Enter';
+  const shortcutHelp=enterSends?t('Enter — отправить · Shift+Enter — новая строка'):t('Enter — новая строка · Ctrl+Enter — отправить');
   const hasFiles=(event:React.DragEvent)=>Array.from(event.dataTransfer?.types||[]).includes('Files')||!!onBoardImage&&Array.from(event.dataTransfer?.types||[]).includes(boardImageMime);
   const stopControl=onStop?<button type="button" className={'icon-button stop-button'+(stopOnly?' stop-primary':'')} aria-label={stopping?t('Останавливаю…'):stopLabel} title={stopping?t('Останавливаю…'):stopLabel+(keyHint?' (Esc)':'')} aria-busy={stopping||undefined} disabled={stopping} onPointerDown={keepFocus} onClick={onStop}>{stopping?<LoaderCircle size={16} className="composer-uploading"/>:stopRetry?<RefreshCw size={16}/>:<Square size={stopOnly?16:13}/>}</button>:null;
   return <div className="composer-with-usage" data-has-usage={usage?true:undefined}><AssistantComposerRoot onSubmit={event=>{event.preventDefault();send();}} data-slot="composer" className={'composer prompt-composer assistant-composer'+(dragging?' composer-drop':'')} data-pulsing={!!onStop&&!stopRetry&&!stopping||undefined} data-stopping={stopping||undefined} data-running={onStop?true:undefined}
@@ -75,9 +73,11 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
     {wave&&<span key={wave.id} className="composer-border-wave" aria-hidden="true" style={{'--composer-wave-x':wave.x,'--composer-wave-y':wave.y} as CSSProperties} onAnimationEnd={()=>setWave(null)}/>}
     {dragging&&<div className="composer-drop-zone" aria-hidden="true">{t('Отпустите, чтобы прикрепить')}</div>}
     {boardSelection&&<BoardSelectionPreview selection={boardSelection} onReveal={onRevealBoardSelection}/>}
-    {attachments.length>0&&<AttachmentTray attachments={attachments} disabled={!!disabled} compact={short} onRemove={onRemove} onRetry={onRetry} onInsertText={onInsertText}/>}
+    {attachments.length>0&&<AttachmentTray attachments={attachments} disabled={!!disabled} compact={short}
+      onRemove={onRemove} onRetry={onRetry} onInsertText={onInsertText} focusDraft={()=>input.current?.focus({preventScroll:true})}/>}
     <div className="composer-input">
-      <AssistantComposerInput ref={input} rows={1} aria-label={label} placeholder={placeholder} value={text} disabled={disabled} aria-keyshortcuts={enterSends?'Enter':'Control+Enter'}
+      <AssistantComposerInput ref={input} rows={1} aria-label={label} placeholder={placeholder} value={text} disabled={disabled}
+        enterKeyHint={enterSends?'send':'enter'} aria-keyshortcuts={shortcutKeys} aria-description={shortcutHelp}
         onPointerDown={()=>{wavePointer.current=Date.now();ripple();}} onFocus={()=>{setFocused(true);if(Date.now()-wavePointer.current>200)ripple();}} onBlur={()=>setFocused(false)}
         onChange={event=>onText(event.target.value)}
         onPaste={event=>{
@@ -88,7 +88,11 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
           if(pasted.length>LONG_PASTE&&!disabled){event.preventDefault();onFiles([new File([pasted],'pasted-text.txt',{type:'text/plain'})],{pastedText:true});}
         }}
         onKeyDown={event=>{
-          if(event.nativeEvent.isComposing)return;
+          // Keep candidate selection and dismissal within the IME. Its final Enter may follow compositionend.
+          if(event.nativeEvent.isComposing||event.nativeEvent.keyCode===229){
+            event.stopPropagation();
+            return;
+          }
           if(event.key==='Enter'&&(event.ctrlKey||event.metaKey||enterSends&&!event.shiftKey&&!event.altKey)){event.preventDefault();send();return;}
           // Up in an empty field brings back the last message to edit, like a terminal.
           if(event.key==='ArrowUp'&&!text&&onRecall){const previous=onRecall();if(previous){event.preventDefault();onText(previous);}}
@@ -97,15 +101,12 @@ export function ChatComposer({scopeKey,boardSelection,onRevealBoardSelection,tex
     {blockedReason&&<p className="composer-hint composer-blocked" role="status">{blockedReason}</p>}
     <div className="composer-tools">
       <input hidden ref={files} type="file" multiple onChange={event=>{const incoming=Array.from(event.target.files||[]);event.target.value='';if(incoming.length)onFiles(incoming);}}/>
-      <div className="composer-add" ref={addMenu}><button type="button" className="icon-button composer-attach" aria-label={t('Прикрепить файлы')} aria-expanded={addOpen} disabled={disabled} onClick={()=>projectPicker?setAddOpen(value=>!value):files.current?.click()}>
-        {uploading?<LoaderCircle size={20} className="composer-uploading"/>:<Plus size={20}/>}
-      </button>
-      {addOpen&&createPortal(<div ref={addPopup} className="composer-add-menu" style={addPlace} role="group" aria-label={t('Прикрепить файлы')}><button type="button" onClick={()=>{setAddOpen(false);files.current?.click();}}><Paperclip size={16}/>{t('Прикрепить файлы')}</button><div onChange={()=>setAddOpen(false)}>{projectPicker}</div></div>,document.body)}</div>
+      <ComposerAttachButton disabled={disabled} uploading={uploading} projectPicker={projectPicker} chooseFiles={()=>files.current?.click()}/>
       <div className="composer-models">{controls}</div>
       <div className="composer-actions">
         <VoiceInput key={scopeKey} disabled={disabled} focus={()=>input.current?.focus({preventScroll:true})} onText={value=>onText(text+(text&&!/\s$/.test(text)?' ':'')+value)}/>
         {!stopOnly&&stopControl}
-        <div className="composer-submit">{stopOnly?stopControl:<button type="button" className="send-button" data-mode={mode} aria-label={sendLabel} title={`${sendLabel} · ${shortcut}`} aria-keyshortcuts={enterSends?'Enter':'Control+Enter'} aria-busy={busy||undefined} disabled={!canSend} aria-description={blockedReason}
+        <div className="composer-submit">{stopOnly?stopControl:<button type="button" className="send-button" data-mode={mode} aria-label={sendLabel} title={`${sendLabel} · ${enterSends?'Enter':'Ctrl+Enter'}`} aria-keyshortcuts={shortcutKeys} aria-busy={busy||undefined} disabled={!canSend} aria-description={blockedReason}
           onPointerDown={keepFocus} onClick={send}>
           {busy?<LoaderCircle size={20} className="composer-uploading"/>:mode==='later'?<Clock size={20}/>:mode==='queue'?<ListPlus size={20}/>:mode==='steer'?<CornerDownRight size={20}/>:<ArrowUp size={20}/>}
         </button>}{usage&&<div className="composer-submit-usage">{usage}</div>}</div>

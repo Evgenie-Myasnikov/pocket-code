@@ -1,5 +1,6 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Таблица с горизонтальной прокруткой':'Horizontally scrollable table',
   'Работает как Claude Code':'Works as Claude Code',
   'Файлы этого сообщения остались на устройстве, с которого оно отправлено. Оно уйдёт после ответа как есть.':'The files of this message stay on the device that sent it. It will be sent as is after the reply.',
   'Нет Anthropic API: доступен только API-чат':'No Anthropic API: only the API chat is available',
@@ -771,6 +772,7 @@ export const english: Record<string, string> = {
   "Связь": "Last contact",
   "Сканировать новый QR": "Scan a new QR",
   "Скопировано": "Copied",
+  "Не удалось скопировать. Выделите текст и скопируйте его вручную.": "Copy failed. Select the text and copy it manually.",
   "Скопировать диагностику": "Copy diagnostics",
   "Сменить ПК / новый QR": "Change PC / new QR",
   "Телефон и ПК подключены к одной сети Wi-Fi.": "The phone and the PC are on the same Wi-Fi network.",
@@ -965,6 +967,7 @@ export const english: Record<string, string> = {
   "Направить": "Steer",
   "Отпустите, чтобы прикрепить": "Drop to attach",
   "Enter — отправить · Shift+Enter — новая строка": "Enter to send · Shift+Enter for a new line",
+  "Enter — новая строка · Ctrl+Enter — отправить": "Enter for a new line · Ctrl+Enter to send",
   "Ctrl+Enter — отправить": "Ctrl+Enter to send",
   "Останавливаю…": "Stopping…",
   "Загружается…": "Uploading…",

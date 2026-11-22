@@ -2,6 +2,19 @@
 
 This is an expert review supported by interface checks and published guidance. It is not a study with participants, an accessibility certification, or proof that every Android device behaves identically.
 
+## Navigating long replies and copying code — 2026-11-22
+
+- When a keyboard reader activated **Jump to latest messages**, the button disappeared and the reader lost their place in the tab order. Focus now moves to the last message, including after a fresh page of history arrives. Tab continues into that message's actions.
+- At a 320 px viewport, **Wrap** fits long lines of code inside an individual example. **Copy** preserves its indentation and line breaks. If clipboard access fails, the reader sees how to copy manually and can retry from the same button.
+- Retrying a failed attachment or inserting a pasted file as text removed the active button. Keyboard activation now returns focus to the draft so typing can continue.
+
+## Reading and composing messages — 2026-11-22
+
+- **Choose files or a project from the composer.** Opening the plus button with Enter left focus outside the popup. Opening now focuses the file action. Tab reaches the project selector; Back or Escape closes the popup and returns focus to the plus button. [WCAG focus order](https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html)
+- **Read a comparison on a phone.** At a 320 CSS pixel viewport and an 18px chat font, a long identifier expanded one table cell to 973px inside a 288px message. Identifiers and headings now wrap within their cells. Comparisons that still need horizontal scrolling can receive keyboard focus independently of the surrounding reply. [WCAG reflow guidance](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
+- **Finish entering a character.** A synthetic IME confirmation event reproduced premature sending. During composition, Enter and Escape are left to the input method. The composer exposes the configured newline or send action to assistive technology and the virtual keyboard. [MDN keyboard events during composition](https://developer.mozilla.org/en-US/docs/Web/API/Element/keydown_event#keydown_events_with_ime) · [HTML enter key hint](https://html.spec.whatwg.org/multipage/interaction.html#input-modalities:-the-enterkeyhint-attribute)
+- **Inspect and correct attachments.** On a short screen, opening the file list replaced its trigger and lost keyboard focus. A single button now exposes the expanded state and retains focus. Keyboard removal moves focus to a neighboring file or back to the draft after the final removal. Failed uploads show the filename and available error reason in the composer so a touch user can read them before retrying. [WAI-ARIA disclosure pattern](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/) · [GOV.UK error messages](https://design-system.service.gov.uk/components/error-message/)
+
 ## Phone shell and inbox — 2026-10-17
 
 The hidden section drawer is replaced by a bottom bar (Chats · Board · Inbox · More) on phones, with the app starting on Chats and Back from the Chats list leaving the app. The bar is not shown inside a conversation, so the transcript keeps its full height; the conversation header has only Back (with the state of other chats), the title and applicable, labelled actions. One app-level inbox serves every bell: its badge counts only items that need the person, polling is silent and the sheet always opens on All. Run states use one vocabulary (Needs you, Running, Done, Error, Stopped) and theme tokens with at least 4.5:1 contrast, always paired with an icon shape. Wider windows keep the existing sidebar instead of a separate navigation rail.

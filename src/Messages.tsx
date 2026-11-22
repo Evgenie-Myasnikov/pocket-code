@@ -47,7 +47,7 @@ export const MessageList=memo(function MessageList({messages,partialText,running
     const delivery=run.message?delivered.current.get(run.message.id):undefined,key=delivery?.key||run.key;
     const body=run.message?
     <Message key={key} message={run.message} running={runningMessages?.has(run.message)||false} live={run.message===messages.at(-1)} {...shared} animateInitial={delivery?.animate??!initialIds.current.has(run.message.id)}/>:
-    <article data-enter={shared.streaming&&ids.some(id=>!initialIds.current.has(id))||undefined} key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
+    <article tabIndex={-1} data-enter={shared.streaming&&ids.some(id=>!initialIds.current.has(id))||undefined} key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
       {ids.slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
     </article>;
@@ -65,7 +65,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   const assistantChat=useAssistantChat();
   // A message made only of background-task notices is an event line, not the person's bubble.
   const notices=message.role==='user'?message.blocks.map(block=>block.type==='text'?parseClaudeTaskNotification(block.text||''):undefined):[];
-  if(notices.length&&notices.every(Boolean))return <article data-message-id={message.id} className="message transcript-event-message">{notices.map((notice,index)=><TaskNotificationEvent key={index} notification={notice!}/>)}</article>;
+  if(notices.length&&notices.every(Boolean))return <article tabIndex={-1} data-message-id={message.id} className="message transcript-event-message">{notices.map((notice,index)=><TaskNotificationEvent key={index} notification={notice!}/>)}</article>;
   if(message.blocks.length&&message.blocks.every(b=>b.type==='tool_result'&&b.tool_use_id&&toolResults?.has(b.tool_use_id)))return null;
   const toolOnly = message.blocks.length > 0 && message.blocks.every((b) => ['tool_result','tool_use','thinking','codexItem','subagent'].includes(b.type));
   const isUser = message.role === 'user' && !toolOnly;
@@ -79,7 +79,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
       return <RichBlock key={block.type==='text'?`text:${message.blocks.slice(0,run.items[0].index).filter(item=>item.type==='text').length}`:run.key} running={running} streaming={streaming&&message.role==='assistant'} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
   if(!content.length&&!attachments.length)return null;
-  return <article data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):message.role==='assistant'?provider:undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
+  return <article tabIndex={-1} data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):message.role==='assistant'?provider:undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>
     {isUser ? <>{plain && !assistantChat && <CopyButton text={plain}/>}<div className="user-message-content">{attachments.length>0&&<div className="message-attachments">{attachments.map((block,index)=><MessageAttachment key={block.attachmentPath||index} block={block} connection={connection} cwd={cwd}/>)}</div>}{content}</div>{plain&&assistantChat&&<AssistantMessageActions id={message.id} text={plain} user/>}</> : <>
       {!toolOnly && message.role!=='assistant' && <div className="message-label">{t("СИСТЕМА")}{plain && <CopyButton text={plain} />}</div>}
       {content}

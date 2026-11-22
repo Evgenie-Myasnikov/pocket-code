@@ -3,7 +3,7 @@
  font-family:var(--font-chat);font-kerning:normal;font-variant-ligatures:common-ligatures;letter-spacing:normal;text-align:start;overflow-wrap:anywhere;
 }
 :root .chat-canvas .message .markdown{font-size:inherit;font-weight:var(--fw-regular);line-height:var(--chat-line-height,1.65);min-width:0}
-:root .chat-canvas .message .markdown :is(p,ul,ol,blockquote,pre,table){margin-block:var(--chat-prose-gap)}
+:root .chat-canvas .message .markdown :is(p,ul,ol,blockquote,pre,.markdown-table-scroll){margin-block:var(--chat-prose-gap)}
 :root .chat-canvas .message .markdown>:first-child{margin-top:0}
 :root .chat-canvas .message .markdown>:last-child{margin-bottom:0}
 :root .chat-canvas .message .markdown :is(ul,ol){padding-inline-start:1.5em}

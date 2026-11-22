@@ -115,6 +115,12 @@ const connectivityError=(error:unknown)=>{const problem=(error as {problem?:stri
 const uniqueMessages = (messages:ChatMessage[]) => [...new Map(messages.map(message=>[message.id,message])).values()];
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() || p;
 export type EmbeddedChat={activity?:ActivityFeed;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardSelection?:BoardSelection|null;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onRevealBoardSelection?(target:BoardRevealTarget):void;onCreated?(session:Session,job:JobView):void;onNewBoardChat?(target:BoardChat):void;onBack():void};
+function focusLatestMessage(transcript: HTMLElement) {
+  const latest = transcript.querySelector<HTMLElement>('.conversation-inner > article.message:last-of-type');
+  const target = latest ?? transcript.querySelector<HTMLElement>('.conversation-inner');
+  target?.focus({preventScroll: true});
+}
+
 export function App({embedded}:{embedded?:EmbeddedChat}={}) {
   useBackNavigation();
   // The phone shell paints its status bar, navigation bar and theme-color from the same palette; inside the Windows window DesktopApp owns the frame.
@@ -227,7 +233,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if(tab==='settings'&&settingsPage!=='index'){setSettingsPage('index');return true;}
     if(!embedded&&boardChat?.context&&tab==='chats'&&mobileChat){setTab('workspace');return true;}
     if(tab!=='chats'){returnToChats();return true;}
-    if(mobileChat){setMobileChat(false);return true;}
+    if(!embedded&&mobileChat){setMobileChat(false);return true;}
     return false;
   });
   useBackAction(()=>{if(readingMode)toggleReadingMode(false);else setTab('workspace');return true;},30,Boolean(!embedded&&boardChat?.context&&tab==='chats'&&mobileChat));
@@ -255,7 +261,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   },[activityTarget,provider,busy,uploading,connection]);
   const [hasMore, setHasMore] = useStateForWorkspace<number | null>(null);
   const [loadingOlder,setLoadingOlder]=useStateForWorkspace(false);
-  const pendingPosition=useRefForWorkspace<ChatPosition|null>(null);
+  const pendingPosition=useRefForWorkspace<(ChatPosition & {focusFrom?: HTMLButtonElement})|null>(null);
   const paging=useRefForWorkspace<symbol|null>(null);
   const historyExpanded=useRefForWorkspace(false);
   const scrollAnchor=useRefForWorkspace<{height:number;top:number;epoch:number;prepend:boolean;messageId?:string;offset?:number}|null>(null);
@@ -676,7 +682,16 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   // land on the latest message when the chat was following it, otherwise where the person was reading.
   const chatShown=tab==='chats'&&(embedded?embedded.visible!==false:mobileChat);
   useLayoutEffect(()=>{const el=scroll.current;if(!chatShown||!el||loading||!el.getClientRects().length)return;el.scrollTop=nearBottom.current&&!readingMode?el.scrollHeight:lastScrollTop.current;lastScrollTop.current=el.scrollTop;setShowScrollActions(fromStart||el.scrollHeight-el.scrollTop-el.clientHeight>=80);},[provider,chatShown]);
-  useLayoutEffect(()=>{const position=pendingPosition.current,el=scroll.current;if(!position||!el||loading&&!history.length&&!job?.messages.length&&!job?.partial||tab!=='chats')return;pendingPosition.current=null;const message=position.messageId?[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.dataset.messageId===position.messageId):null;const textTop=message&&position.textAnchor?restoreTextAnchor(el,message,position.textAnchor):undefined;el.scrollTop=position.bottom?el.scrollHeight:textTop!==undefined?textTop:message&&position.offset!==undefined?el.scrollTop+message.getBoundingClientRect().top-el.getBoundingClientRect().top-position.offset:position.top;lastScrollTop.current=el.scrollTop;nearBottom.current=position.bottom;setShowScrollActions(!position.bottom||fromStart);},[loading,history,job,provider,tab]);
+  useLayoutEffect(()=>{
+    const position=pendingPosition.current,el=scroll.current;
+    if(!position||!el||loading&&!history.length&&!job?.messages.length&&!job?.partial||tab!=='chats')return;
+    pendingPosition.current=null;
+    const message=position.messageId?[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.dataset.messageId===position.messageId):null;
+    const textTop=message&&position.textAnchor?restoreTextAnchor(el,message,position.textAnchor):undefined;
+    el.scrollTop=position.bottom?el.scrollHeight:textTop!==undefined?textTop:message&&position.offset!==undefined?el.scrollTop+message.getBoundingClientRect().top-el.getBoundingClientRect().top-position.offset:position.top;
+    lastScrollTop.current=el.scrollTop;nearBottom.current=position.bottom;setShowScrollActions(!position.bottom||fromStart);
+    if(position.focusFrom&&(document.activeElement===position.focusFrom||document.activeElement===document.body))focusLatestMessage(el);
+  },[loading,history,job,provider,tab]);
   useChatReturn(selected?positionKey(cacheScope,provider,selected.sessionId):'',tab==='chats'&&(embedded?embedded.visible!==false:mobileChat),running,!loading&&!busy&&!paging.current,()=>{void jumpHistory(false);});
   function rememberPosition(){const el=scroll.current;if(!el||loading||!selected||!el.getClientRects().length)return;const top=el.getBoundingClientRect().top,message=[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.getBoundingClientRect().bottom>top);savePosition(positionKey(cacheScope,provider,selected.sessionId),{top:el.scrollTop,window:historyWindow.current,fromStart,bottom:nearBottom.current,messageId:message?.dataset.messageId,textAnchor:message?captureTextAnchor(el,message):undefined,offset:message?message.getBoundingClientRect().top-top:undefined});}
   const persistPosition=useRef(()=>{});persistPosition.current=rememberPosition;
@@ -736,7 +751,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if (epoch !== navigation.current || historyExpanded.current&&(fromStart||!nearBottom.current)) return;
     setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore((beginning ? data.next : data.previous)??null);setHistoryError('');
   }
-  async function jumpHistory(beginning: boolean) {
+  async function jumpHistory(beginning: boolean, focusFrom?: HTMLButtonElement) {
     if (loading || busy) return;
     pendingPosition.current=null;historyExpanded.current=false;
     const epoch = ++navigation.current;
@@ -748,7 +763,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       setFromStart(beginning);setShowScrollActions(beginning);
       // Restore in the existing layout effect, before paint. A delayed RAF could
       // override a user's next scroll and prevent loading the following page.
-      pendingPosition.current={top:0,window:100,fromStart:beginning,bottom:!beginning};
+      pendingPosition.current={top:0,window:100,fromStart:beginning,bottom:!beginning,focusFrom};
     } catch (e) {if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);} finally
     {if (epoch === navigation.current) setLoading(false);}
   }
@@ -1044,7 +1059,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       </ChatOverlay>
       {contentTab === 'connection' ? connectView() : onboardingVisible ? connectView(true) : contentTab === 'workspace' ? (boardPane?null:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div>) : (contentTab === 'files'||contentTab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={docView} onKind={setDocView} onChat={connection?(root,prompt)=>{if(busy||uploading)return;newChat(root);setDraft(prompt);}:undefined} onFolderChat={connection?path=>newChat(path):undefined}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : contentTab === 'settings' ? <SettingsPanel connectionPanel={connectView()} online={!!pcStatus?.online} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={page=>{setSettingsSubpage(null);setSettingsPage(page);}} subpageRequest={settingsSubpage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget}/> : <>
         <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;markScrolling();rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
-          <div className="conversation-inner">{selected && !demo && (job || unreachable && history.length > 0 || selected.source === 'desktop') && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop` : ''}{selected.source === 'desktop' && (job || unreachable && history.length > 0) ? ' · ' : ''}{job ? t("Продолжение с телефона") : unreachable && history.length > 0 ? t("Офлайн · сохранённая копия") : ''}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
+          <div className="conversation-inner" tabIndex={-1}>{selected && !demo && (job || unreachable && history.length > 0 || selected.source === 'desktop') && <p className="muted history-meta" role="status">{selected.source === 'desktop' ? `${engineName} Desktop` : ''}{selected.source === 'desktop' && (job || unreachable && history.length > 0) ? ' · ' : ''}{job ? t("Продолжение с телефона") : unreachable && history.length > 0 ? t("Офлайн · сохранённая копия") : ''}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
             {loading && (!history.length?<ChatHistorySkeleton/>:<p className="history-page-status muted" role="status">{t("Загружаем историю с ПК…")}</p>)}
             {!loading && !history.length && !job && !selected && taskRun && <section className="task-chat-card" aria-label={t('Задача')}><button type="button" className={'task-chat-stage task-stage-text task-stage-'+taskDisplayStage(taskRun)} onClick={()=>setTaskPanel(true)}>{taskRunStageLabel(taskRun)}</button><h2>{taskRun.title}</h2>{taskRun.worktree&&<p className="task-chat-branch"><code>{taskRun.worktree.branch}</code></p>}{(taskRun.noteSnapshot?.description||'').trim()&&<p className="task-chat-criteria">{(taskRun.noteSnapshot?.description||'').trim().split('\n').slice(0,4).join('\n')}</p>}<p className="muted">{t('Проверьте подготовленный запрос и отправьте его, чтобы агент начал. Сам он не отправляется.')}</p></section>}
             {!loading && !history.length && !job && !selected && !taskRun && <div className={'welcome'+(draft.trim()||attachments.length?' welcome-collapsed':'')}><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={16} /></button>)}</div></div>}
@@ -1060,7 +1075,16 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             <div ref={bottom} />
           </div>
         </div>
-        {(showScrollActions||fromStart)&&!readingMode&&<button className="scroll-latest" data-scrolling={scrolling||undefined} aria-label={unseen?t('К новым сообщениям: {0}',unseen):t('К новым сообщениям')} title={t('К новым сообщениям')} disabled={loading || busy} onClick={()=>{const el=scroll.current;if(fromStart||historyExpanded.current||!el){void jumpHistory(false);return;}nearBottom.current=true;scrollChatToLatest(el);lastScrollTop.current=el.scrollTop;setShowScrollActions(false);}}><ArrowDown size={20} aria-hidden="true"/>{unseen>0&&<span className="scroll-latest-count" aria-hidden="true">{unseen>99?'99+':unseen}</span>}</button>}
+        {(showScrollActions||fromStart)&&!readingMode&&<button className="scroll-latest" data-scrolling={scrolling||undefined} aria-label={unseen?t('К новым сообщениям: {0}',unseen):t('К новым сообщениям')} title={t('К новым сообщениям')} disabled={loading || busy} onClick={event=>{
+          const transcript=scroll.current;
+          const keyboardTrigger=event.detail===0?event.currentTarget:undefined;
+          if(fromStart||historyExpanded.current||!transcript){void jumpHistory(false,keyboardTrigger);return;}
+          nearBottom.current=true;
+          scrollChatToLatest(transcript);
+          lastScrollTop.current=transcript.scrollTop;
+          if(keyboardTrigger)focusLatestMessage(transcript);
+          setShowScrollActions(false);
+        }}><ArrowDown size={20} aria-hidden="true"/>{unseen>0&&<span className="scroll-latest-count" aria-hidden="true">{unseen>99?'99+':unseen}</span>}</button>}
         <ChatOverlay edge="bottom">
         {/* Hosts without the queue view still report how many follow-ups wait. */}
         {Boolean(job?.pendingInputIds?.length)&&!job?.queued&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}

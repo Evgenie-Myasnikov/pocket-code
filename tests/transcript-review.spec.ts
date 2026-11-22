@@ -22,10 +22,10 @@ test('edited turns render the answer without a changed-file chip',async({page})=
  await expect(page.getByText('Synthetic edit completed.',{exact:true})).toBeVisible();
  await expect(page.locator('.turn-changes')).toHaveCount(0);
 });
-async function open(page:import('@playwright/test').Page,mode?:'brief'|'detailed'){
+async function open(page:import('@playwright/test').Page,mode?:'brief'|'detailed',history=messages){
  await page.addInitScript(mode=>{sessionStorage.setItem('connection',JSON.stringify({url:'http://127.0.0.1:4319',token:'test-only-'.repeat(5)}));if(mode)localStorage.setItem('pocket-code-detail-mode-v1',mode);},mode);
  await page.route('**/api/sessions?*',r=>r.fulfill({json:[{sessionId:'review-test',summary:'Transcript review',cwd:'C:/Sample',lastModified:1}]}));
- await page.route('**/api/sessions/review-test/messages?*',r=>r.fulfill({json:{messages,previous:null,next:null}}));
+ await page.route('**/api/sessions/review-test/messages?*',r=>r.fulfill({json:{messages:history,previous:null,next:null}}));
  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openChatList(page);await page.getByRole('button',{name:/Transcript review/}).click();
 }
 test('brief transcript folds routine work, keeps errors, plan, changes and notices readable',async({page})=>{
@@ -46,14 +46,29 @@ test('brief transcript folds routine work, keeps errors, plan, changes and notic
  await page.screenshot({path:'.local/transcript-review.png'});
 });
 test('the round latest button replaces the two pills and the beginning lives in the menu',async({page})=>{
- await open(page,'detailed');
+ const earlier={id:'earlier',role:'assistant',blocks:[{type:'text',text:'An earlier paragraph of the conversation. '.repeat(100)}]};
+ await open(page,'detailed',[earlier,...messages]);
+ const transcript=page.locator('.conversation');
+ await expect(transcript.locator('[data-message-id="notice"]')).toBeAttached();
+ await expect.poll(()=>transcript.evaluate(el=>el.scrollTop)).toBeGreaterThan(300);
  await expect(page.locator('.chat-scroll-actions')).toHaveCount(0);
- await page.locator('.conversation').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
+ await transcript.hover();
+ await page.mouse.wheel(0,-360);
  const latest=page.getByRole('button',{name:/^Jump to latest messages/});
- if(await page.locator('.conversation').evaluate(el=>el.scrollHeight-el.clientHeight>80)){await expect(latest).toBeVisible();await latest.click();await expect(latest).toHaveCount(0);}
- await page.getByRole('button',{name:'More actions',exact:true}).click();await expect(page.getByRole('menuitem',{name:'Go to beginning'})).toBeFocused();
- await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitemradio',{name:'Brief'})).toBeFocused();await page.keyboard.press('ArrowUp');await page.keyboard.press('ArrowUp');await expect(page.getByRole('menuitemradio',{name:'Detailed'})).toBeFocused();
- await page.keyboard.press('Escape');await expect(page.getByRole('menu')).toHaveCount(0);await expect(page.getByRole('button',{name:'Back to chats',exact:true})).toBeVisible();
+ await expect(latest).toBeVisible();await latest.click();await expect(latest).toHaveCount(0);
+ const more=page.getByRole('button',{name:'More actions',exact:true});
+ await more.click();
+ const menu=page.getByRole('menu',{name:'More actions'});
+ const first=menu.getByRole('menuitem',{disabled:false}).first();
+ await expect(first).toBeFocused();
+ // Contextual actions precede reading and history navigation. ArrowUp from the first wraps to the last item.
+ await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitemradio',{name:'Detailed'})).toBeFocused();
+ await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitemradio',{name:'Brief'})).toBeFocused();
+ await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitem',{name:'Go to beginning'})).toBeFocused();
+ await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitem',{name:'Reading mode'})).toBeFocused();
+ await page.keyboard.press('ArrowDown');await expect(menu.getByRole('menuitem',{name:'Go to beginning'})).toBeFocused();
+ await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(more).toBeFocused();
+ await expect(page.getByRole('button',{name:'Back to chats',exact:true})).toBeVisible();
 });
 test('reasoning stays open while it is the newest block of a running turn and folds when the turn moves on',async({page})=>{
  await page.goto('http://127.0.0.1:5173');await page.locator('.mobile-tabbar:visible,.desktop-tabs:visible').first().waitFor();
