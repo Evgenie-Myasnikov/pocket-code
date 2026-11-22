@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased (0.28.57)
+## [0.28.57](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.56...v0.28.57) (2026-11-23)
+
+Published from [785d5a9](https://github.com/Evgenie-Myasnikov/pocket-code/commit/785d5a93c36d7c84dd1116e7fbe478f4902a1c7a) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Verified the tag, all four public download hashes, 163 identical UI assets across packages and Android signature continuity. The focused suite passed 131 unit tests and 17 browser tests. The desktop and phone streaming scenario also passed twice per layout. Physical Android and authenticated provider runs remain unverified.
 
 ### Bug Fixes
 
