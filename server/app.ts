@@ -49,6 +49,7 @@ import { EngineUpdates, pocketSource } from './engine-updates.js';
 import { coalesceReads } from './read-coalescer.js';
 import {jiraLoginPage,type JiraLogin} from './jira-login.js';
 import type {JiraConnection} from './jira-connection.js';
+import {TaskWorktrees} from './task-worktrees.js';
 import {TaskRuntime} from './task-runtime.js';
 import {MarkdownChains} from './markdown-chains.js';
 import {mountRunNotifications} from './run-notifications.js';
@@ -69,7 +70,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const workspaceAccess=await createWorkspaceAccess(path.join(config.uploads,'.boards','workspaces.json'));
   let taskRuntime:TaskRuntime|undefined;
   let taskChains:MarkdownChains;
-  const accessRoots=()=>workspaceAccess.current()?.ws.roots||[...roots,...(taskRuntime?.roots()||[])];
+  const chainRoots=new Set<string>();
+  const syncManagedRoots=(boardRoots:string[])=>{
+    const managed=[...boardRoots,...chainRoots];
+    config.codex?.setManagedTaskRoots?.(managed);config.copilot?.setManagedTaskRoots?.(managed);
+  };
+  const accessRoots=()=>workspaceAccess.current()?.ws.roots||[...roots,...chainRoots,...(taskRuntime?.roots()||[])];
   const visibleRoot=(_cwd?:string)=>!workspaceAccess.current();
   const codex = () => { if (!config.codex) throw new HttpError(503, 'Codex is unavailable. Update and restart the PC bridge.'); return config.codex; };
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
@@ -183,7 +189,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   mountSpeech(app,path.join(path.dirname(config.uploads),'speech'));
   mountMiro(app,{integration:new MiroIntegration(new WindowsMiroStore(path.join(config.uploads,'.miro','credentials.vault'))),roots,access:workspaceAccess});
-  taskRuntime=new TaskRuntime({directory:path.join(config.uploads,'.tasks'),roots,access:workspaceAccess,jobs:()=>allJobs().map(job=>jobView(job.id)),managedRoots:managed=>{config.codex?.setManagedTaskRoots?.(managed);config.copilot?.setManagedTaskRoots?.(managed);}});
+  taskRuntime=new TaskRuntime({directory:path.join(config.uploads,'.tasks'),roots,access:workspaceAccess,jobs:()=>allJobs().map(job=>jobView(job.id)),managedRoots:syncManagedRoots});
   await taskRuntime.initialize();taskRuntime.mount(app);
   const disposeNotifications=mountRunNotifications(app,{file:path.join(config.uploads,'.notifications','runs.json'),jobs:()=>allJobs().map(job=>jobView(job.id)),external:()=>config.runs?.events(0)||[]});
   const sourceRoot = await pocketSource(roots);
@@ -640,13 +646,15 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     return engineFor(settings.provider).start({...settings,...turn,approvalTimeoutMs:settings.approvalTimeoutMinutes*60000,...(env?{env}:{})});
   }
   taskChains=new MarkdownChains({
+    registerTree:cwd=>{chainRoots.add(cwd);syncManagedRoots(taskRuntime?.roots()??[]);},
+    worktrees:new TaskWorktrees(path.join(config.uploads,'.tasks','chain-worktrees'),roots),
     file:path.join(config.uploads,'.tasks','markdown-chains'),
     accountName:id=>customProviders.name(id).catch(()=>undefined),
     view:id=>{
       try{return jobView(id);}catch(error){if(error instanceof HttpError&&error.status===404)return undefined;throw error;}
     },
     stop:id=>engineForJob(id).stop(id),
-    start:async(input,id,prompt)=>{
+    start:async(input,id,prompt,verifiedCwd)=>{
       const settings=jobSettings.parse(input);
       const cwd=await allowedPath(accessRoots(),settings.cwd,true);
       validateJobSettings(settings);
@@ -663,7 +671,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
         message='Run the single chain step described in the attached markdown-step.md file.';
       }
       const text=attachmentPaths.length?message+'\n\nFiles attached by the user (read these local files as needed):\n'+JSON.stringify(attachmentPaths[0]):message;
-      return launchJob(settings,{id,cwd,text,displayText:message,attachmentPaths,baseMessageCount:0});
+      return launchJob(settings,{id,cwd:verifiedCwd??cwd,text,displayText:message,attachmentPaths,baseMessageCount:0});
     },
   });
   const scopeSchema=jobSettings.pick({cwd:true,provider:true,account:true});
@@ -688,7 +696,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const match=z.object({sessionId:z.string().min(1).max(512).optional(),jobId:uuid.optional()}).parse(req.query);
     res.json(match.jobId||match.sessionId?await taskChains.findStep(scope,match):await taskChains.list(scope));
   });
-  app.get('/api/task-chains/:id',async(req,res)=>res.json(await taskChains.get(uuid.parse(req.params.id),await chainScope(req.query))));
+  app.get('/api/task-chains/:id',async(req,res)=>res.json(req.query.audit==='1'?await taskChains.audit(uuid.parse(req.params.id),await chainScope(req.query)):await taskChains.get(uuid.parse(req.params.id),await chainScope(req.query))));
   app.post('/api/task-chains/:id/stop',async(req,res)=>res.json(await taskChains.stop(uuid.parse(req.params.id),await chainScope(req.body))));
   app.post('/api/task-chains/:id/delete',async(req,res)=>res.json(await taskChains.remove(uuid.parse(req.params.id),await chainScope(req.body))));
   app.post('/api/jobs', async (req, res) => {

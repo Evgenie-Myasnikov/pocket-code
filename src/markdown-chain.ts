@@ -4,6 +4,10 @@ export type MarkdownChainStep = {
   body: string;
   source: string;
   status: 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
+  branch?: string;
+  worktreeCwd?: string;
+  baseCommit?: string;
+  headCommit?: string;
   retryCount?: number;
   retryAt?: number;
   retryReport?: string;
@@ -50,6 +54,7 @@ export function buildChainStepPrompt(chain: MarkdownChainDetail, index: number) 
   if (index > 0 && chain.steps[index - 1].handoff) {
     sections.push(`Previous step: ${chain.steps[index - 1].title}\n${chain.steps[index - 1].handoff}`);
   }
+  if (step.branch) sections.push('Work in the assigned Git worktree on '+step.branch+'. Commit only the intended step changes before confirming completion. Leave integration and merging to the user.');
   if (step.retryCount) sections.push(
     `Continue the unfinished step. Inspect existing changes and rerun outstanding checks. Avoid repeating completed work. Previous attempt report:\n${step.retryReport || "(no report)"}`
   );

@@ -39,20 +39,36 @@ export class TaskWorktrees{
     if(!runIdPattern.test(id))throw new HttpError(400,'Invalid task run identifier.');
     return path.join(home,createHash('sha256').update(key(repositoryRoot)).digest('hex').slice(0,20),id);
   }
-  create(runId:string,input:string):Promise<TaskWorktree>{
+  async hasRepository(cwd:string){
+    try { return (await git(cwd,['rev-parse','--is-inside-work-tree'])).trim()==='true'; }
+    catch(error:any){if(/not a git repository/i.test(error.stderr))return false;throw error;}
+  }
+  async diff(tree:TaskWorktree,base:string,head:string){
+    const cwd=await this.verify(tree);
+    if(![base,head].every(ref=>/^[a-f0-9]{40,64}$/.test(ref)))throw new HttpError(400,'Invalid audit commits.');
+    return git(cwd,['diff','--no-ext-diff','--no-textconv',base,head,'--'],[],32_000_000);
+  }
+  async completedHead(tree:TaskWorktree) {
+    const cwd=await this.verify(tree);
+    if((await git(cwd,['status','--porcelain'],await filterOverrides(cwd))).trim())return;
+    await git(cwd,['merge-base','--is-ancestor',tree.baseCommit,'HEAD']);
+    return (await git(cwd,['rev-parse','HEAD'])).trim();
+  }
+  create(runId:string,input:string,fromCommit?:string):Promise<TaskWorktree>{
     if(!runIdPattern.test(runId))return Promise.reject(new HttpError(400,'Invalid task run identifier.'));
     const pending=this.pending.get(runId);if(pending)return pending;
-    const request=this.createIsolated(runId,input).finally(()=>this.pending.delete(runId));
+    const request=this.createIsolated(runId,input,fromCommit).finally(()=>this.pending.delete(runId));
     this.pending.set(runId,request);return request;
   }
-  private async createIsolated(runId:string,input:string):Promise<TaskWorktree>{
+  private async createIsolated(runId:string,input:string,fromCommit?:string):Promise<TaskWorktree>{
     const projectPath=await allowedPath(this.roots,input,true);
     let repositoryRoot:string,baseCommit:string;
     try{
       repositoryRoot=await realpath((await git(projectPath,['rev-parse','--show-toplevel'])).trim());
       // Do not widen a shared subfolder to otherwise unshared siblings.
       await allowedPath(this.roots,repositoryRoot,true);
-      baseCommit=(await git(repositoryRoot,['rev-parse','--verify','HEAD^{commit}'])).trim();
+      if(fromCommit && !/^[0-9a-f]{40,64}$/.test(fromCommit))throw new Error('Invalid parent commit');
+      baseCommit=(await git(repositoryRoot,['rev-parse','--verify',(fromCommit || 'HEAD')+'^{commit}'])).trim();
       if(!/^[0-9a-f]{40,64}$/i.test(baseCommit))throw new Error('Invalid commit');
     }catch(error){if(error instanceof HttpError)throw error;throw new HttpError(400,'An isolated task requires a Git repository with a committed HEAD.');}
     const home=await this.home();

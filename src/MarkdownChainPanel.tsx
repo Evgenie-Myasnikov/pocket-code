@@ -13,6 +13,7 @@ export type MarkdownChainControls = {
   detail(id:string):Promise<MarkdownChainDetail>;
   start(input:{id:string;name:string;context:string;tasks:{title:string;source:string;body:string}[]}):Promise<MarkdownChainDetail>;
   stop(id:string):Promise<MarkdownChainDetail>;
+  audit?(id:string):Promise<{diff:string}>;
   remove?(id:string):Promise<void>;
   openChat(step:MarkdownChainDetail['steps'][number]):void;
 };
@@ -41,6 +42,7 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
   const [summaries,setSummaries]=useState<MarkdownChainSummary[]>();
   const [expanded,setExpanded]=useState<number|null>(null);
   const [error,setError]=useState(''),[stopError,setStopError]=useState(''),[stopping,setStopping]=useState(false);
+  const [audit,setAudit]=useState<{id:string;text:string}>();
   const [refresh,setRefresh]=useState(0);
   const [confirmDelete,setConfirmDelete]=useState(false),[deleting,setDeleting]=useState(false);
   const confirmRoot=useRef<HTMLElement>(null),deleteLock=useRef(false);
@@ -120,6 +122,7 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
       {(!id&&!summaries||id&&!detail)&&!error&&<p role="status">{ru?'Загрузка…':'Loading…'}</p>}
       {detail&&<>
         {detail.status!=='running'&&<p className="chain-outcome">{statusLabel(detail.status,ru)}</p>}
+        {detail.status==='done'&&detail.steps[0]?.baseCommit&&detail.steps.at(-1)?.headCommit&&<details><summary>{ru?'Финальный аудит и слияние':'Final review and merge'}</summary>{controls.audit&&<button type="button" onClick={async()=>{try{const result=await controls.audit!(detail.id);setAudit({id:detail.id,text:result.diff||(ru?'Без изменений':'No changes')});}catch(e){setError(String(e));}}}>{ru?'Показать общий diff':'Show cumulative diff'}</button>}{audit?.id===detail.id&&<pre tabIndex={0}>{audit.text}</pre>}<p>{ru?'В целевой ветке проверьте общий diff, затем выполните одно слияние.':'In the target branch, review the cumulative diff, then merge once.'}</p><pre>{'git diff '+detail.steps[0].baseCommit+' '+detail.steps.at(-1)?.headCommit+'\ngit merge --no-ff '+detail.steps.at(-1)?.headCommit}</pre></details>}
         {activeIndex>=3&&<button type="button" className="chain-jump text-button" onClick={()=>{currentStep.current?.scrollIntoView({block:'center'});currentStep.current?.focus({preventScroll:true});}}>{ru?'К текущему шагу':'Go to current step'} · {activeIndex+1}</button>}
         <ol className="chain-steps">{detail.steps.map((step,i)=>{
           const isActive=activeIndex===i;
@@ -132,6 +135,7 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
           <div className="chain-node" aria-hidden="true">{step.status==='done'?<Check size={15}/>:i+1}</div>
           <div className="chain-step">
             <div className="chain-step-heading"><h3>{step.title}</h3><span className="chain-state">{step.retryAt ? (ru ? 'Ожидает повтора' : 'Retry scheduled') : statusLabel(step.status,ru)}{step.retryCount ? ` · ${ru ? 'Попытка' : 'Attempt'} ${step.retryCount + 1}` : ''}</span></div>
+            {step.branch&&<small>{step.branch}</small>}
             {step.error&&<p className="chain-step-error">{step.error}</p>}
             {isActive&&<div className="task-live-response">
               <div className="task-phase"><strong>{executionProvider}</strong>

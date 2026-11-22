@@ -899,13 +899,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const chainControls:MarkdownChainControls|undefined=connection&&!connection.workspaceId&&!demo&&taskCwd?{
     cwd:taskCwd,canStart:canRun,
     list:()=>api('/task-chains?'+chainQuery),
+    audit:id=>api('/task-chains/'+encodeURIComponent(id)+'?'+chainQuery+'&audit=1'),
     detail:id=>api('/task-chains/'+encodeURIComponent(id)+'?'+chainQuery),
     start:input=>api('/task-chains',{...launchOptions(),...chainScope,...input}),
     remove:id=>api('/task-chains/'+encodeURIComponent(id)+'/delete',chainScope),
     stop:id=>api('/task-chains/'+encodeURIComponent(id)+'/stop',chainScope),
     openChat:step=>{
       if(!step.sessionId&&!step.jobId)return;
-      const target:Session={sessionId:step.sessionId||'pending-'+step.jobId,cwd:taskCwd,provider,summary:step.title,lastModified:Date.now(),...(account?{account}:{})};
+      const target:Session={sessionId:step.sessionId||'pending-'+step.jobId,cwd:step.worktreeCwd||taskCwd,provider,summary:step.title,lastModified:Date.now(),...(account?{account}:{})};
       const live=step.sessionId&&jobs.find(run=>run.sessionId===step.sessionId&&run.status==='running');
       const active=live?live.id:(!step.sessionId||step.status==='running'||step.status==='waiting'?step.jobId:undefined);
       if(embedded?.onOpenChainChat)embedded.onOpenChainChat(target,active);

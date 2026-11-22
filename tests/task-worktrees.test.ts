@@ -69,3 +69,22 @@ test('creating and fingerprinting a worktree does not execute Git hooks or filte
   const task=await worktrees.create(randomUUID(),source);await writeFile(path.join(task.cwd,'code.txt'),'changed\n');await worktrees.snapshot(task);
   await assert.rejects(access(marker));assert.equal(fixtureGit(source,'config','filter.fixture.clean'),command);
 });
+
+test('stacked branches preserve both steps for a single reviewed merge',async t=>{
+  const {source,worktrees}=await taskFixture(t);
+  const first=await worktrees.create(randomUUID(),source);
+  await writeFile(path.join(first.cwd,'first.txt'),'first');
+  assert.equal(await worktrees.completedHead(first),undefined);
+  fixtureGit(first.cwd,'add','first.txt');fixtureGit(first.cwd,'commit','-m','First step');
+  const parent=await worktrees.completedHead(first);
+  assert.ok(parent);
+  const second=await worktrees.create(randomUUID(),source,parent);
+  await writeFile(path.join(second.cwd,'second.txt'),'second');
+  fixtureGit(second.cwd,'add','second.txt');fixtureGit(second.cwd,'commit','-m','Second step');
+  const tip=await worktrees.completedHead(second);assert.ok(tip);
+  const patch=await worktrees.diff(second,first.baseCommit,tip);
+  assert.match(patch,/first.txt/);assert.match(patch,/second.txt/);
+  assert.equal(fixtureGit(source,'rev-parse','HEAD'),first.baseCommit);
+  fixtureGit(source,'merge','--no-ff','-m','Reviewed chain',tip);
+  assert.equal(fixtureGit(source,'rev-parse','HEAD^2'),tip);
+});

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- Git-backed Markdown chains run new steps on separate local branches based on the previous verified commit. Retries reuse the worktree. Final review shows the cumulative diff and the exact command for a single manual merge. Non-Git projects keep their existing workflow. TypeScript and Vite passed. A two-step Git fixture verified the cumulative diff and merge. Physical-device and live provider checks remain open.
+
 ## [0.28.53](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.52...v0.28.53) (2026-11-22)
 
 Published [0.28.53](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.53) from [bb22e43b2f3bb75d1972c19e3967cd9e8bbc4e6f](https://github.com/Evgenie-Myasnikov/pocket-code/commit/bb22e43b2f3bb75d1972c19e3967cd9e8bbc4e6f) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). All four public downloads matched the audited SHA-256 hashes, all 163 UI files matched across packages, and the APK signer matched 0.28.52. Android version code 140. Physical-device verification remains open.

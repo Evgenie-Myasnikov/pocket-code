@@ -20,12 +20,15 @@ type LaunchSettings = {
   approvalTimeoutMinutes?: number;
 };
 export type ChainInput = ChainScope & LaunchSettings & {id: string; name: string; context: string; tasks: Task[]};
-type RecordV1 = {version: 1; created: number; fingerprint: string; settings: LaunchSettings; chain: MarkdownChainDetail};
+type RecordV1 = { stacked?:boolean; trees?:Record<number,TaskWorktree>;version: 1; created: number; fingerprint: string; settings: LaunchSettings; chain: MarkdownChainDetail};
 type DeletedRecord = {version: 1; deletedScope: string};
+import type {TaskWorktree,TaskWorktrees} from './task-worktrees.js';
 type Options = {
+  worktrees?:TaskWorktrees;
+  registerTree?(cwd:string):void;
   file: string;
   accountName?(id: string): Promise<string | undefined>;
-  start(input: ChainInput, jobId: string, prompt: string): Promise<JobView> | JobView;
+  start(input: ChainInput, jobId: string, prompt: string, verifiedCwd?:string): Promise<JobView> | JobView;
   view(jobId: string): Promise<JobView | undefined> | JobView | undefined;
   stop(jobId: string): Promise<void> | void;
   intervalMs?: number;
@@ -116,6 +119,9 @@ export class MarkdownChains {
         throw new Error('Cannot restore Markdown chain record.');
       // A durable launch intent might already have reached the provider. Never
       // replay it after restart, even if its session ID had not arrived yet.
+      for(const tree of Object.values(record.trees??{})){
+        try{const cwd=await this.options.worktrees?.verify(tree);if(cwd)this.options.registerTree?.(cwd);}catch{/* Missing trees never grant access. */}
+      }
       const hadLinks = record.chain.steps.some(s => s.jobId);
       for (const step of record.chain.steps) delete step.jobId;
       if (record.chain.status === 'running' && record.chain.steps.some(s => s.retryAt !== undefined)) {
@@ -177,6 +183,7 @@ export class MarkdownChains {
         return this.detail(previous);
       }
       const record: RecordV1 = {version: 1, created: Date.now(), fingerprint, settings, chain};
+      record.stacked = await this.options.worktrees?.hasRepository(input.cwd);
       if (chain.account) chain.accountName = await this.options.accountName?.(chain.account);
       await this.save(record);
       this.schedule();
@@ -191,10 +198,10 @@ export class MarkdownChains {
   async findStep(scope: ChainScope, match: {sessionId?: string; jobId?: string}) {
     await this.init();
     for (const {chain} of this.records.values()) {
-      if (!sameScope(chain, scope)) continue;
+      if (chain.provider!==scope.provider || chain.account!==scope.account) continue;
       const stepIndex = chain.steps.findIndex(step =>
         (match.sessionId && step.sessionId === match.sessionId) || (match.jobId && step.jobId === match.jobId));
-      if (stepIndex >= 0) return [{...summary(chain), stepIndex}];
+      if (stepIndex >= 0 && (chain.cwd===scope.cwd || chain.steps[stepIndex].worktreeCwd===scope.cwd)) return [{...summary(chain), stepIndex}];
     }
     return [];
   }
@@ -202,6 +209,13 @@ export class MarkdownChains {
     const record = this.records.get(id.toLowerCase());
     if (!record || !sameScope(record.chain, scope)) throw new HttpError(404, 'Task chain not found.');
     return record;
+  }
+  async audit(id:string,scope:ChainScope){
+    await this.init();
+    const record=this.record(id,scope),steps=record.chain.steps;
+    const tree=record.trees?.[steps.length-1],base=steps[0]?.baseCommit,head=steps.at(-1)?.headCommit;
+    if(record.chain.status!=='done'||!tree||!base||!head||!this.options.worktrees)throw new HttpError(409,'No completed branch chain to review.');
+    return {diff:await this.options.worktrees.diff(tree,base,head)};
   }
   async get(id: string, scope: ChainScope) {
     await this.init();
@@ -246,6 +260,7 @@ export class MarkdownChains {
         const job = await this.options.view(step.jobId);
         if (job) {
           this.observe(record.chain, step, job);
+          await this.verifyStep(record,record.chain.steps.indexOf(step));
           if (job.status === 'running') await this.options.stop(step.jobId);
         } else delete step.jobId;
       }
@@ -284,6 +299,18 @@ export class MarkdownChains {
     step.status = job.status === 'stopped' ? 'stopped' : 'failed';
     chain.status = step.status;
   }
+  private async verifyStep(record:RecordV1,index:number) {
+    const step=record.chain.steps[index],tree=record.trees?.[index];
+    if(step.status!=='done'||!tree)return;
+    const head=await this.options.worktrees!.completedHead(tree);
+    if(head){step.headCommit=head;return;}
+    delete step.handoff;
+    step.status='pending';
+    record.chain.status='running';
+    step.retryCount=(step.retryCount??0)+1;
+    step.retryReport='Commit the outstanding intended changes in the assigned worktree before completing this step.';
+    step.retryAt=Date.now()+2000;
+  }
   private async advance(saved: RecordV1) {
     let record = structuredClone(saved);
     let chain = record.chain;
@@ -305,6 +332,7 @@ export class MarkdownChains {
         step.status = 'failed'; step.error = 'The host lost the job. Check the chat before repeating this task.';
         chain.status = 'failed';
       } else this.observe(chain, step, job);
+      await this.verifyStep(record,index);
       const old = saved.chain.steps[index];
       if (step.status !== old.status || step.sessionId !== old.sessionId) await this.save(record);
       return;
@@ -318,7 +346,17 @@ export class MarkdownChains {
       const {id, name, context, cwd, provider, account} = chain;
       const input = {id, name, context, cwd, provider, account, ...record.settings,
         tasks: chain.steps.map(({title, source, body}) => ({title, source, body}))};
-      const job = await this.options.start(input, jobId, buildChainStepPrompt(chain, index));
+      if(record.stacked){
+        const trees=record.trees??={};
+        const manager=this.options.worktrees!;
+        const tree=trees[index]??=await manager.create(jobId,cwd,chain.steps[index-1]?.headCommit);
+        current.branch=tree.branch;
+        current.baseCommit=tree.baseCommit;
+        current.worktreeCwd=await manager.verify(tree);
+        this.options.registerTree?.(current.worktreeCwd);
+        await this.save(structuredClone(record));
+      }
+      const job = await this.options.start(input, jobId, buildChainStepPrompt(chain, index),record.trees?.[index]?.cwd);
       this.observe(chain, current, job);
     } catch (error) {
       const started = await this.options.view(jobId);
@@ -330,6 +368,7 @@ export class MarkdownChains {
         chain.status = 'failed';
       }
     }
+    await this.verifyStep(record,index);
     await this.save(record);
   }
   async tick() {
