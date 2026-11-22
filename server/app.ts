@@ -1,4 +1,5 @@
 import {mountSpeech} from './speech.js';
+import {generateClaudeText,mountTaskText,textProviders,type TextProvider} from './task-text.js';
 import {claudeRuntime,updateInstalledClaude} from './claude-executable.js';
 import {ChatLibrary} from './chat-library.js';
 import {BoardMcpRuntime} from './board-mcp-runtime.js';
@@ -48,6 +49,7 @@ import { coalesceReads } from './read-coalescer.js';
 import {jiraLoginPage,type JiraLogin} from './jira-login.js';
 import type {JiraConnection} from './jira-connection.js';
 import {TaskRuntime} from './task-runtime.js';
+import {MarkdownChains} from './markdown-chains.js';
 import {mountRunNotifications} from './run-notifications.js';
 import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
@@ -65,13 +67,15 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   jobs.setBoardMcpConfiguration(boardMcp.configuration);config.codex?.setBoardMcpConfiguration?.(boardMcp.configuration);config.copilot?.setBoardMcpConfiguration?.(boardMcp.configuration);
   const workspaceAccess=await createWorkspaceAccess(path.join(config.uploads,'.boards','workspaces.json'));
   let taskRuntime:TaskRuntime|undefined;
+  let taskChains:MarkdownChains;
   const accessRoots=()=>workspaceAccess.current()?.ws.roots||[...roots,...(taskRuntime?.roots()||[])];
   const visibleRoot=(_cwd?:string)=>!workspaceAccess.current();
   const codex = () => { if (!config.codex) throw new HttpError(503, 'Codex is unavailable. Update and restart the PC bridge.'); return config.codex; };
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
   const engineFor=(provider:string)=>provider==='copilot'?copilot():provider==='codex'?codex():jobs;
   const allJobs = () => [...jobs.list(), ...(config.codex?.list() || []),...(config.copilot?.list()||[])];
-  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status()},id=>allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();},()=>copilot().logout());
+  const textInFlight=new Set<TextProvider>();
+  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status()},id=>(id!=='codex'&&textInFlight.has(id))||allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!taskChains?.hasWork()||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();},()=>copilot().logout());
   const jobView = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot.get(id):config.codex?.list().some(j => j.id === id) ? config.codex.view(config.codex.get(id)) : jobs.view(jobs.get(id));
   const engineForJob = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot:config.codex?.list().some(j => j.id === id) ? config.codex : jobs;
   function guardProject(cwd: string, id: string) {
@@ -146,10 +150,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/devices',(_req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');res.json(devices().list());});
   app.post('/api/devices/:id/disconnect',async(req,res)=>{if(!res.locals.deviceAdmin)throw new HttpError(403,'Manage devices from the PC application.');await devices().revoke(uuid.parse(req.params.id));await config.refreshPairing?.();res.json({ok:true});});
   let activeMutations = 0, runtimeStopping = false, jiraChanging=false;
-  const isBusy = () => activeMutations > 0 || !!taskRuntime?.hasWork() || providerConnections.isSigningIn() || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!copilotQueue?.hasWork() || !!workflow?.isBusy();
+  const isBusy = () => activeMutations > 0 || textInFlight.size>0 || !!taskChains?.hasWork() || !!taskRuntime?.hasWork() || providerConnections.isSigningIn() || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!copilotQueue?.hasWork() || !!workflow?.isBusy();
   app.use('/api', (req, res, next) => {
     if (req.method === 'GET' || req.path === '/runtime/stop') { next(); return; }
-    if(providerConnections.isSigningIn()&&['/jobs','/terminals','/jira/start','/jira/queue','/jira/queue/control','/jira/workflow/action','/jira/workflow/recover','/copilot/login'].includes(req.path)){res.status(409).json({error:'Complete provider sign-in before starting new work.'});return;}
+    if(providerConnections.isSigningIn()&&['/jobs','/task-chains','/task-text/improve','/terminals','/jira/start','/jira/queue','/jira/queue/control','/jira/workflow/action','/jira/workflow/recover','/copilot/login'].includes(req.path)){res.status(409).json({error:'Complete provider sign-in before starting new work.'});return;}
     if(jiraChanging){res.status(409).json({error:'The Jira connection is changing. Please retry shortly.'});return;}
     if (runtimeStopping) { res.status(503).json({ error: 'The PC server is stopping.' }); return; }
     if (req.path.startsWith('/host-update/')) { next(); return; }
@@ -158,9 +162,18 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     let released = false; const release = () => { if (!released) { released = true; activeMutations--; } };
     const end = res.end;
     res.end = function (this: express.Response, ...args: any[]) { try { return (end as any).apply(this, args); } finally { release(); } } as typeof res.end;
-    res.once('finish', release); next();
+    res.once('finish', release); res.once('close',release); next();
   });
   await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}},boardMcp,path.join(config.uploads,'.boards','backups'));
+  const closeText=mountTaskText(app,{
+    busy:textInFlight,allowProject:cwd=>allowedPath(accessRoots(),cwd,true),
+    providers:async()=>{
+      const {providers}=await providerConnections.status();
+      return textProviders.filter(id=>(id!=='copilot'||!!config.copilot)&&providers.some((p:{id:string;installed:boolean;authenticated:boolean|null;server:string})=>
+        p.id===id&&p.installed&&p.authenticated===true&&p.server!=='unavailable'));
+    },
+    generate:{claude:generateClaudeText,...(config.copilot?{copilot:config.copilot.generateTaskText?.bind(config.copilot)}:{})}
+  });
   mountSpeech(app,path.join(path.dirname(config.uploads),'speech'));
   mountMiro(app,{integration:new MiroIntegration(new WindowsMiroStore(path.join(config.uploads,'.miro','credentials.vault'))),roots,access:workspaceAccess});
   taskRuntime=new TaskRuntime({directory:path.join(config.uploads,'.tasks'),roots,access:workspaceAccess,jobs:()=>allJobs().map(job=>jobView(job.id)),managedRoots:managed=>{config.codex?.setManagedTaskRoots?.(managed);config.copilot?.setManagedTaskRoots?.(managed);}});
@@ -592,14 +605,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if (job.messagesRevision !== undefined && String(job.messagesRevision) === req.query.messages) { res.json({ ...job, messages: [], messagesUnchanged: true }); return; }
     res.json(job);
   });
-  app.post('/api/jobs', async (req, res) => {
-    const body = z.object({ provider: providerSchema, id: uuid, cwd: text, sessionId: uuid.optional(), text: z.string().max(100000),
-      attachments: z.array(uuid).max(10).default([]), model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
+  const jobSettings = z.object({provider:providerSchema, cwd:text, account:uuid.optional(),
+      model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
       claudeEffort:z.enum(['low','medium','high','xhigh','max']).optional(),claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
-      approvalTimeoutMinutes: z.union([z.literal(0), z.literal(10), z.literal(60)]).default(0), account:uuid.optional(), taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
-    const cwd = await allowedPath(accessRoots(), body.cwd, true);
-    const engine = engineFor(body.provider);
+      approvalTimeoutMinutes: z.union([z.literal(0), z.literal(10), z.literal(60)]).default(0)});
+  type JobSettings=z.infer<typeof jobSettings>;
+  function validateJobSettings(body:JobSettings) {
     if (body.provider !== 'codex' && body.reasoningEffort) throw new HttpError(400, 'Reasoning effort is available for Codex chats only.');
     // A custom provider runs the same Claude Code agent with that provider's URL, key and chosen model.
     if (body.account) {
@@ -608,6 +620,75 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       if (!body.model) throw new HttpError(400, 'Choose a model from the provider catalog');
       if (body.claudeEffort) throw new HttpError(400, 'Effort levels are not available for custom providers');
     }
+  }
+  async function validateJobEffort(body:JobSettings,cwd:string) {
+    if(body.claudeEffort){
+      if(body.provider!=='claude')throw new HttpError(400,'Claude effort is only available for Claude');
+      const catalog=await claudeCatalog.read(cwd);
+      const selected=catalog.models.find(model=>body.model?model.id===body.model:model.isDefault);
+      if(catalog.source!=='sdk'||!selected?.reasoningEfforts?.includes(body.claudeEffort))throw new HttpError(400,'This Claude model does not advertise the selected effort. Refresh its model catalog.');
+    }
+  }
+  async function launchJob(settings:JobSettings,turn:{id:string;cwd:string;text:string;displayText:string;attachmentPaths:string[];sessionId?:string;baseMessageCount:number}) {
+    const env=settings.account?await customProviders.agentEnv(settings.account,settings.model):undefined;
+    return engineFor(settings.provider).start({...settings,...turn,approvalTimeoutMs:settings.approvalTimeoutMinutes*60000,...(env?{env}:{})});
+  }
+  taskChains=new MarkdownChains({
+    file:path.join(config.uploads,'.tasks','markdown-chains'),
+    view:id=>{
+      try{return jobView(id);}catch(error){if(error instanceof HttpError&&error.status===404)return undefined;throw error;}
+    },
+    stop:id=>engineForJob(id).stop(id),
+    start:async(input,id,prompt)=>{
+      const settings=jobSettings.parse(input);
+      const cwd=await allowedPath(accessRoots(),settings.cwd,true);
+      validateJobSettings(settings);
+      await validateJobEffort(settings,cwd);
+      if(providerConnections.isSigningIn()||runtimeStopping||config.hostUpdater?.draining)throw new HttpError(409,'The host is unavailable to start this step.');
+      let message=prompt;
+      const attachmentPaths:string[]=[];
+      if(prompt.length>60000){
+        const directory=path.join(config.uploads,id);
+        await mkdir(directory,{recursive:true});
+        const file=path.join(directory,'markdown-step.md');
+        await writeFile(file,prompt,{flag:'wx',mode:0o600});
+        attachmentPaths.push(file);
+        message='Run the single chain step described in the attached markdown-step.md file.';
+      }
+      const text=attachmentPaths.length?message+'\n\nFiles attached by the user (read these local files as needed):\n'+JSON.stringify(attachmentPaths[0]):message;
+      return launchJob(settings,{id,cwd,text,displayText:message,attachmentPaths,baseMessageCount:0});
+    },
+  });
+  const scopeSchema=jobSettings.pick({cwd:true,provider:true,account:true});
+  async function chainScope(input:unknown){
+    const scope=scopeSchema.parse(input);
+    return {...scope,cwd:await allowedPath(accessRoots(),scope.cwd,true)};
+  }
+  const chainSize=1024*1024;
+  const chainPlanSchema=jobSettings.extend({id:uuid,name:z.string().min(1).max(512),context:z.string().max(chainSize),
+    tasks:z.array(z.object({title:z.string().min(1).max(4096),source:z.string().min(1).max(4096),body:z.string().min(1).max(chainSize)})).min(1).max(500)
+  }).refine(plan=>plan.context.length+plan.tasks.reduce((total,step)=>total+step.title.length+step.body.length+step.source.length,0)<=chainSize,'The chain exceeds the character limit.');
+  app.post('/api/task-chains',async(req,res)=>{
+    const plan=chainPlanSchema.parse(req.body);
+    const scope=await chainScope(plan);
+    engineFor(plan.provider);
+    validateJobSettings(plan);
+    await validateJobEffort(plan,scope.cwd);
+    res.json(await taskChains.create({...plan,...scope}));
+  });
+  app.get('/api/task-chains',async(req,res)=>{
+    const scope=await chainScope(req.query);
+    const match=z.object({sessionId:z.string().min(1).max(512).optional(),jobId:uuid.optional()}).parse(req.query);
+    res.json(match.jobId||match.sessionId?await taskChains.findStep(scope,match):await taskChains.list(scope));
+  });
+  app.get('/api/task-chains/:id',async(req,res)=>res.json(await taskChains.get(uuid.parse(req.params.id),await chainScope(req.query))));
+  app.post('/api/task-chains/:id/stop',async(req,res)=>res.json(await taskChains.stop(uuid.parse(req.params.id),await chainScope(req.body))));
+  app.post('/api/jobs', async (req, res) => {
+    const body = jobSettings.extend({id:uuid,sessionId:uuid.optional(),text:z.string().max(100000),attachments:z.array(uuid).max(10).default([]),
+      taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed:z.boolean().default(false)}).parse(req.body);
+    const cwd=await allowedPath(accessRoots(),body.cwd,true);
+    engineFor(body.provider);
+    validateJobSettings(body);
     const replyToRetry=async(existing:ReturnType<typeof allJobs>[number])=>{
       if((existing.provider||'claude')!==body.provider||await realpath(existing.cwd)!==cwd||body.sessionId&&existing.sessionId&&body.sessionId!==existing.sessionId)throw new HttpError(409,'This request identifier belongs to another chat or project.');
       if(body.taskRunId){const run=await taskRuntime!.get(body.taskRunId);if(run.jobId!==existing.id||run.worktree?.cwd!==cwd)throw new HttpError(409,'This request identifier belongs to another task run.');}
@@ -615,12 +696,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     };
     const existing = allJobs().find(j => j.id === body.id);
     if (existing) { await replyToRetry(existing);return; }
-    if(body.claudeEffort){
-      if(body.provider!=='claude')throw new HttpError(400,'Claude effort is only available for Claude');
-      const catalog=await claudeCatalog.read(cwd);
-      const selected=catalog.models.find(model=>body.model?model.id===body.model:model.isDefault);
-      if(catalog.source!=='sdk'||!selected?.reasoningEfforts?.includes(body.claudeEffort))throw new HttpError(400,'This Claude model does not advertise the selected effort. Refresh its model catalog.');
-    }
+    await validateJobEffort(body,cwd);
     if (body.sessionId) {
       const s = await session(body.sessionId, body.provider);
       if (await realpath(s.cwd!) !== cwd) throw new HttpError(400, 'Чат относится к другому проекту');
@@ -638,8 +714,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(body.taskRunId)guardProject(cwd,body.id);
     if(body.sessionId && (allJobs().some(job=>job.id!==body.id && job.status==='running' && (job.provider||'claude')===body.provider && job.sessionId===body.sessionId) || body.provider==='claude' && terminals.list().some(terminal=>terminal.status==='running' && terminal.sessionId===body.sessionId))) throw new HttpError(409,'This chat is already running. Send a follow-up to its active turn.');
     const bound=await taskRuntime!.bindJob({...body,cwd});
-    const env = body.account ? await customProviders.agentEnv(body.account, body.model) : undefined;
-    try {res.json(engine.start({ ...body, cwd, text: prompt, attachmentPaths: attached.map(f => f.path), baseMessageCount, displayText: body.text, approvalTimeoutMs: body.approvalTimeoutMinutes * 60000, ...(env ? { env } : {}) }));}
+    try {res.json(await launchJob(body,{id:body.id,cwd,sessionId:body.sessionId,text:prompt,displayText:body.text,attachmentPaths:attached.map(f=>f.path),baseMessageCount}));}
     catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
   });
   app.post('/api/jobs/:id/messages',async(req,res)=>{
@@ -754,7 +829,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       engine.start({id,cwd:sourceRoot,text:prompt,displayText:'Check Pocket Code compatibility after an AI runtime update.',mode:'default',codexAccess:'full',maxBudgetUsd:5});
     });
   }
-  const closeTaskServices=async()=>{await disposeNotifications();await taskRuntime!.close();};
+  const closeTaskServices=async()=>{closeText();await taskChains.close();await disposeNotifications();await taskRuntime!.close();};
   app.locals.closeTaskServices=closeTaskServices;
   return { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines, closeTaskServices, taskRuntime };
 }

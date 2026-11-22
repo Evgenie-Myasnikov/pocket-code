@@ -841,6 +841,16 @@
         "width": 340,
         "height": 380,
         "color": "sand"
+      },
+      {
+        "id": "afd2ba7f-c764-471d-b4d0-c76b9c3aa476",
+        "kind": "card",
+        "text": "Run a Markdown task batch in chat",
+        "x": 490,
+        "y": 2100,
+        "width": 340,
+        "height": 380,
+        "color": "sand"
       }
     ],
     "links": []
@@ -1660,6 +1670,17 @@
       "dependencies": [
         "93388b04-41c8-461a-baba-40ff0521e242"
       ]
+    },
+    {
+      "id": "afd2ba7f-c764-471d-b4d0-c76b9c3aa476",
+      "title": "Run a Markdown task batch in chat",
+      "description": "Context\nA shared Markdown context and ordered task descriptions should open as a runnable batch in the selected project chat.\n\nSources\nsrc/ChatComposer.tsx, src/task-chat.ts, CHANGELOG.md (0.20.2 task batches).\n\nAcceptance criteria\nSelect a main Markdown file, preview ordered tasks, identify missing inputs and send the complete batch through chat.\n\nOpen questions\nNone for the initial implementation.\n\n2026-11-22 (unreleased). The composer previews a Markdown batch from a runner, a linked index, selected task files or level-two sections. An unresolved file prevents preparing a partial batch. Send submits the common context and tasks in the current chat. Nine parser tests, four Edge fixture scenarios and the production build passed. Live model execution and physical-device verification remain open. See src/markdown-task-batch.ts, src/MarkdownTaskDialog.tsx and docs/USER_GUIDE.md.\n\n2026-11-22. Extend Markdown import with tracked execution across separate linked chats. Show ordered steps, their actual run status, the exact context sent and a way to open each conversation. Preserve the existing single-chat draft option.\n\n2026-11-22. Linked execution now runs one chat per step on the PC, stores scoped chain history, carries the previous handoff and requires explicit completion before advancing. The chain panel exposes step context, approval/stop status and bidirectional chat navigation. Sources: server/markdown-chains.ts, src/MarkdownChainPanel.tsx, docs/USER_GUIDE.ru.md. Validation: 18 focused parser, scheduler and host API tests, four Edge scenarios, web and Windows builds passed. UI screenshots in docs/images use synthetic tasks. Live account and physical-device checks remain open.\n\n2026-11-22. Add provider-selected drafting and refinement for task text. Support the current field, related task context and a consistent field-specific template. Preview and apply the suggestion before starting or saving a task. Sources: src/MarkdownTaskDialog.tsx, src/ChatComposer.tsx and docs/USER_GUIDE.md.\n\n2026-11-22. Template v1 generates reviewed, field-specific text using available Claude or GitHub Copilot accounts. Markdown plans support manual authoring and editing before dispatch. Chat drafts, board card fields, checklists and branch edits keep changes local until applied and saved or sent. Verified scoped provider API/permission checks, Windows bridge, manual and imported Markdown, linked chats, mobile board editing and return navigation in the integrated source. Web, Windows and Android debug builds passed. The full test suite is not green; see CHANGELOG.md. Physical-device and live account checks remain open.",
+      "branch": "Далее",
+      "status": "review",
+      "priority": "normal",
+      "x": 490,
+      "y": 2100,
+      "dependencies": []
     }
   ]
 }

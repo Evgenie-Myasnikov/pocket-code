@@ -1,0 +1,174 @@
+import {useEffect, useId, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
+import {useLanguage} from './i18n';
+import {parseMarkdownTasks, type MarkdownSource} from './markdown-task-batch';
+import {useModal} from './navigation';
+import './markdown-task-dialog.css';
+import type {MarkdownChainControls} from './MarkdownChainPanel';
+import type {MarkdownChainDetail} from './markdown-chain';
+import {MarkdownTaskEditor,type MarkdownTaskDraft} from './MarkdownTaskEditor';
+import type {ImproveScope} from './ImproveTaskText';
+
+type Selection = { main?: File; children: File[] };
+type Batch = ReturnType<typeof parseMarkdownTasks>;
+type Preview = { selection: Selection; batch?: Batch; error?: string };
+type Props = {
+  onClose(): void; onPrepare(value: string): void; maxLength: number;
+  controls?:MarkdownChainControls; improveScope?:ImproveScope; onStarted(chain:MarkdownChainDetail):void;
+};
+
+async function readSource(file: File): Promise<MarkdownSource> {
+  return {name: file.name, text: await file.text()};
+}
+
+function diagnostic(message: string, ru: boolean) {
+  if (!ru) return message;
+  if (message === 'Select task files or add level-two task headings.') {
+    return 'Добавьте файлы задач или выберите файл с заголовками ##.';
+  }
+  return message
+    .replace(/^Ambiguous task file: /, 'Несколько файлов соответствуют задаче — ')
+    .replace(/^Empty context file: /, 'Пустой файл контекста — ')
+    .replace(/^Empty task: /, 'Пустое описание задачи — ');
+}
+
+function batchPrompt(batch: MarkdownTaskDraft, ru: boolean) {
+  const instruction = ru
+    ? 'Выполни задачи по порядку в этом чате. Ниже приведены общий контекст и тексты задач из выбранных файлов. Проверяй результат перед переходом к следующей задаче. При ошибке или нехватке информации остановись и укажи, что уже выполнено и какие задачи остались.'
+    : 'Run these tasks in order in this chat. Use the shared context and the task descriptions supplied below from the selected files. Verify each result before continuing. If a task fails or needs more information, stop and report completed and remaining tasks.';
+  return [
+    instruction,
+    (ru ? 'Общий контекст' : 'Shared context') + ' (' + batch.name + ')\n' + batch.context,
+    ...batch.tasks.map((task, index) => '## ' + (index + 1) + '. ' + task.title + '\n' + task.source + '\n\n' + task.body)
+  ].join('\n\n');
+}
+
+export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, improveScope, onStarted}: Props) {
+  const ru = useLanguage() === 'ru';
+  const heading = useId();
+  const panel = useRef<HTMLElement>(null);
+  useModal(panel, true, onClose);
+  const [selection, setSelection] = useState<Selection>({children: []});
+  const [preview, setPreview] = useState<Preview>();
+  const [starting,setStarting]=useState(false),[launchError,setLaunchError]=useState('');
+  const [draft,setDraft]=useState<MarkdownTaskDraft>();
+  const [editing,setEditing]=useState(false);
+  const attempt=useRef<{signature:string;id:string}|null>(null),locked=useRef(false),mounted=useRef(false);
+  useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;};},[]);
+  useEffect(()=>{setLaunchError('');},[selection]);
+  const main = selection.main;
+
+  useEffect(() => {
+    if (!main) return;
+    let current = true;
+    async function read(selectedMain: File) {
+      const files = [selectedMain, ...selection.children];
+      if (files.some(file => !/\.md$/i.test(file.name))) {
+        throw Error(ru ? 'Выберите файлы с расширением .md.' : 'Choose files with the .md extension.');
+      }
+      // UTF-8 takes up to four bytes per character. Check before allocating the file contents.
+      if (files.reduce((total, file) => total + file.size, 0) > Math.max(maxLength,controls?1024*1024:0) * 4) {
+        throw Error(ru ? 'Выбранные файлы слишком велики для одной очереди.' : 'The selected files are too large for one batch.');
+      }
+      const [context, ...children] = await Promise.all(files.map(readSource));
+      if (current) {
+        const tasks = children.filter(child => child.name !== context.name || child.text !== context.text);
+        setPreview({selection, batch: parseMarkdownTasks(context, tasks)});
+      }
+    }
+    read(main).catch(error => {
+      if (current) setPreview({selection, error: error instanceof Error ? error.message : String(error)});
+    });
+    return () => { current = false; };
+  }, [selection, main, maxLength, ru, !!controls]);
+
+  const result = preview?.selection === selection ? preview : undefined;
+  const batch = result?.batch;
+  const plan=draft||(main&&batch?.tasks.length&&!batch.missing.length&&!batch.errors.length
+    ? {name:main.name,context:batch.context,tasks:batch.tasks}:undefined);
+  const valid=plan&&plan.name.trim()&&plan.tasks.length&&plan.tasks.every(task=>task.title.trim()&&task.body.trim());
+  const prompt=valid?batchPrompt(plan,ru):'';
+  const oversized = prompt.length > maxLength;
+  const children = selection.children;
+  async function startChain(){
+    if(!controls||controls.canStart===false||!plan||!prompt||locked.current)return;
+    locked.current=true;setStarting(true);setLaunchError('');
+    const signature=JSON.stringify(plan);
+    if(attempt.current?.signature!==signature)attempt.current={signature,id:crypto.randomUUID()};
+    try{
+      const chain=await controls.start({id:attempt.current.id,...plan});
+      if(mounted.current)onStarted(chain);
+    }catch(error){if(mounted.current)setLaunchError(error instanceof Error?error.message:String(error));}
+    finally{locked.current=false;if(mounted.current)setStarting(false);}
+  }
+  return createPortal(<div className="modal-backdrop">
+    <section ref={panel} className="confirm-modal markdown-task-dialog" role="dialog" aria-modal="true" aria-labelledby={heading}>
+      <h2 id={heading}>{ru ? 'Задачи из Markdown' : 'Markdown tasks'}</h2>
+      {!draft&&<>
+      <label>{ru ? 'Основной контекст (.md)' : 'Main context (.md)'}
+        <input type="file" accept=".md" disabled={starting} onChange={event => {
+          const selectedMain = event.target.files?.[0];
+          if (selectedMain) setSelection(prev => ({...prev, main: selectedMain}));
+        }}/>
+      </label>
+      <label>{ru ? 'Файлы задач (.md)' : 'Task files (.md)'}
+        <input type="file" accept=".md" multiple disabled={starting} onChange={event => {
+          const added = Array.from(event.target.files || []);
+          if (!added.length) return;
+          event.target.value = '';
+          setSelection(prev => ({...prev, children: [...prev.children, ...added]}));
+        }}/>
+      </label>
+      {!!children.length && <details className="markdown-task-files">
+        <summary>{ru ? 'Выбранные файлы' : 'Selected files'} ({children.length})</summary>
+        <ul>{children.map((file, index) => <li key={index}>
+          <span>{file.name}</span>
+          <button type="button" className="text-button" disabled={starting} aria-label={(ru ? 'Убрать ' : 'Remove ') + file.name}
+            onClick={() => setSelection(prev => ({...prev, children: prev.children.filter((_, i) => i !== index)}))}>
+            {ru ? 'Убрать' : 'Remove'}
+          </button>
+        </li>)}</ul>
+      </details>}
+      {!main && <p>{ru ? 'Выберите общий контекст и файлы с описаниями задач. Если задачи записаны под заголовками ##, достаточно одного файла.' : 'Choose a context file and its task files. For tasks under ## headings, choose just the context file.'}</p>}
+      {!main&&<button type="button" className="secondary" onClick={()=>{setDraft({name:'',context:'',tasks:[{title:'',body:'',source:'Markdown'}]});setEditing(true);}}>
+        {ru?'Ввести задачи вручную':'Enter tasks manually'}
+      </button>}
+      {main && !result && <p role="status">{ru ? 'Читаем файлы…' : 'Reading files…'}</p>}
+      </>}
+      {editing&&draft&&<MarkdownTaskEditor draft={draft} onChange={setDraft} disabled={starting} scope={improveScope}/>}
+      {plan&&!editing && <section aria-label={ru ? 'Порядок запуска' : 'Run order'}>
+        <h3>{ru ? 'Порядок запуска' : 'Run order'} ({plan.tasks.length})</h3>
+        <ol>{plan.tasks.map((task, index) => <li key={index}><details>
+          <summary>{task.title}</summary><pre>{task.body}</pre>
+        </details></li>)}</ol>
+      </section>}
+      {plan&&<button type="button" className="text-button" disabled={starting||(editing&&!valid)} onClick={()=>{setDraft(plan);setEditing(!editing);}}>
+        {editing?(ru?'Посмотреть порядок':'Preview order'):(ru?'Редактировать задачи':'Edit tasks')}
+      </button>}
+      {batch && !batch.tasks.length && !!batch.order.length && <details>
+        <summary>{ru ? 'Порядок запуска' : 'Run order'} ({batch.order.length})</summary>
+        <ol>{batch.order.map((entry, index) => <li key={index}>
+          {entry.title}{entry.missing && (ru ? ' — файл отсутствует' : ' — file missing')}
+        </li>)}</ol>
+      </details>}
+      {batch && !!batch.missing.length && <div role="alert">
+        <h3>{ru ? 'Не хватает файлов задач' : 'Missing task files'}</h3>
+        <ul>{batch.missing.map(name => <li key={name}>{name}</li>)}</ul>
+      </div>}
+      {batch?.errors.map((message, index) => <p key={index} role="alert">{diagnostic(message, ru)}</p>)}
+      {result?.error && <p role="alert">{result.error}</p>}
+      {oversized && <p role="alert">{ru ? 'Черновик превышает лимит символов' : 'Draft exceeds the character limit'} ({maxLength}).</p>}
+      {controls&&<p>{ru?'Проект цепочки':'Chain project'} <strong>{controls.cwd}</strong></p>}
+      {launchError&&<p role="alert" className="error-banner">{launchError}</p>}
+      <footer>
+        <button type="button" className="secondary" onClick={onClose}>{ru ? 'Отмена' : 'Cancel'}</button>
+        <button type="button" className={controls?'secondary':'primary'} disabled={starting || !prompt || oversized} onClick={() => onPrepare(prompt)}>
+          {ru ? 'Подготовить черновик' : 'Prepare draft'}
+        </button>
+        {controls&&<button type="button" className="primary" disabled={!prompt||starting||controls.canStart===false} onClick={()=>void startChain()}>
+          {starting?(ru?'Запуск…':'Starting…'):(ru?'Запустить связанные чаты':'Start linked chats')}
+        </button>}
+      </footer>
+    </section>
+  </div>, document.body);
+}

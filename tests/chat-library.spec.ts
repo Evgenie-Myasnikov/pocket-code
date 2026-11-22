@@ -83,6 +83,8 @@ test('keyboard and Back keep the composer attachment picker within the draft',as
  await page.keyboard.press('Escape');await expect(attach).toHaveCount(0);await expect(trigger).toBeFocused();
  await trigger.press('Enter');await page.keyboard.press('Shift+Tab');await expect(trigger).toBeFocused();await expect(attach).toHaveCount(0);
  await trigger.press('Enter');await page.keyboard.press('Tab');await page.keyboard.press('Tab');
+ await expect(page.getByRole('button',{name:'Markdown tasks'})).toBeFocused();await page.keyboard.press('Tab');
+ await expect(page.getByRole('button',{name:'Task chains',exact:true})).toBeFocused();await page.keyboard.press('Tab');
  await expect(page.getByRole('button',{name:/^Access mode:/})).toBeFocused();await expect(attach).toHaveCount(0);
  await trigger.focus();
  await page.keyboard.press('Space');await expect(attach).toBeFocused();

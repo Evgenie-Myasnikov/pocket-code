@@ -2,6 +2,14 @@
 
 ## 0.28.51 (unreleased)
 
+### Features
+- Task text authoring (2026-11-22). Improve an existing task field or fill an empty one with a signed-in Claude or GitHub Copilot provider. Each field uses a stable template and related task context. Review and edit the suggestion before applying it. Covers chat drafts, branch edits, board card titles and descriptions, acceptance criteria, and manually entered or imported Markdown plans. [User guide](docs/USER_GUIDE.md#attachments-and-history)
+  Validation included provider and permission tests, Windows bridge checks, Edge editing flows, narrow-screen hit targets, the TypeScript/Vite build, Windows build and Android debug build. No live model or physical phone was used. The broader integration run had 411 passes, 61 failures and one skip before a CSS token fix. The token suite passed after correction. The Windows minimize smoke check and several existing fixture failures also reproduced on the parent commit. Some Git and test workers failed to launch. Review opened through its current menu on both revisions.
+- Linked Markdown task chats (2026-11-22). Start a tracked chain to run each task in a separate project chat with the shared context and the previous result. The tracker shows approvals, failures and progress, opens the chat for each step, and is accessible from its linked chats. The PC saves the chain privately and halts interrupted steps on restart. [User guide](docs/USER_GUIDE.md#attachments-and-history)
+  Validation covered 18 parser, scheduler and host API tests, four Edge scenarios and local web and Windows builds. Screenshots use synthetic tasks. Execution with a live provider and physical-device checks remain open.
+- Markdown task batches (2026-11-22). Choose a context file in the chat attachment menu to preview tasks from a runner, linked index, selected task files or level-two headings. Missing files block partial imports. Send submits the ordered batch in the project chat, preserving the draft and carrying large batches as a single attachment. [User guide](docs/USER_GUIDE.md#attachments-and-history)
+  Validation covered nine parser tests, four Edge scenarios with a simulated host and the TypeScript/Vite build. Live provider and physical-device runs remain unverified.
+
 ### Fixes
 - Standalone Windows chats (2026-11-22). Desktop starts its local host even for previously disconnected profiles. Fresh installations use loopback. Chats can retry the local service directly, and changes to optional phone access take effect on the next host launch without interrupting an active conversation.
   Validation included the production build, the standalone Windows WebView launch check, three browser chat scenarios with a simulated provider, and eleven bridge, runtime and device tests. Live provider accounts were not exercised.

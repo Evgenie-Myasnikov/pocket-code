@@ -30,6 +30,27 @@ export class CopilotService{
   /** Only verified host-owned task working copies may extend provider access. */
   setManagedTaskRoots(roots:string[]){this.roots=[...this.configuredRoots,...roots];}
  private async connect(){if(this.closed)throw new HttpError(503,'Copilot host is stopping');if(!this.starting)this.starting=this.client.start().catch(error=>{this.starting=undefined;throw error;});await this.starting;return this.client;}
+ async generateTaskText(system:string,prompt:string,directory:string,abort:AbortController):Promise<string>{
+   const client=await this.connect();
+   abort.signal.throwIfAborted();
+   const sessionId=randomUUID();
+   const session=await client.createSession({sessionId,workingDirectory:directory,configDirectory:directory,
+     systemMessage:{mode:'replace',content:system},availableTools:[],excludedTools:['builtin:*','mcp:*','custom:*'],
+     mcpServers:{},enableConfigDiscovery:false,skipCustomInstructions:true,enableOnDemandInstructionDiscovery:false,
+     enableFileHooks:false,enableSkills:false,enableHostGitOperations:false,enableSessionStore:false,
+     memory:{enabled:false},infiniteSessions:{enabled:false},enableSessionTelemetry:false,manageScheduleEnabled:false,
+     onPermissionRequest:()=>({kind:'denied-interactively-by-user'})});
+   const cancel=()=>{void session.abort().catch(()=>{});};
+   abort.signal.addEventListener('abort',cancel,{once:true});
+   try{
+     abort.signal.throwIfAborted();
+     const message=await session.sendAndWait({prompt},80000);
+     return message?.data.content||'';
+   } finally {
+     abort.signal.removeEventListener('abort',cancel);
+     try{await session.disconnect();}finally{await client.deleteSession(sessionId);}
+   }
+ }
  async logout(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');await(await this.connect()).rpc.account.logout({});}
  private quota?:{at:number;value:CodexUsageSnapshot};
  // Account quota is shared by every chat; a short cache keeps per-minute polling from every device cheap.

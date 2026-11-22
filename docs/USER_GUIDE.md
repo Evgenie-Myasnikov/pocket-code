@@ -86,6 +86,16 @@ Only one writer may work in an overlapping project folder. Up to three Pocket Co
 
 ## Attachments and history
 
+**AI task drafting (unreleased).** Use the sparkle button in the composer to **Improve with AI**. For an empty field, choose **Fill with AI** and describe the desired result. Choose an available signed-in Claude or GitHub Copilot provider, add any drafting guidance, and generate a suggestion. You can edit, regenerate or apply the result before sending the message, saving the card or running the tasks.
+
+In **Markdown tasks**, choose **Enter tasks manually** or **Edit tasks** after importing a plan. AI can draft the chain name, shared context, step titles and instructions. Board card titles, descriptions and individual acceptance criteria offer the same action. Each field has a dedicated template and uses the task context shown in the dialog.
+
+**Markdown tasks (unreleased).** Open **+ → Markdown tasks** in the project chat. Choose the main context file and the Markdown files that describe the tasks. If the main file lists task paths or links, the preview uses that order and identifies missing files. For a single-file plan, put the shared context first and start each task with a `## Task title` heading.
+
+Choose **Start linked chats** to run each step in its own chat. The PC starts one step at a time in the selected project. Each chat receives the common context, the current task and the previous step's result. The host advances after the agent explicitly confirms completion. Open a waiting step's chat to handle approvals. An error or a turn that ends without confirmation halts the chain.
+
+Open **+ → Task chains** to track progress, inspect a step's context and full prompt, or open its conversation. The chain button in a linked chat returns to its steps. Closing the panel leaves the host running the queue. After a host restart, inspect the interrupted step before repeating it. To run the entire batch in one chat, use **Prepare draft → Send**.
+
 Use the paperclip, or paste an image/file on Windows. Image attachments show thumbnails; other files show tiles. Remove an attachment with its cross before sending. A message accepts up to ten attachments, each at most 10 MB. Uploads are stored on the host; a missing file may need to be attached again.
 
 The app shows recent history first and loads older pages as you scroll. Loading and history-boundary messages distinguish waiting from the end. Use the jump controls to reach the beginning or newer messages. Position is saved per chat. If the agent was working when you left, returning follows the new messages; idle chats retain the reading position.

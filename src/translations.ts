@@ -1,5 +1,7 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Задачи из Markdown':'Markdown tasks',
+  'Выполни по порядку задачи из вложенного файла markdown-tasks.md.':'Run the tasks in the attached markdown-tasks.md file in order.',
   'Таблица с горизонтальной прокруткой':'Horizontally scrollable table',
   'Работает как Claude Code':'Works as Claude Code',
   'Файлы этого сообщения остались на устройстве, с которого оно отправлено. Оно уйдёт после ответа как есть.':'The files of this message stay on the device that sent it. It will be sent as is after the reply.',

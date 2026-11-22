@@ -11,6 +11,15 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    if(message.action==='restart-host'){calls.push(message);state={...state,online:true,statusCode:'connected'};reply(message.id,state);return;}
    calls.push(message);const {id,action}=message;if(action==='state'||action==='pairing-role'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){(window as any).testDevices=(window as any).testDevices.filter((d:any)=>d.id!==message.deviceId);reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
    const url=new URL('https://example.invalid'+message.endpoint),p=url.pathname,provider=url.searchParams.get('provider')||'claude';
+   if(p==='/task-text/providers'){reply(id,{providers:['claude','copilot']});return;}
+   if(p==='/task-text/improve'&&typeof (window as any).testTaskTextResponse==='string'){reply(id,{text:(window as any).testTaskTextResponse});return;}
+   if(p.startsWith('/task-chains')){
+     const handler=(window as any).testChainRequest;
+     const result=handler?handler(p,message.data,url.searchParams):{value:[]};
+     if(result.error)listeners.forEach(listener=>listener({data:{id,error:result.error,status:result.status}}));
+     else reply(id,result.value);
+     return;
+   }
    if(p.startsWith('/project-board')&&typeof (window as any).boardHostRequest==='function'){void (window as any).boardHostRequest(message.endpoint,message.data).then((result:any)=>{if(result.error)listeners.forEach(listener=>listener({data:{id,error:result.error,status:result.status}}));else reply(id,result.value);});return;}
    const messageBlock=(id:string,text:string)=>({id,role:'assistant',blocks:[{type:'text',text}]});
    if(p==='/pairing-role'){reply(id,{role:'host'});return;}

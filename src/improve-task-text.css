@@ -1,0 +1,30 @@
+.improve-trigger {
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  min-height:32px;padding:.28rem .6rem;width:auto;
+  background:transparent;border:1px solid var(--line);border-radius:8px;
+  color:var(--text);font:inherit;font-size:.8rem;cursor:pointer;
+}
+.improve-trigger.improve-compact {flex:0 0 auto;width:32px;height:32px;padding:0;border-color:transparent;color:var(--muted)}
+.improve-trigger:hover:enabled,.improve-trigger:focus-visible {color:var(--accent);border-color:var(--accent)}
+.improve-trigger:disabled {opacity:.5;cursor:default}
+@container (max-width:370px) {
+  .prompt-composer .composer-tools:has(.improve-compact) .composer-models {grid-column:2/-1}
+  .prompt-composer .composer-tools:has(.improve-compact) .composer-actions {grid-column:1/-1;justify-self:end}
+}
+.modal-backdrop.improve-backdrop {z-index:calc(var(--z-modal,1100) + 1);padding:12px}
+.confirm-modal.improve-dialog {
+  display:grid;gap:.8rem;width:min(100%,38rem);max-width:38rem;
+  max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain;
+  padding:clamp(16px,3vw,26px);background:var(--panel);color:var(--text);
+}
+.improve-dialog header,.improve-dialog footer {display:flex;align-items:center;gap:.6rem}
+.improve-dialog header svg {color:var(--accent);flex-shrink:0}
+.improve-dialog h2,.improve-dialog p {margin:0}
+.improve-dialog label {display:grid;gap:.4rem;color:var(--text);font-size:.87rem}
+.improve-dialog :is(textarea,select) {width:100%;max-width:100%;min-width:0;font:inherit}
+.improve-dialog textarea {resize:vertical;min-height:3.5rem;max-height:50dvh;line-height:1.5}
+.improve-source {border-inline-start:2px solid var(--line);padding-inline-start:.7rem}
+.improve-source summary {cursor:pointer;font-size:.85rem}
+.improve-source pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:10rem;overflow:auto;margin:.45rem 0 0;color:var(--muted);font:inherit;font-size:.85rem}
+.improve-dialog footer {justify-content:flex-end;flex-wrap:wrap}
+.improve-dialog button {width:auto;margin:0}

@@ -23,9 +23,20 @@ test('dictation appends to the draft without sending and ignores a late result a
 for(const regenerate of [false,true])test(`${regenerate?'regenerate':'edit'} sends to a separate native branch`,async({page})=>{
  await page.addInitScript(()=>{(window as any).branchMessages=[{id:'request',role:'user',blocks:[{type:'text',text:'Synthetic original request'}]},{id:'answer',role:'assistant',blocks:[{type:'text',text:'Synthetic answer'}]}];});
  await page.setViewportSize({width:1440,height:900});await desktop(page);await page.locator('.desktop-sessions>button').first().click();
+ await page.locator(`article[data-message-id="${regenerate?'answer':'request'}"]`).hover();
  await page.getByRole('button',{name:regenerate?'Regenerate response':'Edit message',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog).toContainText('original conversation is kept');
- if(!regenerate)await dialog.getByRole('textbox').fill('Synthetic revised request');
+ if(regenerate)await expect(dialog.locator('[data-improve-task-trigger]')).toHaveCount(0);
+ else{
+  await dialog.getByRole('textbox').fill('A draft revision');
+  await page.evaluate(()=>{(window as any).testTaskTextResponse='Synthetic revised request';});
+  await dialog.locator('[data-improve-task-trigger]').click();
+  const improve=page.locator('[data-improve-task-dialog] [role="dialog"]');
+  await improve.getByRole('button',{name:'Generate suggestion',exact:true}).click();
+  await improve.getByRole('button',{name:'Apply',exact:true}).click();
+  await expect(dialog.getByRole('textbox',{name:'Message text',exact:true})).toHaveValue('Synthetic revised request');
+  expect(await page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.endpoint?.endsWith('/branch')))).toBe(false);
+ }
  await dialog.getByRole('button',{name:regenerate?'Regenerate':'Save and send',exact:true}).click();
  await expect(dialog).toHaveCount(0);
  const calls=await page.evaluate(()=>(window as any).desktopCalls);

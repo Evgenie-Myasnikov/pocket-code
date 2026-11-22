@@ -1,0 +1,52 @@
+.confirm-modal.chain-panel {
+  width: min(100%, 41rem);
+  max-width: none;
+  padding: clamp(18px,4vw,30px);
+  background: var(--panel);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.chain-panel .chain-head,.chain-step-heading,.chain-progress>div,.chain-index-row { display:flex;align-items:center;justify-content:space-between;gap:.75rem; }
+.chain-head { margin-bottom: 1rem;color:var(--muted); }
+.chain-panel button { width:auto;margin:0; }
+.chain-panel h2 { color:var(--text);margin:.2rem 0 .45rem;line-height:1.2; }
+.chain-location,.chain-source,.chain-links,.chain-links button,.chain-back { display:flex;align-items:center;gap:.4rem; }
+.chain-location,.chain-source { color:var(--muted);font-size:.8rem; }
+.chain-location svg,.chain-source svg { flex:none; }
+.chain-panel .chain-back,.chain-links button { border:none;background:transparent;padding:.35rem .1rem;color:var(--muted);font:inherit;font-size:.83rem;cursor:pointer; }
+.chain-panel .chain-back:hover,.chain-links button:hover { color:var(--text);text-decoration:underline; }
+.chain-progress { margin:1.3rem 0; }
+.chain-progress>div { font-size:.85rem;margin-bottom:.55rem; }
+.chain-progress span { color:var(--muted);font-variant-numeric:tabular-nums; }
+.chain-progress progress { appearance:none;display:block;width:100%;height:5px;border:none;border-radius:8px;overflow:hidden;background:var(--line);color:var(--accent); }
+.chain-progress progress::-webkit-progress-bar { background:var(--line); }
+.chain-progress progress::-webkit-progress-value { background:var(--accent); }
+.chain-progress progress::-moz-progress-bar { background:var(--accent); }
+.chain-steps { list-style:none;margin:0;padding:0; }
+.chain-steps>li { position:relative;display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px; }
+.chain-steps>li:not(:last-child)::before { position:absolute;content:'';left:13px;top:27px;bottom:0;width:1px;background:var(--line); }
+.chain-node { display:grid;place-items:center;align-self:start;width:27px;height:27px;border:1px solid var(--line);border-radius:50%;color:var(--muted);font-size:.79rem;font-variant-numeric:tabular-nums;font-weight:var(--fw-semibold); }
+.chain-step { padding:2px 0 1rem;min-width:0; }
+.chain-step-heading { align-items:baseline;flex-wrap:wrap;column-gap:.5rem;row-gap:.2rem; }
+.chain-step-heading h3 { margin:0;color:var(--text);font-size:1rem;line-height:1.35; }
+.chain-state { color:var(--muted);font-size:.78rem; }
+.chain-steps>li[data-status=done] .chain-node,.chain-steps>li[data-status=done] .chain-state { color:var(--success,var(--accent)); }
+.chain-steps>li[data-status=running] .chain-node { background:var(--accent);border-color:transparent;color:var(--accent-contrast,var(--bg)); }
+.chain-steps>li[data-status=running] .chain-state,.chain-steps>li[data-status=waiting] .chain-state { color:var(--accent);font-weight:var(--fw-semibold); }
+.chain-steps>li[data-status=failed] .chain-state,.chain-panel p.chain-step-error { color:var(--danger); }
+.chain-source { margin-top:.35rem; }
+.chain-links { flex-wrap:wrap;column-gap:1rem;margin-top:.18rem; }
+.chain-chevron-open { transform:rotate(90deg); }
+.chain-context { margin:.35rem 0 .5rem;padding:.85rem 1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface); }
+.chain-context h4 { margin:.15rem 0 .5rem;font-size:.85rem; }
+.chain-context pre { margin:0;max-height:16rem;overflow:auto;overscroll-behavior:contain;white-space:pre-wrap;font:inherit;line-height:1.55;font-size:.82rem;color:var(--text); }
+.chain-context pre+h4 { margin-top:.85rem; }
+.chain-context details { margin-top:.75rem; }
+.chain-context summary { font-size:.82rem;cursor:pointer;color:var(--muted); }
+.chain-context details pre { margin-top:.5rem; }
+.chain-panel footer { border-top:1px solid var(--line);padding-top:1rem;display:flex;justify-content:flex-end; }
+.chain-index { margin-top:1.3rem; }
+.chain-panel .chain-index-row { width:100%;text-align:left;min-height:3.75rem;padding:.65rem 0;color:var(--text);border:none;border-bottom:1px solid var(--line);border-radius:0;background:transparent;cursor:pointer;font:inherit; }
+.chain-index-row strong,.chain-index-row small { display:block; }
+.chain-index-row small { color:var(--muted);margin-top:.25rem; }
+@media (max-width:480px) { .chain-steps>li { gap:9px; }.chain-links button { min-height:38px; }.chain-context { padding:.65rem; } }
