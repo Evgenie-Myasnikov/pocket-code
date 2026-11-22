@@ -453,6 +453,12 @@ export class CodexService {
     else if (!job.acceptingEvents) this.finish(job, 'stopped');
     // A turn/start request in flight is interrupted as soon as its ID arrives.
   }
+  /** After a Codex runtime update: drop the idle app-server so the next request starts the newest installed Codex. */
+  reconnectWhenIdle(): boolean {
+    if (this.closed || !this.rpc || [...this.jobs.values()].some(job => job.status === 'running')) return false;
+    const rpc = this.rpc; this.rpc = undefined; this.ready = undefined; rpc.close();
+    return true;
+  }
   close() {
     this.closed = true;
     for (const job of this.jobs.values()) if (job.status === 'running') { job.cancelled = true; this.finish(job, 'stopped'); }

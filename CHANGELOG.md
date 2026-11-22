@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.28.49 (unreleased)
+
+### Fixes
+- Codex models: newer models were missing because the provider lists them only to newer Codex clients, while the host used the first `codex.exe` it found (often an outdated desktop build). The host now keeps its own Codex CLI in `%LOCALAPPDATA%\Pocket Code\runtime\codex`, installs the latest official `@openai/codex` release from npm at start and every 6 hours (keeps two versions; `POCKET_CODEX_AUTO_UPDATE=0` disables it), picks the newest installed Codex by `--version`, and finds the current npm layout `vendor/<arch>/bin/codex.exe`. After an update the idle Codex connection reconnects to the new build. Validation: new `tests/codex-runtime.test.ts` (5 passed), `tsc --noEmit` clean, Codex tests unchanged (the pre-existing compatibility-trigger failure reproduces without this change). Manually: Codex 0.153.4 listed GPT-6-Astra and GPT-5.6 only; 0.171.0 on the same account listed GPT-6.2-Sol, GPT-6.2-Astra, GPT-6.1-Terra, GPT-6.1-Sol and GPT-6 models.
+
 ## [0.28.48](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.47...v0.28.48) (2026-11-15)
 
 Published [v0.28.48](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.48) from [d2fa1ceb047acfd6a312a41a7cd1a5db5238d20d](https://github.com/Evgenie-Myasnikov/pocket-code/commit/d2fa1ceb047acfd6a312a41a7cd1a5db5238d20d) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android code 135. Android, Windows and host packages built by scripts/publish-release.ps1; the release manifest names this branch and commit. GitHub SHA-256 digests and sizes of all four public assets match the local artifacts; the tag resolves to the source commit. Privacy guard passed for the tree. The Codex follow-up message on the fixed host, the desktop window and devices were not run on the published packages.

@@ -19,6 +19,7 @@ import { ExistingClaudeJira } from './jira-existing.js';
 import { WindowsJiraStore } from './jira-vault.js';
 import { EngineUpdates } from './engine-updates.js';
 import { CodexService } from './codex.js';
+import { CodexRuntime } from './codex-runtime.js';
 import {JiraConnection} from './jira-connection.js';
 import {JiraLogin} from './jira-login.js';
 
@@ -55,6 +56,15 @@ const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy,
 runtimeReady = true;updater.start();
 const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
 void maintainEngines().catch(()=>{});
+// Keep a private Codex CLI current: the provider lists newer models only to newer clients.
+const codexRuntime=new CodexRuntime();let codexReconnect=false;
+const maintainCodex=async()=>{
+  const result=await codexRuntime.update();
+  if(result.state==='installed'){codexReconnect=true;console.log(`Codex ${result.version} установлен; новые модели появятся после переподключения.`);}
+  if(codexReconnect&&codex.reconnectWhenIdle())codexReconnect=false;
+};
+const codexRuntimeTimer=setInterval(()=>void maintainCodex().catch(()=>{}),60000);codexRuntimeTimer.unref();
+void maintainCodex().catch(()=>{});
 const workflowTimer = setInterval(() => void workflow?.sync().catch(() => {}), 2000); workflowTimer.unref();
 let tunnel: Awaited<ReturnType<typeof startInternetTunnel>> | undefined;
 let closing = false;
@@ -96,7 +106,7 @@ const server = app.listen(port, host, () => {
 let shutdownPromise: Promise<void> | undefined;
 function shutdown(preserveTunnel = false): Promise<void> {
   if (shutdownPromise) return shutdownPromise;
-  closing = true; runtimeReady = false; hostUpdater.close(); updater.close(); clearInterval(workflowTimer); clearInterval(engineTimer); clearInterval(runTimer);
+  closing = true; runtimeReady = false; hostUpdater.close(); updater.close(); clearInterval(workflowTimer); clearInterval(engineTimer); clearInterval(codexRuntimeTimer); clearInterval(runTimer);
   app.locals.providerConnections?.close();
   const stopped = new Promise<void>(resolve => server.close(() => resolve()));
   const queues = [queue?.close(), codexQueue?.close(),copilotQueue?.close(),copilot.close()];

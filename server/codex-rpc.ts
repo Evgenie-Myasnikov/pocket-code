@@ -1,7 +1,8 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { access, readdir, stat } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
+import { compareCodexVersions, privateCodexCandidates } from './codex-runtime.js';
 
 export type RpcEnvelope = { id?: string | number; method?: string; params?: any; result?: any; error?: { code?: number; message?: string } };
 export const CODEX_THREAD_BUSY = 'This chat is open in Codex on the PC. Its history is available here, but Codex must release the chat before you can send a message. Finish the task and close Codex on the PC, then try again.';
@@ -26,8 +27,16 @@ export interface CodexRpc {
   close(): void;
 }
 
-/** Find a native binary; never execute a .cmd/.ps1 wrapper through a shell. */
-export async function discoverCodex(env: NodeJS.ProcessEnv = process.env): Promise<string> {
+export type CodexVersionReader = (executable: string) => Promise<string | undefined>;
+/** Reads `codex --version` without a shell; an unreadable version is undefined, not an error. */
+export const readCodexVersion: CodexVersionReader = executable => new Promise(resolve => execFile(executable, ['--version'], { windowsHide: true, timeout: 10000, maxBuffer: 4096 },
+  (error, stdout) => resolve(error ? undefined : String(stdout).match(/\b(\d+\.\d+\.\d+)\b/)?.[1])));
+let discovered: { key: string; until: number; value: Promise<string> } | undefined;
+
+/** Find a native binary; never execute a .cmd/.ps1 wrapper through a shell.
+ * Several installs can coexist (desktop app, npm CLI). The provider serves its model
+ * catalog per client version, so the newest installed Codex is preferred. */
+export async function discoverCodex(env: NodeJS.ProcessEnv = process.env, readVersion: CodexVersionReader = readCodexVersion): Promise<string> {
   const candidates: string[] = [];
   if (env.POCKET_CODEX_EXECUTABLE) {
     const explicit = path.resolve(env.POCKET_CODEX_EXECUTABLE);
@@ -39,12 +48,19 @@ export async function discoverCodex(env: NodeJS.ProcessEnv = process.env): Promi
     candidates.push(path.join(directory, process.platform === 'win32' ? 'codex.exe' : 'codex'));
     if (process.platform === 'win32') {
       for (const arch of ['x86_64-pc-windows-msvc', 'aarch64-pc-windows-msvc']) {
-        candidates.push(path.join(directory, 'node_modules', '@openai', 'codex', 'vendor', arch, 'codex', 'codex.exe'));
         const platform = arch.startsWith('x86') ? 'codex-win32-x64' : 'codex-win32-arm64';
-        candidates.push(path.join(directory, 'node_modules', '@openai', 'codex', 'node_modules', '@openai', platform, 'vendor', arch, 'codex', 'codex.exe'));
+        for (const vendor of [
+          path.join(directory, 'node_modules', '@openai', 'codex', 'vendor', arch),
+          path.join(directory, 'node_modules', '@openai', 'codex', 'node_modules', '@openai', platform, 'vendor', arch),
+          path.join(directory, 'node_modules', '@openai', platform, 'vendor', arch),
+        ]) {
+          // Newer npm packages ship vendor/<arch>/bin/codex.exe; older ones vendor/<arch>/codex/codex.exe.
+          candidates.push(path.join(vendor, 'bin', 'codex.exe'), path.join(vendor, 'codex', 'codex.exe'));
+        }
       }
     }
   }
+  candidates.push(...await privateCodexCandidates(env));
   if (process.platform === 'win32' && env.LOCALAPPDATA) {
     const root = path.join(env.LOCALAPPDATA, 'OpenAI', 'Codex', 'bin');
     try {
@@ -52,8 +68,25 @@ export async function discoverCodex(env: NodeJS.ProcessEnv = process.env): Promi
       candidates.push(...installed.filter(entry=>entry.time>0).sort((a,b)=>b.time-a.time).map(entry=>entry.file));
     } catch { /* Optional desktop install. */ }
   }
-  for (const candidate of candidates) { try { await access(candidate); return candidate; } catch { /* Try next install. */ } }
-  throw new Error('Codex is not installed on this PC. Install Codex CLI or configure POCKET_CODEX_EXECUTABLE.');
+  const existing: string[] = [], seen = new Set<string>();
+  for (const candidate of candidates) {
+    const key = path.resolve(candidate).toLowerCase();
+    if (seen.has(key)) continue; seen.add(key);
+    try { await access(candidate); existing.push(candidate); } catch { /* Try next install. */ }
+  }
+  if (!existing.length) throw new Error('Codex is not installed on this PC. Install Codex CLI or configure POCKET_CODEX_EXECUTABLE.');
+  if (existing.length === 1) return existing[0];
+  const key = existing.join('\n');
+  if (readVersion === readCodexVersion && discovered?.key === key && discovered.until > Date.now()) return discovered.value;
+  const value = (async () => {
+    const versions = await Promise.all(existing.map(file => readVersion(file).catch(() => undefined)));
+    // Ties and unreadable versions keep discovery order (PATH first, then the newest desktop build).
+    let best = 0;
+    versions.forEach((version, index) => { if (version && (!versions[best] || compareCodexVersions(version, versions[best]!) > 0)) best = index; });
+    return existing[best];
+  })();
+  if (readVersion === readCodexVersion) discovered = { key, until: Date.now() + 60_000, value };
+  return value;
 }
 
 export class StdioCodexRpc extends EventEmitter implements CodexRpc {
