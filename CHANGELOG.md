@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.28.51 (unreleased)
+## [0.28.51](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.50...v0.28.51) (2026-11-22)
 
-Release candidate for Android (version code 138), Windows and the PC host.
+Published [v0.28.51](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.51) from [21ed30b](https://github.com/Evgenie-Myasnikov/pocket-code/commit/21ed30b95bc28772111429e28617ae50d8783883) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android version code 138. The 0.28.50 updater accepted the Android, Windows and host packages. The Android application ID and signer match 0.28.50. The source passed [GitHub CI](https://github.com/Evgenie-Myasnikov/pocket-code/actions/runs/45009319617). All four files downloaded from the public release matched the audited local SHA-256 hashes and sizes. Live provider execution and installation on a physical device remain open.
 
 ### Features
 - Task text authoring (2026-11-22). Improve an existing task field or fill an empty one with a signed-in Claude or GitHub Copilot provider. Each field uses a stable template and related task context. Review and edit the suggestion before applying it. Covers chat drafts, branch edits, board card titles and descriptions, acceptance criteria, and manually entered or imported Markdown plans. [User guide](docs/USER_GUIDE.md#attachments-and-history)
