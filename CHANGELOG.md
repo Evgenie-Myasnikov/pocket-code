@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [0.28.52](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.51...v0.28.52) (2026-11-22)
 
-Preparing 0.28.52 (Android version code 139) from the integrated release branch.
+Published [0.28.52](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.52) from [18b514d915586690a601590f961363c755ff0193](https://github.com/Evgenie-Myasnikov/pocket-code/commit/18b514d915586690a601590f961363c755ff0193) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). All four public downloads matched the audited SHA-256 hashes, all 163 UI files matched across packages, and the APK signer matched 0.28.51. Android version code 139. Physical-device verification remains open.
 
 ### Features
 - Task chains (2026-11-22). Open Tasks on Windows or Android to create or import a Markdown plan. Follow each linked chat, its provider and requested model, current output, exact step context and result. Stopped and completed chains can be deleted while their chats stay available.
