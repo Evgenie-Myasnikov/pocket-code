@@ -1,9 +1,14 @@
 import {mountSpeech} from './speech.js';
 import {generateClaudeText,mountTaskText,textProviders} from './task-text.js';
-import {codexTaskTextAvailable,generateCodexTaskText} from './codex-task-text.js';
+import {codexTaskTextAvailable,generateCodexTaskText,supportsCodexSampling} from './codex-task-text.js';
 import {claudeRuntime,updateInstalledClaude} from './claude-executable.js';
 import {ChatLibrary} from './chat-library.js';
+import {mountChatErasures} from './chat-erasures.js';
+import {folderKey,mountChatBulkDelete} from './chat-bulk-delete.js';
+import {createChatOriginals} from './chat-originals.js';
+import type {ChainDeleteChat,ChainDeletePreview} from '../src/markdown-chain.js';
 import {BoardMcpRuntime} from './board-mcp-runtime.js';
+import {SessionGeneration} from './session-generation.js';
 import {ChatPageSync} from './chat-page-sync.js';
 import {CustomProviders,mountCustomProviders} from './custom-providers.js';
 import {WindowsJiraStore} from './jira-vault.js';
@@ -29,7 +34,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
-import { listSessions, getSessionMessages, forkSession } from '@anthropic-ai/claude-agent-sdk';
+import { listSessions, getSessionMessages, getSessionInfo, deleteSession, forkSession } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { allowedPath, HttpError, safeFilename, validToken, within } from './security.js';
 import { Jobs } from './jobs.js';
@@ -49,20 +54,21 @@ import { EngineUpdates, pocketSource } from './engine-updates.js';
 import { coalesceReads } from './read-coalescer.js';
 import {jiraLoginPage,type JiraLogin} from './jira-login.js';
 import type {JiraConnection} from './jira-connection.js';
+import {purgeChainCopies,stageChainUploads} from './chain-source-uploads.js';
 import {TaskWorktrees} from './task-worktrees.js';
 import {TaskRuntime} from './task-runtime.js';
-import {MarkdownChains} from './markdown-chains.js';
+import {MarkdownChains,stepLaunchSettings} from './markdown-chains.js';
 import {mountRunNotifications} from './run-notifications.js';
 import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 
 export type Config = { port?:number; customProviders?:CustomProviders; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
-type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages; forkSession?:typeof forkSession };
+type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages; forkSession?:typeof forkSession; getSessionInfo?:typeof getSessionInfo; deleteSession?:typeof deleteSession };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
 const providerSchema = z.enum(['claude', 'codex','copilot']).default('claude');
-export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages, forkSession }, terminals = new Terminals()) {
+export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages, getSessionInfo, deleteSession, forkSession }, terminals = new Terminals()) {
   const roots = await Promise.all(config.roots.map(p => realpath(p)));
   const claudeCatalog = config.claudeModels || new ClaudeModelCatalog();
   const boardMcp=new BoardMcpRuntime(path.dirname(config.uploads),config.port,root=>config.codex?.refreshBoardMcp?.(root));
@@ -160,7 +166,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const isBusy = () => activeMutations > 0 || textInFlight.size>0 || !!taskChains?.hasWork() || !!taskRuntime?.hasWork() || providerConnections.isSigningIn() || allJobs().some(job => job.status === 'running') || terminals.list().some(terminal => terminal.status === 'running') || !!queue?.hasWork() || !!codexQueue?.hasWork() || !!copilotQueue?.hasWork() || !!workflow?.isBusy();
   app.use('/api', (req, res, next) => {
     if (req.method === 'GET' || req.path === '/runtime/stop') { next(); return; }
-    if(providerConnections.isSigningIn()&&['/jobs','/task-chains','/task-text/improve','/terminals','/jira/start','/jira/queue','/jira/queue/control','/jira/workflow/action','/jira/workflow/recover','/copilot/login'].includes(req.path)){res.status(409).json({error:'Complete provider sign-in before starting new work.'});return;}
+    if(providerConnections.isSigningIn()&&['/jobs','/task-chains','/task-text/improve','/task-text/plan','/terminals','/jira/start','/jira/queue','/jira/queue/control','/jira/workflow/action','/jira/workflow/recover','/copilot/login'].includes(req.path)){res.status(409).json({error:'Complete provider sign-in before starting new work.'});return;}
     if(jiraChanging){res.status(409).json({error:'The Jira connection is changing. Please retry shortly.'});return;}
     if (runtimeStopping) { res.status(503).json({ error: 'The PC server is stopping.' }); return; }
     if (req.path.startsWith('/host-update/')) { next(); return; }
@@ -174,14 +180,41 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}},boardMcp,path.join(config.uploads,'.boards','backups'));
   const customProviders=config.customProviders??new CustomProviders(new WindowsJiraStore(path.join(config.uploads,'..','custom-providers.dat')));
   const guardCustomProviders=()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can use custom providers');};
+  type ConnectionStatus={id:string;installed:boolean;authenticated:boolean|null;server:string;version?:string};
+  function localExecutors(status:ConnectionStatus[]){
+    return textProviders.filter(id=>(id!=='copilot'||!!config.copilot)&&(id!=='codex'||!!config.codex)&&
+      status.some(p=>p.id===id&&p.installed&&p.authenticated===true&&p.server!=='unavailable'));
+  }
   const closeText=mountTaskText(app,{
     busy:textInFlight,allowProject:cwd=>allowedPath(accessRoots(),cwd,true),
-    providers:async()=>{
+    providers:async(refresh)=>{
+      const {providers}=await providerConnections.status(refresh);
+      const available=localExecutors(providers);
+      const canSample=!!config.codex && available.includes('codex') && await codexTaskTextAvailable(refresh);
+      const usable=available.filter(id=>id!=='codex'||canSample);
+      const unavailable=textProviders.filter(id=>!usable.includes(id)).map(provider=>{
+        const p=providers.find((item:ConnectionStatus)=>item.id===provider) as ConnectionStatus|undefined;
+        let reason:import('../src/task-catalogue.js').TextProviderIssue['reason']='unknown';
+        if(p&&!p.installed)reason='not_detected';
+        else if(p?.server==='unavailable'||provider==='codex'&&!config.codex||provider==='copilot'&&!config.copilot)reason='runtime';
+        else if(p?.authenticated===false)reason='signed_out';
+        else if(provider==='codex'&&p?.version&&!supportsCodexSampling(p.version))reason='version';
+        return {provider,reason};
+      });
+      return {providers:usable,unavailable};
+    },
+    executors:async()=>{
+      guardCustomProviders();
       const {providers}=await providerConnections.status();
-      const available=textProviders.filter(id=>(id!=='copilot'||!!config.copilot)&&providers.some((p:{id:string;installed:boolean;authenticated:boolean|null;server:string})=>
-        p.id===id&&p.installed&&p.authenticated===true&&p.server!=='unavailable'));
-      const canSample=!!config.codex && available.includes('codex') && await codexTaskTextAvailable();
-      return available.filter(id=>id!=='codex'||canSample);
+      const names={claude:'Claude',codex:'Codex',copilot:'GitHub Copilot'};
+      return localExecutors(providers).map(provider=>({provider,label:names[provider]}));
+    },
+    accountExecutors:async()=>{
+      guardCustomProviders();
+      const {providers}=await providerConnections.status();
+      // An API key can drive the installed Claude agent without a Claude subscription login.
+      const installed=providers.some((p:ConnectionStatus)=>p.id==='claude'&&p.installed&&p.server!=='unavailable');
+      return installed?customProviders.taskExecutors():[];
     },
     generate:{claude:generateClaudeText,...(config.codex?{codex:generateCodexTaskText}:{}),...(config.copilot?{copilot:config.copilot.generateTaskText?.bind(config.copilot)}:{})},
     accounts:async()=>{guardCustomProviders();return (await customProviders.list()).filter(p=>p.hasKey).map(({id,name})=>({id,name}));},
@@ -282,7 +315,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     jira: config.jira, jiraForProvider: jira,
     job: id => { try { return jobView(id); } catch { return undefined; } },
     validate: async input => { const cwd = await allowedPath(accessRoots(), input.cwd, true); if (input.provider === 'codex') codex();if(input.provider==='copilot'&&!(await copilot().status()).authenticated)throw new HttpError(409,'Connect GitHub Copilot before starting this task.'); guardProject(cwd, input.id); return cwd; },
-    start: async (input, issue, sessionId) => {
+    start: (input, issue, sessionId) => chatLibrary.resume(input.provider,sessionId,async()=>{
       const cwd = await allowedPath(accessRoots(), input.cwd, true); guardProject(cwd, input.id);
       const existing = allJobs().find(j => j.status === 'running' && j.jira?.site === input.site && j.jira.key === input.key && j.id !== input.id);
       if (existing) throw new HttpError(409, 'An agent is already working on this Jira task. Open its chat first.');
@@ -295,7 +328,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       const baseMessageCount = sessionId ? (input.provider === 'copilot' ? (await copilot().messages(sessionId)).length : input.provider === 'codex' ? await codex().messageCount(sessionId) : (await sdk.getSessionMessages(sessionId, { dir: cwd })).length) : 0;
       const engine = engineFor(input.provider);
       return engine.start({ ...input, mode: input.role === 'developer' ? input.mode : 'plan', cwd, sessionId, baseMessageCount, text: prompt, displayText: `${issue.key}: ${issue.summary}\n\n${issue.description}`, jira: { site: input.site, key: issue.key, summary: issue.summary, url: issue.url } });
-    },
+    }),
   }) : undefined;
   const flow = () => { jira(); return workflow!; };
   app.get('/api/jira/workflow', async (req, res) => {
@@ -340,7 +373,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.post('/api/jira/queue/control', async (req, res) => { const body = z.object({ provider: providerSchema, action: z.enum(['pause', 'resume', 'clear']) }).parse(req.body); res.json(await queueFor(body.provider).control(body.action)); });
   const chatLibrary=new ChatLibrary(path.join(config.uploads,'.chat-library.json'));
+  mountChatErasures(app,chatLibrary,()=>!workspaceAccess.current());
   jobs.onSession(job=>{const account=job.account;if(account)void customProviders.name(account).catch(()=>undefined).then(name=>chatLibrary.tagAccount(job.sessionId,account,name)).catch(()=>{});});
+  const generationStore=new SessionGeneration(path.join(config.uploads,'.tasks','chat-generation'));
+  for(const engine of [jobs,config.codex,config.copilot]){
+    if(engine)engine.recordGeneration=job=>{void generationStore.record(job).catch(()=>{});};
+  }
   const loadSessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if (provider === 'copilot') return copilot().sessions();
     if (provider === 'codex') return codex().sessions();
@@ -361,9 +399,9 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   // Concurrent list/project/history requests share metadata only while loading.
   // Every later request sees Desktop renames, project removal and provider loss.
   const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
-  const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
+  const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude',includeDeleted=false) => {
     if(workspaceAccess.current())return [];
-    const listed=await chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)),workspaceAccess.store.chatLinks());
+    const listed=await chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)),workspaceAccess.store.chatLinks(),includeDeleted);
     if(provider!=='claude')return listed;
     // A chat started with a custom provider keeps that account, so it is listed and resumed with the same provider.
     // Tasks record their account when the session ID appears; this fallback covers tasks listed before that write finished.
@@ -375,7 +413,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {
-    uuid.parse(id);
+    if(provider==='copilot')z.string().min(1).max(4096).parse(id);else uuid.parse(id);
     const found = (await sessions(provider)).find(s => s.sessionId === id);
     if (!found) throw new HttpError(404, 'Чат не найден в разрешённых папках');
     if (found.cwd && (!found.readOnly||workspaceAccess.current())) await allowedPath(accessRoots(), found.cwd, true);
@@ -443,6 +481,25 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/projects',async(_req,res)=>res.json(await projectFolders()));
   app.get('/api/document-projects',async(req,res)=>res.json(await documentProjects(await projectFolders(),z.enum(['rules','changelog','files']).parse(req.query.kind))));
   app.get('/api/sessions', async (req, res) => res.json(await sessions(providerSchema.parse(req.query.provider))));
+  const chatRuns=(provider:'claude'|'codex'|'copilot')=>{
+    const observing=taskChains?.observingJobs();
+    return [
+      ...engineFor(provider).list().map(job=>observing?.has(job.id)?{...job,status:'running' as const}:job),
+      ...(provider==='claude'?terminals.list().filter(t=>t.status==='running'&&t.sessionId):[]),
+    ];
+  };
+  const processChats=mountChatBulkDelete(app,chatLibrary,{
+    personal:()=>!workspaceAccess.current(),sessions,
+    jobs:chatRuns,
+    accounts:()=>customProviders.list(),
+    originals:createChatOriginals({sdk,codex:config.codex,copilot:config.copilot}),
+    allowedOriginalCwd:async cwd=>{try{await allowedPath(accessRoots(),cwd,true);return true;}catch{return false;}},
+    verifyDesktopOriginal:async(id,cwd)=>{
+      const row=await sdk.getSessionInfo?.(id,{dir:cwd});
+      return row?.sessionId===id&&!!row.cwd&&folderKey(row.cwd)===folderKey(cwd);
+    },
+    forget:async(provider,id)=>{await generationStore.forget(provider,id);engineFor(provider).forgetSession?.(id);previews.forget(provider,id);if(provider==='claude')terminals.forgetSession?.(id);},
+  });
   app.get('/api/chat-library/projects',async(_req,res)=>{
     if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
     const data=await chatLibrary.read();res.json(data.projects);
@@ -472,7 +529,16 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({ok:true});
   });
   app.post('/api/sessions/:id/manage',async(req,res)=>{
-    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','board','account']),account:uuid.optional(),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
+    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','erase','board','account']),eraseOriginals:z.boolean().optional(),account:uuid.optional(),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
+    if(body.action==='erase'){
+      if(!body.eraseOriginals)throw new HttpError(400,'Confirm original history removal.');
+      const id=String(req.params.id),result=await processChats({provider:body.provider,account:body.account,ids:[id],action:'delete',eraseOriginals:true});
+      if(result.running.length)throw new HttpError(409,'Stop this chat before deleting it.');
+      if(result.unsupported.length)throw new HttpError(409,'This provider cannot erase original history.');
+      if(result.failed.length)throw new HttpError(502,'The provider could not remove the original chat. Retry the removal.');
+      if(!result.ids.includes(id)&&!result.alreadyRemoved.includes(id))throw new HttpError(404,'Chat unavailable in this account.');
+      res.json({sessionId:id,deleted:true,originalRemoved:true});return;
+    }
     // A chat that has just started can be linked to its board before its provider lists it.
     const found=await session(String(req.params.id),body.provider).catch(error=>{if(body.action==='board'&&error?.status===404&&engineFor(body.provider).list().some(job=>job.sessionId===req.params.id))return {sessionId:String(req.params.id)} as Awaited<ReturnType<typeof session>>;throw error;});
     if(body.action==='account'){
@@ -487,9 +553,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       await chatLibrary.edit(data=>{const key=body.provider+':'+found.sessionId;data.chats[key]={...data.chats[key],board};});
       res.json({sessionId:found.sessionId,board});return;
     }
-    if(body.action==='delete'&&engineFor(body.provider).list().some(j=>j.sessionId===found.sessionId&&j.status==='running'))throw new HttpError(409,'Stop this chat before deleting it');
     if(body.action==='rename'&&!body.title)throw new HttpError(400,'A chat title is required');
-    await chatLibrary.edit(data=>{const key=body.provider+':'+found.sessionId;data.chats[key]={...data.chats[key],...(body.action==='delete'?{deleted:true}:{title:body.title})};});
+    if(body.action==='delete')await chatLibrary.deleteChats(body.provider,(_data,remove)=>{
+      if(chatRuns(body.provider).some(j=>j.sessionId===found.sessionId&&j.status==='running')||!remove(found.sessionId))
+        throw new HttpError(409,'Stop this chat before deleting it');
+    });
+    else await chatLibrary.edit(data=>{const key=body.provider+':'+found.sessionId;data.chats[key]={...data.chats[key],title:body.title};});
     res.json({sessionId:found.sessionId,deleted:body.action==='delete',title:body.title});
   });
   app.post('/api/sessions/:id/branch',async(req,res)=>{
@@ -542,6 +611,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const inline=await previews.inline(()=>previewMessages(provider,s));
     if(!inline)throw new HttpError(404,'This chat has no image.');
     res.json({name:entry.image.name,mimeType:inline.mimeType,data:inline.data});
+  });
+  app.get('/api/sessions/:id/generation',async(req,res)=>{
+    const provider=providerSchema.parse(req.query.provider),chat=await session(req.params.id,provider);
+    const account='account' in chat && typeof chat.account==='string'?chat.account:undefined;
+    const matches=engineFor(provider).list().filter(job=>job.sessionId===chat.sessionId&&job.account===account)
+      .sort((a,b)=>b.startedAt-a.startedAt);
+    res.json({generation:matches.length?matches[0].generation:await generationStore.get(provider,chat.sessionId,account)});
   });
   const chatPageSync=new ChatPageSync();
   app.get('/api/sessions/:id/messages', async (req, res) => {
@@ -646,6 +722,29 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     return engineFor(settings.provider).start({...settings,...turn,approvalTimeoutMs:settings.approvalTimeoutMinutes*60000,...(env?{env}:{})});
   }
   taskChains=new MarkdownChains({
+    eraseChainFiles:(id,jobs)=>purgeChainCopies(config.uploads,id,jobs),
+    manageChats:async(targets,confirmed,eraseOriginals)=>{
+      const reply:ChainDeletePreview={chats:[],running:[],unavailable:[],failed:[],unsupported:[],...(eraseOriginals?{eraseOriginals:true}:{})};
+      const groups=new Map<string,typeof targets>();
+      for(const chat of targets){const key=JSON.stringify([chat.provider,chat.account||'']);const members=groups.get(key);if(members)members.push(chat);else groups.set(key,[chat]);}
+      for(const group of groups.values()){
+        const {provider,account}=group[0],members=new Map(group.map(s=>[s.sessionId,[folderKey(s.cwd)]]));
+        const ids=confirmed?confirmed.filter(s=>s.provider===provider&&s.account===account&&members.has(s.sessionId)).map(s=>s.sessionId):[...members.keys()];
+        if(!ids.length)continue;
+        const names=(ids:string[]):ChainDeleteChat[]=>ids.map(sessionId=>({provider,...(account?{account}:{}),sessionId}));
+        try{
+          const result=await processChats({provider,account,ids,eraseOriginals,action:confirmed?'delete':'preview'},members);
+          reply.chats.push(...names(confirmed?[...result.ids,...result.alreadyRemoved]:result.ids));
+          reply.running.push(...names(result.running));reply.unavailable.push(...names(result.unavailable));
+          reply.failed!.push(...names(result.failed));reply.unsupported!.push(...names(result.unsupported));
+        }catch(error){
+          if(error instanceof HttpError&&error.status===403)throw error;
+          reply.failed!.push(...names(ids));
+        }
+      }
+      return reply;
+    },
+    prepareSources:(id,files)=>stageChainUploads(config.uploads,id,files),
     registerTree:cwd=>{chainRoots.add(cwd);syncManagedRoots(taskRuntime?.roots()??[]);},
     worktrees:new TaskWorktrees(path.join(config.uploads,'.tasks','chain-worktrees'),roots),
     file:path.join(config.uploads,'.tasks','markdown-chains'),
@@ -654,23 +753,23 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       try{return jobView(id);}catch(error){if(error instanceof HttpError&&error.status===404)return undefined;throw error;}
     },
     stop:id=>engineForJob(id).stop(id),
-    start:async(input,id,prompt,verifiedCwd)=>{
+    start:async(input,id,prompt,verifiedCwd,sourcePaths=[])=>{
       const settings=jobSettings.parse(input);
       const cwd=await allowedPath(accessRoots(),settings.cwd,true);
       validateJobSettings(settings);
       await validateJobEffort(settings,cwd);
       if(providerConnections.isSigningIn()||runtimeStopping||config.hostUpdater?.draining)throw new HttpError(409,'The host is unavailable to start this step.');
       let message=prompt;
-      const attachmentPaths:string[]=[];
+      const attachmentPaths:string[]=[...sourcePaths];
       if(prompt.length>60000){
         const directory=path.join(config.uploads,id);
         await mkdir(directory,{recursive:true});
         const file=path.join(directory,'markdown-step.md');
         await writeFile(file,prompt,{flag:'wx',mode:0o600});
-        attachmentPaths.push(file);
+        attachmentPaths.unshift(file);
         message='Run the single chain step described in the attached markdown-step.md file.';
       }
-      const text=attachmentPaths.length?message+'\n\nFiles attached by the user (read these local files as needed):\n'+JSON.stringify(attachmentPaths[0]):message;
+      const text=attachmentPaths.length?message+'\n\nFiles attached by the user (read these local files as needed):\n'+attachmentPaths.map(file=>JSON.stringify(file)).join('\n'):message;
       return launchJob(settings,{id,cwd:verifiedCwd??cwd,text,displayText:message,attachmentPaths,baseMessageCount:0});
     },
   });
@@ -680,15 +779,25 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     return {...scope,cwd:await allowedPath(accessRoots(),scope.cwd,true)};
   }
   const chainSize=1024*1024;
+  const chainExecutor=z.object({provider:z.enum(['claude','codex','copilot']),account:uuid.optional(),model:z.string().regex(modelIdPattern).optional()}).strict();
   const chainPlanSchema=jobSettings.extend({id:uuid,name:z.string().min(1).max(512),context:z.string().max(chainSize),
-    tasks:z.array(z.object({title:z.string().min(1).max(4096),source:z.string().min(1).max(4096),body:z.string().min(1).max(chainSize)})).min(1).max(500)
+    parallelSubtasks:z.boolean().optional(),
+    sourceFiles:z.array(z.object({name:z.string().min(1).max(4096).regex(/^[^\x00-\x1f]+$/),projectPath:z.string().min(1).max(4096).optional(),text:z.string().max(chainSize).optional()}).strict()).max(500).optional(),
+    tasks:z.array(z.object({title:z.string().min(1).max(4096),source:z.string().min(1).max(4096),body:z.string().min(1).max(chainSize),executor:chainExecutor.optional()})).min(1).max(500)
   }).refine(plan=>plan.context.length+plan.tasks.reduce((total,step)=>total+step.title.length+step.body.length+step.source.length,0)<=chainSize,'The chain exceeds the character limit.');
   app.post('/api/task-chains',async(req,res)=>{
     const plan=chainPlanSchema.parse(req.body);
     const scope=await chainScope(plan);
-    engineFor(plan.provider);
-    validateJobSettings(plan);
-    await validateJobEffort(plan,scope.cwd);
+    const checked=new Set<string>();
+    for(const task of plan.tasks){
+      const key=JSON.stringify(task.executor??null);
+      if(checked.has(key))continue;
+      checked.add(key);
+      const settings=jobSettings.parse({...scope,...stepLaunchSettings(scope,plan,task.executor)});
+      engineFor(settings.provider);
+      validateJobSettings(settings);
+      await validateJobEffort(settings,scope.cwd);
+    }
     res.json(await taskChains.create({...plan,...scope}));
   });
   app.get('/api/task-chains',async(req,res)=>{
@@ -696,9 +805,17 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const match=z.object({sessionId:z.string().min(1).max(512).optional(),jobId:uuid.optional()}).parse(req.query);
     res.json(match.jobId||match.sessionId?await taskChains.findStep(scope,match):await taskChains.list(scope));
   });
-  app.get('/api/task-chains/:id',async(req,res)=>res.json(req.query.audit==='1'?await taskChains.audit(uuid.parse(req.params.id),await chainScope(req.query)):await taskChains.get(uuid.parse(req.params.id),await chainScope(req.query))));
+  app.get('/api/task-chains/:id',async(req,res)=>{
+    const id=uuid.parse(req.params.id),scope=await chainScope(req.query);
+    if(req.query.deletePreview==='1')res.json(await taskChains.previewRemoval(id,scope,req.query.eraseOriginals==='1'));
+    else res.json(req.query.audit==='1'?await taskChains.audit(id,scope):await taskChains.get(id,scope));
+  });
   app.post('/api/task-chains/:id/stop',async(req,res)=>res.json(await taskChains.stop(uuid.parse(req.params.id),await chainScope(req.body))));
   app.post('/api/task-chains/:id/delete',async(req,res)=>res.json(await taskChains.remove(uuid.parse(req.params.id),await chainScope(req.body))));
+  app.post('/api/task-chains/:id/delete-chats',async(req,res)=>{
+    const body=z.object({eraseOriginals:z.literal(true),chats:z.array(z.object({provider:z.enum(['claude','codex','copilot']),account:uuid.optional(),sessionId:z.string().min(1).max(4096)}).strict())}).parse(req.body);
+    res.json(await taskChains.remove(uuid.parse(req.params.id),await chainScope(req.body),body));
+  });
   app.post('/api/jobs', async (req, res) => {
     const body = jobSettings.extend({id:uuid,sessionId:uuid.optional(),text:z.string().max(100000),attachments:z.array(uuid).max(10).default([]),
       taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed:z.boolean().default(false)}).parse(req.body);
@@ -712,26 +829,28 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     };
     const existing = allJobs().find(j => j.id === body.id);
     if (existing) { await replyToRetry(existing);return; }
-    await validateJobEffort(body,cwd);
-    if (body.sessionId) {
-      const s = await session(body.sessionId, body.provider);
-      if (await realpath(s.cwd!) !== cwd) throw new HttpError(400, 'Чат относится к другому проекту');
-    }
-    const attached = body.attachments.map(id => {
-      const file = uploads.get(id);
-      if (!file || file.cwd !== cwd || file.expires < Date.now()) throw new HttpError(400, 'Вложение недоступно. Прикрепите файл ещё раз.');
-      return file;
+    await chatLibrary.resume(body.provider,body.sessionId,async()=>{
+      await validateJobEffort(body,cwd);
+      if (body.sessionId) {
+        const s = await session(body.sessionId, body.provider);
+        if (await realpath(s.cwd!) !== cwd) throw new HttpError(400, 'Чат относится к другому проекту');
+      }
+      const attached = body.attachments.map(id => {
+        const file = uploads.get(id);
+        if (!file || file.cwd !== cwd || file.expires < Date.now()) throw new HttpError(400, 'Вложение недоступно. Прикрепите файл ещё раз.');
+        return file;
+      });
+      if (!body.text.trim() && !attached.length) throw new HttpError(400, 'Введите сообщение или прикрепите файл');
+      const prompt = body.text + (attached.length ? '\n\nFiles attached by the user (read these local files as needed):\n' + attached.map(f => JSON.stringify(f.path)).join('\n') : '');
+      const baseMessageCount = body.sessionId ? (body.provider === 'copilot' ? (await copilot().messages(body.sessionId)).length : body.provider === 'codex' ? await codex().messageCount(body.sessionId) : (await sdk.getSessionMessages(body.sessionId, { dir: cwd })).length) : 0;
+      const raced = allJobs().find(j => j.id === body.id);
+      if (raced) { await replyToRetry(raced);return; }
+      if(body.taskRunId)guardProject(cwd,body.id);
+      if(body.sessionId && (allJobs().some(job=>job.id!==body.id && job.status==='running' && (job.provider||'claude')===body.provider && job.sessionId===body.sessionId) || body.provider==='claude' && terminals.list().some(terminal=>terminal.status==='running' && terminal.sessionId===body.sessionId))) throw new HttpError(409,'This chat is already running. Send a follow-up to its active turn.');
+      const bound=await taskRuntime!.bindJob({...body,cwd});
+      try {res.json(await launchJob(body,{id:body.id,cwd,sessionId:body.sessionId,text:prompt,displayText:body.text,attachmentPaths:attached.map(f=>f.path),baseMessageCount}));}
+      catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
     });
-    if (!body.text.trim() && !attached.length) throw new HttpError(400, 'Введите сообщение или прикрепите файл');
-    const prompt = body.text + (attached.length ? '\n\nFiles attached by the user (read these local files as needed):\n' + attached.map(f => JSON.stringify(f.path)).join('\n') : '');
-    const baseMessageCount = body.sessionId ? (body.provider === 'copilot' ? (await copilot().messages(body.sessionId)).length : body.provider === 'codex' ? await codex().messageCount(body.sessionId) : (await sdk.getSessionMessages(body.sessionId, { dir: cwd })).length) : 0;
-    const raced = allJobs().find(j => j.id === body.id);
-    if (raced) { await replyToRetry(raced);return; }
-    if(body.taskRunId)guardProject(cwd,body.id);
-    if(body.sessionId && (allJobs().some(job=>job.id!==body.id && job.status==='running' && (job.provider||'claude')===body.provider && job.sessionId===body.sessionId) || body.provider==='claude' && terminals.list().some(terminal=>terminal.status==='running' && terminal.sessionId===body.sessionId))) throw new HttpError(409,'This chat is already running. Send a follow-up to its active turn.');
-    const bound=await taskRuntime!.bindJob({...body,cwd});
-    try {res.json(await launchJob(body,{id:body.id,cwd,sessionId:body.sessionId,text:prompt,displayText:body.text,attachmentPaths:attached.map(f=>f.path),baseMessageCount}));}
-    catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
   });
   app.post('/api/jobs/:id/messages',async(req,res)=>{
     const id=uuid.parse(req.params.id),body=z.object({id:uuid,text:z.string().max(100000),attachments:z.array(uuid).max(10).default([])}).parse(req.body);
@@ -760,13 +879,15 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/terminals', (_req, res) => res.json(terminals.list()));
   app.post('/api/terminals', async (req, res) => {
     const body = z.object({ id: uuid, cwd: text, sessionId: uuid.optional(), takeoverConfirmed: z.boolean().default(false) }).parse(req.body);
-    const cwd = await allowedPath(accessRoots(), body.cwd, true);
-    guardProject(cwd, body.id);
-    if (body.sessionId) {
-      const s = await session(body.sessionId);
-      if (await realpath(s.cwd!) !== cwd) throw new HttpError(400, 'Чат относится к другому проекту');
-    }
-    res.json(terminals.start({ ...body, cwd }));
+    await chatLibrary.resume('claude',body.sessionId,async()=>{
+      const cwd = await allowedPath(accessRoots(), body.cwd, true);
+      guardProject(cwd, body.id);
+      if (body.sessionId) {
+        const s = await session(body.sessionId);
+        if (await realpath(s.cwd!) !== cwd) throw new HttpError(400, 'Чат относится к другому проекту');
+      }
+      res.json(terminals.start({ ...body, cwd }));
+    });
   });
   app.get('/api/terminals/:id/output', (req, res) => res.json(terminals.output(uuid.parse(req.params.id), z.coerce.number().int().min(-1).default(-1).parse(req.query.cursor))));
   app.post('/api/terminals/:id/input', (req, res) => {
@@ -810,14 +931,16 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json(await readProjectDocument(cwd,text.parse(req.query.path),typeof req.query.known==='string'?req.query.known.slice(0,64):undefined));
   });
   app.get('/api/files', async (req, res) => {
-    const dir = await allowedPath(accessRoots(), text.parse(req.query.path), true);
+    const scope=req.query.cwd===undefined?accessRoots():[await allowedPath(accessRoots(),text.parse(req.query.cwd),true)];
+    const dir = await allowedPath(scope, text.parse(req.query.path), true);
     const entries = await readdir(dir, { withFileTypes: true });
-    res.json({ path: dir, parent: accessRoots().some(r => within(r, path.dirname(dir))) ? path.dirname(dir) : null,
+    res.json({ path: dir, parent: scope.some(r => within(r, path.dirname(dir))) ? path.dirname(dir) : null,
       entries: entries.filter(e => !e.isSymbolicLink()).map(e => ({ name: e.name, directory: e.isDirectory(), path: path.join(dir, e.name) }))
         .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name)) });
   });
   app.get('/api/file', async (req, res) => {
-    const file = await allowedPath(accessRoots(), text.parse(req.query.path));
+    const scope=req.query.cwd===undefined?accessRoots():[await allowedPath(accessRoots(),text.parse(req.query.cwd),true)];
+    const file = await allowedPath(scope, text.parse(req.query.path));
     const info = await stat(file);
     if (!info.isFile()) throw new HttpError(400, 'Выберите файл');
     if (info.size > 2 * 1024 * 1024) throw new HttpError(413, 'Предпросмотр доступен для файлов до 2 МБ');
@@ -845,7 +968,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       engine.start({id,cwd:sourceRoot,text:prompt,displayText:'Check Pocket Code compatibility after an AI runtime update.',mode:'default',codexAccess:'full',maxBudgetUsd:5});
     });
   }
-  const closeTaskServices=async()=>{closeText();await taskChains.close();await disposeNotifications();await taskRuntime!.close();};
+  const closeTaskServices=async()=>{closeText();await generationStore.flush();await taskChains.close();await disposeNotifications();await taskRuntime!.close();};
   app.locals.closeTaskServices=closeTaskServices;
   return { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines, closeTaskServices, taskRuntime };
 }

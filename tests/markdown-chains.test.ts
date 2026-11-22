@@ -66,10 +66,12 @@ test('chains record real chat IDs, approval state and ordered completion with a 
   assert.equal(prompts[0], buildChainStepPrompt(detail, 0));
   assert.ok(!prompts[0].includes(input.tasks[1].body));
   first.approvals = []; first.status = 'done';
+  assert.ok(chains.observingJobs().has(first.id),'the host still needs the completed job to save its handoff');
   first.messages = [{id: 'reply', role: 'assistant', blocks: [{type: 'text', text: 'x'.repeat(6400) + '\nOutline saved.\n' + chainCompletionMarker(input.id, 0)}]}];
   await chains.tick(); await chains.tick();
   detail = await chains.get(input.id, input);
   assert.equal(detail.steps[0].status, 'done');
+  assert.ok(!chains.observingJobs().has(first.id));
   assert.equal(detail.steps[0].handoff?.length, 6000);
   assert.equal(prompts.length, 2);
   assert.equal(prompts[1], buildChainStepPrompt(detail, 1));
@@ -86,6 +88,52 @@ test('chains record real chat IDs, approval state and ordered completion with a 
   assert.deepEqual(await chains.findStep({...input, cwd: 'elsewhere'}, {jobId: second.id}), []);
   assert.deepEqual(await chains.findStep(input, {}), []);
   assert.ok(!chains.hasWork());
+});
+
+test('assigned steps route handoffs, retries and chat links through their own provider and account',async t=>{
+  const {input,options,jobs}=await fixture(t);
+  const launched:ChainInput[]=[];
+  const store=new MarkdownChains({...options,accountName:async()=> 'Fixture API',start:(settings,id,prompt)=>{
+    launched.push(settings);return options.start(settings,id,prompt);
+  }});
+  t.after(()=>store.close());
+  const account=randomUUID(), model='fixture-model';
+  const owner={cwd:input.cwd,provider:'codex' as const};
+  const plan={...input,model:'fixture-default',reasoningEffort:'medium',codexAccess:'auto' as const,tasks:[
+    {...input.tasks[0],executor:{provider:'claude' as const,account,model}},input.tasks[1]
+  ]};
+  const created=await store.create(plan);
+  assert.equal(created.steps[0].executorAccountName,'Fixture API');
+  assert.deepEqual((await store.create(plan)).steps,created.steps);
+  await assert.rejects(store.create({...plan,tasks:input.tasks}),/already used/);
+  await store.tick();
+  const first=[...jobs.values()][0]; first.sessionId=randomUUID();first.status='done';
+  first.messages=[{id:'reply',role:'assistant',blocks:[{type:'text',text:'Retry the check.'}]}];
+  await store.tick();
+  const pending=await store.get(plan.id,owner);
+  t.mock.method(Date,'now',()=>pending.steps[0].retryAt!+1);
+  await store.tick();
+  const retry=[...jobs.values()][1];retry.sessionId=randomUUID();retry.status='done';
+  retry.messages=[{id:'done',role:'assistant',blocks:[{type:'text',text:'Check passed.\n'+chainCompletionMarker(plan.id,0)}]}];
+  await store.tick();await store.tick();
+  assert.equal(launched.length,3);
+  for(const settings of launched.slice(0,2)){
+    assert.equal(settings.provider,'claude');assert.equal(settings.account,account);assert.equal(settings.model,model);
+    assert.equal(settings.reasoningEffort,undefined);assert.equal(settings.codexAccess,undefined);
+  }
+  assert.equal(launched[2].provider,'codex');assert.equal(launched[2].model,plan.model);
+  assert.equal(launched[2].account,undefined);assert.equal(launched[2].reasoningEffort,'medium');
+  const link=await store.findStep({...owner,provider:'claude',account},{sessionId:retry.sessionId});
+  const previous=await store.findStep({...owner,provider:'claude',account},{sessionId:first.sessionId});
+  assert.equal(previous[0]?.stepIndex,0);
+  const saved=JSON.parse(await readFile(path.join(options.file,plan.id+'.json'),'utf8'));
+  assert.deepEqual(saved.attempts.slice(0,2).map((a:{provider:string;account:string;sessionId:string})=>[a.provider,a.account,a.sessionId]),[
+    ['claude',account,first.sessionId],['claude',account,retry.sessionId],
+  ]);
+  assert.equal(link[0].id,plan.id);assert.deepEqual(link[0].owner,{...owner,account:undefined});
+  assert.deepEqual(await store.findStep(owner,{sessionId:retry.sessionId}),[]);
+  assert.deepEqual(await store.findStep({...owner,provider:'claude'},{sessionId:retry.sessionId}),[]);
+  await assert.rejects(store.get(plan.id,{...owner,provider:'claude',account}),/not found/);
 });
 
 test('only the final assistant reply may confirm completion', async t => {
@@ -215,4 +263,30 @@ test('removal erases terminal task content durably, retains chats and rejects st
     await assert.rejects(restored.create(input), /already used/);
     await assert.rejects(restored.remove(input.id, {...input, cwd: 'other'}), /not found/);
   } finally { await restored.close(); }
+});
+
+test('step delegation is explicit in its prompt and child activity is scoped to that step',async t=>{
+  const {chains,input,jobs,prompts}=await fixture(t);
+  await chains.create({...input,parallelSubtasks:true});
+  await chains.tick();
+  assert.match(prompts[0],/use your native subagent tools/);
+  const job=[...jobs.values()][0];
+  const child={id:'child',name:'Inspect glossary',provider:'codex' as const,status:'running' as const};
+  job.messages=[{id:'tool',role:'assistant',blocks:[{type:'subagent',agent:child}]}];
+  const read=()=>chains.get(input.id,input);
+  assert.deepEqual((await read()).steps[0].subtasks,[{id:'child',name:'Inspect glossary',status:'running'}]);
+  await chains.tick();
+  const sibling={...child,id:'peer',name:'Check sources',status:'completed' as const};
+  // A newer transcript window may omit a previously observed child.
+  job.messages=[{id:'peer',role:'assistant',blocks:[{type:'subagent',agent:sibling}]}];
+  await chains.tick();
+  assert.deepEqual((await read()).steps[0].subtasks?.map(item=>item.id),['child','peer']);
+  job.messages=[{id:'tool-done',role:'assistant',blocks:[{type:'subagent',agent:{...child,status:'completed'}}]}];
+  job.messages.push({id:'final',role:'assistant',blocks:[{type:'text',text:chainCompletionMarker(input.id,0)}]});
+  job.status='done'; await chains.tick();
+  const result=await read();
+  assert.deepEqual(result.steps[0].subtasks,[{id:'child',name:'Inspect glossary',status:'completed'},{id:'peer',name:'Check sources',status:'completed'}]);
+  assert.equal(result.steps[1].subtasks,undefined);
+  assert.match(buildChainStepPrompt({...result,parallelSubtasks:false},1),/without delegating/);
+  assert.doesNotMatch(buildChainStepPrompt({...result,parallelSubtasks:undefined},1),/subagent/);
 });

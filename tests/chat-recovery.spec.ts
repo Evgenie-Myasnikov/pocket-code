@@ -29,6 +29,64 @@ async function connect(page:Page,provider='codex',firstMessage=1){
 async function submit(page:Page){
   await page.getByRole('button',{name:'Send message',exact:true}).click();
 }
+
+test('phone reopens the saved reply during sync and removes it when the host denies access',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await host(page);
+  await page.route('**/api/sessions?*',route=>route.fulfill({json:['saved-chat','second-chat'].map(sessionId=>({sessionId,cwd:root,summary:sessionId==='saved-chat'?'Saved claude chat':'Second chat',lastModified:1}))}));
+  await page.route('**/api/sessions/second-chat/messages?*',route=>route.fulfill({json:{messages:[message(2)],previous:null,next:null}}));
+  await connect(page,'claude');
+  const back=page.getByRole('button',{name:'Back to chats',exact:true});
+  await back.click();await page.getByRole('button',{name:/Second chat/}).click();
+  await expect(page.getByText('History message 2',{exact:true})).toBeVisible();await back.click();
+  const pending=gate();let denied=false;
+  await page.route('**/api/sessions/saved-chat/messages?*',async route=>{
+    await pending.promise;denied=true;return route.fulfill({status:403,json:{error:'Access removed'}});
+  });
+  await page.getByRole('button',{name:/Saved claude chat/}).click();
+  await expect(page.getByText('History message 1',{exact:true})).toBeVisible();expect(denied).toBe(false);
+  pending.resolve();await expect(page.getByText('Access removed',{exact:true})).toBeVisible();
+  await expect(page.getByText('History message 1',{exact:true})).toHaveCount(0);
+});
+
+test('a reconnected phone purges another device’s erased chat without reopening it',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await host(page);
+ let erased=false,readsOfErased=0,feedReads=0,unsupported=true;
+ const first='1'.repeat(64),second='2'.repeat(64);
+ await page.route('**/api/chat-library/erasures*',route=>{
+   feedReads++;
+   if(unsupported)return route.fulfill({status:404,json:{error:'Old host'}});
+   const revision=erased?second:first,known=new URL(route.request().url()).searchParams.get('known');
+   return route.fulfill({json:known===revision?{unchanged:true,revision}:{revision,entries:erased?[{provider:'claude',sessionId:'saved-chat'}]:[],next:null}});
+ });
+ await page.route('**/api/sessions?*',route=>route.fulfill({json:(erased?['other']:['saved-chat','other']).map(sessionId=>({sessionId,cwd:root,summary:sessionId==='other'?'Other chat':'Saved claude chat',lastModified:1}))}));
+ await page.route('**/api/sessions/saved-chat/messages?*',route=>{if(erased)readsOfErased++;return route.fulfill({json:{messages:[message(1)],previous:null,next:null}});});
+ await connect(page,'claude');
+ await expect.poll(()=>feedReads).toBeGreaterThan(0);
+ const cached=()=>page.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('pocket-code-chats-v1:')&&localStorage.getItem(k)?.includes('"chat:saved-chat"')));
+ await expect.poll(cached).toBe(true);await page.getByRole('button',{name:'Back to chats',exact:true}).click();
+ await page.getByRole('button',{name:/Other chat/}).click();await expect(page.getByText('History message 1',{exact:true})).toBeVisible();
+ unsupported=false;await page.evaluate(()=>window.dispatchEvent(new Event('pocket-recovered')));
+ await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).some(k=>k.endsWith(':erasures')&&localStorage.getItem(k)==='1'.repeat(64)))).toBe(true);
+ erased=true;await page.evaluate(()=>window.dispatchEvent(new Event('pocket-recovered')));
+ await expect.poll(cached).toBe(false);
+ await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).some(k=>k.endsWith(':erasures')&&localStorage.getItem(k)==='2'.repeat(64)))).toBe(true);
+ await page.getByRole('button',{name:'Back to chats',exact:true}).click();
+ await expect(page.getByRole('button',{name:/Saved claude chat/})).toHaveCount(0);await expect(page.getByRole('button',{name:/Other chat/})).toBeVisible();
+ expect(readsOfErased).toBe(0);
+});
+test('a peer erasure closes the open mobile chat and preserves drafts in surviving chats',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await host(page);
+ let erased=false;
+ await page.route('**/api/chat-library/erasures*',route=>route.fulfill({json:{revision:(erased?'2':'1').repeat(64),entries:erased?[{provider:'claude',sessionId:'saved-chat'}]:[],next:null}}));
+ await page.route('**/api/sessions?*',route=>route.fulfill({json:(erased?['other']:['saved-chat','other']).map(sessionId=>({sessionId,cwd:root,summary:sessionId==='other'?'Other chat':'Saved claude chat',lastModified:1}))}));
+ await connect(page,'claude');
+ const back=page.getByRole('button',{name:'Back to chats',exact:true}),other=page.getByRole('button',{name:/Other chat/}),composer=page.getByLabel('Message Claude');
+ await back.click();await other.click();await composer.fill('Keep this draft in Other chat');
+ await back.click();await page.getByRole('button',{name:/Saved claude chat/}).click();await composer.fill('Draft for erased chat only');
+ erased=true;await page.evaluate(()=>window.dispatchEvent(new Event('pocket-recovered')));
+ await expect(other).toBeVisible();await expect(page.getByRole('button',{name:'Saved claude chat',exact:true})).toHaveCount(0);
+ await expect(composer).toBeHidden();await other.click();await expect(composer).toHaveValue('Keep this draft in Other chat');
+});
 async function rejectedHost(page:Page){
   await host(page);const reject=gate(),sent:any[]=[];let job:any;
   await page.route('**/api/jobs',route=>{

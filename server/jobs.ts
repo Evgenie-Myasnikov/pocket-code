@@ -9,6 +9,7 @@ import { updateClaudeAgents, updateClaudeAgentResults } from './subagents.js';
 import {Followups,type FollowupInput} from './followups.js';
 import {PromptStream} from './prompt-stream.js';
 import {ToolInputPreviews} from './write-preview.js';
+import {ClaudeGeneration} from './provider-generation.js';
 import {projectBoardInstructions} from './project-rules.js';
 
 type Run = typeof query;
@@ -36,6 +37,7 @@ function claudeNotice(job: Job, event: any): ChatMessage | undefined {
 export class Jobs {
   private boardMcp:BoardMcpConfiguration=()=>({});
   setBoardMcpConfiguration(config:BoardMcpConfiguration){this.boardMcp=config;}
+  recordGeneration?:(job:JobView)=>void;
   private jobs = new Map<string, Job>();
   private sessionListeners: ((job: { sessionId: string; account?: string }) => void)[] = [];
   /** Called once a task learns its session ID, so a custom provider account is recorded before any list request. */
@@ -47,6 +49,9 @@ export class Jobs {
     return view;
   }
   list() { return [...this.jobs.values()].map(j => ({ ...this.view(j), messages: [], partial: '', writePreviews:undefined })); }
+  forgetSession(id:string) {
+    for(const [jobId,job] of this.jobs)if(job.sessionId===id&&job.status!=='running')this.jobs.delete(jobId);
+  }
   trimCompleted() {
     for (const job of [...this.jobs.values()].filter(j => j.status !== 'running').sort((a, b) => a.startedAt - b.startedAt)) {
       if (this.jobs.size < 90) break;
@@ -102,6 +107,7 @@ export class Jobs {
   async execute(job: Job, input: Parameters<Jobs['start']>[0]) {
     let stream: ReturnType<Run> | undefined;
     const previews=new ToolInputPreviews();
+    const generation=new ClaudeGeneration();
     let historySize = JSON.stringify(job.messages).length;
     let historyCount = job.messages.length;
     try {
@@ -124,6 +130,7 @@ export class Jobs {
         // Forwarded child messages have their own session/deltas/results. They must
         // neither replace the parent identity nor be appended to its transcript.
         if ('parent_tool_use_id' in event && event.parent_tool_use_id) { job.revision++; continue; }
+        generation.observe(job,event);
         if (event.type==='stream_event' && !job.stopRequested && !job.controller.signal.aborted) {
           const part=event.event;
           if (part.type==='message_start') previews.clear(job);
@@ -161,7 +168,7 @@ export class Jobs {
             job.error = ('errors' in event && event.errors.length ? event.errors.join('\n') : 'result' in event ? event.result : '') || 'Claude завершил задачу с ошибкой';
           }
           const next=!event.is_error&&!job.stopRequested&&!job.controller.signal.aborted?job.waiting.shift():undefined;
-          if(next){queueView(job);job.messages.push({id:next.id,role:'user',blocks:userInputBlocks(next)});job.inputs.push(next.id,next.text,job.sessionId);}
+          if(next){generation.nextTurn(job);queueView(job);job.messages.push({id:next.id,role:'user',blocks:userInputBlocks(next)});job.inputs.push(next.id,next.text,job.sessionId);}
           else{job.acceptingInput=false;job.inputs.close();}
         }
         job.revision++;
@@ -193,6 +200,7 @@ export class Jobs {
       // A missing completion event is not proof that a historical agent is active.
       for (const block of job.messages.flatMap(m => m.blocks)) if (block.agent?.status === 'running') block.agent.status = job.status === 'stopped' ? 'stopped' : 'unknown';
       for (const resolve of [...job.pending.values()]) resolve({ behavior: 'deny', message: 'Задача завершена' });
+      if(this.jobs.get(job.id)===job)this.recordGeneration?.(job);
       job.messagesRevision = (job.messagesRevision || 0) + 1; job.revision++;
     }
   }

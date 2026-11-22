@@ -48,6 +48,11 @@ export class TaskWorktrees{
     if(![base,head].every(ref=>/^[a-f0-9]{40,64}$/.test(ref)))throw new HttpError(400,'Invalid audit commits.');
     return git(cwd,['diff','--no-ext-diff','--no-textconv',base,head,'--'],[],32_000_000);
   }
+  async projectDirectory(tree:TaskWorktree) {
+    const root=await this.verify(tree);
+    const original=await allowedPath([tree.repositoryRoot],tree.projectPath,true);
+    return allowedPath([root],path.join(root,path.relative(tree.repositoryRoot,original)),true);
+  }
   async completedHead(tree:TaskWorktree) {
     const cwd=await this.verify(tree);
     if((await git(cwd,['status','--porcelain'],await filterOverrides(cwd))).trim())return;

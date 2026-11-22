@@ -120,7 +120,10 @@ class ToolInput {
     }
     this.flushText();
   }
-  view() {return !this.invalid && this.havePath && this.path && this.haveContent ? this.text.view(this.id,this.schema.tool,this.path) : undefined;}
+  view() {
+    if(this.invalid||!this.haveContent||!this.text.totalBytes&&!this.havePath)return;
+    return this.text.view(this.id,this.schema.tool,this.havePath?this.path:'');
+  }
 }
 
 /** Lives only in the running provider driver; public snapshots contain decoded fields only. */

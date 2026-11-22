@@ -9,12 +9,15 @@ export const CODEX_THREAD_BUSY = 'This chat is open in Codex on the PC. Its hist
 export class CodexRequestError extends Error {
   readonly errorCode?: 'codex_thread_busy';
   readonly code?: number;
+  readonly missingThreadId?: string;
   constructor(readonly method: string, error: NonNullable<RpcEnvelope['error']>) {
     const busy = method === 'thread/resume' && error.code === -32600 && /^thread [a-zA-Z0-9_-]{1,128} already has an active writer\.?$/.test(error.message?.trim() || '');
     // Only a recognized protocol condition may become a public explanation. Raw
     // error messages can contain local paths, account data or private config.
     super(busy ? CODEX_THREAD_BUSY : `Codex rejected ${method} (${error.code ?? 'unknown'}).`);
     this.name = 'CodexRequestError'; this.code = error.code;
+    if (error.code === -32600 && (method === 'thread/delete' || method === 'thread/read'))
+      this.missingThreadId = /^(?:no rollout found for thread id |thread not loaded: )([a-zA-Z0-9_-]{1,128})$/.exec(error.message || '')?.[1];
     if (busy) this.errorCode = 'codex_thread_busy';
   }
 }

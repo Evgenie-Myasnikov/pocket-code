@@ -64,17 +64,26 @@ export class SessionPreviews{
     this.running++;
     try{return await work();}finally{this.running--;this.waiting.shift()?.();}
   }
+  forget(provider:string,sessionId:string){
+    for(const cache of [this.entries,this.pending]){
+      for(const key of cache.keys()){
+        const last=key.lastIndexOf(':');
+        if(key.slice(0,last)===provider+':'+sessionId)cache.delete(key);
+      }
+    }
+  }
   get(provider:string,sessionId:string,lastModified:number,read:()=>Promise<ChatMessage[]>):Promise<PreviewEntry>{
     const key=provider+':'+sessionId+':'+lastModified,cached=this.entries.get(key);
     if(cached){this.entries.delete(key);this.entries.set(key,cached);return Promise.resolve(cached);}
     const running=this.pending.get(key);if(running)return running;
     const promise=this.slot(async()=>{const {text,image}=previewFromMessages(await read());return {text,image};}).then(entry=>{
+      if(this.pending.get(key)!==promise)return entry;
       // An older version of the same chat never outlives a newer one.
       for(const old of this.entries.keys())if(old.startsWith(provider+':'+sessionId+':'))this.entries.delete(old);
       this.entries.set(key,entry);
       while(this.entries.size>(this.options.capacity??500))this.entries.delete(this.entries.keys().next().value!);
       return entry;
-    }).finally(()=>this.pending.delete(key));
+    }).finally(()=>{if(this.pending.get(key)===promise)this.pending.delete(key);});
     this.pending.set(key,promise);return promise;
   }
   /** Inline image bytes are read again on request so the cache only ever holds short text and file names. */

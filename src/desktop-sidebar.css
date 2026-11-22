@@ -126,6 +126,14 @@
 .rail-chat-folder[open]>summary>svg:first-child { transform:rotate(90deg); }
 .rail-chat-folder>summary>svg { color:var(--muted); flex:none; }
 .rail-chat-folder>summary>span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.folder-chat-actions{margin-inline-start:auto;display:grid;place-items:center;flex:none;padding:4px;border:0;border-radius:5px;background:transparent;color:var(--muted);opacity:0}
+.rail-chat-folder>summary:is(:hover,:focus-within) .folder-chat-actions,.folder-chat-actions:focus-visible{opacity:1}
+.folder-chat-actions:hover{background:var(--bg-active);color:var(--text)}
+.desktop-app>.desktop-rail .bulk-toolbar{display:inline-flex;align-items:center}
+.desktop-app>.desktop-rail .bulk-toolbar .icon-button{opacity:1}
+.desktop-app>.desktop-rail .desktop-sessions>button[data-marked=true]>.marked-chat-check{display:block;flex:none;color:var(--accent)}
+.bulk-folder-path{overflow-wrap:anywhere}.bulk-dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-block-start:16px}
+@media(pointer:coarse){.folder-chat-actions{opacity:1;min-width:40px;min-height:40px}}
 .rail-chat-folder>summary:focus-visible,.rail-quick-chats button:focus-visible { outline:2px solid var(--ring); outline-offset:-2px; }
 .desktop-rail .rail-chat-folder .desktop-sessions { margin-inline-start:14px; padding-inline-start:4px; border-inline-start:1px solid var(--border-subtle); }
 @media(pointer:coarse){.desktop-rail .rail-quick-chats button,.desktop-rail .rail-chat-folder>summary{min-height:44px}}

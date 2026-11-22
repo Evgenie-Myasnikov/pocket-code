@@ -65,3 +65,6 @@
   .improve-dialog header h2 { font-size:1.17rem; }
 }
 @media (forced-colors:active) { .improve-provider-choice:has(:checked) { outline:2px solid Highlight; } }
+
+.improve-provider-status{margin:0;padding:0;list-style:none;color:var(--muted);font-size:.85rem;display:grid;gap:.3rem}
+.improve-refresh{justify-self:start;align-self:flex-start}

@@ -1,14 +1,15 @@
 import {createHash, randomUUID} from 'node:crypto';
-import {mkdir, readFile, readdir, rename, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, readdir, rename, stat, writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import {buildChainStepPrompt, chainCompletionMarker, type MarkdownChainDetail, type MarkdownChainStep, type MarkdownChainSummary} from '../src/markdown-chain.js';
+import {buildChainStepPrompt, chainCompletionMarker, type ChainExecutor, type ChainSourceInput, type MarkdownChainDetail, type MarkdownChainStep, type MarkdownChainSummary} from '../src/markdown-chain.js';
 import type {CodexAccess} from './codex-access.js';
-import {HttpError} from './security.js';
+import {allowedPath,HttpError} from './security.js';
 import type {JobView} from './types.js';
+import type {ChainDeleteChat,ChainDeletePreview} from '../src/markdown-chain.js';
 import {activityItem} from './activity.js';
 
 export type ChainScope = Pick<MarkdownChainDetail, 'cwd' | 'provider' | 'account'>;
-type Task = Pick<MarkdownChainStep, 'title' | 'body' | 'source'>;
+type Task = Pick<MarkdownChainStep, 'title' | 'body' | 'source' | 'executor'>;
 type LaunchSettings = {
   model?: string;
   mode?: 'default' | 'plan';
@@ -19,16 +20,48 @@ type LaunchSettings = {
   maxBudgetUsd?: number;
   approvalTimeoutMinutes?: number;
 };
-export type ChainInput = ChainScope & LaunchSettings & {id: string; name: string; context: string; tasks: Task[]};
-type RecordV1 = { stacked?:boolean; trees?:Record<number,TaskWorktree>;version: 1; created: number; fingerprint: string; settings: LaunchSettings; chain: MarkdownChainDetail};
-type DeletedRecord = {version: 1; deletedScope: string};
+export type ChainInput = ChainScope & LaunchSettings & {id: string; name: string; context: string; tasks: Task[]; parallelSubtasks?:boolean; sourceFiles?:ChainSourceInput[]};
+export function stepLaunchSettings(scope: ChainScope, settings: LaunchSettings, executor?: ChainExecutor) {
+  if (!executor) return {provider:scope.provider, account:scope.account, ...settings};
+  const sameAccount=executor.provider===scope.provider && executor.account===scope.account;
+  const model=executor.model ?? (sameAccount ? settings.model : undefined);
+  const sameModel=sameAccount && model===settings.model;
+  return {
+    provider:executor.provider, account:executor.account, model,
+    approvalTimeoutMinutes:settings.approvalTimeoutMinutes, maxBudgetUsd:settings.maxBudgetUsd, mode:settings.mode,
+    reasoningEffort:sameModel && executor.provider==='codex' ? settings.reasoningEffort : undefined,
+    claudeEffort:sameModel && executor.provider==='claude' ? settings.claudeEffort : undefined,
+    claudeAccess:sameAccount && executor.provider==='claude' ? settings.claudeAccess : undefined,
+    codexAccess:executor.provider==='codex' ? (sameAccount ? settings.codexAccess : 'ask' as const) : undefined,
+  };
+}
+type Attempt=Omit<ChainDeleteChat,'sessionId'>&{step:number;jobId?:string;sessionId?:string;cwd:string};
+export type ChainChatTarget=ChainDeleteChat&{cwd:string};
+type RemovalResult=ChainDeletePreview&{ok:boolean};
+type Intent={chats:ChainDeleteChat[];eraseOriginals:boolean};
+type RecordV1 = { attempts?:Attempt[]; deleting?:Intent; sourceUploads?:{name:string;text:string}[]; stacked?:boolean; trees?:Record<number,TaskWorktree>;version: 1; created: number; fingerprint: string; settings: LaunchSettings; chain: MarkdownChainDetail};
+type DeletedRecord = {version: 1; deletedScope: string;result?:RemovalResult;intentHash?:string;audit?:{tree:TaskWorktree;base:string;head:string}};
+const chatKey=(s:ChainDeleteChat)=>JSON.stringify([s.provider,s.account||'',s.sessionId]);
+const intentHash=(intent:Intent)=>createHash('sha256').update(JSON.stringify([intent.eraseOriginals,intent.chats.map(chatKey).sort()])).digest('hex');
+function updateAttempt(record:RecordV1,index:number){
+  const step=record.chain.steps[index],owner=step.executor??record.chain;
+  if(!step.jobId&&!step.sessionId)return;
+  const attempts=record.attempts??=[];
+  let seen=attempts.find(a=>a.step===index&&(step.jobId?a.jobId===step.jobId:a.sessionId===step.sessionId));
+  if(!seen){seen={step:index,provider:owner.provider,account:owner.account,cwd:record.chain.cwd,jobId:step.jobId};attempts.push(seen);}
+  seen.cwd=step.launchCwd||step.worktreeCwd||record.chain.cwd;
+  if(step.sessionId)seen.sessionId=step.sessionId;
+}
 import type {TaskWorktree,TaskWorktrees} from './task-worktrees.js';
 type Options = {
   worktrees?:TaskWorktrees;
   registerTree?(cwd:string):void;
+  prepareSources?(id:string,files:ReadonlyArray<{name:string;text?:string}>):Promise<Record<string,string>>;
   file: string;
   accountName?(id: string): Promise<string | undefined>;
-  start(input: ChainInput, jobId: string, prompt: string, verifiedCwd?:string): Promise<JobView> | JobView;
+  manageChats?(targets:ChainChatTarget[],confirmed:ChainDeleteChat[]|undefined,eraseOriginals:boolean):Promise<ChainDeletePreview>;
+  eraseChainFiles?(chainId:string,jobIds:string[]):Promise<void>;
+  start(input: ChainInput, jobId: string, prompt: string, verifiedCwd?:string, sourcePaths?:string[]): Promise<JobView> | JobView;
   view(jobId: string): Promise<JobView | undefined> | JobView | undefined;
   stop(jobId: string): Promise<void> | void;
   intervalMs?: number;
@@ -40,7 +73,17 @@ const sameScope = (chain: ChainScope, scope: ChainScope) =>
 const scopeHash = ({cwd, provider, account}: ChainScope) =>
   createHash('sha256').update(JSON.stringify([cwd, provider, account])).digest('hex');
 const outputLimit = 12000;
+async function sourceFileAt(folder:string,relative:string) {
+  const file=await allowedPath([folder],path.join(folder,...relative.split('/')));
+  if(!(await stat(file)).isFile())throw new HttpError(400,'A selected source must be a file.');
+}
 function captureOutput(chain: MarkdownChainDetail, step: MarkdownChainStep, job: JobView) {
+  const children = new Map((step.subtasks ?? []).map(child => [child.id, child]));
+  for (const message of job.messages) for (const block of message.blocks) {
+    const agent = block.agent;
+    if (agent) children.set(agent.id, {id:agent.id, name:agent.name.slice(0, 160), status:agent.status});
+  }
+  if (children.size) step.subtasks = [...children.values()];
   // Providers may still retain an outstanding delta when a job terminates.
   // A committed final answer is the source of the completed step's result.
   let text = job.status === 'done' ? '' : job.partial;
@@ -76,7 +119,7 @@ function summary(chain: MarkdownChainDetail): MarkdownChainSummary {
 
 export class MarkdownChains {
   private records = new Map<string, RecordV1>();
-  private deleted = new Map<string, string>();
+  private deleted = new Map<string, DeletedRecord>();
   private restored?: Promise<void>;
   private tail: Promise<unknown> = Promise.resolve();
   private timer?: ReturnType<typeof setTimeout>;
@@ -95,6 +138,7 @@ export class MarkdownChains {
     await rename(file + '.tmp', file);
   }
   private async save(record: RecordV1) {
+    record.chain.steps.forEach((_,index)=>updateAttempt(record,index));
     await this.writeRecord(record.chain.id, record);
     this.records.set(record.chain.id.toLowerCase(), record);
   }
@@ -111,7 +155,7 @@ export class MarkdownChains {
     for (const name of names.filter(name => name.endsWith('.json') && uuid.test(name.slice(0, -5)))) {
       const record: RecordV1 | DeletedRecord = JSON.parse(await readFile(path.join(this.options.file, name), 'utf8'));
       if ('deletedScope' in record && record.version === 1 && /^[a-f\d]{64}$/.test(record.deletedScope)) {
-        this.deleted.set(name.slice(0, -5).toLowerCase(), record.deletedScope);
+        this.deleted.set(name.slice(0, -5).toLowerCase(), record);
         continue;
       }
       if (!('chain' in record)) throw new Error('Cannot restore Markdown chain record.');
@@ -123,6 +167,7 @@ export class MarkdownChains {
         try{const cwd=await this.options.worktrees?.verify(tree);if(cwd)this.options.registerTree?.(cwd);}catch{/* Missing trees never grant access. */}
       }
       const hadLinks = record.chain.steps.some(s => s.jobId);
+      record.chain.steps.forEach((_,index)=>updateAttempt(record,index));
       for (const step of record.chain.steps) delete step.jobId;
       if (record.chain.status === 'running' && record.chain.steps.some(s => s.retryAt !== undefined)) {
         await this.save(record);
@@ -141,6 +186,9 @@ export class MarkdownChains {
         else this.records.set(record.chain.id.toLowerCase(), record);
       }
     }
+    for(const record of [...this.records.values()])if(record.deleting){
+      try{await this.finishRemoval(structuredClone(record),record.deleting);}catch{/* A later scoped request can retry the durable confirmed selection. */}
+    }
   }
   private schedule() {
     if (this.closed || this.timer || !this.hasWork()) return;
@@ -151,6 +199,13 @@ export class MarkdownChains {
     this.timer.unref();
   }
   hasWork() { return [...this.records.values()].some(r => r.chain.status === 'running'); }
+  observingJobs(){
+    const ids=new Set<string>();
+    for(const {chain} of this.records.values())if(chain.status==='running'){
+      for(const step of chain.steps)if(step.jobId&&activeStep(step))ids.add(step.jobId);
+    }
+    return ids;
+  }
 
   private async detail(record: RecordV1) {
     const chain = structuredClone(record.chain);
@@ -171,20 +226,48 @@ export class MarkdownChains {
       if (this.deleted.has(key)) throw new HttpError(409, 'Chain identifier already used.');
       const {model, mode, reasoningEffort, claudeEffort, claudeAccess, codexAccess, maxBudgetUsd, approvalTimeoutMinutes} = input;
       const settings = {model, mode, reasoningEffort, claudeEffort, claudeAccess, codexAccess, maxBudgetUsd, approvalTimeoutMinutes};
+      const sources=input.sourceFiles??[];
+      const labels=new Set<string>();
+      let uploadBytes=0;
+      for(const file of sources){
+        if(labels.has(file.name))throw new HttpError(400,'Selected source file names must be unique.');
+        labels.add(file.name);
+        if(file.projectPath!==undefined && (file.text!==undefined ||
+          /[\\:\x00-\x1f]/.test(file.projectPath) || file.projectPath.split('/').some(p=>!p||p==='.'||p==='..')))
+          throw new HttpError(400,'Invalid project-relative source file path.');
+        if(file.text!==undefined)uploadBytes+=Buffer.byteLength(file.text);
+      }
+      if(uploadBytes>1024*1024)throw new HttpError(413,'Uploaded source text exceeds 1 MiB.');
+      const sourceUploads=sources.flatMap(file=>file.text===undefined?[]:[{name:file.name,text:file.text}]);
       const chain: MarkdownChainDetail = {
         id: input.id, cwd: input.cwd, provider: input.provider, account: input.account, name: input.name,
         context: input.context, status: 'running',
-        steps: input.tasks.map(({title, source, body}) => ({title, source, body, status: 'pending'}))
+        ...(input.parallelSubtasks!==undefined?{parallelSubtasks:input.parallelSubtasks}:{}),
+        ...(sources.length?{sourceFiles:sources.map(({name,projectPath})=>({name,projectPath}))}:{}),
+        steps: input.tasks.map(({title, source, body, executor}) => ({title, source, body, executor:executor && {...executor}, status: 'pending'}))
       };
-      const fingerprint = createHash('sha256').update(JSON.stringify([settings, chain])).digest('hex');
+      const fingerprint = createHash('sha256').update(JSON.stringify([settings, chain,...(sourceUploads.length?[sourceUploads]:[])])).digest('hex');
       const previous = this.records.get(key);
       if (previous) {
         if (previous.fingerprint !== fingerprint) throw new HttpError(409, 'Chain identifier already used.');
         return this.detail(previous);
       }
       const record: RecordV1 = {version: 1, created: Date.now(), fingerprint, settings, chain};
+      for(const file of sources)if(file.projectPath)await sourceFileAt(chain.cwd,file.projectPath);
+      if(sourceUploads.length)record.sourceUploads=sourceUploads;
       record.stacked = await this.options.worktrees?.hasRepository(input.cwd);
       if (chain.account) chain.accountName = await this.options.accountName?.(chain.account);
+      const accounts=new Map<string,string|undefined>();
+      if(chain.account)accounts.set(chain.account,chain.accountName);
+      for(const step of chain.steps){
+        if(!step.executor)continue;
+        const {account,model}=stepLaunchSettings(chain,settings,step.executor);
+        if(model)step.executor.model=model;
+        if(account){
+          if(!accounts.has(account))accounts.set(account,await this.options.accountName?.(account));
+          step.executorAccountName=accounts.get(account);
+        }
+      }
       await this.save(record);
       this.schedule();
       return this.detail(record);
@@ -197,11 +280,21 @@ export class MarkdownChains {
   }
   async findStep(scope: ChainScope, match: {sessionId?: string; jobId?: string}) {
     await this.init();
-    for (const {chain} of this.records.values()) {
-      if (chain.provider!==scope.provider || chain.account!==scope.account) continue;
-      const stepIndex = chain.steps.findIndex(step =>
-        (match.sessionId && step.sessionId === match.sessionId) || (match.jobId && step.jobId === match.jobId));
-      if (stepIndex >= 0 && (chain.cwd===scope.cwd || chain.steps[stepIndex].worktreeCwd===scope.cwd)) return [{...summary(chain), stepIndex}];
+    for (const {chain,attempts} of this.records.values()) {
+      let stepIndex = chain.steps.findIndex(step => {
+        const owner=step.executor??chain;
+        return owner.provider===scope.provider && owner.account===scope.account &&
+          (chain.cwd===scope.cwd || step.launchCwd===scope.cwd || step.worktreeCwd===scope.cwd) &&
+          ((match.sessionId && step.sessionId===match.sessionId) || (match.jobId && step.jobId===match.jobId));
+      });
+      if(stepIndex<0&&match.sessionId){
+        const attempt=attempts?.find(a=>a.provider===scope.provider&&a.account===scope.account&&(a.cwd===scope.cwd||chain.cwd===scope.cwd)&&a.sessionId===match.sessionId);
+        if(attempt)stepIndex=attempt.step;
+      }
+      if(stepIndex>=0){
+        const owner={cwd:chain.cwd,provider:chain.provider,account:chain.account};
+        return [{...summary(chain),stepIndex,...(!sameScope(chain,scope)?{owner}:{})}];
+      }
     }
     return [];
   }
@@ -212,6 +305,10 @@ export class MarkdownChains {
   }
   async audit(id:string,scope:ChainScope){
     await this.init();
+    const removed=this.deleted.get(id.toLowerCase());
+    if(removed?.deletedScope===scopeHash(scope)&&removed.audit&&this.options.worktrees){
+      const {tree,base,head}=removed.audit;return {diff:await this.options.worktrees.diff(tree,base,head)};
+    }
     const record=this.record(id,scope),steps=record.chain.steps;
     const tree=record.trees?.[steps.length-1],base=steps[0]?.baseCommit,head=steps.at(-1)?.headCommit;
     if(record.chain.status!=='done'||!tree||!base||!head||!this.options.worktrees)throw new HttpError(409,'No completed branch chain to review.');
@@ -235,19 +332,91 @@ export class MarkdownChains {
     }
     return chain;
   }
-  async remove(id: string, scope: ChainScope) {
+  private terminal(id:string,scope:ChainScope){
+    const record=this.record(id,scope);
+    if(record.chain.status==='running')throw new HttpError(409,'Stop the running chain before deleting it.');
+    return record;
+  }
+  private async affected(record:RecordV1){
+    const attempts=structuredClone(record.attempts||[]);
+    const targets=new Map<string,ChainChatTarget>(),shared=new Set<string>();
+    for(const other of this.records.values())if(other.chain.id!==record.chain.id){
+      for(const attempt of other.attempts||[])if(attempt.sessionId)shared.add(attempt.provider+':'+attempt.sessionId);
+    }
+    let unknownCount=0;
+    for(const attempt of attempts){
+      if(!attempt.sessionId&&attempt.jobId){
+        const job=await this.options.view(attempt.jobId);
+        if(job?.id===attempt.jobId&&(job.provider||'claude')===attempt.provider&&job.account===attempt.account&&job.cwd===attempt.cwd)attempt.sessionId=job.sessionId;
+      }
+      if(!attempt.sessionId){unknownCount++;continue;}
+      const {provider,account,sessionId,cwd}=attempt;
+      const chat={provider,...(account?{account}:{}),sessionId,cwd};
+      targets.set(chatKey(chat),chat);
+    }
+    record.chain.steps.forEach((step,index)=>{
+      const count=attempts.filter(a=>a.step===index).length;
+      const minimum=(step.retryCount||0)+(step.status==='done'||step.status==='failed'&&count>0?1:0);
+      unknownCount+=Math.max(0,minimum-count);
+    });
+    return {targets:[...targets.values()],unknownCount,shared};
+  }
+  private async inspectRemoval(record:RecordV1,confirmed:ChainDeleteChat[]|undefined,eraseOriginals:boolean){
+    if(!this.options.manageChats)throw new HttpError(503,'Chat deletion is unavailable.');
+    const {targets,unknownCount,shared}=await this.affected(record);
+    const keys=new Set(targets.map(chatKey));
+    if(confirmed?.some(chat=>!keys.has(chatKey(chat))))throw new HttpError(409,'The confirmed chats do not belong to this chain.');
+    const permitted=targets.filter(s=>!shared.has(s.provider+':'+s.sessionId));
+    const allowedKeys=new Set(permitted.map(chatKey));
+    const result=await this.options.manageChats(permitted,confirmed?.filter(s=>allowedKeys.has(chatKey(s))),eraseOriginals);
+    result.unavailable.push(...targets.filter(s=>!allowedKeys.has(chatKey(s))).map(({cwd,...chat})=>chat));
+    if(unknownCount)result.unknownCount=unknownCount;
+    return result;
+  }
+  async previewRemoval(id:string,scope:ChainScope,eraseOriginals:boolean){
     await this.init();
-    return this.action(async () => {
-      const deletedScope = scopeHash(scope);
-      const key = id.toLowerCase();
-      if (this.deleted.get(key) === deletedScope) return {ok: true};
-      const {chain} = this.record(id, scope);
-      if (chain.status === 'running') throw new HttpError(409, 'Stop the running chain before deleting it.');
-      // A delayed create retry must not resurrect a removed chain and run it again.
-      await this.writeRecord(chain.id, {version: 1, deletedScope});
-      this.deleted.set(key, deletedScope);
-      this.records.delete(key);
-      return {ok: true};
+    return this.action(()=>this.inspectRemoval(this.terminal(id,scope),undefined,eraseOriginals));
+  }
+  private async finishRemoval(record:RecordV1,intent?:Intent){
+    let result:RemovalResult|undefined;
+    if(intent){
+      const report=await this.inspectRemoval(record,intent.chats,intent.eraseOriginals);
+      const remaining=await this.inspectRemoval(record,undefined,intent.eraseOriginals);
+      const blocked=!!(remaining.chats.length||remaining.running.length||remaining.unavailable.length||remaining.failed?.length||remaining.unsupported?.length||remaining.unknownCount);
+      for(const field of ['running','unavailable','failed','unsupported'] as const){
+        const items=report[field]??=[],known=new Set(items.map(chatKey));
+        items.push(...(remaining[field]||[]).filter(chat=>!known.has(chatKey(chat))));
+      }
+      result={...report,ok:!blocked&&!report.failed?.length};
+      if(!result.ok){
+        delete record.deleting;await this.save(record);return result;
+      }
+      if(intent.eraseOriginals)await this.options.eraseChainFiles?.(record.chain.id,[...new Set((record.attempts||[]).flatMap(a=>a.jobId?[a.jobId]:[]))]);
+    }
+    const {chain}=record,key=chain.id.toLowerCase(),last=chain.steps.length-1;
+    const tree=record.trees?.[last],base=chain.steps[0]?.baseCommit,head=chain.steps[last]?.headCommit;
+    const tombstone:DeletedRecord={version:1,deletedScope:scopeHash(chain),...(result&&intent?{result,intentHash:intentHash(intent)}:{}),
+      ...(chain.status==='done'&&tree&&base&&head?{audit:{tree,base,head}}:{})};
+    await this.writeRecord(chain.id,tombstone);
+    this.deleted.set(key,tombstone);this.records.delete(key);
+    return result||{ok:true};
+  }
+  async remove(id:string,scope:ChainScope,intent?:Intent){
+    await this.init();
+    return this.action(async()=>{
+      const old=this.deleted.get(id.toLowerCase());
+      if(old?.deletedScope===scopeHash(scope)){
+        if(!intent)return {ok:true};
+        if(old.intentHash!==intentHash(intent)||!old.result)throw new HttpError(409,'This chain was already deleted with a different selection.');
+        return old.result;
+      }
+      const record=structuredClone(this.terminal(id,scope));
+      if(intent){
+        const {targets}=await this.affected(record),keys=new Set(targets.map(chatKey));
+        if(intent.chats.some(chat=>!keys.has(chatKey(chat))))throw new HttpError(409,'The confirmed chats do not belong to this chain.');
+        record.deleting=intent;await this.save(record);
+      }
+      return this.finishRemoval(record,intent);
     });
   }
   async stop(id: string, scope: ChainScope) {
@@ -324,6 +493,7 @@ export class MarkdownChains {
       delete step.sessionId;
       delete step.output;
       delete step.outputTruncated;
+      delete step.subtasks;
     }
     if (step.jobId) {
       const job = await this.options.view(step.jobId);
@@ -334,7 +504,8 @@ export class MarkdownChains {
       } else this.observe(chain, step, job);
       await this.verifyStep(record,index);
       const old = saved.chain.steps[index];
-      if (step.status !== old.status || step.sessionId !== old.sessionId) await this.save(record);
+      const childrenChanged = JSON.stringify(step.subtasks) !== JSON.stringify(old.subtasks);
+      if (childrenChanged || step.status !== old.status || step.sessionId !== old.sessionId) await this.save(record);
       return;
     }
     const jobId = randomUUID();
@@ -343,20 +514,36 @@ export class MarkdownChains {
     record = structuredClone(record); chain = record.chain;
     const current = chain.steps[index];
     try {
-      const {id, name, context, cwd, provider, account} = chain;
-      const input = {id, name, context, cwd, provider, account, ...record.settings,
+      const {id, name, context, cwd} = chain;
+      const uploads=new Map(record.sourceUploads?.map(file=>[file.name,file.text]));
+      const input = {id, name, context, cwd, ...stepLaunchSettings(chain,record.settings,current.executor),
+        sourceFiles:chain.sourceFiles?.map(file=>({...file,text:uploads.get(file.name)})),
         tasks: chain.steps.map(({title, source, body}) => ({title, source, body}))};
+      current.launchCwd=cwd;
       if(record.stacked){
         const trees=record.trees??={};
         const manager=this.options.worktrees!;
         const tree=trees[index]??=await manager.create(jobId,cwd,chain.steps[index-1]?.headCommit);
         current.branch=tree.branch;
         current.baseCommit=tree.baseCommit;
-        current.worktreeCwd=await manager.verify(tree);
+        current.launchCwd=await manager.projectDirectory(tree);
+        if(chain.sourceFiles){
+          current.worktreeSources=[];
+          for(const file of chain.sourceFiles){
+            if(!file.projectPath)continue;
+            try{await sourceFileAt(current.launchCwd,file.projectPath);current.worktreeSources.push(file.projectPath);}
+            catch(error){if(!(error instanceof HttpError) || ![403,404,400].includes(error.status))throw error;}
+          }
+        }
+        current.worktreeCwd=tree.cwd;
         this.options.registerTree?.(current.worktreeCwd);
-        await this.save(structuredClone(record));
       }
-      const job = await this.options.start(input, jobId, buildChainStepPrompt(chain, index),record.trees?.[index]?.cwd);
+      if(input.sourceFiles?.length && this.options.prepareSources){
+        const paths=await this.options.prepareSources(id,input.sourceFiles);
+        if(Object.keys(paths).length)current.uploadPaths=paths;
+      }
+      await this.save(structuredClone(record));
+      const job = await this.options.start(input, jobId, buildChainStepPrompt(chain, index),current.launchCwd,Object.values(current.uploadPaths??{}));
       this.observe(chain, current, job);
     } catch (error) {
       const started = await this.options.view(jobId);

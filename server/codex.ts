@@ -1,5 +1,6 @@
 import type {BoardMcpConfiguration} from './board-mcp-runtime.js';
 import {updatePatchPreviews,removeWritePreview} from './write-preview.js';
+import {CodexTurnGeneration} from './codex-generation.js';
 import { userInputBlocks } from './user-input-blocks.js';
 import { randomUUID } from 'node:crypto';
 import {projectBoardInstructions} from './project-rules.js';
@@ -25,6 +26,7 @@ export type CodexServiceOptions = { rpcFactory?: () => CodexRpc | Promise<CodexR
 /** Small history pages: one generated image is 4-5 MB inline, and a page must fit the protocol line limit. */
 const CODEX_ITEM_PAGE = 20, CODEX_TURN_PAGE = 10;
 export class CodexService {
+  private usageByJob=new WeakMap<CodexJob,CodexTurnGeneration>();
   async refreshAuthentication(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');const old=this.rpc;this.rpc=undefined;this.ready=undefined;old?.close();}
   async usage() { return normalizeCodexUsage(await (await this.connect()).request('account/rateLimits/read', {})); }
   private boardMcp:BoardMcpConfiguration=()=>({});
@@ -40,6 +42,7 @@ export class CodexService {
   }
   private rpc?: CodexRpc;
   private ready?: Promise<CodexRpc>;
+  recordGeneration?:(job:JobView)=>void;
   private jobs = new Map<string, CodexJob>();
   private closed = false;
   private sessionReads = coalesceReads<string, CodexSession[]>(0, 1);
@@ -75,15 +78,20 @@ export class CodexService {
     return ready;
   }
   async status() {
-    let available = false;
+    let available = false, authenticated:boolean|undefined;
     try {
       const rpc = await this.connect(); available = true;
       const account = await rpc.request('account/read', { refreshToken: false });
-      const authenticated = Boolean(account.account) || account.requiresOpenaiAuth === false;
+      if(!account||!Object.hasOwn(account,'account')&&account.requiresOpenaiAuth!==false)
+        throw new Error('Codex sign-in could not be verified.');
+      authenticated = Boolean(account.account) || account.requiresOpenaiAuth === false;
       const result = await rpc.request('model/list', { includeHidden: false, limit: 100 });
       const models = codexModels(result.data);
       return { available, authenticated, models, ...(!authenticated ? { error: 'Sign in to Codex on this PC, then reconnect.' } : {}) };
-    } catch (error) { return { available, authenticated: false, models: [], error: error instanceof Error ? error.message : 'Codex is unavailable.' }; }
+    } catch (error) {
+      return {available,authenticated:authenticated??false,models:[],access:authenticated===undefined?'verification-failed':authenticated?'models-unavailable':'sign-in-required',
+        error:error instanceof Error?error.message:'Codex is unavailable.'};
+    }
   }
   private async readThread(id: string, includeTurns = false, historyOnly = false) {
     if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw new HttpError(400, 'Invalid Codex conversation.');
@@ -94,6 +102,26 @@ export class CodexService {
   }
   async sessions(): Promise<CodexSession[]> {
     return this.sessionReads('sessions', () => this.loadSessions());
+  }
+  async eraseOriginal(id:string,cwd:string) {
+    if(this.list().some(job=>job.sessionId===id&&job.status==='running'))throw new HttpError(409,'Stop the current turn before erasing this chat.');
+    const rpc=await this.connect();
+    try {
+      const thread=await this.readThread(id);
+      if(thread.id!==id||path.relative(cwd,thread.cwd)!=='')throw new HttpError(409,'The original chat belongs to a different project.');
+      if(thread.status?.type==='active')throw new HttpError(409,'Stop the current turn before erasing this chat.');
+    } catch(error){
+      if(!(error instanceof CodexRequestError && error.missingThreadId===id))throw error;
+    }
+    try { await rpc.request('thread/delete',{threadId:id}); }
+    catch(error){
+      if(error instanceof CodexRequestError && error.missingThreadId===id)return;
+      if(error instanceof CodexRequestError && error.code===-32601)throw new HttpError(501,'Update Codex on the PC to erase original chats.');
+      throw error;
+    }
+  }
+  forgetSession(id:string) {
+    for(const [jobId,job] of this.jobs)if(job.sessionId===id&&job.status!=='running')this.jobs.delete(jobId);
   }
   async forkBeforeMessage(id:string,messageId:string):Promise<string|undefined>{
     if(this.list().some(job=>job.sessionId===id&&job.status==='running'))throw new HttpError(409,'Stop the current turn before branching.');
@@ -335,9 +363,13 @@ export class CodexService {
       const permissions = codexPermissions(input.codexAccess, input.mode, cwd);
       const { sandbox, approvalPolicy, approvalsReviewer, sandboxPolicy } = permissions;
       const boardServers=this.boardMcp(cwd);
-      const startParams = { cwd, ...(Object.keys(boardServers).length?{config:Object.fromEntries(Object.entries(boardServers).map(([name,value])=>["mcp_servers."+name,value]))}:{}), ...(input.model ? { model: input.model } : {}), sandbox, approvalPolicy, approvalsReviewer, developerInstructions: await projectBoardInstructions(cwd) };
+      const startParams = { cwd, runtimeWorkspaceRoots:[cwd], ...(Object.keys(boardServers).length?{config:Object.fromEntries(Object.entries(boardServers).map(([name,value])=>["mcp_servers."+name,value]))}:{}), ...(input.model ? { model: input.model } : {}), sandbox, approvalPolicy, approvalsReviewer, developerInstructions: await projectBoardInstructions(cwd) };
       if (job.cancelled) return;
       const session = await rpc.request(input.sessionId ? 'thread/resume' : 'thread/start', input.sessionId ? { ...startParams, threadId: input.sessionId, excludeTurns: true } : startParams);
+      // This host starts a shared app-server. Each thread and turn must use its own project.
+      const matchesProject=(reported:unknown)=>typeof reported==='string'&&path.isAbsolute(reported)&&path.relative(cwd,reported)==='';
+      if(!matchesProject(session?.thread?.cwd)||(session?.cwd!==undefined&&!matchesProject(session.cwd)))
+        throw new HttpError(409,'Codex did not open the requested working directory. Check the project folder and try again.');
       verifyCodexPermissions(session, permissions);
       job.sessionId = session.thread.id; job.cwd = cwd; job.revision++;
       if (job.cancelled) return;
@@ -349,7 +381,11 @@ export class CodexService {
       }
       if (job.cancelled) return;
       job.acceptingEvents = true;
-      const result = await rpc.request('turn/start', { threadId: job.sessionId, input: turnInput, cwd, approvalPolicy, approvalsReviewer,
+      // Recent runtimes keep a tool environment with its own default directory, independent of thread.cwd.
+      const environmentId=session.thread.environments?.[0]?.environmentId;
+      const result = await rpc.request('turn/start', { threadId: job.sessionId, input: turnInput, cwd, runtimeWorkspaceRoots:[cwd],
+        ...(typeof environmentId==='string' && environmentId ? {environments:[{environmentId,cwd,runtimeWorkspaceRoots:[cwd]}]} : {}),
+        approvalPolicy, approvalsReviewer,
         ...(input.model ? { model: input.model } : {}), clientUserMessageId: job.messages[0].id,
         ...(input.reasoningEffort ? { effort: input.reasoningEffort } : {}),
         sandboxPolicy });
@@ -364,18 +400,31 @@ export class CodexService {
   private notification(message: RpcEnvelope) {
     const p = message.params;
     if (!p || !p.threadId) return;
-    const job = [...this.jobs.values()].find(j => j.status === 'running' && j.acceptingEvents && j.sessionId === p.threadId && (!j.turnId || !p.turnId || j.turnId === p.turnId));
+    const usage=message.method==='thread/tokenUsage/updated',receivedAt=Date.now();
+    const job = [...this.jobs.values()].find(j => j.sessionId===p.threadId&&(
+      usage&&j.turnId&&j.turnId===p.turnId||j.status==='running'&&j.acceptingEvents&&(!j.turnId||!p.turnId||j.turnId===p.turnId)));
     if (!job) return;
     job.eventQueue = job.eventQueue.then(async () => {
-      if (job.status !== 'running') return;
+      if (job.status !== 'running' && !usage) return;
+      let meter=this.usageByJob.get(job);
+      if(!meter){meter=new CodexTurnGeneration();this.usageByJob.set(job,meter);}
       switch (message.method) {
         case 'turn/started': job.turnId = p.turn.id; break;
         case 'item/agentMessage/delta': job.partial += p.delta || ''; break;
+        case 'thread/tokenUsage/updated':
+          if(typeof p.turnId==='string'&&p.turnId===job.turnId){
+            job.generation=meter.update(p.tokenUsage,job.generation);
+            if(job.status!=='running'&&this.jobs.get(job.id)===job)this.recordGeneration?.(this.view(job));
+          }
+          break;
         case 'item/fileChange/patchUpdated':
           if (!job.cancelled) updatePatchPreviews(job,p.itemId,p.changes);
           break;
         case 'item/started': case 'item/completed': {
           if (p.item?.type === 'userMessage') break; // Initial user input already appears immediately.
+          meter.modelItem(p.item,message.method==='item/completed',receivedAt,job.generation);
+          if(message.method==='item/started'&&p.item?.type==='fileChange'&&!job.cancelled)
+            updatePatchPreviews(job,p.item.id,p.item.changes);
           const item = await codexMessage(p.item, [...this.roots, ...(this.options.attachmentRoots || [])], true);
           if (message.method === 'item/completed' && p.item?.type === 'fileChange') removeWritePreview(job,p.item.id);
           if (item) { const index = job.messages.findIndex(m => m.id === item.id); if (index < 0) job.messages.push(item); else job.messages[index] = item; }
@@ -400,6 +449,7 @@ export class CodexService {
     if (status === 'error') job.error = error || 'Codex stopped with an error.';
     for (const pending of [...job.pending.values()]) pending.finish(false);
     job.revision++;
+    if(this.jobs.get(job.id)===job)this.recordGeneration?.(this.view(job));
     this.refreshIdleBoardMcp();
   }
   private serverRequest(rpc: CodexRpc, request: RpcEnvelope) {

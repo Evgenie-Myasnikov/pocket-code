@@ -133,3 +133,24 @@ test('a late suggestion cannot replace a newer version of the input',async({page
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   await expect(draft).toHaveValue('Updated draft');
 });
+
+test('a partial catalogue explains unavailable providers and refreshes without losing the drafting guidance',async({page})=>{
+  await chat(page,route=>route.fulfill({json:{text:'Verified instruction'}}));
+  let refresh=false;
+  await page.route('**/api/task-text/providers*',route=>{
+    refresh=new URL(route.request().url()).searchParams.get('refresh')==='1';
+    return route.fulfill({json: refresh?{providers:['copilot','codex'],accounts:[]}:
+      {providers:['copilot'],accounts:[],warnings:['accounts'],unavailable:[{provider:'claude',reason:'signed_out'},{provider:'codex',reason:'version'}]}});
+  });
+  await page.getByRole('button',{name:'Fill with AI · Instructions',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Fill with AI · Instructions'});
+  await expect(dialog.getByRole('radio',{name:'GitHub Copilot'})).toBeChecked();
+  await expect(dialog.getByText(/sign-in required/)).toBeVisible();
+  await expect(dialog.getByText(/requires Codex CLI/)).toBeVisible();
+  await expect(dialog.getByRole('alert')).toContainText('saved API connections');
+  await dialog.getByLabel('Drafting guidance').fill('Keep this draft');
+  await dialog.getByRole('button',{name:'Refresh providers'}).click();
+  await expect(dialog.getByRole('radio',{name:'Codex',exact:true})).toBeVisible();
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect(dialog.getByLabel('Drafting guidance')).toHaveValue('Keep this draft');expect(refresh).toBe(true);
+});

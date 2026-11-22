@@ -50,6 +50,36 @@ async function until(predicate: () => boolean) {
   assert.fail('Condition was not reached');
 }
 
+test('a Codex file change streams native patch revisions and attributes output usage to its own resumed turn',async t=>{
+  const {service,rpc,input}=await setup(t);
+  service.start({...input,sessionId:'session-1'});
+  await until(()=>rpc.requests.some(r=>r.method==='turn/start'));
+  const notify=(method:string,data:object)=>rpc.notification(method,data);
+  const patch=(diff:string)=>[{path:'src/example.ts',kind:{type:'update',movePath:null},diff}];
+  notify('item/started',{item:{type:'fileChange',id:'patch-1',status:'inProgress',changes:patch('+const a = 1;')}});
+  await until(()=>service.get(input.id).writePreviews?.[0]?.content==='+const a = 1;');
+  notify('item/fileChange/patchUpdated',{itemId:'patch-1',changes:patch('+const a = 1;\n+const b = 2;')});
+  await until(()=>service.get(input.id).writePreviews?.[0]?.totalLines===2);
+  assert.equal(service.get(input.id).writePreviews?.[0]?.content,'+const a = 1;\n+const b = 2;');
+  notify('item/completed',{item:{type:'fileChange',id:'patch-1',status:'completed',changes:patch('+const a = 1;\n+const b = 2;')}});
+  await until(()=>!service.get(input.id).writePreviews?.length);
+  const sample=(threadOutput:number,lastOutput:number,latest:number,threadTotal:number)=>({tokenUsage:{total:{outputTokens:threadOutput,totalTokens:threadTotal},last:{outputTokens:lastOutput,totalTokens:latest},modelContextWindow:10000}});
+  notify('item/started',{item:{type:'agentMessage',id:'reply',text:'',startedAtMs:1000}});
+  notify('item/completed',{item:{type:'agentMessage',id:'reply',text:'Done',startedAtMs:1000,completedAtMs:2000}});
+  const first=sample(1007,7,1500,3100);
+  notify('thread/tokenUsage/updated',first);notify('thread/tokenUsage/updated',first);
+  await until(()=>service.get(input.id).generation?.outputTokens===7);
+  assert.deepEqual(service.get(input.id).generation,{outputTokens:7,outputTokensPerSecond:7,totalTokens:3100,contextTokens:1500,contextWindow:10000});
+  notify('item/started',{item:{type:'agentMessage',id:'reply2',text:'',startedAtMs:4000}});
+  notify('item/completed',{item:{type:'agentMessage',id:'reply2',text:'More',startedAtMs:4000,completedAtMs:4500}});
+  notify('turn/completed',{turn:{id:'turn-1',status:'completed'}});
+  await until(()=>service.get(input.id).status==='done');
+  notify('thread/tokenUsage/updated',{...sample(1200,100,9999,60000),turnId:'another-turn'});
+  notify('thread/tokenUsage/updated',sample(1010,3,2000,4800));
+  await until(()=>service.get(input.id).generation?.outputTokens===10);
+  assert.deepEqual(service.get(input.id).generation,{outputTokens:10,outputTokensPerSecond:6,totalTokens:4800,contextTokens:2000,contextWindow:10000});
+});
+
 test('Codex lists beyond twenty pages and rejects a stalled listing cursor',async t=>{
  const {service,rpc}=await setup(t);
  rpc.handler=(method,params)=>{
@@ -440,4 +470,42 @@ test('fork rejects an older Codex that ignores the requested boundary',async t=>
  const {rpc,service}=await setup(t);rpc.thread.turns=[{id:'t1',items:[{id:'u1',type:'userMessage'}]},{id:'t2',items:[{id:'u2',type:'userMessage'}]}];
  rpc.handler=(method,p)=>method==='thread/fork'?{thread:{id:'fork'}}:method==='thread/read'&&p.threadId==='fork'?{thread:{...rpc.thread,id:'fork'}}:undefined;
  await assert.rejects(service.forkBeforeMessage('session-1','u2'),/boundary/);
+});
+
+test('Codex sends the exact selected project and rejects an inconsistent working directory before starting a turn',async t=>{
+  for(const sessionId of [undefined,'session-1']){
+    for(const mismatch of ['thread','response']){
+      const {service,rpc,input,outside,root}=await setup(t);
+      const method=sessionId?'thread/resume':'thread/start';
+      rpc.handler=(m,p)=>m===method?{thread:{...rpc.thread,cwd:mismatch==='thread'?outside:root},cwd:mismatch==='response'?outside:p.cwd}:undefined;
+      service.start({...input,sessionId});await until(()=>service.get(input.id).status==='error');
+      assert.equal(rpc.requests.find(r=>r.method===method)?.params.cwd,root);
+      assert.match(service.get(input.id).error!,/requested working directory/);
+      assert.equal(rpc.requests.some(r=>r.method==='turn/start'),false);
+    }
+  }
+});
+
+test('Codex binds the primary tool environment and runtime roots to the selected project for new and resumed turns',async t=>{
+  for(const sessionId of [undefined,'session-1']){
+    const {service,rpc,input,root,outside}=await setup(t);
+    rpc.thread.environments=[{environmentId:'fixture-shell',cwd:outside,runtimeWorkspaceRoots:[outside]}];
+    service.start({...input,sessionId});
+    await until(()=>Boolean(service.get(input.id).turnId));
+    const thread=rpc.requests.find(r=>r.method===(sessionId?'thread/resume':'thread/start'))!.params;
+    const turn=rpc.requests.find(r=>r.method==='turn/start')!.params;
+    assert.equal(thread.cwd,root);assert.deepEqual(thread.runtimeWorkspaceRoots,[root]);
+    assert.equal(turn.cwd,root);assert.deepEqual(turn.runtimeWorkspaceRoots,[root]);
+    assert.deepEqual(turn.environments,[{environmentId:'fixture-shell',cwd:root,runtimeWorkspaceRoots:[root]}]);
+  }
+});
+
+test('a failed model list does not erase a confirmed sign-in, while a failed account read remains unverified',async t=>{
+  const {service,rpc}=await setup(t);
+  rpc.handler=method=>{if(method==='model/list')throw new Error('Synthetic catalogue error');};
+  const partial=await service.status();
+  assert.equal(partial.authenticated,true);assert.equal(partial.access,'models-unavailable');assert.deepEqual(partial.models,[]);
+  rpc.handler=method=>{if(method==='account/read')throw new Error('Synthetic probe error');};
+  const unknown=await service.status();
+  assert.equal(unknown.authenticated,false);assert.equal(unknown.access,'verification-failed');
 });

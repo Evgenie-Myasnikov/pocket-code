@@ -3,7 +3,16 @@
 ## Unreleased
 
 ### Features
+- File changes and token usage (2026-11-22). Chats display native partial writes, measured generation statistics and the last saved response metrics. A per-response result card opens the verified working and output folders and lists changed files and available diff counts. Validation covered actual adapter event handlers with synthetic events, five Edge scenarios for streaming and file results, and the production TypeScript/Vite build.
+- Chat history (2026-11-22). Reopening a chat restores its cached transcript immediately while the host refreshes it. Permanent erasure also clears connected clients’ retained copies on synchronization and closes an erased chat that is open on another device. Edge scenarios covered slow connections, switching chats, account isolation and reconnecting after erasure.
+- Task cleanup (2026-11-22). A stopped or finished chain can be erased with the local originals and caches of its known step and retry chats. Confirmed deletions are journaled so partial failures can be retried. Synthetic host and browser tests verified the two deletion options and protected the final handoff from a simultaneous folder deletion.
+- Task chains (2026-11-22). Import a plan once, split it manually or with an AI planner, review and revise its steps, pick each executor, then launch. Step context renders Markdown, shows project, worktree and attachment paths, and lists native subtasks reported by the provider. Verified with host and Edge scenarios, a nested Git fixture and a live Codex planning request on synthetic files.
+- Windows chats (2026-11-22). Shift-click selects a range and Ctrl-click toggles individual chats. The folder menu previews the full group for removal, including filtered rows. Confirmation skips active chats. Erasure removes the local provider original and Pocket Code caches. A separately labeled list-only action preserves the original. Verified on synthetic conversations through the host and Edge.
 - Git-backed Markdown chains run new steps on separate local branches based on the previous verified commit. Retries reuse the worktree. Final review shows the cumulative diff and the exact command for a single manual merge. Non-Git projects keep their existing workflow. TypeScript and Vite passed. A two-step Git fixture verified the cumulative diff and merge. Physical-device and live provider checks remain open.
+
+### Bug Fixes
+- AI drafting providers (2026-11-22). A failed provider or API profile lookup no longer hides working options. The selector explains unavailable providers, refreshes their status and preserves a valid API connection and model. An HTTP fixture reproduced the previous server error and Edge covered recovery. Native Codex text sampling accepts up to 4,000 UTF-8 bytes.
+- Portable boards (2026-11-22). Raised the shared version and branch-link limit to 128 after the existing 66-version project board failed validation at 64. All 52 repository cards passed validation. Four snapshot and host-boundary tests covered round trips and overflow.
 
 ## [0.28.53](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.52...v0.28.53) (2026-11-22)
 

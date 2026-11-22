@@ -2,6 +2,8 @@ import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
 import type {Express} from 'express';
 import type {JiraStore} from './jira-vault.js';
+import {validModelId} from './provider-model.js';
+import type {PlanExecutor} from './task-plan.js';
 import {HttpError} from './security.js';
 const message=z.object({role:z.enum(['user','assistant']),content:z.string().max(32000)}).strict();
 const profile=z.object({id:z.string().uuid(),name:z.string().trim().min(1).max(80),url:z.string().max(2048),key:z.string().max(8192),messages:z.array(message).max(100).default([]),agentAuth:z.enum(['bearer','x-api-key']).optional()});
@@ -56,6 +58,7 @@ export class CustomProviders{
    await response.body?.cancel();
    if(response.status===404||response.status===405)return 'unsupported';
    if(response.status===401||response.status===403)continue;
+   if(!response.ok&&response.status!==400&&response.status!==422)return 'unknown';
    if(p.agentAuth!==auth)await this.transaction(async()=>{const list=await this.load();await this.store.save({profiles:list.map(v=>v.id===p.id?{...v,agentAuth:auth}:v)});});
    return 'supported';
   }
@@ -67,6 +70,17 @@ export class CustomProviders{
   const p=await this.get(id);if(!p.key)throw new HttpError(409,'Sign in to this provider with an API key first','provider_no_key');
   const env:NodeJS.ProcessEnv={...base};for(const name of inheritedAuth)delete env[name];
   return {...env,ANTHROPIC_BASE_URL:agentBaseUrl(p.url),...(p.agentAuth==='x-api-key'?{ANTHROPIC_API_KEY:p.key}:{ANTHROPIC_AUTH_TOKEN:p.key}),ANTHROPIC_MODEL:model,ANTHROPIC_SMALL_FAST_MODEL:model,ANTHROPIC_DEFAULT_OPUS_MODEL:model,ANTHROPIC_DEFAULT_SONNET_MODEL:model,ANTHROPIC_DEFAULT_HAIKU_MODEL:model,CLAUDE_CODE_SUBAGENT_MODEL:model,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1'};
+ }
+ async taskExecutors():Promise<PlanExecutor[]>{
+  const profiles=(await this.load()).filter(p=>p.key);
+  const rows=await Promise.all(profiles.map(async profile=>{
+    try{
+      if(await this.probeAgent(profile)!=='supported')return [];
+      const models=parseModelCatalog(await this.call(profile,'models'));
+      return models.filter(validModelId).map(model=>({provider:'claude' as const,account:profile.id,model,label:profile.name+' · '+model}));
+    }catch{return [];}
+  }));
+  return rows.flat();
  }
  async name(id:string){return (await this.get(id)).name;}
  async models(id:string){return parseModelCatalog(await this.call(await this.get(id),'models'));}

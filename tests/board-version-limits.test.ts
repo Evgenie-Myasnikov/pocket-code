@@ -11,7 +11,7 @@ import {BoardStore} from '../server/boards.js';
 import {createProjectBoard} from '../server/project-board.js';
 import {BOARD_VERSION_LIMIT} from '../src/board-limits.js';
 
-test('host and repository saves share the 64-version boundary; rejected additions preserve board and Git state',async()=>{
+test('host and repository saves share the version limit; rejected additions preserve board and Git state',async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'pocket-version-api-')),uploads=path.join(root,'uploads'),token='synthetic-version-host-key-'.repeat(3);
  const git=(...args:string[])=>execFileSync('git',args,{cwd:root,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
  git('init');git('-c','user.name=Synthetic','-c','user.email=fixture@example.invalid','commit','--allow-empty','-m','fixture');

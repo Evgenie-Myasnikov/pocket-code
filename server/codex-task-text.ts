@@ -10,17 +10,17 @@ export function supportsCodexSampling(version?:string) {
   return !!version && /^\d+\.\d+\.\d+$/.test(version) && compareCodexVersions(version,'0.171.0') >= 0;
 }
 let cached: {executable:string; until:number; supported:boolean} | undefined;
-async function textExecutable() {
+async function textExecutable(refresh=false) {
   const executable=await discoverCodex();
-  if(cached?.executable!==executable||cached.until<=Date.now()){
+  if(refresh||cached?.executable!==executable||cached.until<=Date.now()){
     const version=await readCodexVersion(executable);
     cached={executable,until:Date.now()+30000,supported:supportsCodexSampling(version)};
   }
   if(!cached.supported)throw new HttpError(503,'Codex text editing requires Codex CLI 0.171.0 or newer on the PC.');
   return executable;
 }
-export async function codexTaskTextAvailable() {
-  try {await textExecutable();return true;} catch {return false;}
+export async function codexTaskTextAvailable(refresh=false) {
+  try {await textExecutable(refresh);return true;} catch {return false;}
 }
 
 type SamplingRpc=Pick<StdioCodexRpc,'request'|'startRequest'|'notify'|'reject'|'close'> & {

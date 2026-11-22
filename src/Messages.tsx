@@ -6,6 +6,7 @@ import type {Connection} from './api';
 import { RichBlock, TaskNotificationEvent } from './RichBlocks';
 import {parseClaudeTaskNotification} from './claude-task-notification';
 import type {TurnChanges} from './turn-changes';
+import {TurnResult} from './TurnResult';
 import {ActivityGroup} from './ActivityGroup';
 import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode} from './activity-groups';
 import { t, useLanguage } from "./i18n";import { Fragment, memo, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'ani
   const startedEmpty=useRef(!text);
   return text?<Message {...shared} animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
 }
-export const MessageList=memo(function MessageList({messages,partialText,runningMessages,turnChanges,onReview,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];partialText?:string;runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;onReview?:(changes:TurnChanges)=>void}){
+export const MessageList=memo(function MessageList({messages,partialText,runningMessages,turnChanges,onReview,resultRoot,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];partialText?:string;runningMessages?:Set<ChatMessage>|null;turnChanges?:Map<string,TurnChanges>;resultRoot?:string;onReview?:(changes:TurnChanges)=>void}){
   // Messages already present when this transcript mounts are a snapshot, even
   // if their run is still active. Only newly arriving messages start from empty.
   const initialIds=useRef(new Set(messages.map(message=>message.id)));
@@ -52,7 +53,10 @@ export const MessageList=memo(function MessageList({messages,partialText,running
       {ids.slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
     </article>;
-    return <Fragment key={key}>{body}</Fragment>;
+    return <Fragment key={key}>{body}{shared.connection&&resultRoot&&ids.map(id=>{
+      const changes=turnChanges?.get(id);
+      return changes&&<TurnResult key={id} connection={shared.connection!} root={resultRoot} changes={changes} onReview={onReview}/>;
+    })}</Fragment>;
   });
   const partial=pending.current;
   if(partial){

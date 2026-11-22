@@ -26,6 +26,20 @@ test('a muted conversation stays identifiable when reopening the library',async(
  }
 });
 
+test('a peer erasure closes the Windows chat and retains other conversation drafts',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await desktop(page);
+ const rows=page.locator('.desktop-sessions>button'),composer=page.getByRole('textbox',{name:'Message Claude',exact:true});
+ await rows.nth(1).click();await composer.fill('Keep this desktop draft');
+ await rows.first().click();await expect(composer).toHaveValue('');await composer.fill('Erased chat draft');
+ await page.evaluate(()=>{
+   (window as any).chatChanges={'claude:alpha':{action:'delete'}};
+   (window as any).testErasures={revision:'2'.repeat(64),entries:[{provider:'claude',sessionId:'alpha'}],next:null};
+   window.dispatchEvent(new Event('pocket-recovered'));
+ });
+ await expect(rows).toHaveCount(1);await expect(page.getByText('The responsive layout is ready.')).toHaveCount(0);
+ await rows.first().click();await expect(composer).toHaveValue('Keep this desktop draft');
+});
+
 test('desktop chat actions are discoverable and do not switch the conversation or draft',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await desktop(page);
  const rows=page.locator('.desktop-sessions>button'),actions=page.locator('.desktop-sessions .chat-list-action');
@@ -46,8 +60,8 @@ test('desktop chat actions are discoverable and do not switch the conversation o
  await page.getByRole('textbox',{name:'Chat name'}).fill('Synthetic reference notes');await page.getByRole('button',{name:'Rename',exact:true}).click();
  await expect(rows.nth(1)).toContainText('Synthetic reference notes');await expect(input).toHaveValue('Synthetic draft to retain');
  await expect(rows.first()).toHaveAttribute('aria-pressed','true');
- await actions.nth(1).click();await page.getByRole('menuitem',{name:'Delete from Pocket Code'}).click();
- await expect(page.getByRole('dialog',{name:'Delete chat'})).toContainText('Synthetic reference notes');
+ await actions.nth(1).click();await page.getByRole('menuitem',{name:'Erase chat…'}).click();
+ await expect(page.getByRole('dialog',{name:'Erase chat'})).toContainText('Synthetic reference notes');
  await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(rows).toHaveCount(2);
  await page.emulateMedia({reducedMotion:'reduce'});await expect(actions.first()).toHaveCSS('transition-duration','0s');
  await page.screenshot({path:'.local/chat-actions-desktop.png'});
@@ -60,7 +74,7 @@ test('running chat action keeps deletion unavailable and keyboard focus visible'
  const bell=page.getByRole('button',{name:'Chat notifications',exact:true}).first();
  await row.focus();await page.keyboard.press('Tab');await expect(bell).toBeFocused();await page.keyboard.press('Space');await expect(bell).toHaveAttribute('aria-pressed','false');
  await expect(row).toHaveAttribute('data-running','true');await page.keyboard.press('Tab');await expect(action).toBeFocused();await expect(action).toHaveCSS('opacity','1');
- await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Delete from Pocket Code'})).toBeDisabled();
+ await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Erase chat…'})).toBeDisabled();
  await expect(page.getByRole('menuitem',{name:'Rename',exact:true})).toBeEnabled();
  await page.getByRole('menuitem',{name:'Unmute notifications'}).click();await expect(bell).toHaveAttribute('aria-pressed','true');await expect(action).toBeFocused();
 });
@@ -77,10 +91,10 @@ for(const pending of [false,true])test(`phone exposes a separate touch action wi
  await page.getByRole('menuitem',{name:'Mute notifications'}).click();
  const bell=page.locator('.sidebar .chat-mute-action').first();await expect(bell).toHaveAttribute('aria-pressed','false');
  await expect(row).toBeVisible();await action.click();await expect(page.getByRole('menuitem',{name:'Unmute notifications'})).toBeVisible();
- if(pending)await expect(page.getByRole('menuitem',{name:'Delete from Pocket Code'})).toBeDisabled();
+ if(pending)await expect(page.getByRole('menuitem',{name:'Erase chat…'})).toBeDisabled();
  await page.getByRole('menuitem',{name:'Rename',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'Rename chat'})).toBeVisible();await page.getByRole('button',{name:'Cancel',exact:true}).click();
  await expect(row).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- if(pending){await row.click({button:'right'});await expect(page.getByRole('menuitem',{name:'Delete from Pocket Code'})).toBeDisabled();await page.keyboard.press('Escape');}
+ if(pending){await row.click({button:'right'});await expect(page.getByRole('menuitem',{name:'Erase chat…'})).toBeDisabled();await page.keyboard.press('Escape');}
  else {await page.screenshot({path:'.local/chat-actions-phone.png'});await row.click();await expect(page.locator('.composer textarea')).toBeVisible();}
 });

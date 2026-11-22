@@ -1,5 +1,6 @@
-import {clearHistoryCache} from './chat-history-cache';
+import {clearHistoryCache,forgetHistorySessions,transcriptScope} from './chat-history-cache';
 import {clearBoardThumbnails} from './board-image-thumbnails';
+import {forgetPositions} from './chat-position';
 import type {Connection} from './api';
 
 const PREFIX='pocket-code-chats-v1:';
@@ -27,4 +28,21 @@ export function writeChatCache(scope:string,provider:string,id:string,value:unkn
 export function clearChatCache(){
   void clearHistoryCache();void clearBoardThumbnails();
   try{for(const key of Object.keys(localStorage))if(key.startsWith(PREFIX))localStorage.removeItem(key);}catch{/* unavailable storage */}
+}
+export type RemovedTranscripts={hostScope:string;url:string;provider:string;ids:string[];reason:'deleted'|'unavailable'};
+export async function forgetChatTranscripts(connection:Connection,provider:string,ids:string[],reason:RemovedTranscripts['reason']='deleted'){
+ if(!ids.length)return true;
+ const scope=await chatCacheScope(connection),removed=new Set(ids),hostPrefix=transcriptScope(scope,connection);
+ forgetPositions(scope,hostPrefix,provider,removed);
+ let localRemoved=true;
+ try{for(const k of Object.keys(localStorage)){
+   if(k!==PREFIX+scope+':'+provider&&!(connection.desktop&&k===PREFIX+'desktop-local:'+provider)&&!(k.startsWith(PREFIX+hostPrefix)&&k.endsWith(':'+provider)))continue;
+   const entries=JSON.parse(localStorage.getItem(k)||'{}');
+   for(const id of removed)delete entries['chat:'+id];
+   if(Array.isArray(entries.sessions?.value))entries.sessions.value=entries.sessions.value.filter((entry:{sessionId:string})=>!removed.has(entry.sessionId));
+   localStorage.setItem(k,JSON.stringify(entries));
+ }}catch{localRemoved=false;}
+ const purge=forgetHistorySessions(scope,hostPrefix,provider,removed);
+ window.dispatchEvent(new CustomEvent<RemovedTranscripts>('pocket-chat-transcripts-removed',{detail:{hostScope:hostPrefix,url:connection.url,provider,ids:[...removed],reason}}));
+ return await purge&&localRemoved;
 }

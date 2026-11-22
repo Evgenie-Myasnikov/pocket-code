@@ -11,7 +11,15 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    if(message.action==='restart-host'){calls.push(message);state={...state,online:true,statusCode:'connected'};reply(message.id,state);return;}
    calls.push(message);const {id,action}=message;if(action==='state'||action==='pairing-role'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){(window as any).testDevices=(window as any).testDevices.filter((d:any)=>d.id!==message.deviceId);reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
    const url=new URL('https://example.invalid'+message.endpoint),p=url.pathname,provider=url.searchParams.get('provider')||'claude';
-   if(p==='/task-text/providers'){reply(id,{providers:['claude','codex','copilot'],accounts:(window as any).testTaskTextAccounts});return;}
+   if(p==='/chat-library/bulk-delete'){reply(id,(window as any).testBulkHost(message.data));return;}
+   if(p==='/chat-library/erasures'){reply(id,(window as any).testErasures||{});return;}
+   if(p==='/task-text/plan/providers'){reply(id,(window as any).testPlanCatalog||{});return;}
+   if(p.endsWith('/generation')){
+     const read=(window as any).testSessionGeneration;
+     void Promise.resolve(read?read(p.split('/')[2],url.searchParams):{}).then(value=>reply(id,value));return;
+   }
+   if(p==='/task-text/plan'){reply(id,(window as any).testPlanResponse||{});return;}
+   if(p==='/task-text/providers'){reply(id,(window as any).testTaskTextCatalog||{providers:['claude','codex','copilot'],accounts:(window as any).testTaskTextAccounts});return;}
    if(p==='/custom-providers'&&(window as any).testTaskTextAccounts){reply(id,(window as any).testTaskTextAccounts.map((a:any)=>({...a,hasKey:true})));return;}
    if(p.startsWith('/custom-providers/')&&p.endsWith('/models')&&(window as any).testTaskTextModels){reply(id,(window as any).testTaskTextModels[p.split('/')[2]]||[]);return;}
    if(p==='/task-text/improve'&&typeof (window as any).testTaskTextResponse==='string'){reply(id,{text:(window as any).testTaskTextResponse});return;}
@@ -47,16 +55,28 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    if(p==='/task-notifications'){reply(id,{items:[],unread:0});return;}
    if(p==='/jobs'&&action==='write'){const run={...message.data,provider:message.data.provider||'claude',sessionId:message.data.sessionId||'alpha',status:'running',messages:[],partial:'Working on your request',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0};(window as any).testRuns=[run];reply(id,run);return;}
    if(p==='/chat-library/projects'){if(message.data)(window as any).attachedProjects=[...new Set([...((window as any).attachedProjects||[]),message.data.cwd])];reply(id,message.data?{cwd:message.data.cwd}:((window as any).attachedProjects||[]));return;}
-   if(/^\/sessions\/[^/]+\/manage$/.test(p)){const key=message.data.provider+':'+p.split('/')[2];(window as any).chatChanges={...(window as any).chatChanges,[key]:message.data};reply(id,{ok:true});return;}
-   if(p==='/sessions'){reply(id,[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}].filter(s=>(window as any).chatChanges?.[provider+':'+s.sessionId]?.action!=='delete').map(s=>({...s,customTitle:(window as any).chatChanges?.[provider+':'+s.sessionId]?.title})));return;}
+   if(/^\/sessions\/[^/]+\/manage$/.test(p)){
+     const key=message.data.provider+':'+p.split('/')[2],erase=message.data.action==='erase';
+     const error=(window as any).testEraseError;
+     if(erase&&error){listeners.forEach(listener=>listener({data:{id,error,status:502}}));return;}
+     if(erase&&(window as any).testUnconfirmedErase){reply(id,{ok:true});return;}
+     (window as any).chatChanges={...(window as any).chatChanges,[key]:erase?{action:'delete'}:message.data};
+     reply(id,erase?{deleted:true,originalRemoved:true}:{ok:true});return;
+   }
+   if(p==='/sessions'){reply(id,((window as any).testChatRows||[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}]).filter((s:any)=>(window as any).chatChanges?.[provider+':'+s.sessionId]?.action!=='delete').map((s:any)=>({...s,customTitle:(window as any).chatChanges?.[provider+':'+s.sessionId]?.title})));return;}
    if(p==='/provider-connections'){reply(id,{providers:['claude','codex','copilot'].map(id=>({id,installed:true,version:'1.0.0',server:id==='claude'?'on-demand':'ready',authenticated:id==='claude',busy:false,login:{state:'idle'},methods:id==='claude'?['browser','console','sso']:['browser','device']}))});return;}
    if(p==='/devices'){reply(id,(window as any).testDevices||[]);return;}
    if(p==='/document-projects'){reply(id,[{root:'C:\\Demo\\Atlas',name:'Atlas',documents:[]}]);return;}
    if(p==='/project-rules'){if(action==='write')(window as any).boardRuleEnabled=message.data.boardMaintenance;reply(id,{boardMaintenance:(window as any).boardRuleEnabled!==false,canEdit:true});return;}
    if(p==='/project-docs'){reply(id,{project:url.searchParams.get('cwd'),truncated:false,documents:[{path:'AGENTS.md',name:'AGENTS.md',kind:'rules',source:'project',appliesTo:'all',bytes:40},{path:'CHANGELOG.md',name:'CHANGELOG.md',kind:'changelog',source:'project',appliesTo:'all',bytes:40}]});return;}
    if(p==='/project-doc'){const path=url.searchParams.get('path');reply(id,{path,name:path,kind:path==='AGENTS.md'?'rules':'changelog',source:'project',appliesTo:'all',bytes:40,content:path==='AGENTS.md'?'# Synthetic rules\n\nUse synthetic data.':'# Changelog\n\n- Synthetic entry'});return;}
-   if(p==='/files'){const folder=url.searchParams.get('path')||'C:\Demo\Atlas';reply(id,{path:folder,parent:null,entries:[{name:'README.md',directory:false,path:folder+'\README.md'}]});return;}
-   if(p==='/file'){reply(id,{name:'README.md',text:'Synthetic readme'});return;}
+   if(p==='/files'){
+     const folder=url.searchParams.get('path')||'C:\\Demo\\Atlas',nested=folder.endsWith('\\docs');
+     const entries=[{name:'README.md',directory:false,path:folder+'\\README.md'}];
+     if(!nested&&(window as any).withSourceFolder)entries.push({name:'docs',directory:true,path:folder+'\\docs'});
+     reply(id,{path:folder,parent:nested?folder.slice(0,-5):null,entries});return;
+   }
+   if(p==='/file'){reply(id,{name:'README.md',path:url.searchParams.get('path'),text:'Synthetic readme'});return;}
    if(p==='/projects'){reply(id,(window as any).testProjectPaths||['C:\\Demo\\Atlas','C:\\Demo\\Garden']);return;}
    if(p==='/jobs'){reply(id,(window as any).testRuns||[]);return;}
    if(/^\/jobs\/[^/]+\/messages$/.test(p)&&action==='write'){if((window as any).rejectNextFollowup){(window as any).rejectNextFollowup=false;queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,error:'Synthetic turn closing',status:409}})));return;}const run=(window as any).testRuns.find((r:any)=>r.id===p.split('/')[2]);run.revision++;reply(id,run);return;}

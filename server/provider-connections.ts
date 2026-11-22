@@ -48,12 +48,12 @@ export class ProviderConnections{
   return this.loginState.get(id);
  }
  isSigningIn(){return [...this.loginState.values()].some(value=>value.state==='waiting'||value.state==='checking');}
- async status(){if(this.cache&&Date.now()-this.cache.at<8000)return this.cache.value;if(this.pending)return this.pending;this.pending=this.load().finally(()=>{this.pending=undefined;});return this.pending;}
+ async status(refresh=false){if(!refresh&&this.cache&&Date.now()-this.cache.at<8000)return this.cache.value;if(this.pending)return this.pending;this.pending=this.load().finally(()=>{this.pending=undefined;});return this.pending;}
  private async load(){const providers=await Promise.all((['claude','codex','copilot'] as const).map(async id=>{
   let installed=false,authenticated:boolean|null=null,server='unavailable',version='',access:string|undefined;
   try{const exe=await providerExecutable(id);installed=true;const checked=await runCheck(exe,['--version']);version=checked.stdout.match(/\b\d+\.\d+\.\d+(?:[-.][a-zA-Z0-9]+)*\b/)?.[0]||'';
    if(id==='claude'){authenticated=parseClaudeAuth(await runCheck(exe,['auth','status']));server=checked.code===0?'on-demand':'unavailable';}
-   else{const probe=await this.probes[id]?.();server=probe?.available?'ready':'unavailable';authenticated=probe?.available?probe.authenticated:null;access=probe?.access;}
+   else{const probe=await this.probes[id]?.();server=probe?.available?'ready':'unavailable';authenticated=probe?.available&&probe.access!=='verification-failed'?probe.authenticated:null;access=probe?.access;}
   }catch{/* Do not expose raw CLI output, account names, paths or credentials. */}
   return{id,installed,version,server,authenticated,access,busy:this.busy(id),login:this.loginState.get(id)||{state:'idle'},methods:Object.keys(loginMethods[id])};
  }));const value={providers,checkedAt:Date.now()};this.cache={at:Date.now(),value};return value;}

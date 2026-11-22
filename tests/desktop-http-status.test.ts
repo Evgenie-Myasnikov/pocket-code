@@ -63,13 +63,23 @@ ${source.slice(begin,end)}
 class Probe {public static int Main(){
  string job="/jobs/12345678-1234-4123-8123-123456789abc";
  string message=job+"/messages/abcdef12-1234-4123-8123-123456789abc";
+ string metrics="/sessions/abcdef12-1234-4123-8123-123456789abc/generation";
+ if(!DesktopReadPolicy.Allows(metrics+"?provider=codex")||DesktopReadPolicy.AllowsWrite(metrics)||DesktopReadPolicy.Allows(metrics+"/extra"))throw new Exception("Generation statistics must be read-only");
+ if(!DesktopReadPolicy.AllowsWrite("/chat-library/bulk-delete")||DesktopReadPolicy.Allows("/chat-library/bulk-delete")||DesktopReadPolicy.AllowsWrite("/chat-library/bulk-delete/extra"))throw new Exception("Bulk delete route policy");
+ if(!DesktopReadPolicy.Allows("/chat-library/erasures?offset=200")||DesktopReadPolicy.AllowsWrite("/chat-library/erasures")||DesktopReadPolicy.Allows("/chat-library/erasures/extra"))throw new Exception("Erasure feed must be read-only");
  if(!DesktopReadPolicy.AllowsWrite(message+"/cancel")||DesktopReadPolicy.Allows(message+"/cancel")||
     DesktopReadPolicy.AllowsWrite(message+"/cancel/extra")||DesktopReadPolicy.AllowsWrite(job+"/messages/not-an-id/cancel"))
  throw new Exception("Unexpected queued message cancel policy");
  if(!DesktopReadPolicy.Allows("/task-text/providers")||DesktopReadPolicy.AllowsWrite("/task-text/providers")||
     !DesktopReadPolicy.AllowsWrite("/task-text/improve")||DesktopReadPolicy.Allows("/task-text/improve"))
  throw new Exception("Unexpected task text route policy");
+ foreach(string route in new[]{"/task-text/plan/providers","/files?path=C%3A%5CDemo","/file?path=C%3A%5CDemo%5Cguide.md"})
+   if(!DesktopReadPolicy.Allows(route)||DesktopReadPolicy.AllowsWrite(route))throw new Exception("Planner source read policy");
+ if(!DesktopReadPolicy.AllowsWrite("/task-text/plan")||DesktopReadPolicy.Allows("/task-text/plan")||
+    DesktopReadPolicy.AllowsWrite("/task-text/plan/extra")||DesktopReadPolicy.Allows("/task-text/plan/providers/extra"))
+   throw new Exception("Planner generation policy");
  string chain="/task-chains/12345678-1234-4123-8123-123456789abc";
+ if(!DesktopReadPolicy.AllowsWrite(chain+"/delete-chats")||DesktopReadPolicy.Allows(chain+"/delete-chats")||DesktopReadPolicy.AllowsWrite(chain+"/delete-chats/extra"))throw new Exception("Chain erasure policy");
  if(!DesktopReadPolicy.Allows("/task-chains?cwd=sample")||!DesktopReadPolicy.Allows(chain)||
     !DesktopReadPolicy.AllowsWrite("/task-chains")||!DesktopReadPolicy.AllowsWrite(chain+"/stop")||
     !DesktopReadPolicy.AllowsWrite(chain+"/delete")||DesktopReadPolicy.Allows(chain+"/stop")||DesktopReadPolicy.Allows(chain+"/delete")||

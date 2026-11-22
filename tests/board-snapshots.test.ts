@@ -23,11 +23,11 @@ test('repository snapshots roundtrip without committing and reject traversal/pri
  }finally{await rm(root,{recursive:true,force:true});}
 });
 
-test('snapshots retain 40 and 64 release columns and branch links; overflow cannot replace a valid snapshot',async()=>{
+test('snapshots retain legacy and current release columns and branch links; overflow cannot replace a valid snapshot',async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'pocket-snapshot-versions-'));
  try{
   const board=example();
-  for(const count of [40,BOARD_VERSION_LIMIT]){
+  for(const count of [40,64,66,BOARD_VERSION_LIMIT]){
    board.versions=Array.from({length:count},(_,i)=>'1.0.'+i);
    board.versionBranches=Object.fromEntries(board.versions.map(version=>[version,'release/'+version]));
    board.notes[0].branch=board.versions.at(-1)!;

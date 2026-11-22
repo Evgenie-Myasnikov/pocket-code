@@ -93,14 +93,17 @@ provide shared unsaved collaboration or cross-user undo.
 
 Host 0.28.15 raises the bounded version-label and branch-map limit from 40 to 64.
 Older hosts require at most 40 entries in each field; update the host before
-loading a larger snapshot. The limit is shared by storage, APIs and the UI.
+loading a larger snapshot.
+
+Unreleased hosts accept up to 128 versions and branch links so existing release
+history remains editable. Storage, host APIs and the UI share this bound.
 
 ## Format limits, health and history (0.28.41)
 
 Limits of a version 1 board file: title 1–160 characters, description up to
 20,000, image caption up to 160, 12 images, 100 dependencies and 50 checklist
 items per card, 500 cards, 500 canvas objects, 1,000 connections, 4,000 characters
-of object text, 64 version labels, 2,000,000 bytes per file. `status` is idea,
+of object text, 128 version labels, 2,000,000 bytes per file. `status` is idea,
 questions, ready, working, review or done; `priority` is critical, high, normal or
 low. Optional card fields: `images`, `checklist: [{text, done}]` and
 `statusHistory: [{status, at}]` (written by the host). A canvas object of kind

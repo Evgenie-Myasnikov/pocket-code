@@ -54,6 +54,11 @@ test('API authenticates, scopes sessions, prevents path escapes and routes attac
     assert.equal((await (await request('/file?path=' + encodeURIComponent(path.join(root, 'hello.txt')))).json()).text, 'Hello');
     await writeFile(path.join(root,'AGENTS.md'),'# Project rules');
     const docsQuery='?cwd='+encodeURIComponent(root);
+    const nested=path.join(root,'result-folder');await mkdir(nested);
+    const narrow='?cwd='+encodeURIComponent(nested)+'&path=';
+    assert.equal((await request('/files'+narrow+encodeURIComponent(root))).status,403);
+    assert.equal((await request('/file'+narrow+encodeURIComponent(path.join(root,'hello.txt')))).status,403);
+    assert.equal((await(await request('/files'+narrow+encodeURIComponent(nested))).json()).parent,null);
     assert.equal((await request('/project-docs'+docsQuery,undefined,'wrong')).status,401);
     assert.equal((await request('/project-docs?cwd='+encodeURIComponent(outside))).status,403);
     assert.equal((await (await request('/project-docs'+docsQuery)).json()).documents[0].path,'AGENTS.md');

@@ -1,0 +1,16 @@
+.chat-generation-metrics {
+  display:flex;
+  align-items:baseline;
+  flex-wrap:wrap;
+  gap:.25rem 1rem;
+  margin:0 0 .4rem;
+  padding:.15rem .25rem;
+  color:var(--muted);
+  font-size:max(.75rem,var(--type-min));
+  line-height:1.4;
+  font-variant-numeric:tabular-nums;
+}
+.chat-generation-metrics>span { display:inline-flex;align-items:center;gap:.3em;white-space:nowrap; }
+.chat-generation-metrics b { font-weight:var(--fw-medium,500);color:var(--text); }
+.chat-generation-rate>svg { flex:none; }
+@media(max-width:600px){.chat-generation-metrics{gap:.1rem .7rem;margin-bottom:.25rem;}}

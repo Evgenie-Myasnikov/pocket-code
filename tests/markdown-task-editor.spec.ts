@@ -1,6 +1,46 @@
 import {expect,test} from '@playwright/test';
 import {desktop} from './desktop-fixture';
 
+test('refreshing Fill instructions preserves a selected API profile and model while local availability changes',async({page})=>{
+  const account='00000000-0000-4000-8000-000000000010';
+  await page.addInitScript(id=>{
+    localStorage.setItem('pocket-code-language-v1','ru');
+    const fixture=window as any;
+    fixture.testTaskTextCatalog={providers:['copilot'],accounts:[{id,name:'Редактор каталога'}],
+      unavailable:[{provider:'claude',reason:'signed_out'},{provider:'codex',reason:'version'}]};
+    fixture.testTaskTextModels={[id]:['editor-small','editor-pro']};
+  },account);
+  await page.setViewportSize({width:1280,height:940});
+  await desktop(page);
+  await page.locator('.desktop-rail').getByRole('button',{name:'Задачи',exact:true}).click();
+  await page.getByRole('button',{name:'Создать задачу',exact:true}).click();
+  const editor=page.getByRole('dialog',{name:'Создать задачу'});
+  await editor.getByRole('button',{name:'Заполнить с ИИ · Инструкции'}).click();
+  const dialog=page.getByRole('dialog',{name:'Заполнить с ИИ · Инструкции'});
+  await expect(dialog.getByRole('radio',{name:'GitHub Copilot'})).toBeChecked();
+  await expect(dialog.getByText(/требуется вход на ПК/)).toBeVisible();
+  await expect(dialog.getByText(/нужен Codex CLI/)).toBeVisible();
+  await dialog.locator('summary',{hasText:'API-подключения'}).click();
+  await dialog.getByRole('combobox',{name:'Подключение',exact:true}).selectOption(account);
+  await dialog.getByRole('combobox',{name:'Модель',exact:true}).selectOption('editor-pro');
+  await dialog.getByLabel('Пожелания к тексту').fill('Сравни обозначения в справочнике. Перечисли расхождения и опиши проверку для каждого исправления.');
+  await page.evaluate(()=>{
+    const fixture=window as any;
+    fixture.testTaskTextCatalog.providers=['codex'];
+    fixture.testTaskTextCatalog.unavailable=[{provider:'claude',reason:'signed_out'},{provider:'copilot',reason:'not_detected'}];
+  });
+  await dialog.getByRole('button',{name:'Обновить список'}).click();
+  await expect(dialog.getByRole('radio',{name:'Codex',exact:true})).toBeVisible();
+  await expect(dialog.getByRole('combobox',{name:'Подключение',exact:true})).toHaveValue(account);
+  await expect(dialog.getByRole('combobox',{name:'Модель',exact:true})).toHaveValue('editor-pro');
+  await expect(dialog.getByText(/CLI не обнаружен/)).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'Создать вариант'})).toBeEnabled();
+  if(process.env.POCKET_PROVIDER_PREVIEW){
+    await page.evaluate(()=>document.fonts.ready.then(()=>true));
+    await dialog.screenshot({path:process.env.POCKET_PROVIDER_PREVIEW});
+  }
+});
+
 test('review an AI suggestion inside the manual Markdown editor and prepare the edited batch',async({page})=>{
   const sample='Сравни названия категорий со справочником. Выпиши несовпадения и укажи ожидаемую категорию для каждой карточки.';
   await page.addInitScript(text=>{

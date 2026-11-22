@@ -149,7 +149,7 @@ export const Markdown=memo(function Markdown({text,streaming=false,animateInitia
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.
-function Disclosure({className,summary,children,defaultOpen=false}:{className:string;summary:ReactNode;children:()=>ReactNode;defaultOpen?:boolean}){
+export function Disclosure({className,summary,children,defaultOpen=false}:{className:string;summary:ReactNode;children:()=>ReactNode;defaultOpen?:boolean}){
   const [open,setOpen]=useState(false),element=useRef<HTMLDetailsElement|null>(null);
   // Opened once on mount; afterwards the person alone decides.
   useEffect(()=>{if(defaultOpen&&element.current)element.current.open=true;},[]);

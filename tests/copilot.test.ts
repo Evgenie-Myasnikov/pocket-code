@@ -18,8 +18,11 @@ test('Copilot exposes only allowlisted streaming file arguments and clears previ
   const fragment=(toolCallId:string,toolName:string|undefined,inputDelta:string,agentId?:string)=>f.emit({type:'assistant.tool_call_delta',agentId,data:{toolCallId,toolName,inputDelta}});
   fragment('nested','create','{"path":"hidden","file_text":"hidden"}','child');
   fragment('shell','bash','{"path":"hidden","file_text":"hidden"}');
-  fragment('new','create','{"path":"sample.ts","file_text":"first\\n');
-  fragment('new',undefined,'line"}');
+  fragment('new','create','{"file_text":"first\\n');
+  assert.deepEqual(f.service.get(i.id).writePreviews,[{id:'new',tool:'Write',path:'',content:'first\n',totalBytes:6,totalLines:1}]);
+  fragment('new',undefined,'line","path":"sam');
+  assert.equal(f.service.get(i.id).writePreviews![0].path,'');
+  fragment('new',undefined,'ple.ts"}');
   const job=f.service.get(i.id);
   assert.deepEqual(job.writePreviews,[{id:'new',path:'sample.ts',tool:'Write',content:'first\nline',totalBytes:10,totalLines:2}]);
   assert.equal(job.messages.length,1);assert.equal(f.service.list()[0].writePreviews,undefined);
@@ -39,6 +42,23 @@ test('Copilot permits independent histories in one project and rejects duplicate
   assert.equal(f.service.list().filter(run=>run.status==='running').length,2);
   assert.throws(()=>f.service.start({...input(),sessionId:'first'}),/already running/);
  }finally{await f.service.close();}
+});
+
+test('Copilot forwards actual usage through live jobs and final persistence without treating streamed text as tokens',async()=>{
+ const f=fixture(),i=input();
+ let persisted:unknown;
+ f.service.recordGeneration=view=>{persisted=view.generation;};
+ try{
+  f.service.start(i);await waitFor(()=>!!f.config());
+  f.emit({type:'assistant.message_delta',data:{deltaContent:'synthetic'}});
+  assert.equal(f.service.get(i.id).generation,undefined);
+  f.emit({type:'assistant.usage',id:'actual',data:{inputTokens:50,outputTokens:31,interTokenLatencyMs:25}});
+  f.emit({type:'session.usage_info',data:{currentTokens:250,tokenLimit:1000}});
+  const expected={outputTokens:31,outputTokensPerSecond:40,totalTokens:81,contextTokens:250,contextWindow:1000};
+  assert.deepEqual(f.service.get(i.id).generation,expected);
+  f.finish();await waitFor(()=>f.service.get(i.id).status==='done');
+  assert.deepEqual(persisted,expected);
+ }finally{f.finish();await f.service.close();}
 });
 
 test('Copilot attaches managed board MCP to new and resumed sessions',async()=>{

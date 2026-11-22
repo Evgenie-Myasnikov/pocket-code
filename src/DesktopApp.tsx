@@ -1,10 +1,10 @@
-import {useCustomAccount} from './custom-account';
+import type {MarkdownChainScope} from './markdown-chain';
+import {setCustomAccount,useCustomAccount} from './custom-account';
 import {chatTitle} from './chat-title';
 import {RailButton} from './RailButton';
 import {ChatAtmosphere} from './ChatAtmosphere';
 import {ChatActions,type ChatActionTarget} from './ChatActions';
-import {ChatListActions} from './ChatListActions';
-import {Fragment} from 'react';
+import {DesktopChatFolders} from './DesktopChatFolders';
 import {PanelResizeHandle} from './PanelResizeHandle';
 import './desktop-sidebar.css';
 import type {BoardSelection} from './board-selection-context';
@@ -17,12 +17,13 @@ import {ProviderPicker} from './ProviderPicker';
 import {useActivity} from './useActivity';
 import {useDesktopRunNotifications,type WatchedChat} from './chat-notifications';
 import type {BoardNoticeTarget} from './BoardNotifications';
-import {ChatRunStatus,RunStatusDot,relativeTime,fullTime} from './run-status';
+
 import {providerName} from './ActivityList';
 import {useChatShortcuts} from './use-chat-shortcuts';
 import {useComposerPreferences,enterSends} from './composer-preferences';
 import {detailMode,setDetailMode} from './detail-mode';
-import {readChatCache,writeChatCache} from './chat-cache';
+import {chatCacheScope,forgetChatTranscripts,readChatCache,writeChatCache,type RemovedTranscripts} from './chat-cache';
+import {transcriptScope} from './chat-history-cache';
 import {DesktopSettings} from './DesktopSettings';
 import {DesktopWorkspaces} from './DesktopWorkspaces';
 import {connectionKind} from './connection-kind';
@@ -39,7 +40,7 @@ import {ProviderConnections,HostStatus} from './ProviderConnections';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import QRCode from 'qrcode';
 import {releaseRepository} from './release-update';
-import {ListChecks,Home,LayoutDashboard,PanelLeftClose,PanelLeftOpen,ArrowDown,BookOpen,FileText,Check,ChevronRight,Folder,GitCompareArrows,Keyboard,MessageCirclePlus,MessageSquare,Monitor,Plus,RefreshCw,Settings,Smartphone,Wifi,X} from 'lucide-react';
+import {ListChecks,Home,PanelLeftClose,PanelLeftOpen,ArrowDown,BookOpen,FileText,Check,Folder,GitCompareArrows,Keyboard,MessageCirclePlus,MessageSquare,Monitor,Plus,Settings,Smartphone,Wifi,X} from 'lucide-react';
 import {request,type Connection} from './api';
 import {loadLinkedBoard} from './board-link';
 import {boardChatContext} from './board-chat-context';
@@ -56,6 +57,7 @@ import {Review,ChatOutputs,Subagents,DocumentLibrary} from './lazy-panels';
 
 import {shareSnapshot} from './chat-snapshot';
 import {startVisiblePoll} from './visible-poll';
+import {useChatErasures} from './use-chat-erasures';
 import {useBackNavigation,useModal} from './navigation';
 import type {JobView} from '../server/types';
 import type {BoardLink,Session} from './session';
@@ -137,17 +139,25 @@ export function DesktopApp(){
   const [boardChat,setBoardChat]=useState<BoardChat|undefined>(),[docDraft,setDocDraft]=useState(''),[docTab,setDocTab]=useState<DocumentKind>('rules');
   const [creating,setCreating]=useState(false);
   const activity=useActivity(state.online?connection:null);
+  useChatErasures(state.online?connection:null);
   const [railCollapsed,setRailCollapsed]=useState(()=>{try{return localStorage.getItem('pocket-desktop-sidebar-collapsed-v1')==='true';}catch{return false;}});
   function collapseRail(value:boolean){setRailCollapsed(value);try{localStorage.setItem('pocket-desktop-sidebar-collapsed-v1',String(value));}catch{}}
   const [taskChainId,setTaskChainId]=useState<string>();
   const [taskDraft,setTaskDraft]=useState<{root:string;prompt:string}>();
   const chatDrafts=useRef(new Map<string,Map<string,ChatDraft>>());
-  function openTasks(id?:string){setTaskChainId(id);setPage('tasks');}
+  const [taskProject,setTaskProject]=useState<string>();
+  const [linkedRoot,setLinkedRoot]=useState<string>();
+  function openTasks(id?:string,owner?:MarkdownChainScope){
+    setLinkedRoot(owner?.cwd);
+    if(owner){if(owner.provider==='claude')setCustomAccount(owner.account||'');setProvider(owner.provider);}
+    setTaskChainId(id);setPage('tasks');
+  }
   function navigateRail(next:'chats'|'work'|'rules'|'changelog'|'settings'){if(next==='settings'&&(page==='settings'))setSettingsNonce(value=>value+1);setPage(next);if(next==='rules'||next==='changelog')setDocTab(next);}
   const [shortcutsOpen,setShortcutsOpen]=useState(false),composerPreferences=useComposerPreferences();
   const shortcutsSheet=useRef<HTMLElement|null>(null);useModal(shortcutsSheet,shortcutsOpen,()=>setShortcutsOpen(false));
   const [notificationChat,setNotificationChat]=useState<WatchedChat|null>(null);
   const [selected,setSelected]=useState<Session|null>(null),[loading,setLoading]=useState(false),[revision,setRevision]=useState(0),[address,setAddress]=useState(0);
+  const libraryEpoch=useRef(0);
   // The window's own host is the one the supervisor watches; a failed bridge read turns the footer amber at once.
   useEffect(()=>{if(!state.online){setPrimaryHost('',null);return;}setPrimaryHost(connection.url,()=>request(connection,'/health'));},[state.online]);
   useEffect(()=>{const unwatch=watchDesktop(setState);let active=true;void desktopCall<DesktopState>('state').then(value=>{if(active)setState(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;unwatch();};},[]);
@@ -167,12 +177,42 @@ export function DesktopApp(){
     if(!boardTarget&&boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));
   },[provider]);
   useEffect(()=>{if(!state.online)return;let active=true;setLoading(true);
-    const stop=startVisiblePoll(async()=>{try{const list=await request<Session[]>(connection,`/sessions?provider=${provider}`);if(!active)return;setSessions(old=>shareSnapshot(old,list));writeChatCache('desktop-local',provider,'sessions',list);setError('');}catch(e){if(active&&!(e as {code?:string}).code?.startsWith('host_'))setError((e as Error).message);}finally{if(active)setLoading(false);}},10000);return()=>{active=false;stop();};
+    const stop=startVisiblePoll(async()=>{const epoch=libraryEpoch.current;try{const list=await request<Session[]>(connection,`/sessions?provider=${provider}`);if(!active||epoch!==libraryEpoch.current)return;setSessions(old=>shareSnapshot(old,list));writeChatCache('desktop-local',provider,'sessions',list);setError('');}catch(e){if(active&&!(e as {code?:string}).code?.startsWith('host_'))setError((e as Error).message);}finally{if(active)setLoading(false);}},10000);return()=>{active=false;stop();};
   },[state.online,provider,revision]);
   useEffect(()=>{if(!state.online)return;let active=true;const stop=startVisiblePoll(async()=>{try{const folders=await request<string[]>(connection,'/projects');if(active)setProjects(old=>shareSnapshot(old,folders));}catch{/* Session project folders remain available. */}},60000);return()=>{active=false;stop();};},[state.online,revision]);
-  useEffect(()=>{if(!state.online)return;let active=true;const stop=startVisiblePoll(async()=>{try{const runs=await request<JobView[]>(connection,`/jobs?provider=${provider}`);if(active)setJobs(old=>shareSnapshot(old,runs));}catch{/* Keep the last known run state during a transient disconnect. */}},1000);return()=>{active=false;stop();};},[state.online,provider,revision]);
+  useEffect(()=>{if(!state.online)return;let active=true;const stop=startVisiblePoll(async()=>{const epoch=libraryEpoch.current;try{const runs=await request<JobView[]>(connection,`/jobs?provider=${provider}`);if(active&&epoch===libraryEpoch.current)setJobs(old=>shareSnapshot(old,runs));}catch{/* Keep the last known run state during a transient disconnect. */}},1000);return()=>{active=false;stop();};},[state.online,provider,revision]);
   // Custom providers share the Claude workspace; each lists only its own chats, the PC's Claude sign-in lists the rest.
   const customAccount=useCustomAccount(),account=provider==='claude'?customAccount:'';
+  const currentLane=useRef(provider);
+  useEffect(()=>setChatAction(null),[provider,account,projectFilter]);
+  currentLane.current=provider;
+  function removeChats(ids:string[],forgetTranscripts=true){
+    if(!ids.length)return;
+    libraryEpoch.current++;
+    if(forgetTranscripts)void forgetChatTranscripts(connection,provider,ids);
+    const removed=new Set(ids);
+    const cached=readChatCache<Session[]>('desktop-local',provider,'sessions');
+    if(cached)writeChatCache('desktop-local',provider,'sessions',cached.filter(s=>!removed.has(s.sessionId)));
+    if(currentLane.current===provider){
+      setSessions(old=>old.filter(s=>!removed.has(s.sessionId)));
+      setJobs(old=>old.filter(j=>!j.sessionId||!removed.has(j.sessionId)));
+      setSelected(old=>old&&removed.has(old.sessionId)?null:old);
+      setRevision(value=>value+1);
+    }
+  }
+  useEffect(()=>{
+    let live=true;
+    const hostScope=chatCacheScope(connection).then(scope=>transcriptScope(scope,connection));
+    async function removed(event:Event){
+      const detail=(event as CustomEvent<RemovedTranscripts>).detail;
+      if(!detail||detail.url!==connection.url||detail.hostScope!==await hostScope||!live)return;
+      if(detail.provider===provider){removeChats(detail.ids,false);return;}
+      const ids=new Set(detail.ids),old=readChatCache<Session[]>('desktop-local',detail.provider,'sessions');
+      if(old)writeChatCache('desktop-local',detail.provider,'sessions',old.filter(s=>!ids.has(s.sessionId)));
+    }
+    window.addEventListener('pocket-chat-transcripts-removed',removed);
+    return()=>{live=false;window.removeEventListener('pocket-chat-transcripts-removed',removed);};
+  },[provider]);
   const previousAccount=useRef(account);useEffect(()=>{if(previousAccount.current===account)return;previousAccount.current=account;if(!selected?.account&&!account||selected?.account===account)return;setSelected(null);setCreating(false);if(boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));},[account]);
   const latestJobs=useMemo(()=>{const map=new Map<string,JobView>();for(const job of [...jobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[jobs]);
   const chatSessions=useMemo(()=>{const map=new Map(sessions.map(item=>[item.sessionId,item]));for(const job of latestJobs.values())if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,{sessionId:job.sessionId,cwd:job.cwd,summary:name(job.cwd),lastModified:job.startedAt,...(job.account?{account:job.account}:{})});return [...map.values()].filter(item=>provider!=='claude'||(item.account||'')===account).sort((a,b)=>Number(latestJobs.get(b.sessionId)?.status==='running')-Number(latestJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[sessions,latestJobs,provider,account]);
@@ -257,21 +297,20 @@ export function DesktopApp(){
       <div className="desktop-library" hidden={railCollapsed}><ProviderPicker connection={connection||undefined} value={provider} onChange={setProvider} attention={id=>activity.items.filter(item=>item.provider===id&&(item.status==='needs_input'||item.status==='error')).length}/>
       {folders.length>0&&<div className="desktop-project-links"><div className="desktop-list-caption">{label('Projects','Проекты')}</div>{folders.length>1?<ProjectFolderPicker label={label('Filter projects','Фильтр проектов')} paths={folders}
         value={projectFilter} allowClear placeholder={label('All projects','Все проекты')} onChange={folder=>{setProjectFilter(folder);if(folder)setProject(folder);}}/>:folders.map(folder=><button key={folder} className="rail-action" title={folder} aria-pressed={projectFilter===folder} onClick={()=>{setProjectFilter(projectFilter===folder?'':folder);setProject(folder);}}><Folder size={16}/><span>{name(folder)}</span></button>)}</div>}
-      <div className="desktop-list-caption"><span>{label('Workspace chats','Чаты по папкам')}</span><button className="icon-button" aria-label={label('Refresh','Обновить')} onClick={()=>setRevision(value=>value+1)}><RefreshCw size={16}/></button></div>
-      <div className="desktop-session-groups">{loading&&!sessions.length?<p role="status">{label('Loading chats…','Загружаем чаты…')}</p>:Array.from(sessionsByFolder,([folder,items])=><details key={folder} className="rail-chat-folder" open>
-        <summary title={folder}><ChevronRight size={13} aria-hidden="true"/><Folder size={15} aria-hidden="true"/><span>{folder?name(folder):label('No project','Без проекта')}</span></summary>
-        <div className="desktop-sessions">{items.map((session,index)=>{const job=latestJobs.get(session.sessionId);const status=job?.status==='running'&&job.approvals?.length?'needs_input':job?.status;return <Fragment key={session.sessionId}><button style={{gridRow:index+1}} data-running={job?.status==='running'||undefined} aria-description={job?.status==='running'?label('Working','Работает'):undefined} onContextMenu={event=>{event.preventDefault();setChatAction({session,x:event.clientX,y:event.clientY,running:job?.status==='running'});}} onKeyDown={event=>{if(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10'){event.preventDefault();const r=event.currentTarget.getBoundingClientRect();setChatAction({session,x:r.left,y:r.bottom,running:job?.status==='running'});}}} key={session.sessionId} title={[session.customTitle||session.summary,session.board?(session.board.kind==='discussion'?label('Board discussion: ','Обсуждение доски: '):session.board.kind==='task'?label('Board task: ','Задача доски: '):label('Board: ','Доска: '))+session.board.title:'',session.cwd?name(session.cwd):'',fullTime(session.lastModified)].filter(Boolean).join(' · ')} aria-pressed={page==='chats'&&selected?.sessionId===session.sessionId} onClick={()=>openChat(session)}>{status&&status!=='running'?<RunStatusDot status={status} className="desktop-chat-dot" labelled={false}/>:<span className="desktop-chat-dot" data-status="idle"/>}<span><strong>{session.board&&<LayoutDashboard className="desktop-chat-board" size={13} aria-label={label('Board chat: ','Чат доски: ')+session.board.title}/>}{session.customTitle||chatTitle(session.summary,label('Untitled chat','Без названия'))}</strong><small>{session.cwd?name(session.cwd):label('No project','Без проекта')}{!status&&<> · <time title={fullTime(session.lastModified)}>{relativeTime(session.lastModified)}</time></>}</small>{status&&status!=='running'&&<small className="desktop-run-label"><ChatRunStatus status={status}/></small>}</span><ChevronRight size={14}/></button><ChatListActions session={session} provider={provider} connection={connection} jobId={job?.id} row={index+1} running={job?.status==='running'} open={chatAction?.session.sessionId===session.sessionId} onOpen={setChatAction} onClose={()=>setChatAction(null)}/></Fragment>;})}</div></details>)}{!loading&&!visible.length&&<p className="muted">{state.online?label('No matching chats','Нет подходящих чатов'):label('Chats will load when the local server is available.','Чаты загрузятся, когда локальный сервер будет доступен.')}</p>}</div></div>
+      <DesktopChatFolders key={[provider,account,projectFilter].join('|')} groups={sessionsByFolder} jobs={latestJobs} focusId={page==='chats'?selected?.sessionId:undefined}
+        actionId={chatAction?.session.sessionId} projectFilter={projectFilter} loading={loading} online={state.online} connection={connection} provider={provider} account={account}
+        onOpen={openChat} onMenu={setChatAction} onCloseMenu={()=>setChatAction(null)} onRefresh={()=>setRevision(value=>value+1)} onDeleted={removeChats}/></div>
       </div>
     </aside>
     <main className={'desktop-main'+(page==='work'&&boardChat?.context&&(selected||creating)?' desktop-board-chat':'')}>{state.online&&<ConnectionStatus/>}{error&&<div className="desktop-error" role="alert">{error}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setError('')}><X size={16}/></button></div>}
-    {(selected||creating||page==='tasks')&&<div className="desktop-chat-host" hidden={page!=='tasks'&&page!=='chats'&&!(page==='work'&&boardChat?.context)}>{localHostRecovery}<SharedChat key={provider+':'+account+(selected?'saved':'new')+(boardChat?':'+boardChat.boardId+':'+boardChat.note.id:'')+(boardChat?.conversation?':'+boardChat.conversation.generation:'')+(docDraft?':draft':'')} embedded={{tasksPage:page==='tasks'?{initialId:taskChainId}:undefined,onOpenTasks:openTasks,draftStore:chatDrafts.current,taskDraft,onTaskDraftUsed:()=>setTaskDraft(undefined),onTaskProvider:value=>{setTaskChainId(undefined);setProvider(value);},onTaskDraft:(root,prompt)=>{if(prompt!==undefined){setTaskDraft({root,prompt});setDocDraft('');setNotificationChat(null);setBoardChat(undefined);setProject(root);setSelected(null);setCreating(true);setPage('chats');}else{if(!selected)setCreating(true);setPage(boardChat?.context?'work':'chats');}},draft:docDraft||undefined,activity,visible:page==='chats'||(page==='work'&&!!boardChat?.context),connection,provider,session:selected||undefined,cwd:selected?.cwd||projectRoot,boardSelection,boardChat,jobId:boardChat?.resumeJobId||(selected?(notificationChat?.provider===provider&&selected.sessionId===(notificationChat.sessionId||`pending-${notificationChat.jobId}`)?notificationChat.jobId:latestJobs.get(selected.sessionId)?.id):undefined),onRevealBoardSelection:target=>{setBoardReveal(target);setPage('work');},onNewBoardChat:target=>void openBoardChat(target,true),onOpenChainChat:(session,jobId)=>{setDocDraft('');setCreating(false);openPlainChat(session);if(jobId)setNotificationChat({provider,sessionId:session.sessionId,jobId,cwd:session.cwd||projectRoot,title:session.summary||''});},onBoard:target=>{setNoticeTarget(target);setPage('work');},onCreated:(session,run)=>{setProvider(run.provider||provider);setDocDraft('');setJobs(old=>[run,...old.filter(j=>j.id!==run.id)]);setSelected(session);setCreating(false);},onBack:()=>{setDocDraft('');setSelected(null);setCreating(false);setBoardChat(undefined);}}}/></div>}
+    {(selected||creating||page==='tasks')&&<div className="desktop-chat-host" hidden={page!=='tasks'&&page!=='chats'&&!(page==='work'&&boardChat?.context)}>{localHostRecovery}<SharedChat key={provider+':'+account+(selected?'saved':'new')+(boardChat?':'+boardChat.boardId+':'+boardChat.note.id:'')+(boardChat?.conversation?':'+boardChat.conversation.generation:'')+(docDraft?':draft':'')} embedded={{tasksPage:page==='tasks'?{initialId:taskChainId,initialRoot:linkedRoot,project:taskProject}:undefined,onTaskProject:setTaskProject,onOpenTasks:openTasks,draftStore:chatDrafts.current,taskDraft,onTaskDraftUsed:()=>setTaskDraft(undefined),onTaskProvider:value=>{setTaskChainId(undefined);setProvider(value);},onTaskDraft:(root,prompt)=>{if(prompt!==undefined){setTaskDraft({root,prompt});setDocDraft('');setNotificationChat(null);setBoardChat(undefined);setProject(root);setSelected(null);setCreating(true);setPage('chats');}else{if(!selected)setCreating(true);setPage(boardChat?.context?'work':'chats');}},draft:docDraft||undefined,activity,visible:page==='chats'||(page==='work'&&!!boardChat?.context),connection,provider,session:selected||undefined,cwd:selected?.cwd||projectRoot,boardSelection,boardChat,jobId:boardChat?.resumeJobId||(selected?(notificationChat?.provider===provider&&selected.sessionId===(notificationChat.sessionId||`pending-${notificationChat.jobId}`)?notificationChat.jobId:latestJobs.get(selected.sessionId)?.id):undefined),onRevealBoardSelection:target=>{setBoardReveal(target);setPage('work');},onNewBoardChat:target=>void openBoardChat(target,true),onOpenChainChat:(session,jobId)=>{const owner=session.provider||provider;if(owner==='claude')setCustomAccount(session.account||'');setProvider(owner);setDocDraft('');setCreating(false);openPlainChat(session);setNotificationChat({provider:owner,sessionId:session.sessionId,jobId,cwd:session.cwd||projectRoot,title:session.summary||''});},onBoard:target=>{setNoticeTarget(target);setPage('work');},onCreated:(session,run)=>{setProvider(run.provider||provider);setDocDraft('');setJobs(old=>[run,...old.filter(j=>j.id!==run.id)]);setSelected(session);setCreating(false);},onBack:()=>{setDocDraft('');setSelected(null);setCreating(false);setBoardChat(undefined);}}}/></div>}
     {page==='tasks'?null:page==='workspace'?<DesktopWorkspaces connection={connection} value={projectSpaces} roots={allFolders} addresses={state.addresses} onBoard={()=>{setLocalBoards(false);setPage('work');}}/>:page==='work'?<div className="desktop-board-section">{boardChat?.context&&(selected||creating)&&<BoardChatDivider/>}<WorkBoards revealTarget={boardReveal} onSelection={setBoardSelection} focusTarget={noticeTarget} local connection={connection} roots={allFolders} workspaces={projectSpaces} onChat={target=>void openBoardChat(target)}/></div>:page==='chats'?(selected||creating?null:<div className="desktop-empty"><MessageSquare size={36}/><h1>{label('Chats','Чаты')}</h1>
       {state.online&&(projectRoot?<button className="primary" onClick={startChat}>{label('Start a conversation','Начать разговор')}</button>:<p>{label('Add a project folder on the PC to start a chat.','Добавьте папку проекта на ПК, чтобы начать чат.')}</p>)}
       {localHostRecovery}
       {recent&&<button className="secondary" aria-label={label('Resume latest chat','Продолжить последний чат')} onClick={()=>openChat(recent)}>{label('Resume latest chat','Продолжить последний чат')} · {recent.customTitle||chatTitle(recent.summary,label('Untitled chat','Без названия'))}</button>}
     </div>):(page==='rules'||page==='changelog')?<div className="desktop-project"><DocumentLibrary connection={connection} kind={docTab} showHeading onKind={kind=>{setDocTab(kind);if(kind!=='files')setPage(kind);}} onChat={state.online?(root,prompt)=>{setNotificationChat(null);setBoardChat(undefined);setProject(root);setDocDraft(prompt);setSelected(null);setCreating(true);setPage('chats');}:undefined}/></div>:<DesktopSettings onShortcuts={()=>setShortcutsOpen(true)} roots={allFolders} key={page+':'+settingsNonce} connectionPanel={connectionPanel} state={state} connection={connection} appearance={appearance} action={action}/>}
     </main>
-    {chatAction&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={provider} jobId={latestJobs.get(chatAction.session.sessionId)?.id} managementDisabled={!state.online} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{setSessions(old=>{const next=deleted?old.filter(s=>s.sessionId!==session.sessionId):old.map(s=>s.sessionId===session.sessionId?session:s);writeChatCache('desktop-local',provider,'sessions',next);return next;});if(selected?.sessionId===session.sessionId){setSelected(deleted?null:session);if(deleted)setCreating(false);}setRevision(value=>value+1);}}/>}
+    {chatAction&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={provider} jobId={latestJobs.get(chatAction.session.sessionId)?.id} managementDisabled={!state.online} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{if(deleted){removeChats([session.sessionId],false);return;}setSessions(old=>{const next=old.map(s=>s.sessionId===session.sessionId?session:s);writeChatCache('desktop-local',provider,'sessions',next);return next;});if(selected?.sessionId===session.sessionId)setSelected(session);setRevision(value=>value+1);}}/>}
     {shortcutsOpen&&<div className="modal-backdrop" onClick={event=>{if(event.target===event.currentTarget)setShortcutsOpen(false);}}><section ref={shortcutsSheet} className="confirm-modal desktop-shortcuts" role="dialog" aria-modal="true" aria-label={label('Keyboard shortcuts','Сочетания клавиш')}><Keyboard size={32}/><h2>{label('Keyboard shortcuts','Сочетания клавиш')}</h2><dl>{shortcuts.map(([keys,text])=><div key={keys+text}><dt><kbd>{keys}</kbd></dt><dd>{text}</dd></div>)}</dl><button className="secondary" onClick={()=>setShortcutsOpen(false)}>{label('Close','Закрыть')}</button></section></div>}
   </div>;
 }

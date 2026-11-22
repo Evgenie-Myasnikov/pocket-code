@@ -98,23 +98,23 @@ public static class DesktopReadPolicy {
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
         if(path=="/speech/install"||path=="/speech/synthesize")return true;
-        if(path=="/task-text/improve")return true;
+        if(path=="/task-text/improve"||path=="/task-text/plan")return true;
         const string uuid=@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
         if(Regex.IsMatch(path,@"^/jobs/"+uuid+"/messages/"+uuid+"/cancel$"))return true;
-        if(Regex.IsMatch(path,@"^/task-chains(?:/[a-f0-9-]+/(?:stop|delete))?$"))return true;
-        if(path=="/chat-library/projects"||Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(manage|branch)$"))return true;
+        if(Regex.IsMatch(path,@"^/task-chains(?:/[a-f0-9-]+/(?:stop|delete|delete-chats))?$"))return true;
+        if(path=="/chat-library/projects"||path=="/chat-library/bulk-delete"||Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(manage|branch)$"))return true;
         if(Regex.IsMatch(path,@"^/(task-runs|task-runs/[a-f0-9-]+/(check|checks|approve|resume)|miro/(config|oauth/start|token|access|disconnect|items/update))$"))return true;
         return Regex.IsMatch(path,@"^/(custom-providers|custom-providers/remove|custom-providers/[a-f0-9-]+/chat|jobs|uploads|project-rules|project-board|project-board/mcp|project-board/view|project-board/create|project-board/delete|project-board/repair|project-board/restore|project-board/chat|engine-updates/claude|project-board/miro|project-board/image|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
     }
     public static bool Allows(string endpoint){
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
-        if(path=="/chat-library/projects"||path=="/speech/status")return true;
-        if(path=="/task-text/providers")return true;
+        if(path=="/chat-library/projects"||path=="/chat-library/erasures"||path=="/speech/status")return true;
+        if(path=="/task-text/providers"||path=="/task-text/plan/providers")return true;
         if(Regex.IsMatch(path,@"^/task-chains(?:/[a-f0-9-]+)?$"))return true;
         if(Regex.IsMatch(path,@"^/(activity/events|task-runs(?:/[a-f0-9-]+(?:/(checks|result|board|review))?)?|miro/(status|items))$"))return true;
         return Regex.IsMatch(path,@"^/boards/[a-f0-9-]+$")||Regex.IsMatch(path,@"^/(custom-providers|custom-providers/[a-f0-9-]+/(models|history)|health|project-board|project-board/mcp|project-board/mcp/status|project-board/views|project-board/live|project-board/backups|project-board/chat|engine-updates/claude|project-board/image|repository-boards|repository-board|board-snapshots|pairing-role|devices|providers|provider-connections|projects|sessions|jobs|activity|task-notifications|board-notifications|workspaces|boards|codex/usage|claude/usage|claude/models|copilot/usage|updates/status|updates/latest|review|review/availability|message-attachment|project-artifact|document-projects|project-docs|project-rules|project-doc|files|file)$")||
-            Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents)$")||
+            Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(messages|subagents|generation)$")||
             Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/subagents/[A-Za-z0-9_%.-]+/messages$")||
             Regex.IsMatch(path,@"^/jobs/[A-Za-z0-9_-]+$");
     }

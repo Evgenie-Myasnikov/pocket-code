@@ -1,3 +1,5 @@
+import type {ChainDeletePreview} from './markdown-chain';
+import type {MarkdownChainScope} from './markdown-chain';
 import {setCustomAccount,useCustomAccount,useCustomModels} from './custom-account';
 import {ClaudeEngineUpdate,claudeOutdated} from './ClaudeEngineUpdate';
 import {chatTitle} from './chat-title';
@@ -16,7 +18,7 @@ import {boardImageMime,boardImageFile,takeBoardImageDrag,takeQueuedBoardImages,t
 import {prepareBoardConversation,attachBoardConversation,currentBoardConversation,boardChatLane} from './board-conversation';
 import {boardConversationHost} from './board-conversation-host';
 import {captureTextAnchor,restoreTextAnchor} from './chat-text-anchor';
-import {chatHistoryRequest,readHistoryView,writeHistoryView} from './chat-history-cache';
+import {chatHistoryRequest,readHistoryView,writeHistoryView,recentTranscript,rememberTranscript,transcriptScope,legacyTranscriptScope} from './chat-history-cache';
 import './compact-ui.css';
 import {ProviderPicker} from './ProviderPicker';
 import {MobileNavigation} from './MobileNavigation';
@@ -33,6 +35,7 @@ import './section-header.css';
 import {ChatComposer} from './ChatComposer';
 import type {MarkdownChainControls} from './MarkdownChainPanel';
 import {withLiveWrites} from './live-write-messages';
+import {ChatGenerationFooter} from './ChatGenerationFooter';
 import {ProjectFolderPicker} from './ProjectFolderPicker';
 import {TasksPage} from './TasksPage';
 import {ChatChainLink} from './ChatChainLink';
@@ -66,7 +69,8 @@ import {shareMessages,shareSnapshot} from './chat-snapshot';
 import {startVisiblePoll} from './visible-poll';
 import {ConnectionStatus} from './ConnectionStatus';
 import {getReachability,hostDown,hostGate,retryNow,setPrimaryHost,useReachability} from './reachability';
-import {chatCacheScope,readChatCache,writeChatCache,clearChatCache} from './chat-cache';
+import {chatCacheScope,readChatCache,writeChatCache,clearChatCache,forgetChatTranscripts,type RemovedTranscripts} from './chat-cache';
+import {useChatErasures} from './use-chat-erasures';
 
 
 import {attachmentReady,type DraftAttachment} from './AttachmentTray';
@@ -107,6 +111,8 @@ function readRevoked(){try{return localStorage.getItem(revokedKey);}catch{return
 function setRevoked(name:string|null){try{if(name===null)localStorage.removeItem(revokedKey);else localStorage.setItem(revokedKey,name);}catch{/* The notice is optional. */}}
 /** A cached /health answer means the PC was not reached, even though the request returned. */
 async function freshHealth(c:Connection){let stale=false;const mark=()=>{stale=true;};window.addEventListener('pocket-offline-read',mark);try{return {health:await request<Health>(c,'/health'),stale};}finally{window.removeEventListener('pocket-offline-read',mark);}}
+// Switching from a new desktop chat remounts the workspace for the same native host.
+const desktopHealth=new WeakMap<Connection,Health>();
 type ProviderInfo = {id: WorkspaceProvider;name: string;available: boolean;authenticated?: boolean;models?: EffortModel[];error?: string;};
 type Attachment = DraftAttachment;
 export type ChatDraft = {text: string;attachments: Attachment[];};
@@ -119,7 +125,7 @@ const budgetRangeMessage='Лимит стоимости запроса вне д
 const connectivityError=(error:unknown)=>{const problem=(error as {problem?:string}|null)?.problem;return problem==='unreachable'||problem==='tls'||problem==='cleartext'||hostDown(getReachability());};
 const uniqueMessages = (messages:ChatMessage[]) => [...new Map(messages.map(message=>[message.id,message])).values()];
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() || p;
-export type EmbeddedChat={tasksPage?:{initialId?:string};onOpenTasks?(initialId?:string):void;onTaskDraft?(root:string,prompt?:string):void;taskDraft?:{root:string;prompt:string};onTaskDraftUsed?():void;draftStore?:Map<string,Map<string,ChatDraft>>;onTaskProvider?(provider:WorkspaceProvider):void;activity?:ActivityFeed;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardSelection?:BoardSelection|null;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onRevealBoardSelection?(target:BoardRevealTarget):void;onCreated?(session:Session,job:JobView):void;onNewBoardChat?(target:BoardChat):void;onOpenChainChat?(session:Session,jobId?:string):void;onBack():void};
+export type EmbeddedChat={tasksPage?:{initialId?:string;initialRoot?:string;project?:string};onTaskProject?(root:string):void;onOpenTasks?(initialId?:string,owner?:MarkdownChainScope):void;onTaskDraft?(root:string,prompt?:string):void;taskDraft?:{root:string;prompt:string};onTaskDraftUsed?():void;draftStore?:Map<string,Map<string,ChatDraft>>;onTaskProvider?(provider:WorkspaceProvider):void;activity?:ActivityFeed;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardSelection?:BoardSelection|null;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onRevealBoardSelection?(target:BoardRevealTarget):void;onCreated?(session:Session,job:JobView):void;onNewBoardChat?(target:BoardChat):void;onOpenChainChat?(session:Session,jobId?:string):void;onBack():void};
 function focusLatestMessage(transcript: HTMLElement) {
   const latest = transcript.querySelector<HTMLElement>('.conversation-inner > article.message:last-of-type');
   const target = latest ?? transcript.querySelector<HTMLElement>('.conversation-inner');
@@ -158,6 +164,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [connecting,setConnecting]=useState(false),[connectionError,setConnectionError]=useState(''),[connectionProblem,setConnectionProblem]=useState<ConnectionProblem|undefined>();
   const [connected,setConnected]=useState(false),[paired,setPaired]=useState(false),[restoring,setRestoring]=useState(!embedded),[lastContact,setLastContact]=useState(0),[revokedFrom,setRevokedFrom]=useState(readRevoked);
   const disconnecting=useRef(false),pcName=useRef('');
+  useChatErasures(!embedded?connection:null);
   const [workspaceConnection,setWorkspaceConnection]=useState<Connection|null>(null),[workspaceScanner,setWorkspaceScanner]=useState(false);
   const projectSpaces=useProjectWorkspaces(embedded?connection:workspaceConnection);
   const personalBoards=useProjectWorkspaces(connection);const [localBoards,setLocalBoards]=useState(true);
@@ -166,7 +173,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   // One reachability model for every screen: requests report into it and one probe with backoff runs while the PC is away.
   const reach=useReachability(),unreachable=offline||hostDown(reach),gate=hostGate(connection?.url);
   const [providersLoaded,setProvidersLoaded]=useState(false);
-  const canRun = !unreachable && !!connection && providerInfo?.available === true && providerInfo.authenticated !== false && !connection?.workspaceId;
+  const canRun = !unreachable && !!connection && (!embedded||connected) && providerInfo?.available === true && providerInfo.authenticated !== false && !connection?.workspaceId;
   const [boardChat,setBoardChat]=useState<BoardChat|null>(embedded?.boardChat||null);
   const [boardMissing,setBoardMissing]=useStateForWorkspace(false);
   const [boardSelection,setBoardSelection]=useState<BoardSelection|null>(null);
@@ -178,7 +185,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [boardLaunch,setBoardLaunch]=useState<BoardChat|null>(null);
   const [taskPanel,setTaskPanel]=useState(false);
   const [workspaceAccesses,setWorkspaceAccesses]=useState<WorkspaceAccess[]>([]);
-  const [health, setHealth] = useState<Health | null>(embedded?null:{name:'Offline',roots:[],version:packageVersion,protocol:1}),[sessions, setSessions] = useStateForWorkspace<Session[]>([]),[jobs, setJobs] = useStateForWorkspace<JobView[]>([]);
+  const [health, setHealth] = useState<Health | null>(embedded?desktopHealth.get(embedded.connection)??null:{name:'Offline',roots:[],version:packageVersion,protocol:1}),[sessions, setSessions] = useStateForWorkspace<Session[]>([]),[jobs, setJobs] = useStateForWorkspace<JobView[]>([]);
   const [selected, setSelected] = useStateForWorkspace<Session | null>(null),[history, setHistory] = useStateForWorkspace<ChatMessage[]>([]),[job, setJob] = useStateForWorkspace<JobView | null>(null);
   const [projects, setProjects] = useState<string[] | null>(null);
   const projectRoots = (projects || health?.roots || []);
@@ -191,11 +198,22 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [localTab,setTab]=useState<'tasks' | 'chats' | 'files' | 'changelog' | 'settings' | 'connection' | 'workspace'>('chats'),[docView,setDocView]=useState<DocumentKind>('rules');
   const tab=embedded?.tasksPage?'tasks':localTab;
   const [taskChainId,setTaskChainId]=useState<string>();
-  const [taskProject,setTaskProject]=useStateForWorkspace('');
+  const [taskSelection,setTaskSelection]=useState<{scope:string;root:string}>();
+  const taskProject=embedded?.tasksPage?.project||(taskSelection?.scope===cacheScope?taskSelection.root:'');
+  function setTaskProject(root:string){
+    setTaskSelection({scope:cacheScope,root});
+    embedded?.onTaskProject?.(root);
+  }
   const [localTaskDraft,setLocalTaskDraft]=useState<{root:string;prompt:string}>();
-  function openTasks(id?:string){
-    if(id)setTaskProject(cwd);
-    if(embedded?.onOpenTasks){embedded.onOpenTasks(id);return;}
+  const [linkedRoot,setLinkedRoot]=useState<string>();
+  function openTasks(id?:string,owner?:MarkdownChainScope){
+    setLinkedRoot(owner?.cwd);
+    if(owner && !embedded){
+      if(owner.provider==='claude')setCustomAccount(owner.account||'');
+      setProvider(owner.provider);
+    }
+    if(id)setTaskProject(owner?.cwd??cwd);
+    if(embedded?.onOpenTasks){embedded.onOpenTasks(id,owner);return;}
     setTaskChainId(id);setTab('tasks');setMobileChat(true);
   }
   useEffect(()=>{if(tab==='workspace')setBoardVisited(true);},[tab]);
@@ -227,7 +245,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const localActivity=useActivity(demo||embedded?.activity?null:connection);
   const activity=embedded?.activity||localActivity;
   const [activityTarget,setActivityTarget]=useState<{item:ActivityItem;connection:Connection}|null>(null);
-  const [notificationTarget,setNotificationTarget]=useState<WatchedChat|null>(null);
+  const [notificationTarget,setNotificationTarget]=useState<(WatchedChat & {account?:string})|null>(null);
   useRunNotifications(demo||connection?.workspaceId?null:connection,locale().startsWith('ru')?'ru':'en');
   useChatNotifications(connection,demo?null:tab==='chats'?(mobileChat&&(selected||job)?{provider,sessionId:job?.sessionId||selected?.sessionId,jobId:job?.id,cwd,title:selected?.customTitle||selected?.summary||engineName}:null):undefined,locale().startsWith('ru')?'ru':'en',chat=>{
     if(chat.provider!=='claude'&&chat.provider!=='codex'&&chat.provider!=='copilot')return;
@@ -237,7 +255,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if(!notificationTarget||notificationTarget.provider!==provider||!connection)return;
     if(busy||uploading)return;
     const target=notificationTarget;setNotificationTarget(null);
-    void openSession({sessionId:target.sessionId||`pending-${target.jobId}`,cwd:target.cwd,summary:target.title,provider,lastModified:Date.now()},target.jobId?{id:target.jobId,sessionId:target.sessionId}:undefined);
+    void openSession({sessionId:target.sessionId||`pending-${target.jobId}`,cwd:target.cwd,summary:target.title,provider,account:target.account,lastModified:Date.now()},target.jobId?{id:target.jobId,sessionId:target.sessionId}:undefined);
   },[notificationTarget,provider,connection,busy,uploading]);
   useEffect(()=>{setActivityTarget(null);},[connection]);
   const [takeover, setTakeover] = useStateForWorkspace(false),[budget, setBudget] = useStateForWorkspace(id=>preferences(id).budget);
@@ -425,7 +443,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const runningMessages=useMemo(()=>job?.status==='running'?new Set(jobTranscript):null,[jobTranscript,job?.status]);
   const toolResults=useMemo(()=>{const blocks=outputMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b]));},[outputMessages]);
   const detail=useDetailMode(embedded?'detailed':'brief');
-  const changesByTurn=useMemo(()=>computeTurnChanges(outputMessages,toolResults,running),[outputMessages,toolResults,running]);
+  const resultRoot=!selected?.readOnly&&!demo?(selected?.cwd||job?.cwd||cwd):undefined;
+  const changesByTurn=useMemo(()=>resultRoot?computeTurnChanges(outputMessages,toolResults,running,resultRoot):undefined,[outputMessages,toolResults,running,resultRoot]);
   const plan=useMemo(()=>latestPlan(outputMessages),[outputMessages]);
   // New replies since the person scrolled away from the end, counted for the round "latest" button.
   const seenLast=useRef(''),lastMessageId=outputMessages.at(-1)?.id||'';
@@ -486,7 +505,53 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     }
     const stop=startVisiblePoll(pollAgents,6000,true,document,hostGate(connection.url));return()=>{cancelled=true;stop();};
   },[connection,provider,parentChatId,tab,demo]);
-  const api = <T,>(endpoint:string,data?:unknown):Promise<T>=>data===undefined&&/^\/sessions\/[^/]+\/messages\?/.test(endpoint)?chatHistoryRequest(connection!,endpoint,cacheScope) as Promise<T>:request<T>(connection!,endpoint,data);
+  const historyScope=transcriptScope(cacheScope,connection,selected?selected.account:job?.account??account);
+  function clearDeniedHistory(failure:unknown,sessionId:string,pendingJob=false){
+    const status=(failure as {status?:number}).status;
+    if(!connection||!(status===401||status===403||status===404&&!pendingJob))return;
+    void forgetChatTranscripts(connection,provider,[sessionId],'unavailable');
+    setHistory([]);setJob(null);setHasMore(null);
+  }
+  const api = <T,>(endpoint:string,data?:unknown):Promise<T>=>data===undefined&&/^\/sessions\/[^/]+\/messages\?/.test(endpoint)?chatHistoryRequest(connection!,endpoint,historyScope) as Promise<T>:request<T>(connection!,endpoint,data);
+  const [libraryRevision,setLibraryRevision]=useState(0);
+  // Provider workspaces stay mounted on mobile. A deletion may be confirmed by a chain in a different lane.
+  const removalHandlers=useRef(new Map<string,(detail:RemovedTranscripts)=>void>());
+  const activeSurface=useRef({provider,tab});
+  useLayoutEffect(()=>{activeSurface.current={provider,tab};},[provider,tab]);
+  const hostScope=transcriptScope(cacheScope,connection);
+  useLayoutEffect(()=>{removalHandlers.current.clear();},[hostScope]);
+  useLayoutEffect(()=>{
+    if(!hostScope)return;
+    removalHandlers.current.set(provider,detail=>{
+      const ids=new Set(detail.ids);
+      setSessions(old=>old.filter(item=>!ids.has(item.sessionId)));
+      setJobs(old=>old.filter(item=>!item.sessionId||!ids.has(item.sessionId)));
+      if(detail.reason==='deleted'){
+        setLibraryRevision(revision=>revision+1);
+        for(const id of ids)drafts.current?.delete(id);
+        setPendingSend(old=>old&&ids.has(old.key)?null:old);
+        setOfflineQueue(old=>old.some(item=>ids.has(item.key))?old.filter(item=>!ids.has(item.key)):old);
+        if(parentChatId&&ids.has(parentChatId)){
+          navigation.current++;paging.current=null;pendingPosition.current=null;scrollAnchor.current=null;
+          setSelected(null);setHistory([]);setJob(null);setHasMore(null);setLoading(false);setLoadingOlder(false);
+          restoreDraft(`new:${cwd}`);setHistoryError('');setError('');setTakeover(false);setChatViewOpen(false);
+          setReviewOpen(false);setOutputsOpen(false);setAgentPanel(null);setReadingMode(false);
+          if(activeSurface.current.provider===provider){
+            setBoardChat(null);setBoardMissing(false);setBranchTarget(null);
+            if(!embedded&&activeSurface.current.tab==='chats')setMobileChat(false);
+          }
+        }
+      }
+    });
+  },[hostScope,provider,parentChatId,cwd,Boolean(embedded)]);
+  useEffect(()=>{
+    const onRemoved=(event:Event)=>{
+      const detail=(event as CustomEvent<RemovedTranscripts>).detail;
+      if(detail.hostScope===hostScope)removalHandlers.current.get(detail.provider)?.(detail);
+    };
+    window.addEventListener('pocket-chat-transcripts-removed',onRemoved);
+    return()=>window.removeEventListener('pocket-chat-transcripts-removed',onRemoved);
+  },[hostScope]);
   useEffect(()=>{
     // Rejected turns never reached Codex. Recover only the originating draft;
     // navigation or typing a newer message must not lose either piece of work.
@@ -531,7 +596,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       if(scope!==cacheScope){rememberPosition();rememberDraft();setProjects(null);setProviders([]);setBoardChat(null);setBoardLaunch(null);setActivityTarget(null);}
       setCacheScope(scope);setSaved(c);setConnection(c);setDemo(false);
       if(!embedded){const host=c;setPrimaryHost(host.url,()=>request(host,'/health'));}
-      const {health:h,stale}=await freshHealth(c);if(epoch!==connectEpoch.current)return;if(h.protocol!==1)throw Object.assign(Error(t('Обновите приложение и сервер до одной версии')),{problem:'incompatible'});setHealth(h);
+      const {health:h,stale}=await freshHealth(c);if(epoch!==connectEpoch.current)return;if(h.protocol!==1){if(embedded){desktopHealth.delete(embedded.connection);setHealth(null);}throw Object.assign(Error(t('Обновите приложение и сервер до одной версии')),{problem:'incompatible'});}setHealth(h);
+      if(embedded&&!stale)desktopHealth.set(embedded.connection,h);
       if(stale){setPaired(true);const alternate=await reachableRoute(c);if(alternate&&epoch===connectEpoch.current){void connect(alternate,true);return;}if(epoch===connectEpoch.current){setConnectionProblem('unreachable');setOffline(true);}return;}
       setConnected(true);setPaired(true);setLastContact(Date.now());setRevoked(null);setRevokedFrom(null);
       // The PC name, identity and other routes are kept so the next start can name the PC and fall back to another route.
@@ -546,7 +612,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   useEffect(()=>{const handle=()=>recover.current();window.addEventListener('pocket-recovered',handle);return()=>window.removeEventListener('pocket-recovered',handle);},[]);
   useEffect(()=>()=>{if(!embedded)setPrimaryHost('',null);},[]);
   // An embedded chat opened while the PC host restarts or updates keeps retrying instead of waiting for a manual Retry.
-  useEffect(()=>{if(!embedded||health||connecting||!connectionError)return;const timer=setTimeout(()=>void connect(embedded.connection),3000);return()=>clearTimeout(timer);},[Boolean(embedded),health,connecting,connectionError]);
+  useEffect(()=>{if(!embedded||connected||connecting||!connectionError)return;const timer=setTimeout(()=>void connect(embedded.connection),3000);return()=>clearTimeout(timer);},[Boolean(embedded),connected,connecting,connectionError]);
   useEffect(()=>{if(embedded){void connect(embedded.connection);return;}loadConnection().then(c=>{if(!c){setRestoring(false);return;}setSaved(c);if(c.workspaceOnly){setRestoring(false);setTab('settings');setSettingsPage('connection');}else{setPaired(true);void connect(c,true);}}).catch(()=>{setRestoring(false);setConnectionError(t('Не удалось восстановить подключение. Отсканируйте QR-код ПК снова.'));});},[]);
   async function switchWorkspace(access:WorkspaceAccess){
     setWorkspaceConnection(access);setLocalBoards(false);setWorkspaceScanner(false);setError('');
@@ -615,16 +681,20 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const cached=readChatCache<Session[]>(cacheScope,provider,'sessions');
     if(Array.isArray(cached)){setSessions(cached);setSessionsLoaded(true);}
   },[cacheScope,provider,demo]);
+  useLayoutEffect(()=>{
+    if(historyScope&&!demo&&parentChatId&&!loading&&!fromStart&&!historyError&&!error)
+      rememberTranscript(historyScope,provider,parentChatId,outputMessages,historyWindow.current,hasMore,job?.id);
+  },[historyScope,provider,demo,parentChatId,outputMessages,loading,fromStart,historyError,error,hasMore,job?.id]);
   useEffect(()=>{
-    if(!cacheScope||demo||!selected||loading||fromStart||!outputMessages.length)return;
-    const timer=setTimeout(()=>writeChatCache(cacheScope,provider,'chat:'+selected.sessionId,outputMessages.slice(-200)),400);
+    if(!historyScope||demo||!selected||loading||fromStart||historyError||error)return;
+    const timer=setTimeout(()=>writeChatCache(historyScope,provider,'chat:'+selected.sessionId,outputMessages.slice(-200)),400);
     return()=>clearTimeout(timer);
-  },[cacheScope,provider,demo,selected?.sessionId,outputMessages,loading,fromStart]);
+  },[historyScope,provider,demo,selected?.sessionId,outputMessages,loading,fromStart,historyError,error]);
   useEffect(()=>{
-    if(!cacheScope||demo||!selected||loading||!history.length)return;
-    const timer=setTimeout(()=>void writeHistoryView(cacheScope,provider,selected.sessionId,{messages:history,window:historyWindow.current,fromStart,hasMore}),800);
+    if(!historyScope||demo||!selected||loading||historyError||error)return;
+    const timer=setTimeout(()=>void writeHistoryView(historyScope,provider,selected.sessionId,{messages:history,window:historyWindow.current,fromStart,hasMore}),800);
     return()=>clearTimeout(timer);
-  },[cacheScope,provider,demo,selected?.sessionId,history,loading,fromStart,hasMore]);
+  },[historyScope,provider,demo,selected?.sessionId,history,loading,fromStart,hasMore,historyError,error]);
   useEffect(() => {
     if (!connection || demo) return;
     let cancelled = false;
@@ -638,12 +708,12 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           const cacheSnapshot=shareSnapshot(cachedSessions,scopedSessions.slice(0,300));
           if(cacheScope&&cacheSnapshot!==cachedSessions)writeChatCache(cacheScope,provider,'sessions',cacheSnapshot);
           cachedSessions=cacheSnapshot;
-          setSessions(old=>shareSnapshot(old,scopedSessions));if(scopedJobs)setJobs(old=>shareSnapshot(old,scopedJobs));setSelected(old=>old?shareSnapshot(old,scopedSessions.find(item=>item.sessionId===old.sessionId)||old):null);setNetworkError('');setSessionsLoaded(true);
+          setSessions(old=>shareSnapshot(old,scopedSessions));if(scopedJobs)setJobs(old=>shareSnapshot(old,scopedJobs));setSelected(old=>old?shareSnapshot(old,scopedSessions.find(item=>item.sessionId===old.sessionId&&(item.account||'')===(old.account||''))||old):null);setNetworkError('');setSessionsLoaded(true);
         }
       } catch (e) {if (!cancelled) setNetworkError(connectivityError(e)?'':(e as Error).message);}
     }
     const stop=startVisiblePoll(refresh,5000,true,document,hostGate(connection.url));return () => {cancelled = true;stop();};
-  }, [connection, demo, provider, Boolean(providerInfo),cacheScope]);
+  }, [connection, demo, provider, Boolean(providerInfo),cacheScope,libraryRevision]);
   useEffect(() => {
     if (!connection || !job || demo || job.status !== 'running') return;
     let cancelled = false,revision = -1,transcript = -1;
@@ -675,13 +745,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       if(historyExpanded.current&&(fromStart||!nearBottom.current))return;
       try {
         const window=historyWindow.current;
-        const data = await chatHistoryRequest(connection!, `/sessions/${encodeURIComponent(target!)}/messages?provider=${provider}&window=${window}${fromStart ? '&from=start' : ''}`,cacheScope);
+        const data = await chatHistoryRequest(connection!, `/sessions/${encodeURIComponent(target!)}/messages?provider=${provider}&window=${window}${fromStart ? '&from=start' : ''}`,historyScope);
+        if(data.stale)return;
         if (!cancelled && epoch === navigation.current && !sending.current && !paging.current && window===historyWindow.current && !(historyExpanded.current&&(fromStart||!nearBottom.current))) {setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore((fromStart ? data.next : data.previous)??null);setHistoryError('');}
-      } catch (e) {if (!cancelled) setHistoryError((e as Error).message);}
+      } catch (e) {if (!cancelled&&epoch===navigation.current){clearDeniedHistory(e,target!);setHistoryError((e as Error).message);}}
     }
     const stop=startVisiblePoll(sync,3000,false,document,hostGate(connection.url));
     return () => {cancelled = true;stop();};
-  }, [connection, selected?.sessionId, job?.id, job?.errorCode, job?.status, job?.sessionId, demo, loading, loadingOlder, busy, tab, fromStart, provider]);
+  }, [connection, historyScope, selected?.sessionId, job?.id, job?.errorCode, job?.status, job?.sessionId, demo, loading, loadingOlder, busy, tab, fromStart, provider]);
   useEffect(() => {
     // Keep the live answer until the host has flushed it to session history.
     // Only then can normal desktop history polling take over without duplicates.
@@ -694,17 +765,18 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       if(historyExpanded.current&&(fromStart||!nearBottom.current))return;
       try {
         const window=historyWindow.current;
-        const data = await chatHistoryRequest(connection!, `/sessions/${encodeURIComponent(completed.sessionId!)}/messages?provider=${provider}&window=${window}`,cacheScope);
+        const data = await chatHistoryRequest(connection!, `/sessions/${encodeURIComponent(completed.sessionId!)}/messages?provider=${provider}&window=${window}`,historyScope);
+        if(data.stale)return;
         if (cancelled || epoch !== navigation.current || sending.current || paging.current || window!==historyWindow.current || historyExpanded.current&&(fromStart||!nearBottom.current)) return;
         if (data.messages.some(message => message.id === lastAnswer!.id)) {
           setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore(data.previous??null);setHistoryError('');setJob(null);
-          setSelected(old => old?.sessionId === completed.sessionId ? old : sessionsNow.current.find(session => session.sessionId === completed.sessionId) || {sessionId:completed.sessionId!,provider,cwd:completed.cwd,summary:t("Текущая задача"),lastModified:completed.startedAt});
+          setSelected(old => old?.sessionId === completed.sessionId ? old : sessionsNow.current.find(session => session.sessionId === completed.sessionId&&(session.account||'')===(completed.account||'')) || {sessionId:completed.sessionId!,provider,cwd:completed.cwd,summary:t("Текущая задача"),lastModified:completed.startedAt,account:completed.account});
           return false;
         }
-      } catch (error) {if (!cancelled && epoch === navigation.current) setHistoryError((error as Error).message);}
+      } catch (error) {if (!cancelled && epoch === navigation.current){clearDeniedHistory(error,completed.sessionId!,true);setHistoryError((error as Error).message);}}
     }
     const stop=startVisiblePoll(syncCompleted,3000,true,document,hostGate(connection.url));return () => {cancelled=true;stop();};
-  },[connection,provider,job?.id,job?.status,demo,busy,loading,loadingOlder,fromStart,tab]);
+  },[connection,provider,historyScope,job?.id,job?.status,demo,busy,loading,loadingOlder,fromStart,tab]);
   // A hidden chat (display:none) loses its scroll offset. Before the first paint after it is shown again,
   // land on the latest message when the chat was following it, otherwise where the person was reading.
   const chatShown=tab==='chats'&&(embedded?embedded.visible!==false:mobileChat);
@@ -719,8 +791,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     lastScrollTop.current=el.scrollTop;nearBottom.current=position.bottom;setShowScrollActions(!position.bottom||fromStart);
     if(position.focusFrom&&(document.activeElement===position.focusFrom||document.activeElement===document.body))focusLatestMessage(el);
   },[loading,history,job,provider,tab]);
-  useChatReturn(selected?positionKey(cacheScope,provider,selected.sessionId):'',tab==='chats'&&(embedded?embedded.visible!==false:mobileChat),running,!loading&&!busy&&!paging.current,()=>{void jumpHistory(false);});
-  function rememberPosition(){const el=scroll.current;if(!el||loading||!selected||!el.getClientRects().length)return;const top=el.getBoundingClientRect().top,message=[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.getBoundingClientRect().bottom>top);savePosition(positionKey(cacheScope,provider,selected.sessionId),{top:el.scrollTop,window:historyWindow.current,fromStart,bottom:nearBottom.current,messageId:message?.dataset.messageId,textAnchor:message?captureTextAnchor(el,message):undefined,offset:message?message.getBoundingClientRect().top-top:undefined});}
+  useChatReturn(selected?positionKey(historyScope,provider,selected.sessionId):'',tab==='chats'&&(embedded?embedded.visible!==false:mobileChat),running,!loading&&!busy&&!paging.current,()=>{void jumpHistory(false);});
+  function rememberPosition(){const el=scroll.current;if(!el||loading||!selected||error||historyError||!el.getClientRects().length)return;const top=el.getBoundingClientRect().top,message=[...el.querySelectorAll<HTMLElement>('[data-message-id]')].find(node=>node.getBoundingClientRect().bottom>top);savePosition(positionKey(historyScope,provider,selected.sessionId),{top:el.scrollTop,window:historyWindow.current,fromStart,bottom:nearBottom.current,messageId:message?.dataset.messageId,textAnchor:message?captureTextAnchor(el,message):undefined,offset:message?message.getBoundingClientRect().top-top:undefined});}
   const persistPosition=useRef(()=>{});persistPosition.current=rememberPosition;
   useEffect(()=>{const save=()=>{persistPosition.current();flushPositions();};window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',save);return()=>{save();window.removeEventListener('pagehide',save);document.removeEventListener('visibilitychange',save);};},[]);
   useLayoutEffect(()=>{
@@ -768,14 +840,16 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       nearBottom.current=false;historyWindow.current=nextWindow;historyExpanded.current=true;
       setHistory(old=>shareMessages(old,uniqueMessages(provider==='codex'?(fromStart?[...old,...data.messages]:[...data.messages,...old]):data.messages).slice(fromStart?0:-5000,fromStart?5000:undefined)));
       setHasMore(fromStart?data.next:data.previous);setHistoryError('');
-    } catch(e) {if(epoch===navigation.current)setHistoryError((e as Error).message);}
+    } catch(e) {if(epoch===navigation.current){clearDeniedHistory(e,selected.sessionId);setHistoryError((e as Error).message);}}
     finally {if(paging.current===requestId){paging.current=null;setLoadingOlder(false);}}
   }
-  async function loadHistory(s: Session, active: JobView | null, epoch: number, older = false, beginning = fromStart) {
+  async function loadHistory(s: Session, active: JobView | null, epoch: number, older = false, beginning = fromStart, warm=false) {
     if (older) historyWindow.current = Math.min(5000, historyWindow.current + 100);
     if(active?.errorCode==='codex_thread_busy')active=null;
-    const data = await chatHistoryRequest(connection!,`/sessions/${encodeURIComponent(s.sessionId)}/messages?provider=${provider}&window=${historyWindow.current}${beginning ? '&from=start' : ''}${active ? `&end=${active.baseMessageCount}` : ''}`,cacheScope,cached=>{if(epoch!==navigation.current||historyExpanded.current&&(fromStart||!nearBottom.current))return;setHistory(old=>shareMessages(old,uniqueMessages(cached.messages)));setHasMore(beginning?cached.next??null:cached.previous??null);});
-    if (epoch !== navigation.current || historyExpanded.current&&(fromStart||!nearBottom.current)) return;
+    const scope=transcriptScope(cacheScope,connection,s.account??account);
+    const data = await chatHistoryRequest(connection!,`/sessions/${encodeURIComponent(s.sessionId)}/messages?provider=${provider}&window=${historyWindow.current}${beginning ? '&from=start' : ''}${active ? `&end=${active.baseMessageCount}` : ''}`,scope,cached=>{if(warm||epoch!==navigation.current||historyExpanded.current&&(fromStart||!nearBottom.current))return;setHistory(old=>shareMessages(old,uniqueMessages(cached.messages)));setHasMore(beginning?cached.next??null:cached.previous??null);});
+    if (epoch !== navigation.current || warm&&data.stale || historyExpanded.current&&(fromStart||!nearBottom.current)) return;
+    if(warm&&!nearBottom.current)captureScrollAnchor(false);
     setHistory(old=>shareMessages(old,uniqueMessages(data.messages)));setHasMore((beginning ? data.next : data.previous)??null);setHistoryError('');
   }
   async function jumpHistory(beginning: boolean, focusFrom?: HTMLButtonElement) {
@@ -825,30 +899,35 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     historyExpanded.current=false;
     // A chat continues with the provider it was started with: the PC's Claude sign-in or its custom provider.
     // Chats opened from a running task, a notification, a board or a new turn arrive without the account: look it up, and keep the current provider when it is unknown.
-    if(provider==='claude'&&!demo){const owner=jobs.find(j=>activeJob&&j.id===activeJob.id||j.sessionId===s.sessionId),listed=sessions.find(x=>x.sessionId===s.sessionId),owned=s.account||owner?.account||listed?.account||(owner||listed?'':undefined);if(owned!==undefined&&owned!==customAccount)setCustomAccount(owned);}
+    if(provider==='claude'&&!demo){const owner=jobs.find(j=>activeJob&&j.id===activeJob.id||j.sessionId===s.sessionId),listed=sessions.find(x=>x.sessionId===s.sessionId),owned=s.account??(owner?.account||listed?.account||(owner||listed?'':customAccount));s={...s,account:owned};if(owned!==customAccount)setCustomAccount(owned);}
     const epoch = ++navigation.current;setSelected(s);projectChosen.current=true;setCwd(s.cwd || health!.roots[0]);setMobileChat(true);setTab('chats');
-    const active = activeJob || jobs.find((j) => j.sessionId === s.sessionId && j.status === 'running');
     const savedPosition:ChatPosition={top:0,window:200,fromStart:false,bottom:true};pendingPosition.current=savedPosition;
     historyWindow.current = savedPosition?.window||200;setHistoryError('');setFromStart(savedPosition?.fromStart||false);setShowScrollActions(savedPosition?!savedPosition.bottom:false);lastScrollTop.current = savedPosition?.top||0;
-    const cached=cacheScope&&!demo?readChatCache<ChatMessage[]>(cacheScope,provider,'chat:'+s.sessionId):null;
-    setHistory(Array.isArray(cached)?cached:[]);setJob(null);restoreDraft(activeJob?.sessionId||s.sessionId);setError('');setTakeover(false);setHasMore(null);nearBottom.current = savedPosition?.bottom??true;
+    const scope=transcriptScope(cacheScope,connection,s.account??account);
+    const warm=scope&&!demo?recentTranscript(scope,provider,s.sessionId):undefined;
+    const active=activeJob||jobs.find(j=>j.sessionId===s.sessionId&&j.status==='running')||(warm?.jobId?{id:warm.jobId}:undefined);
+    const legacy=legacyTranscriptScope(connection,provider,scope);
+    const cached=warm?.messages??(scope&&!demo?(readChatCache<ChatMessage[]>(scope,provider,'chat:'+s.sessionId)??(legacy?readChatCache<ChatMessage[]>(legacy,provider,'chat:'+s.sessionId):null)):null);
+    if(warm){historyWindow.current=Math.max(200,warm.window);historyExpanded.current=warm.window>200;}
+    setHistory(Array.isArray(cached)?cached:[]);setJob(null);restoreDraft(activeJob?.sessionId||s.sessionId);setError('');setTakeover(false);setHasMore(warm?.hasMore??null);nearBottom.current = savedPosition?.bottom??true;
     if (demo) {setHistory(demoMessages);return;}
     setLoading(true);
+    let full:JobView|null=null;
     try {
-      const view=cacheScope?await readHistoryView(cacheScope,provider,s.sessionId):undefined;
+      const view=scope&&!warm?await readHistoryView(scope,provider,s.sessionId,legacy):undefined;
       if(epoch!==navigation.current)return;
       if(view&&view.fromStart===(savedPosition?.fromStart||false)&&Array.isArray(view.messages)){historyWindow.current=Math.max(historyWindow.current,view.window);historyExpanded.current=view.window>200||view.messages.length>200;setHistory(view.messages);setHasMore(view.hasMore);}
-      let full:JobView|null=null;if(active){try{full=await api<JobView>(`/jobs/${active.id}`);}catch(e){if(s.sessionId.startsWith('pending-')||(e as {status?:number}).status!==404)throw e;}}
+      if(active){try{full=await api<JobView>(`/jobs/${active.id}`);}catch(e){if(s.sessionId.startsWith('pending-')||(e as {status?:number}).status!==404)throw e;}}
       if (epoch !== navigation.current) return;
-      if(full&&(full.provider||'claude')!==provider)throw new Error(t('Чат относится к другому рабочему пространству.'));
+      if(full&&((full.provider||'claude')!==provider||provider==='claude'&&(full.account||'')!==(s.account||'')))throw Object.assign(new Error(t('Чат относится к другому рабочему пространству.')),{status:403});
       // Keep cached preceding turns while the base page refreshes. The live job
       // owns its message IDs, so remove only overlaps instead of blanking history.
       if(full){const liveIds=new Set(full.messages.map(message=>message.id));setHistory(old=>old.filter(message=>!liveIds.has(message.id)));}
       setJob(full);setTakeover(Boolean(full));
       const resolved=full?.sessionId?{...s,sessionId:full.sessionId,cwd:full.cwd}:s;
       if(resolved.sessionId!==s.sessionId)setSelected(resolved);
-      if (!resolved.sessionId.startsWith('pending-')) await loadHistory(resolved, full, epoch, false, savedPosition?.fromStart||false);
-    } catch (e) {if (epoch === navigation.current) {if(context?.conversation&&(e as {status?:number}).status===404)setBoardMissing(true);if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);}} finally {if (epoch === navigation.current) setLoading(false);}
+      if (!resolved.sessionId.startsWith('pending-')) await loadHistory(resolved, full, epoch, false, savedPosition?.fromStart||false,Boolean(warm));
+    } catch (e) {if (epoch === navigation.current) {clearDeniedHistory(e,s.sessionId,Boolean(full));if(context?.conversation&&(e as {status?:number}).status===404)setBoardMissing(true);if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);}} finally {if (epoch === navigation.current) setLoading(false);}
   }
   function newChat(project = cwd,context?:BoardChat) {
     if (busy || uploading) return;
@@ -893,7 +972,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       mode:chatAccess==='plan'?'plan':'default',claudeAccess:chatAccess==='plan'?claudeAccess:chatAccess as ClaudeAccess,
       maxBudgetUsd:clampBudget(budget),...(account?{account}:{claudeEffort:claudeEffort.value||undefined})};
   }
-  const taskCwd=tab==='tasks'?(taskProject&&projectRoots.includes(taskProject)?taskProject:cwd||projectRoots[0]||''):cwd;
+  const pinnedRoot=embedded?.tasksPage?.initialId?embedded.tasksPage.initialRoot:taskChainId?linkedRoot:undefined;
+  const taskCwd=tab==='tasks'?(pinnedRoot||taskProject||cwd||projectRoots[0]||''):cwd;
   const chainScope={cwd:taskCwd,provider,...(account?{account}:{})};
   const chainQuery=new URLSearchParams(chainScope).toString();
   const chainControls:MarkdownChainControls|undefined=connection&&!connection.workspaceId&&!demo&&taskCwd?{
@@ -902,14 +982,31 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     audit:id=>api('/task-chains/'+encodeURIComponent(id)+'?'+chainQuery+'&audit=1'),
     detail:id=>api('/task-chains/'+encodeURIComponent(id)+'?'+chainQuery),
     start:input=>api('/task-chains',{...launchOptions(),...chainScope,...input}),
-    remove:id=>api('/task-chains/'+encodeURIComponent(id)+'/delete',chainScope),
+    previewDeletion:id=>api('/task-chains/'+encodeURIComponent(id)+'?'+chainQuery+'&deletePreview=1&eraseOriginals=1'),
+    remove:async(id,chats)=>{
+      const result=await api<ChainDeletePreview & {ok:boolean}>('/task-chains/'+encodeURIComponent(id)+(chats?'/delete-chats':'/delete'),{...chainScope,...(chats?{chats,eraseOriginals:true}:{})});
+      if(chats&&result?.eraseOriginals===true&&Array.isArray(result.chats)){
+        for(const owner of new Set(result.chats.map(chat=>chat.provider))){
+          const ids=result.chats.filter(chat=>chat.provider===owner).map(chat=>chat.sessionId);
+          await forgetChatTranscripts(connection,owner,ids);
+        }
+      }
+      return result;
+    },
     stop:id=>api('/task-chains/'+encodeURIComponent(id)+'/stop',chainScope),
     openChat:step=>{
       if(!step.sessionId&&!step.jobId)return;
-      const target:Session={sessionId:step.sessionId||'pending-'+step.jobId,cwd:step.worktreeCwd||taskCwd,provider,summary:step.title,lastModified:Date.now(),...(account?{account}:{})};
-      const live=step.sessionId&&jobs.find(run=>run.sessionId===step.sessionId&&run.status==='running');
+      const executor=step.executor??{provider,account};
+      const target:Session={sessionId:step.sessionId||'pending-'+step.jobId,cwd:step.launchCwd||step.worktreeCwd||taskCwd,provider:executor.provider,summary:step.title,lastModified:Date.now(),account:executor.account||''};
+      const live=step.sessionId&&jobs.find(run=>(run.provider||'claude')===executor.provider&&(run.account||'')===(executor.account||'')&&run.sessionId===step.sessionId&&run.status==='running');
       const active=live?live.id:(!step.sessionId||step.status==='running'||step.status==='waiting'?step.jobId:undefined);
       if(embedded?.onOpenChainChat)embedded.onOpenChainChat(target,active);
+      else if(executor.provider!==provider || (executor.account||'')!==account){
+        rememberDraft();
+        if(executor.provider==='claude')setCustomAccount(executor.account||'');
+        setNotificationTarget({provider:executor.provider,account:executor.account||'',sessionId:step.sessionId,jobId:active,cwd:target.cwd!,title:step.title});
+        setProvider(executor.provider);
+      }
       else void openSession(target,active?{id:active,sessionId:step.sessionId}:undefined);
     }
   }:undefined;
@@ -1159,9 +1256,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         onPrepareDraft={connection&&!busy&&!uploading?prepareTaskDraft:undefined} maxDraftLength={taskFileRoom?1024*1024:taskTextRoom}
         unavailable={!connection||demo||connection.workspaceId?t('Подключитесь к ПК в настройках'):undefined}
         scopePicker={connection&&!demo&&!connection.workspaceId&&<div className="tasks-scope">
-          <ProviderPicker connection={connection} value={provider} onChange={value=>{rememberDraft();setTaskChainId(undefined);(embedded?.onTaskProvider||setProvider)(value);}} disabled={busy||uploading}/>
+          <ProviderPicker connection={connection} value={provider} onChange={value=>{rememberDraft();setTaskProject(taskCwd);setTaskChainId(undefined);(embedded?.onTaskProvider||setProvider)(value);}} disabled={busy||uploading}/>
           <div className="project-folder-field"><span>{t('Проект')}</span>
-            <ProjectFolderPicker label={t('Проект')} value={taskCwd} paths={[...new Set([...projectRoots,...(cwd?[cwd]:[])])]} onChange={root=>{
+            <ProjectFolderPicker label={t('Проект')} value={taskCwd} paths={[...new Set([...projectRoots,...(taskCwd?[taskCwd]:[]),...(cwd?[cwd]:[])])]} onChange={root=>{
               setTaskChainId(undefined);if(embedded?.tasksPage?.initialId)embedded.onOpenTasks?.();setTaskProject(root);
             }}/>
           </div>
@@ -1173,9 +1270,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             {!loading && !history.length && !job && !selected && !taskRun && <div className={'welcome'+(draft.trim()||attachments.length?' welcome-collapsed':'')}><div className="welcome-symbol">✳</div><h1>{t("Что создадим сегодня?")}</h1><p>{t("Файлы, инструменты и контекст вашего ПК.")}<br />{t("Теперь под рукой.")}</p><div className="suggestions">{[t("Изучи структуру проекта"), t("Помоги найти и исправить ошибку"), t("Составь план новой функции")].map((t) => <button key={t} onClick={() => setDraft(t)}>{t}<ArrowUp size={16} /></button>)}</div></div>}
             {!loading && selected && !history.length && !job && (unreachable||historyError&&hostDown(reach)?<div className="offline-empty muted" role="status"><p>{embedded?t('История чата загрузится, когда локальный сервер будет доступен.'):t("Этот чат ещё не сохранён на телефоне. Он загрузится, когда ПК будет доступен.")}</p><button className="secondary" onClick={()=>{retryNow();if(selected)void openSession(selected);}}>{t("Повторить")}</button></div>:<p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>)}
             {selected&&!loading&&(history.length>0||!unreachable)&&(loadingOlder||historyError||hasMore!==null&&(unreachable||!fromStart))&&<p className="history-page-status muted" role="status" aria-live="polite">{loadingOlder?<span className="history-loading"><LoaderCircle size={16} aria-hidden="true"/>{t('Загружаем сообщения…')}</span>:historyError?<>{t('Не удалось обновить историю')}{!unreachable&&<small className="history-error-reason">{t(historyError)}</small>}</>:unreachable?t('Остальная история загрузится, когда ПК будет на связи'):t('Выше есть ещё сообщения · прокрутите вверх')}{historyError&&hasMore!==null&&!unreachable&&<button className="text-button" onClick={()=>void extendHistory()}>{t('Повторить загрузку')}</button>}</p>}
-            <MessageList connection={connection} cwd={cwd} key={`${provider}-history`} provider={provider} messages={history} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>
+            <MessageList connection={connection} cwd={cwd} key={`${provider}-history`} provider={provider} messages={history} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} resultRoot={resultRoot} onReview={openTurnReview}/>
             {hasMore !== null && historyWindow.current >= 5000 && <p className="muted" role="status">{t("Достигнут предел окна: 5000 сообщений")}</p>}
-            {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={jobTranscript} partialText={job.partial} streaming={running&&!runUnknown} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} onReview={openTurnReview}/>}
+            {job&&job.errorCode!=='codex_thread_busy' && <MessageList connection={connection} cwd={cwd} key={`${provider}-${job.id}`} provider={provider} messages={jobTranscript} partialText={job.partial} streaming={running&&!runUnknown} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} resultRoot={resultRoot} onReview={openTurnReview}/>}
             {job?.expiredApprovals?.map((item,index)=><p key={`expired-${index}`} className="approval-expired transcript-event" role="status">{t('Время ожидания истекло — агенту отправлен отказ')} · {item.tool}</p>)}
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers, extra) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers, ...extra });if(allow&&a.tool==='ExitPlanMode'&&extra?.mode){const key=currentDraftKey(),mode=extra.mode;setAccessChoices(old=>({...old,[key]:mode}));}}} />)}
             {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error-banner">{t(job.error)}{provider==='claude'&&claudeOutdated(job.error)&&<ClaudeEngineUpdate connection={connection} compact/>}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
@@ -1197,6 +1294,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         {/* Hosts without the queue view still report how many follow-ups wait. */}
         {Boolean(job?.pendingInputIds?.length)&&!job?.queued&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}
         <div className="composer-area">{boardChat?.context&&<div className="board-context-chip">{boardChat.context.name}</div>}{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}
+          {!readingMode&&connection&&!demo&&<ChatGenerationFooter key={JSON.stringify([connection.url,connection.token,provider,account,selected?.sessionId])} connection={connection} provider={provider} account={account} sessionId={selected?.sessionId} job={job}/>}
           {!readingMode&&<OutboxShelf items={outbox} busy={busy}/>}
           {/* Only lost contact needs a notice here; action details stay in the transcript. */}
           {running&&job&&runUnknown&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)&&!runUnknown} lostAt={runUnknown?runLost??jobContact.current.at:undefined}/>}{!error&&connection&&!demo&&!readingMode&&!job?.approvals.length&&<LimitAlert provider={provider} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}{error &&<div className="error-banner" role="alert">{t(error)}{!embedded&&t(error)===t(budgetRangeMessage)&&<button className="text-button" onClick={()=>{setError('');setSettingsSubpage('access');setSettingsPage('workspace');setTab('settings');setMobileChat(true);}}>{t('Открыть настройки бюджета')}</button>}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}

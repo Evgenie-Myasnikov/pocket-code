@@ -16,7 +16,9 @@ export type ActivityItem = {
   resultMessageId?: string;
   action?: 'command' | 'files' | 'search' | 'agent' | 'responding' | 'tool';
 };
+export type GenerationMetrics={outputTokens?:number;outputTokensPerSecond?:number;totalTokens?:number;contextTokens?:number;contextWindow?:number};
 export type JobView = {
+  generation?:GenerationMetrics;
   writePreviews?:WritePreview[];
   /** Changes whenever the transcript does; token deltas only change `partial`. */
   messagesRevision?:number;

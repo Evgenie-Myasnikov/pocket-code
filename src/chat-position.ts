@@ -10,3 +10,15 @@ export function savePosition(key:string,value:ChatPosition){if(!key)return;memor
 export function markRunningOnLeave(key:string,running:boolean){const position=readPosition(key);if(position||running)savePosition(key,{...(position||{top:0,window:100,fromStart:false,bottom:true}),followOnReturn:running});}
 export function positionOnOpen(key:string,live=false){const position=readPosition(key);if(!live&&!position?.followOnReturn)return position;const latest:ChatPosition={top:0,window:100,fromStart:false,bottom:true};savePosition(key,latest);return latest;}
 export function clearPositions(){clearTimeout(timer);memory.clear();pending.clear();try{for(const key of Object.keys(localStorage))if(key.startsWith(prefix))localStorage.removeItem(key);}catch{}}
+export function forgetPositions(scope:string,hostPrefix:string,provider:string,ids:Set<string>){
+ const legacy=prefix+scope+':'+provider+':',host=prefix+hostPrefix;
+ const matches=(key:string)=>{
+   if(key.startsWith(legacy))return ids.has(key.slice(legacy.length));
+   if(!key.startsWith(host))return false;
+   const record=key.slice(host.length),parts=record.indexOf(':');
+   return parts!==-1&&record.slice(parts+1).startsWith(provider+':')&&ids.has(record.slice(parts+2+provider.length));
+ };
+ for(const key of memory.keys())if(matches(key))memory.delete(key);
+ for(const key of pending.keys())if(matches(key))pending.delete(key);
+ try{for(const key of Object.keys(localStorage))if(matches(key))localStorage.removeItem(key);}catch{/* Optional storage. */}
+}

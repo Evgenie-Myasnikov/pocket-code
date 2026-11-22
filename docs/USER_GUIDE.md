@@ -10,8 +10,9 @@ The shared assistant-ui composer has a **+** menu for files and, in a new chat,
 the project folder. Adding a folder explicitly makes it appear under Projects;
 importing provider history does not fill the sidebar with every working directory.
 Provider selection stays in the chat list. Existing conversations keep their folder.
-Right-click a chat to rename it or remove it from Pocket Code on this PC and its
-paired phones. Removal does not erase the original provider history.
+Right-click a chat to rename it or review its removal. **Erase permanently** deletes its original local provider history and clears the Pocket Code cache. Paired devices clear cached copies when they reconnect. **Only remove from list** keeps the provider original.
+
+On Windows, click the first chat and Shift-click the last to select a range. Ctrl-click adds or removes individual chats. Press Delete to review the selection. To clear a folder for the current provider and account, open the folder menu and choose **Delete all chats in this folder**. The confirmation counts eligible chats across the folder, including hidden rows. Running chats are kept.
 
 Hover over a chat or focus its row and use the bell to mute or restore alerts for that conversation on this device. On touch screens, use the chat actions menu (…). Muting keeps the messages, progress and approval cards visible.
 
@@ -84,27 +85,35 @@ Send with the arrow or **Ctrl+Enter / Cmd+Enter**. A running chat accepts clarif
 
 **Unreleased composer update:** the shared input grows with a multiline prompt up to a bounded height. Attachments, model/effort controls and compact send/stop buttons stay within the same surface. Fresh response characters softly fade into view; already loaded history and code blocks remain still. No artificial typing queue delays the response. The operating system's reduced-motion setting disables the effect.
 
-Only one writer may work in an overlapping project folder. Up to three Pocket Code jobs per provider can run in separate non-overlapping folders. Use separate existing worktrees for isolated work; Pocket Code does not create or merge them automatically.
+Only one writer may work in an overlapping project folder. Up to three Pocket Code jobs per provider can run in separate non-overlapping folders. For independent chats, choose separate worktrees. Markdown task chains in a Git project create their own worktrees for successive steps and offer a cumulative diff for one manual merge.
 
 When the provider streams a file write, the chat shows the file name, received byte and line counts, and the most recent lines. Open the file row to inspect the code or diff. A failed command stays visible in the transcript and expands to show the command and its output.
 
+Below the conversation, token usage shows the generated output, measured speed, session total and share of the context window when the provider supplies the corresponding data. The last recorded reply remains available when you reopen the chat. After a successful file change, open the result card to inspect the changed files, additions and deletions, or open the output folder or working folder. Each card covers one response.
+
 ## Attachments and history
 
-**AI task drafting.** Use the sparkle button in the composer to **Improve with AI**. For an empty field, choose **Fill with AI** and describe the desired result. Choose an available Claude, Codex or GitHub Copilot account. To use an OpenAI-compatible API, add its URL and API key in the AI provider settings, then open **API connections** in the drafting dialog and choose the connection and model. The PC sends the field and its displayed context to that provider when you generate a suggestion. Codex appears on supported local runtimes and the dialog shows its remaining input budget. You can edit, regenerate or apply the result before sending the message, saving the card or running the tasks.
+**AI task drafting.** Use the sparkle button in the composer to **Improve with AI**. For an empty field, choose **Fill with AI** and describe the desired result. Choose an available Claude, Codex or GitHub Copilot account. To use an OpenAI-compatible API, add its URL and API key in the AI provider settings, then open **API connections** in the drafting dialog and choose the connection and model. The PC sends the field and its displayed context to that provider when you generate a suggestion. The dialog shows why a local provider is unavailable. After signing in or updating its CLI, refresh the list. Codex also shows its remaining input budget. You can edit, regenerate or apply the result before sending the message, saving the card or running the tasks.
 
-In **Tasks**, choose **Create task** to enter a plan manually or **Import Markdown** to load a plan. Choose **Edit tasks** to change an imported plan. Each step has a sparkle button beside its instructions to improve the text or fill the empty field. AI can draft the chain name, shared context, step titles and instructions. Board card titles, descriptions and individual acceptance criteria offer the same action. Each field has a dedicated template and uses the task context shown in the dialog.
+In **Tasks**, choose **Create task** to enter a plan manually or **Import Markdown** to load a plan. Choose **Edit tasks** to change an imported plan. For free-form text, choose **Split manually** or **Split with AI** to use the same files and keep the main document as shared context. Each step has a sparkle button beside its instructions to improve the text or fill the empty field. AI can draft the chain name, shared context, step titles and instructions. Board card titles, descriptions and individual acceptance criteria offer the same action. Each field has a dedicated template and uses the task context shown in the dialog.
+
+**Plan a task chain.** In **Tasks**, choose the project folder. **Plan with AI** accepts a plan and related text files from the project or your device. Pick a planning provider and generate a draft. Review the proposed order, source and executor for each step. You can edit fields, move, add or remove steps, or ask for a revision and choose whether to apply it. **Start chain** starts the reviewed plan.
+
+**Parallel work inside a step.** With **Allow parallel subtasks** selected, the step asks its agent to use available native subagent tools for independent work, then reconcile the results before completion. The step displays child activity reported by the provider. Open its chat to inspect the available child context. Provider support varies.
+
+**Inspect a step.** Open **Step context** and switch between the task, shared context, previous handoff, paths and full prompt. **Paths** shows the selected project, recorded working directory and selected source files. Device uploads have a private copy on the PC. A new Git-backed step can have a separate working directory for its branch.
 
 **Markdown tasks.** Open **Tasks**, select the project and provider, then choose **Import Markdown**. Choose the main context file and the Markdown files that describe the tasks. If the main file lists task paths or links, the preview uses that order and identifies missing files. For a single-file plan, put the shared context first and start each task with a `## Task title` heading.
 
-Choose **Start linked chats** to run each step in its own chat. The PC starts one step at a time in the selected project. Each chat receives the common context, the current task and the previous step's result. The host advances after the agent explicitly confirms completion. Open a waiting step's chat to handle approvals. An error or a turn that ends without confirmation halts the chain.
+Choose **Start linked chats** to run each step in its own chat. The PC starts one step at a time in the selected project. Each chat receives the common context, the current task and the previous step's result. The host advances after the agent explicitly confirms completion. Open a waiting step's chat to handle approvals. When a turn ends without confirming completion, the host retries that step with its previous report. A user stop or provider failure stops the run.
 
-In **Tasks**, open a chain to see its current stage, assistant output and results. Each step includes its context, full prompt and a link to its conversation. Stop an active chain before deleting it. Confirming deletion removes the chain record and preserves its chats. The chain button in a linked chat returns to its steps. Closing the panel leaves the host running the queue. After a host restart, inspect the interrupted step before repeating it. To run the entire batch in one chat, use **Prepare draft → Send**.
+In **Tasks**, open a chain to see its current stage, assistant output and results. Each step includes its context, full prompt and a link to its conversation. Stop an active chain before deleting it. Choose to remove just the chain or also erase its linked chats. The latter previews known step and retry chats, deletes their local provider originals, clears cached copies and reports any failures for retry. The chain button in a linked chat returns to its steps. Closing the panel leaves the host running the queue. After a host restart, inspect the interrupted step before repeating it. To run the entire batch in one chat, use **Prepare draft → Send**.
 
 Use the paperclip, or paste an image/file on Windows. Image attachments show thumbnails; other files show tiles. Remove an attachment with its cross before sending. A message accepts up to ten attachments, each at most 10 MB. Uploads are stored on the host; a missing file may need to be attached again.
 
 The app shows recent history first and loads older pages as you scroll. Loading and history-boundary messages distinguish waiting from the end. Use the jump controls to reach the beginning or newer messages. Position is saved per chat. If the agent was working when you left, returning follows the new messages; idle chats retain the reading position.
 
-Recent chat data is cached per PC/provider. Reconnecting refreshes it. The cache is limited and is not a complete offline archive or draft backup. A file preview shows the current file on the host, which may differ from the original result.
+Reopening a recent chat shows its cached messages immediately while the PC checks for new or changed replies. Each connection, provider and API account has a separate transcript cache. Previously saved pages also work offline when local storage is available. The cache is limited and is not a complete offline archive or draft backup. A file preview shows the current file on the host, which may differ from the original result.
 
 ## Tool activity, subagents and results
 

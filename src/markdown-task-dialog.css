@@ -16,6 +16,7 @@
 .markdown-task-dialog footer button:first-child { margin-inline-end:auto;border-color:transparent;background:transparent;color:var(--muted); }
 .markdown-task-dialog button { width:auto;margin:0; }
 .markdown-task-files button { margin-inline-start:.5rem; }
+.markdown-split-actions { display:flex;align-items:center;gap:.55rem;flex-wrap:wrap; }
 .markdown-task-editor,.markdown-step-editor { min-width:0;margin:0;display:grid;gap:.8rem;border:0;padding:0; }
 .markdown-step-editor { padding:.75rem 1rem 1rem;border:1px solid var(--line);border-radius:10px; }
 .markdown-step-editor legend { padding:0 .4rem;font-weight:var(--fw-semibold);font-size:.87rem; }

@@ -1,6 +1,44 @@
 import {test,expect} from '@playwright/test';
 import {desktop} from './desktop-fixture';
 
+test('a rapid reopen paints this tab’s transcript while storage and the host are unavailable',async({page})=>{
+ await page.addInitScript(()=>{
+   Object.defineProperty(window,'indexedDB',{value:undefined});
+   const save=Storage.prototype.setItem;
+   Storage.prototype.setItem=function(key,value){if(!key.startsWith('pocket-code-chats-v1:'))save.call(this,key,value);};
+ });
+ await desktop(page);
+ const a=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});
+ const b=page.locator('.desktop-sessions button').filter({hasText:'Documentation'});
+ await a.click();await expect(page.getByText('The responsive layout is ready.',{exact:true})).toBeVisible();
+ await b.click();await expect(page.getByText('Garden documentation',{exact:true})).toBeVisible();
+ await page.evaluate(()=>{
+   const host=(window as any).chrome.webview,send=host.postMessage.bind(host);
+   const held:any[]=[];
+   host.postMessage=(call:any)=>call.endpoint?.includes('/alpha/messages')?held.push(call):send(call);
+   (window as any).finishRefresh=()=>{(window as any).branchMessages=[{id:'replacement',role:'assistant',blocks:[{type:'text',text:'Revised latest reply'}]}];held.forEach(send);};
+ });
+ await a.click();
+ await expect(page.getByText('The responsive layout is ready.',{exact:true})).toBeVisible({timeout:1500});
+ await expect(page.getByText('Garden documentation',{exact:true})).toHaveCount(0);
+ await page.evaluate(()=>(window as any).finishRefresh());
+ await expect(page.getByText('Revised latest reply',{exact:true})).toBeVisible();
+ await expect(page.getByText('The responsive layout is ready.',{exact:true})).toHaveCount(0);
+});
+
+test('reopening from a new desktop chat shows the cached transcript while the health check is held',async({page})=>{
+ await desktop(page);
+ const a=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});
+ await a.click();await expect(page.getByText('The responsive layout is ready.',{exact:true})).toBeVisible();
+ await page.locator('.desktop-new-chat').click();
+ await expect(page.getByText('The responsive layout is ready.',{exact:true})).toHaveCount(0);
+ await page.evaluate(()=>{
+   const host=(window as any).chrome.webview,send=host.postMessage.bind(host);
+   host.postMessage=(call:any)=>{if(call.endpoint!=='/health'&&!call.endpoint?.includes('/alpha/messages'))send(call);};
+ });
+ await a.click();await expect(page.getByText('The responsive layout is ready.',{exact:true})).toBeVisible({timeout:1500});
+});
+
 test('opening cached history follows the refreshed latest end',async({page})=>{
  await page.setViewportSize({width:390,height:844});await desktop(page);
  const first=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});

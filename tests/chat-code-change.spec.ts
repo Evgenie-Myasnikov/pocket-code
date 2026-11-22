@@ -10,6 +10,7 @@ test('live file writes display received code and resolve into one completed edit
     (window as any).testHistoryPage=()=>({messages:[],previous:null,next:null});
     (window as any).testRuns=[{id:'edit-fixture',provider:'claude',sessionId:'alpha',cwd:'C:\\Demo\\Atlas',status:'running',startedAt:Date.now(),baseMessageCount:0,approvals:[],revision:1,partial:'',
       messages:[{id:'request',role:'user',blocks:[{type:'text',text:'Добавь форматирование цены в учебный каталог.'}]}],
+      generation:{outputTokens:111,outputTokensPerSecond:55,totalTokens:16200000,contextTokens:68000,contextWindow:100000},
       writePreviews:[{id:'edit-1',tool:'Write',path:'src/catalog/price.ts',content:source,totalBytes:new TextEncoder().encode(source).length,totalLines:5}]}];
   },{source});
   await page.setViewportSize({width:1280,height:800});await desktop(page);
@@ -19,6 +20,10 @@ test('live file writes display received code and resolve into one completed edit
   await expect(row.locator('.edit-metrics')).toContainText(Buffer.byteLength(source)+' Б · 5 строк');
   await expect(row.locator('.edit-live-snippet')).toHaveText(source.split('\n').slice(-4).join('\n'),{useInnerText:false});
   const snippet=row.locator('.edit-live-snippet'),title=row.locator('.edit-summary-line');
+  const metrics=page.getByRole('group',{name:'Статистика токенов'});
+  await expect(metrics).toContainText('Сгенерировано 111');await expect(metrics).toContainText('55 токенов/с');
+  await expect(metrics).toContainText('68% контекста');
+  if(process.env.POCKET_LIVE_TOKENS_PREVIEW)await page.screenshot({path:process.env.POCKET_LIVE_TOKENS_PREVIEW,animations:'disabled'});
   expect(await snippet.evaluate(el=>getComputedStyle(el).fontFamily)).toMatch(/mono|Consolas/i);
   expect((await snippet.boundingBox())!.y).toBeGreaterThanOrEqual((await title.boundingBox())!.y+(await title.boundingBox())!.height);
   const capture=process.env.POCKET_CODE_CHANGE_PREVIEW;
@@ -27,14 +32,29 @@ test('live file writes display received code and resolve into one completed edit
     const r=(await row.boundingBox())!;
     await page.screenshot({path:capture,animations:'disabled',clip:{x:Math.max(0,r.x-14),y:r.y-12,width:r.width+28,height:r.height+24}});
   }
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  const suffix=' // '+('received code '.repeat(8))+'end';
+  await snippet.evaluate((el,suffix)=>{
+    const w=window as any,seen:string[]=[];
+    w.receivedFileText=seen;
+    const observer=new MutationObserver(()=>{seen.push(el.textContent||'');if(el.textContent?.endsWith(suffix))observer.disconnect();});
+    observer.observe(el,{subtree:true,characterData:true,childList:true});
+    const run=w.testRuns[0],p=run.writePreviews[0];p.content+=suffix;p.totalBytes+=suffix.length;run.revision++;
+  },suffix);
+  await expect(snippet).toContainText('received code end');
+  const seen=await page.evaluate(()=>(window as any).receivedFileText as string[]);
+  const complete=source.split('\n').slice(-4).join('\n')+suffix;
+  expect(seen.some(frame=>frame.length>complete.length-suffix.length&&frame.length<complete.length)).toBe(true);
+  expect(seen.every(frame=>complete.startsWith(frame))).toBe(true);
   await row.locator('summary').focus();await page.keyboard.press('Enter');
   await expect(row.locator('.edit-file header')).toContainText('src/catalog/price.ts');
   await expect(row.locator('.edit-source-line code').nth(1)).toHaveText('  const decimals = 2;',{useInnerText:false});
   await row.evaluate(element=>{(window as any).liveEditNode=element;});
   await page.evaluate(()=>{
-    const run=(window as any).testRuns[0],p=run.writePreviews[0];p.content+='\n}';p.totalBytes+=2;p.totalLines++;run.revision++;
+    const run=(window as any).testRuns[0],p=run.writePreviews[0];p.content+='\n}';p.totalBytes+=2;p.totalLines++;run.generation.outputTokens=135;run.revision++;
   });
   await expect(row.locator('.edit-metrics')).toContainText('6 строк');
+  await expect(metrics).toContainText('Сгенерировано 135');
   expect(await row.evaluate(element=>(window as any).liveEditNode===element)).toBe(true);await expect(row).toHaveJSProperty('open',true);
   await page.evaluate(()=>{
     const run=(window as any).testRuns[0],p=run.writePreviews[0];run.writePreviews=[];

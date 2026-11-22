@@ -1,0 +1,20 @@
+.turn-result {width:fit-content;max-width:100%;min-width:min(21rem,100%);box-sizing:border-box;margin:0 0 1.1rem;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-size:.86em;color:var(--text);overflow:hidden}
+.turn-result-location,.turn-result-tools {display:flex;align-items:center;gap:.55rem;min-width:0;padding:.25rem .8rem}
+.turn-result-location:first-child {padding-top:.55rem;font-weight:650}
+.turn-result-location>svg,.turn-result-tools>button>svg,.turn-result li svg {flex:none;color:var(--muted)}
+.turn-result-location>span,.turn-result li span {min-width:0;overflow-wrap:anywhere}
+.turn-result button {display:inline-flex;align-items:center;gap:.3rem;border:0;background:transparent;color:var(--muted);font:inherit;min-height:36px;padding:.15rem .25rem;cursor:pointer}
+.turn-result button:hover,.turn-result button:focus-visible {color:var(--text)}
+.turn-result-location>button {margin-left:auto;font-weight:500}
+.turn-result-tools {background:var(--panel);border-top:1px solid var(--line);font-size:.93em;flex-wrap:wrap}
+.turn-result-review {margin-left:auto}
+.turn-result-chevron {transform:rotate(-90deg)}
+[aria-expanded=true]>.turn-result-chevron {transform:none}
+.turn-result-counts {display:inline-flex;gap:.35em;font-variant-numeric:tabular-nums}
+.turn-result-counts>b:first-child {color:var(--diff-add-fg)}.turn-result-counts>b:last-child {color:var(--diff-del-fg)}
+.turn-result ul {margin:0;padding:.25rem .8rem .55rem;list-style:none;border-top:1px solid var(--line);max-height:15rem;overflow:auto}
+.turn-result li>button,.turn-result-deleted {display:flex;align-items:center;gap:.45rem;width:100%;min-height:32px;text-align:left}
+.turn-result li span,.turn-result li button {font-family:var(--font-mono);font-size:.97em}
+.turn-result li button>svg:last-child,.turn-result-deleted small {margin-left:auto}.turn-result-deleted{color:var(--muted)}
+.turn-result-browser .files-panel {max-width:none;padding:1rem}
+@media(pointer:coarse){.turn-result button,.turn-result li>button{min-height:44px}}

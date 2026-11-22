@@ -20,7 +20,8 @@ export function toolText(content:unknown):string{
 }
 /** Changed lines for a replacement, ignoring the unchanged lines it repeats at either end. */
 function replaced(before:string,after:string){
-  const a=before.replace(/\r\n/g,'\n').split('\n'),b=after.replace(/\r\n/g,'\n').split('\n');
+  const split=(text:string)=>text?text.replace(/\r\n/g,'\n').replace(/\n$/,'').split('\n'):[];
+  const a=split(before),b=split(after);
   let start=0;while(start<a.length&&start<b.length&&a[start]===b[start])start++;
   let end=0;while(end<a.length-start&&end<b.length-start&&a[a.length-1-end]===b[b.length-1-end])end++;
   return {added:before||after?b.length-start-end:0,removed:before?a.length-start-end:0};

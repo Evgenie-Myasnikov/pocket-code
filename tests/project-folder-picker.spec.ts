@@ -32,6 +32,10 @@ test('browse a large project library and select a nested authorized project in T
   const result=dialog.getByRole('button',{name:nested,exact:true});
   await expect(result).toBeFocused();await result.press('Enter');
   await expect(dialog).toBeHidden();await expect(trigger).toContainText('Каталог');await expect(trigger).toBeFocused();
+  await page.locator('.tasks-scope .provider-picker-trigger').click();
+  await page.getByRole('menuitemradio',{name:'Codex'}).click();
+  await expect(page.locator('.tasks-scope .provider-picker-trigger')).toContainText('Codex');
+  await expect(trigger).toContainText('Каталог');
 });
 
 test('phone folder browsing keeps the selected Tasks project on cancel',async({page})=>{

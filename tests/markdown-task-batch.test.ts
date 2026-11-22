@@ -60,6 +60,16 @@ test('a duplicate selected filename blocks import; full paths disambiguate', () 
   assert.equal(parseMarkdownTasks(qualified, [file('sub/first.md', 'One'), file('other/first.md', 'Two')]).tasks[0].body, 'One');
 });
 
+test('project-bound Markdown links resolve relative to their context and never match unrelated same-name files',()=>{
+  const main={name:'plans/phase/index.md',projectPath:'plans/phase/index.md',text:'- [Read](../steps/one.md)'};
+  const right={name:'plans/steps/one.md',projectPath:'plans/steps/one.md',text:'Right task.'};
+  const other={name:'archive/steps/one.md',projectPath:'archive/steps/one.md',text:'Other task.'};
+  assert.deepEqual(parseMarkdownTasks(main,[other]).missing,['../steps/one.md']);
+  assert.equal(parseMarkdownTasks(main,[other,right]).tasks[0].source,right.projectPath);
+  const upload=parseMarkdownTasks(main,[file('one.md','Uploaded task.')]);
+  assert.equal(upload.tasks[0].source,'one.md');
+});
+
 test('a generic context with selected task files keeps the selection order', () => {
   assert.deepEqual(parseMarkdownTasks(file('context.md', '# Context\nFollow the guide.'), [second, first]).tasks.map(task => task.title), ['Second', 'First']);
 });

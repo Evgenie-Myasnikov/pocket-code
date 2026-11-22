@@ -1,6 +1,23 @@
 import {test,expect} from '@playwright/test';
 import {desktop} from './desktop-fixture';
 
+test('permanent erase requires confirmation from the provider and retains the chat on failure',async({page})=>{
+ await desktop(page);
+ const chat=page.locator('.desktop-sessions button').filter({hasText:'Interface review'});
+ await chat.click();await expect(page.getByText('The responsive layout is ready.',{exact:true})).toBeVisible();
+ await chat.click({button:'right'});await page.getByRole('menuitem',{name:'Erase chat…'}).click();
+ const dialog=page.getByRole('dialog',{name:'Erase chat',exact:true});
+ await expect(dialog.getByRole('combobox')).toHaveValue('erase');await expect(dialog.getByRole('button',{name:'Cancel'})).toBeFocused();
+ await page.evaluate(()=>{(window as any).testEraseError='Provider transcript is busy';});
+ await dialog.getByRole('button',{name:'Erase permanently'}).click();await expect(dialog.getByRole('alert')).toHaveText('Provider transcript is busy');
+ await page.evaluate(()=>{(window as any).testEraseError=undefined;(window as any).testUnconfirmedErase=true;});
+ await dialog.getByRole('button',{name:'Erase permanently'}).click();await expect(dialog.getByRole('alert')).toContainText('did not confirm');
+ await expect(chat).toBeVisible();
+ await page.evaluate(()=>{(window as any).testUnconfirmedErase=false;});
+ await dialog.getByRole('button',{name:'Erase permanently'}).click();
+ await expect(dialog).toHaveCount(0);await expect(chat).toHaveCount(0);await expect(page.getByText('The responsive layout is ready.',{exact:true})).toHaveCount(0);
+});
+
 test('all projects are visible until explicitly filtered; desktop has no Back and context actions reopen',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await desktop(page);
  const rows=page.locator('.desktop-sessions>button');await expect(rows).toHaveCount(2);
@@ -10,7 +27,7 @@ test('all projects are visible until explicitly filtered; desktop has no Back an
  await rows.first().click({button:'right'});await page.getByRole('menuitem',{name:'Rename',exact:true}).click();
  await page.getByRole('textbox',{name:'Chat name'}).fill('Synthetic renamed chat');await page.getByRole('button',{name:'Rename',exact:true}).click();
  await expect(rows.first()).toContainText('Synthetic renamed chat');
- await rows.first().click({button:'right'});await page.getByRole('menuitem',{name:'Delete from Pocket Code'}).click();await page.getByRole('button',{name:'Delete chat',exact:true}).click();await expect(rows).toHaveCount(1);
+ await rows.first().click({button:'right'});await page.getByRole('menuitem',{name:'Erase chat…'}).click();await page.getByRole('combobox',{name:'Action'}).selectOption('list');await page.getByRole('button',{name:'Remove from list',exact:true}).click();await expect(rows).toHaveCount(1);
 });
 
 test('a running title pulses without a Running label and retains height when another chat opens',async({page})=>{

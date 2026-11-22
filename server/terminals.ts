@@ -56,6 +56,12 @@ export class Terminals {
     t.process.write(data); t.inputs.add(requestId);
     if (t.inputs.size > 2000) t.inputs.delete(t.inputs.values().next().value!);
   }
+  forgetSession(id:string) {
+    for(const [key,terminal] of this.terminals)if(terminal.sessionId===id&&terminal.status==='exited'){
+      terminal.screen.dispose();
+      this.terminals.delete(key);
+    }
+  }
   stop(id: string) { const t = this.get(id); if (t.status === 'running') t.process.kill(); }
   close() { for (const t of this.terminals.values()) { if (t.status === 'running') t.process.kill(); t.screen.dispose(); } }
 }

@@ -1,14 +1,29 @@
-import {useId,useMemo,useState,type ReactNode} from 'react';
+import {useId,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {ChevronRight,FileCode2} from 'lucide-react';
 import {useLanguage} from './i18n';
 import type {ToolView} from './tool-registry';
 import {editFiles,type EditFile} from './edit-diff';
+import {usePacedText} from './usePacedText';
+import {useStreamSpeed} from './stream-speed';
 import './edit-activity.css';
 
 const signs={add:'+',del:'-',context:' ',meta:''};
 const lineForms:Record<string,string>={one:'строка',few:'строки',many:'строк',other:'строк'};
 const ruPlural=new Intl.PluralRules('ru');
 function diffText(file:EditFile){return file.content??file.lines.map(row=>signs[row.kind]+row.text).join('\n');}
+
+function LiveWriteSnippet({text}:{text:string}){
+  const viewport=useRef<HTMLSpanElement>(null);
+  const speed=useStreamSpeed();
+  const visible=usePacedText(text.slice(-4000),false,speed);
+  const lines=visible.split(/\r?\n/);
+  if(lines.at(-1)==='')lines.pop();
+  const tail=lines.slice(-4).join('\n');
+  useLayoutEffect(()=>{
+    if(viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight;
+  },[tail]);
+  return <span ref={viewport} className="edit-live-snippet" aria-hidden="true"><code>{tail}</code></span>;
+}
 
 export function EditActivity({view,input,name,result,copy,fallback,created=false}:{
   view:ToolView;input:Record<string,unknown>;name:string;result?:ReactNode;
@@ -33,7 +48,7 @@ export function EditActivity({view,input,name,result,copy,fallback,created=false
     if(currentText===undefined)return;
     const lines=currentText.split(/\r?\n/);
     if(lines.at(-1)==='')lines.pop();
-    return {bytes:new TextEncoder().encode(currentText).length,count:lines.length,tail:lines.slice(-4).join('\n')};
+    return {bytes:new TextEncoder().encode(currentText).length,count:lines.length};
   },[currentText]);
   const bytes=typeof input.preview_bytes==='number'?input.preview_bytes:measured?.bytes;
   const diffKnown=files.length>0&&files.every(file=>file.counted);
@@ -55,7 +70,7 @@ export function EditActivity({view,input,name,result,copy,fallback,created=false
           {running&&<><i className="edit-live-dot" aria-hidden="true"/><span className="visually-hidden">{l('In progress','Выполняется')}</span></>}
         </span>
       </span>
-      {preview&&<span className="edit-live-snippet" aria-hidden="true">{measured?.tail}</span>}
+      {preview&&<LiveWriteSnippet text={preview}/>}
     </summary>
     {open&&<div className="edit-expanded">
       {truncated&&<small>{l('Showing the latest received part','Показана последняя полученная часть')}</small>}

@@ -1,6 +1,7 @@
 import type {BoardMcpConfiguration} from './board-mcp-runtime.js';
 import { userInputBlocks } from './user-input-blocks.js';
 import {randomUUID} from 'node:crypto';
+import path from 'node:path';
 import {projectBoardInstructions} from './project-rules.js';
 import {CopilotLogin} from './copilot-login.js';
 import {CopilotClient,type CopilotSession,type SessionEvent} from '@github/copilot-sdk';
@@ -9,6 +10,7 @@ import type {ChatMessage,JobView} from './types.js';
 import {Followups,type FollowupInput} from './followups.js';
 import {coalesceReads} from './read-coalescer.js';
 import {ToolInputPreviews} from './write-preview.js';
+import {CopilotGeneration} from './provider-generation.js';
 import {copilotUsage} from './copilot-usage.js';
 import type {CodexUsageSnapshot} from './codex-usage.js';
 
@@ -22,6 +24,7 @@ export function copilotMessage(event:SessionEvent):ChatMessage|null{
 type Input={id:string;cwd:string;sessionId?:string;text:string;displayText?:string;model?:string;mode:'default'|'plan';maxBudgetUsd:number;approvalTimeoutMs?:number;baseMessageCount?:number;attachmentPaths?:string[];jira?:JobView['jira']};
 type Run={view:JobView;session?:CopilotSession;pending:Map<string,(allow:boolean,answers?:Record<string,string>)=>void>;followups:Followups;approvalTimeoutMs:number};
 export class CopilotService{
+ recordGeneration?:(job:JobView)=>void;
  async refreshAuthentication(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Provider is busy');await this.client.stop();this.starting=undefined;}
  private boardMcp:BoardMcpConfiguration=()=>({});
  setBoardMcpConfiguration(config:BoardMcpConfiguration){this.boardMcp=config;}
@@ -72,6 +75,20 @@ export class CopilotService{
  async sessions(){const sessions=await(await this.connect()).listSessions();return Promise.all(sessions.filter(item=>!item.isRemote).map(async item=>{const cwd=item.context?.workingDirectory||'';let readOnly=true;try{await allowedPath(this.roots,cwd,true);readOnly=false;}catch{}return{sessionId:item.sessionId,summary:item.summary||'Copilot chat',cwd,lastModified:new Date(item.modifiedTime).getTime(),source:'copilot',provider:'copilot' as const,readOnly};}));}
  private historyReads=coalesceReads<string,ChatMessage[]>(0,8);
  async messages(id:string){return this.historyReads(id,()=>this.loadMessages(id));}
+ async eraseOriginal(id:string,cwd:string) {
+   if(this.list().some(job=>job.sessionId===id&&job.status==='running'))throw new HttpError(409,'Stop the current turn before erasing this chat.');
+   const client=await this.connect();
+   const matches=(await client.listSessions()).filter(item=>item.sessionId===id);
+   if(!matches.length)return;
+   const [original]=matches;
+   if(matches.length!==1||original.isRemote||!original.context?.workingDirectory||path.relative(cwd,original.context.workingDirectory)!=='')
+     throw new HttpError(409,'The local original chat could not be verified in this project.');
+   await allowedPath(this.roots,cwd,true);
+   await client.deleteSession(id);
+ }
+ forgetSession(id:string) {
+   for(const [jobId,run] of this.runs)if(run.view.sessionId===id&&run.view.status!=='running')this.runs.delete(jobId);
+ }
  async forkBeforeMessage(id:string,messageId:string){
   if(this.list().some(job=>job.sessionId===id&&job.status==='running'))throw new HttpError(409,'Stop the current turn before branching.');
   const found=(await this.messages(id)).find(m=>m.id===messageId&&m.role==='user');
@@ -113,8 +130,10 @@ export class CopilotService{
   run.session=input.sessionId?await client.resumeSession(input.sessionId,config):await client.createSession(config);run.view.sessionId=run.session.sessionId;run.view.revision++;
   if(run.view.status!=='running'){await run.session.abort();return;}
   const previews=new ToolInputPreviews();
+  const generation=new CopilotGeneration(!input.sessionId);
   unsubscribe=run.session.on(event=>{
     if(run.view.status!=='running')return;
+    generation.observe(run.view,event);
     if(!event.agentId){
       if(event.type==='assistant.tool_call_delta'){
         const {toolCallId,inputDelta,toolName}=event.data;
@@ -131,7 +150,7 @@ export class CopilotService{
   await run.session.sendAndWait({prompt:input.text,attachments:input.attachmentPaths?.map(file=>({type:'file' as const,path:file}))},3600000);
   if(run.view.status==='running')run.view.status='done';
  }catch(error){if(run.view.status!=='stopped'){run.view.status='error';run.view.error=error instanceof Error?error.message:'Copilot failed';}}
- finally{unsubscribe?.();delete run.view.writePreviews;for(const finish of run.pending.values())finish(false);run.view.partial='';run.view.revision++;await run.session?.disconnect().catch(()=>{});}}
+ finally{unsubscribe?.();if(this.runs.get(run.view.id)===run)this.recordGeneration?.(run.view);delete run.view.writePreviews;for(const finish of run.pending.values())finish(false);run.view.partial='';run.view.revision++;await run.session?.disconnect().catch(()=>{});}}
  async followup(id:string,input:FollowupInput){const run=this.runs.get(id);if(!run)throw new HttpError(404,'Copilot task not found');await run.followups.run(input,async()=>{if(run.view.status!=='running'||!run.session)throw new HttpError(409,'Copilot is not ready for a follow-up. Your draft is preserved.');await run.session.send({prompt:input.text,mode:'enqueue',attachments:input.attachmentPaths?.map(file=>({type:'file' as const,path:file}))});run.view.messages.push({id:input.id,role:'user',blocks:userInputBlocks(input)});run.view.revision++;});return run.view;}
  stop(id:string){const run=this.runs.get(id);if(!run)return;delete run.view.writePreviews;run.view.status='stopped';run.view.revision++;for(const finish of run.pending.values())finish(false);void run.session?.abort().catch(()=>{});}
  approve(id:string,approval:string,allow:boolean,answers?:Record<string,string>,_decision?:{message?:string;remember?:boolean;mode?:string}){const run=this.runs.get(id),finish=run?.pending.get(approval);if(!finish)throw new HttpError(404,'This question is no longer pending');finish(allow,answers);}

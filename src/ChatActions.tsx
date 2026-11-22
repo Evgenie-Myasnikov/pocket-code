@@ -1,25 +1,57 @@
-import {useRef,useState} from 'react';
-import {Bell,BellOff,Pencil,Trash2} from 'lucide-react';
+import {useEffect,useRef,useState} from 'react';
+import {Bell,BellOff,ListChecks,Pencil,Trash2} from 'lucide-react';
 import {CardActionMenu} from './CardActionMenu';
 import {request,type Connection} from './api';
 import type {Session} from './session';
 import {useLanguage} from './i18n';
 import {useModal} from './navigation';
 import {useChatMute} from './chat-mute';
-export type ChatActionTarget={session:Session;x:number;y:number;running?:boolean};
+import {forgetChatTranscripts} from './chat-cache';
+export type ChatActionTarget={session:Session;x:number;y:number;running?:boolean;select?():void};
 export function ChatActions({target,connection,provider,jobId,managementDisabled,onClose,onChanged}:{target:ChatActionTarget;connection:Connection;provider:string;jobId?:string;managementDisabled?:boolean;onClose():void;onChanged(session:Session,deleted:boolean):void}){
  const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
  const {muted,toggle}=useChatMute(connection,target.session.provider||provider,target.session.sessionId,jobId);
  const [phase,setPhase]=useState<'menu'|'rename'|'delete'>('menu'),[title,setTitle]=useState(target.session.customTitle||target.session.summary||''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [eraseOriginals,setEraseOriginals]=useState(true),cancelButton=useRef<HTMLButtonElement>(null),saving=useRef(false);
  const menuSelection=useRef(false);
  const choose=(next:'rename'|'delete')=>{menuSelection.current=true;setPhase(next);};
  const closeMenu=()=>queueMicrotask(()=>{if(!menuSelection.current)onClose();});
  const dialog=useRef<HTMLElement|null>(null);useModal(dialog,phase==='rename'||phase==='delete',()=>{if(!busy)onClose();});
- async function save(){setBusy(true);setError('');try{await request(connection,`/sessions/${encodeURIComponent(target.session.sessionId)}/manage`,{provider,action:phase,title:phase==='rename'?title.trim():undefined});onChanged({...target.session,customTitle:title.trim()},phase==='delete');onClose();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ useEffect(()=>{if(phase==='delete')cancelButton.current?.focus({preventScroll:true});},[phase]);
+ async function save(){
+   if(saving.current||phase==='menu')return;
+   saving.current=true;setBusy(true);setError('');
+   try{
+     const deleting=phase==='delete',original=deleting&&eraseOriginals;
+     const result=await request<{deleted?:boolean;originalRemoved?:boolean}>(connection,`/sessions/${encodeURIComponent(target.session.sessionId)}/manage`,{
+       provider,action:original?'erase':phase,...(!deleting?{title:title.trim()}:original?{eraseOriginals:true,...(target.session.account?{account:target.session.account}:{})}:{})
+     });
+     if(original&&!(result?.deleted&&result.originalRemoved))throw Error(l('The host did not confirm permanent erasure. Refresh or update the host before retrying.','Сервер не подтвердил полное удаление. Обновите сервер и повторите попытку.'));
+     if(deleting)await forgetChatTranscripts(connection,provider,[target.session.sessionId]);
+     onChanged({...target.session,customTitle:title.trim()},deleting);onClose();
+   }catch(e){setError((e as Error).message);}finally{saving.current=false;setBusy(false);}
+ }
  if(phase==='menu')return <CardActionMenu label={l('Chat actions','Действия чата')} point={target} onClose={closeMenu} items={[
   {label:l('Rename','Переименовать'),Icon:Pencil,disabled:managementDisabled,onSelect:()=>choose('rename')},
+  ...(target.select?[{label:l('Select chat','Выбрать чат'),Icon:ListChecks,onSelect:target.select}]:[]),
   {label:muted?l('Unmute notifications','Включить уведомления'):l('Mute notifications','Отключить уведомления'),Icon:muted?Bell:BellOff,onSelect:toggle},
-  {label:l('Delete from Pocket Code','Удалить из Pocket Code'),Icon:Trash2,danger:true,disabled:managementDisabled||target.running,onSelect:()=>choose('delete')},
+  {label:l('Erase chat…','Стереть чат…'),Icon:Trash2,danger:true,disabled:managementDisabled||target.running,onSelect:()=>choose('delete')},
  ]}/>;
- return <div className="modal-backdrop"><section ref={dialog} className="confirm-modal" role="dialog" aria-modal="true" aria-label={phase==='rename'?l('Rename chat','Переименовать чат'):l('Delete chat','Удалить чат')}><form aria-busy={busy} onSubmit={e=>{e.preventDefault();void save();}}><h2>{phase==='rename'?l('Rename chat','Переименовать чат'):l('Delete chat','Удалить чат')}</h2><p className="muted" style={{overflowWrap:'anywhere'}}>{target.session.customTitle||target.session.summary||l('Untitled chat','Чат без названия')}</p>{phase==='rename'?<input autoFocus aria-label={l('Chat name','Название чата')} value={title} maxLength={200} onChange={e=>setTitle(e.target.value)}/>:<p>{l('Remove this chat from Pocket Code on this PC and connected phones? Its original history in the AI provider remains available.','Удалить чат из Pocket Code на этом ПК и подключённых телефонах? Исходная история в AI-провайдере сохранится.')}</p>}{error&&<p role="alert">{error}</p>}<button type="submit" className={'primary'+(phase==='delete'?' danger':'')} disabled={busy||phase==='rename'&&!title.trim()}>{busy?(phase==='rename'?l('Saving…','Сохраняем…'):l('Deleting…','Удаляем…')):(phase==='rename'?l('Rename','Переименовать'):l('Delete chat','Удалить чат'))}</button><button type="button" className="text-button" disabled={busy} onClick={onClose}>{l('Cancel','Отмена')}</button></form></section></div>;
+ const heading=phase==='rename'?l('Rename chat','Переименовать чат'):l('Erase chat','Стереть чат');
+ const submit=phase==='rename'?l('Rename','Переименовать'):eraseOriginals?l('Erase permanently','Стереть безвозвратно'):l('Remove from list','Убрать из списка');
+ return <div className="modal-backdrop"><section ref={dialog} className="confirm-modal" role="dialog" aria-modal="true" aria-label={heading}>
+   <form aria-busy={busy} onSubmit={e=>{e.preventDefault();void save();}}>
+     <h2>{heading}</h2><p style={{overflowWrap:'anywhere'}}>{target.session.customTitle||target.session.summary||l('Untitled chat','Чат без названия')}</p>
+     {phase==='rename'?<input autoFocus aria-label={l('Chat name','Название чата')} value={title} maxLength={200} onChange={e=>setTitle(e.target.value)}/>:<>
+       <label>{l('Action','Действие')}<select value={eraseOriginals?'erase':'list'} disabled={busy} onChange={e=>{setEraseOriginals(e.target.value==='erase');setError('');}}>
+         <option value="erase">{l('Erase original and cached copies','Стереть оригинал и кеш')}</option>
+         <option value="list">{l('Only remove from list','Только убрать из списка')}</option>
+       </select></label>
+       <p>{eraseOriginals?l('This permanently erases the provider transcript stored on this PC and clears the Pocket Code cache. Connected devices remove their saved copy when they sync.','Переписка провайдера на этом ПК и кеш Pocket Code будут удалены безвозвратно. Подключённые устройства удалят свою копию при синхронизации.'):l('Hide the chat from the Pocket Code library. You can still open the original in the provider.','Чат исчезнет из списка Pocket Code. Исходная переписка останется доступна у провайдера.')}</p>
+     </>}
+     {error&&<p role="alert">{error}</p>}
+     <button type="submit" className={'primary'+(phase==='delete'?' danger':'')} disabled={busy||phase==='rename'&&!title.trim()}>{busy?(phase==='rename'?l('Saving…','Сохраняем…'):l('Removing…','Удаляем…')):submit}</button>
+     <button type="button" ref={cancelButton} className="text-button" disabled={busy} onClick={onClose}>{l('Cancel','Отмена')}</button>
+   </form>
+ </section></div>;
 }

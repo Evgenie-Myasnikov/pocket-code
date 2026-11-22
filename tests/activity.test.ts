@@ -6,6 +6,7 @@ import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { activityItem, recentActivityJobs } from '../server/activity.js';
 import { createApp } from '../server/app.js';
+import { Jobs } from '../server/jobs.js';
 import type { JobView } from '../server/types.js';
 
 function fixture(overrides: Partial<JobView> = {}): JobView {
@@ -95,7 +96,8 @@ test('activity HTTP feed is authenticated, bounded and combines only retained br
     get:(id:string)=>rows.find(row=>row.id===id)!,view:(row:JobView)=>row,close:()=>{},
     status:()=>{throw new Error('Activity must not connect to provider');}, sessions:()=>{throw new Error('Activity must not load desktop history');}
   });
-  const runtime=await createApp({roots:[root],uploads:path.join(root,'uploads'),token:'a'.repeat(43),hostName:'Fixture',desktopSessionIndexes:[],codex:engine('codex') as any},engine('claude') as any);
+  const jobs=Object.assign(new Jobs(),engine('claude'));
+  const runtime=await createApp({roots:[root],uploads:path.join(root,'uploads'),token:'a'.repeat(43),hostName:'Fixture',desktopSessionIndexes:[],codex:engine('codex') as any},jobs);
   const server=runtime.app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
   t.after(async()=>{runtime.terminals.close();await new Promise<void>(resolve=>server.close(()=>resolve()));assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await rm(root,{recursive:true,force:true});});
   const url=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/activity`;

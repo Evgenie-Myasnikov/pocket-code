@@ -166,13 +166,13 @@ test('empty comparison explains itself and offers the branch comparison',async({
   await expect.poll(()=>state.calls.some(url=>url.pathname==='/api/review'&&url.searchParams.get('mode')==='branch')).toBe(true);
 });
 
-test('the turn chip opens Review on the files of that turn, with all changes one tap away',async({page})=>{
+test('the turn result opens Review on the files of that turn, with all changes one tap away',async({page})=>{
   const state=await host(page);await page.setViewportSize({width:390,height:844});
-  state.messages=[{id:'ask',role:'user',blocks:[{type:'text',text:'Water the plants'}]},{id:'edit',role:'assistant',blocks:[{type:'tool_use',id:'e1',name:'Edit',input:{file_path:'C:/Workspace/garden-app/src/plants.ts',old_string:'a',new_string:'b'}}]},{id:'done',role:'assistant',blocks:[{type:'text',text:'Done.'}]}];
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  state.messages=[{id:'ask',role:'user',blocks:[{type:'text',text:'Water the plants'}]},{id:'edit',role:'assistant',blocks:[{type:'tool_use',id:'e1',name:'Edit',input:{file_path:'C:/Workspace/garden-app/src/plants.ts',old_string:'a',new_string:'b',status:'completed'}}]},{id:'done',role:'assistant',blocks:[{type:'text',text:'Done.'}]}];
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await page.getByRole('button',{name:/Garden review/}).click();
-  await page.locator('button.turn-changes').click();
+  await page.getByRole('button',{name:'View diff',exact:true}).click();
   const review=panel(page);await expect(review.locator('.review-file')).toHaveCount(1);
   await expect(review.locator('.review-filter-note')).toContainText('Only files from this turn');
   await review.locator('.review-filter-note').getByRole('button',{name:'Show all',exact:true}).click();
@@ -183,10 +183,10 @@ test('the turn chip opens Review on the files of that turn, with all changes one
 
 test('a turn whose files no longer differ says so and offers all changes',async({page})=>{
   const state=await host(page);await page.setViewportSize({width:390,height:844});
-  state.messages=[{id:'ask',role:'user',blocks:[{type:'text',text:'Tidy up'}]},{id:'edit',role:'assistant',blocks:[{type:'tool_use',id:'e1',name:'Edit',input:{file_path:'C:/Workspace/garden-app/src/committed.ts',old_string:'a',new_string:'b'}}]},{id:'done',role:'assistant',blocks:[{type:'text',text:'Done.'}]}];
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  state.messages=[{id:'ask',role:'user',blocks:[{type:'text',text:'Tidy up'}]},{id:'edit',role:'assistant',blocks:[{type:'tool_use',id:'e1',name:'Edit',input:{file_path:'C:/Workspace/garden-app/src/committed.ts',old_string:'a',new_string:'b',status:'completed'}}]},{id:'done',role:'assistant',blocks:[{type:'text',text:'Done.'}]}];
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
-  await page.getByRole('button',{name:/Garden review/}).click();await page.locator('button.turn-changes').click();
+  await page.getByRole('button',{name:/Garden review/}).click();await page.getByRole('button',{name:'View diff',exact:true}).click();
   const review=panel(page);await expect(review.locator('.review-empty')).toContainText('The files of this turn no longer differ in this comparison.');
   await review.locator('.review-empty').getByRole('button',{name:'Show all',exact:true}).click();
   await expect(review.locator('.review-file')).toHaveCount(5);

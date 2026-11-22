@@ -1,4 +1,4 @@
-export type MarkdownSource = { name: string; text: string };
+export type MarkdownSource = { name: string; text: string; projectPath?:string };
 type MarkdownTask = { title: string; body: string; source: string };
 type MarkdownBatch = {
   tasks: MarkdownTask[];
@@ -90,12 +90,18 @@ function references(prose: ReturnType<typeof scan>['prose'], prompts: string[]) 
   return table.length ? table : list;
 }
 
-function resolveFiles(refs: string[], children: MarkdownSource[], batch: MarkdownBatch) {
+function resolveFiles(refs: string[], children: MarkdownSource[], batch: MarkdownBatch, mainPath?:string) {
   const used = new Map<MarkdownSource, string>();
   for (const ref of new Set(refs)) {
     const key = pathKey(ref);
-    const exact = children.filter(file => pathKey(file.name) === key);
-    const matches = exact.length ? exact : children.filter(file => pathKey(basename(file.name)) === basename(key));
+    const relative=mainPath?.split('/').slice(0,-1)??[];
+    for(const part of ref.replaceAll('\\','/').split('/')){
+      if(part==='..'&&relative.length&&relative.at(-1)!=='..')relative.pop();
+      else if(part&&part!=='.')relative.push(part);
+    }
+    const linked=mainPath?children.filter(file=>file.projectPath===relative.join('/')):[];
+    const exact = linked.length?linked:children.filter(file => pathKey(file.name) === key);
+    const matches = exact.length ? exact : children.filter(file => !file.projectPath && pathKey(basename(file.name)) === basename(key));
     if (!matches.length) {
       batch.missing.push(ref);
       batch.order.push({ title: ref, source: ref, missing: true });
@@ -118,7 +124,7 @@ export function parseMarkdownTasks(main: MarkdownSource, children: MarkdownSourc
   const batch: MarkdownBatch = { tasks: [], order: [], missing: [], errors: [], context: lines.join('\n').trim() };
   if (!batch.context) batch.errors.push(`Empty context file: ${main.name}`);
   if (refs.length) {
-    resolveFiles(refs, children, batch);
+    resolveFiles(refs, children, batch,main.projectPath);
   } else if (children.length) {
     resolveFiles(children.map(file => file.name), children, batch);
   } else {

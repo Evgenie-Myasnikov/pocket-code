@@ -1,6 +1,7 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Check,ChevronRight,KeyRound,Sparkles} from 'lucide-react';
+import {catalogueWarning,providerIssueText,type CatalogueSection,type TextProviderIssue} from './task-catalogue';
 import {ProviderMark} from './ProviderMark';
 import {codexTaskTextBytes,CODEX_TASK_TEXT_BYTES} from './task-text-limit';
 import {request,type Connection} from './api';
@@ -34,6 +35,8 @@ function ImproveDialog({connection,cwd,provider,field,value,context='',maxLength
   const [models,setModels]=useState<string[]>(),[model,setModel]=useState('');
   const [modelError,setModelError]=useState(''),[modelReload,setModelReload]=useState(0);
   const [catalogError,setCatalogError]=useState(''),[reload,setReload]=useState(0);
+  const [loadingCatalogue,setLoadingCatalogue]=useState(true);
+  const [warnings,setWarnings]=useState<CatalogueSection[]>([]),[unavailable,setUnavailable]=useState<TextProviderIssue[]>([]);
   const [brief,setBrief]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [result,setResult]=useState<{value:string;context:string;text:string}>();
   const limit=Math.min(maxLength??inputLimit,inputLimit);
@@ -43,20 +46,24 @@ function ImproveDialog({connection,cwd,provider,field,value,context='',maxLength
   const tooLarge=value.length>inputLimit||selectedContext.length>inputLimit;
   const stale=!!result&&(result.value!==value||result.context!==selectedContext);
   const selectedAccount=accounts.find(account=>account.id===accountId);
-  const ready=!!choice&&(choice!=='custom'||!!selectedAccount&&!!model&&models?.includes(model))&&!busy&&!tooLarge&&!codexOver&&!!(value.trim()||selectedContext);
+  const ready=!!choice&&!loadingCatalogue&&!catalogError&&(choice!=='custom'||!!selectedAccount&&!!model&&models?.includes(model))&&!busy&&!tooLarge&&!codexOver&&!!(value.trim()||selectedContext);
   const applicable=!!result&&!stale&&!busy&&!!result.text.trim()&&result.text.length<=limit;
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;};},[]);
   useEffect(()=>{
     let active=true;
-    setCatalogError('');setProviders(undefined);setAccounts([]);setChoice('');setAccountId('');
-    request<{providers:Provider[];accounts?:ApiAccount[]}>(connection,'/task-text/providers').then(response=>{
+    setCatalogError('');setLoadingCatalogue(true);
+    request<{providers:Provider[];accounts?:ApiAccount[];warnings?:CatalogueSection[];unavailable?:TextProviderIssue[]}>(connection,'/task-text/providers'+(reload?'?refresh=1':'')).then(response=>{
       if(!active)return;
       if(!Array.isArray(response?.providers))throw Error(ru?'Не удалось получить список провайдеров.':'Could not read the provider list.');
       const choices=response.providers.filter(id=>Object.hasOwn(providerNames,id));
-      setProviders(choices);
-      if(Array.isArray(response.accounts))setAccounts(response.accounts.filter(account=>account&&typeof account.name==='string'&&!!account.name.trim()&&typeof account.id==='string'&&!!account.id));
-      setChoice(provider&&choices.includes(provider)?provider:choices[0]||'');
-    }).catch(e=>{if(active)setCatalogError(e instanceof Error?e.message:String(e));});
+      setProviders(choices);setWarnings(Array.isArray(response.warnings)?response.warnings:[]);
+      setUnavailable((Array.isArray(response.unavailable)?response.unavailable:[]).filter(entry=>entry&&Object.hasOwn(providerNames,entry.provider)&&!choices.includes(entry.provider)));
+      const availableAccounts=(Array.isArray(response.accounts)?response.accounts:[]).filter(account=>account&&typeof account.name==='string'&&!!account.name.trim()&&typeof account.id==='string'&&!!account.id);
+      setAccounts(availableAccounts);
+      const keepSelected=choice==='custom'?availableAccounts.some(account=>account.id===accountId):!!choice&&choices.includes(choice);
+      if(!keepSelected){setChoice(provider&&choices.includes(provider)?provider:choices[0]||'');setAccountId('');}
+    }).catch(e=>{if(active)setCatalogError(e?.status===500?(ru?'ПК не смог загрузить список. Проверьте вход и API-подключения в настройках ПК, затем обновите список.':'The PC could not load the provider list. Check sign-in and API connections in PC settings, then refresh.'):e instanceof Error?e.message:String(e));})
+      .finally(()=>{if(active)setLoadingCatalogue(false);});
     return ()=>{active=false;};
   },[connection.url,connection.token,connection.desktop,provider,reload,ru]);
 
@@ -93,7 +100,7 @@ function ImproveDialog({connection,cwd,provider,field,value,context='',maxLength
     onKeyDown={e=>{if(e.key==='Tab')return;e.stopPropagation();if(e.key==='Escape'){e.preventDefault();onClose();}}}>
     <section ref={root} className="confirm-modal improve-dialog" role="dialog" aria-modal="true" aria-label={caption}>
       <header><span className="improve-title-mark"><Sparkles aria-hidden="true" size={20}/></span><h2>{title}</h2></header>
-      <fieldset className="improve-providers" disabled={busy}>
+      <fieldset className="improve-providers" disabled={busy||loadingCatalogue} aria-busy={loadingCatalogue}>
         <legend>{ru?'Провайдер':'Provider'}</legend>
         {!providers&&!catalogError&&<p role="status">{ru?'Загрузка…':'Loading…'}</p>}
         <div className="improve-options">{providers?.map(id=><label key={id} className="improve-provider-choice">
@@ -125,10 +132,9 @@ function ImproveDialog({connection,cwd,provider,field,value,context='',maxLength
           </div>}
         </details>}
       </fieldset>
-      {(catalogError||providers?.length===0&&!accounts.length)&&<div>
-        <p role="alert">{catalogError||(ru?'Нет доступных провайдеров. Проверьте подключение провайдера на ПК.':'No providers are available. Check the provider connection on the PC.')}</p>
-        <button type="button" className="text-button" onClick={()=>setReload(n=>n+1)}>{ru?'Обновить список':'Refresh providers'}</button>
-      </div>}
+      {!!unavailable.length&&<ul className="improve-provider-status">{unavailable.map(({provider:id,reason})=><li key={id}><strong>{providerNames[id]}</strong> · {providerIssueText(reason,ru)}</li>)}</ul>}
+      {(catalogError||warnings.length>0||providers?.length===0&&!accounts.length&&!unavailable.length)&&<p role="alert">{catalogError||catalogueWarning(warnings,ru)||(ru?'Нет доступных провайдеров. Проверьте подключение провайдера на ПК.':'No providers are available. Check the provider connection on the PC.')}</p>}
+      {(providers||catalogError)&&<button type="button" className="text-button improve-refresh" disabled={busy||loadingCatalogue} onClick={()=>setReload(n=>n+1)}>{ru?'Обновить список':'Refresh providers'}</button>}
       {(value||context.trim())&&<div className="improve-sources">
         {value&&<details className="improve-source"><summary><ChevronRight size={14} aria-hidden="true"/>{ru?'Исходный текст':'Original text'}</summary><pre>{value}</pre></details>}
         {context.trim()&&<details className="improve-source"><summary><ChevronRight size={14} aria-hidden="true"/>{ru?'Контекст задачи':'Task context'}</summary><pre>{context}</pre></details>}

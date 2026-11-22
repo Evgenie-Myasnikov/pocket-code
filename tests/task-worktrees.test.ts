@@ -88,3 +88,12 @@ test('stacked branches preserve both steps for a single reviewed merge',async t=
   fixtureGit(source,'merge','--no-ff','-m','Reviewed chain',tip);
   assert.equal(fixtureGit(source,'rev-parse','HEAD^2'),tip);
 });
+
+test('a project nested in a repository runs in the equivalent subdirectory of its assigned worktree',async t=>{
+  const {source,worktrees}=await taskFixture(t),project=path.join(source,'app');
+  await mkdir(project);await writeFile(path.join(project,'plan.md'),'Project plan');
+  fixtureGit(source,'add','app/plan.md');fixtureGit(source,'commit','-m','Add nested project');
+  const tree=await worktrees.create(randomUUID(),project);
+  assert.equal(await worktrees.projectDirectory(tree),path.join(tree.cwd,'app'));
+  assert.equal(await readFile(path.join(await worktrees.projectDirectory(tree),'plan.md'),'utf8'),'Project plan');
+});

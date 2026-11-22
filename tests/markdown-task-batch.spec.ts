@@ -98,7 +98,8 @@ test('linked chats show execution order, per-step context and project history',a
           chain={id:data.id,name:data.name,cwd:data.cwd,provider:data.provider,account:data.account,accountName:data.account===account?'Учебный API':undefined,model:data.model,context:data.context,status:'running',
             steps:data.tasks.map((task,i)=>({...task,status:i===0?'done':i===1?'running':'pending'}))};
           Object.assign(chain.steps[0],{sessionId:'alpha',handoff:'Собраны 12 карточек. Для каждой записаны название и категория.'});
-          Object.assign(chain.steps[1],{sessionId:'beta',phase:'responding',output:'Сверяю первые четыре категории.'});
+          chain.sourceFiles=[{name:'docs/catalog.md',projectPath:'docs/catalog.md'}];
+          Object.assign(chain.steps[1],{launchCwd:data.cwd,sessionId:'beta',phase:'responding',output:'Сверяю первые четыре категории.'});
           const running=chain.steps[1];
           (window as any).advanceSyntheticReply=()=>{running.output+=' Проверка продолжается.';};
           return {error:'Ответ хоста потерян',status:503};
@@ -125,7 +126,7 @@ test('linked chats show execution order, per-step context and project history',a
   await importer.getByLabel('Основной контекст (.md)').setInputFiles(markdown('Обновление каталога.md',[
     'Используй учебный каталог. Сохрани названия и порядок разделов.',
     '## Собрать карточки','Составь список карточек и укажи категорию каждой.',
-    '## Проверить категории','Сверь категории со справочником. Перечисли расхождения.',
+    '## Проверить категории','Сверь категории со справочником.\n\n1. Проверь **названия**.\n2. Сверь поле `category`.\n3. Перечисли расхождения.',
     '## Подготовить отчёт','Собери результаты проверки в короткий отчёт.',
   ].join('\n')));
   const start=importer.getByRole('button',{name:'Запустить связанные чаты'});
@@ -145,8 +146,18 @@ test('linked chats show execution order, per-step context and project history',a
   await steps.nth(1).getByRole('button',{name:'Контекст шага'}).click();
   const context=steps.nth(1).locator('.chain-context');
   await expect(context.locator('.chain-run-settings')).toContainText('catalog-editor');
+  await expect(context.getByRole('tab',{name:'Задание',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(context.getByRole('tabpanel')).toContainText('Сверь категории со справочником');
+  await expect(context.getByRole('tabpanel').locator('strong')).toHaveText('названия');
+  await expect(context.getByRole('tabpanel').locator('ol > li')).toHaveCount(3);
+  await context.getByRole('tab',{name:'Пути',exact:true}).click();
+  await expect(context.getByRole('tabpanel')).toContainText('Рабочая папка шага');
+  await expect(context.getByRole('tabpanel')).toContainText('docs\\catalog.md');
+  await context.getByRole('tab',{name:'Из предыдущего шага'}).click();
   await expect(context.getByText('Собраны 12 карточек.',{exact:false}).first()).toBeVisible();
+  await context.getByRole('tab',{name:'Общий контекст'}).click();
   await expect(context.getByText('Используй учебный каталог.',{exact:false}).first()).toBeVisible();
+  await context.getByRole('tab',{name:'Задание',exact:true}).click();
   if(capture)await panel.screenshot({path:capture.replace(/\.png$/,'-context.png')});
   const live=steps.nth(1).locator('.task-live-response');
   await expect(live).toHaveCSS('animation-name','workspace-reveal');
@@ -160,8 +171,8 @@ test('linked chats show execution order, per-step context and project history',a
   expect(await live.evaluate(element=>element===(window as any).originalReply&&(window as any).replyRestarts===0)).toBe(true);
   await page.emulateMedia({reducedMotion:'reduce'});
   await expect(context).toHaveCSS('animation-name','none');
-  await context.locator('summary').click();
-  await expect(context.locator('details pre')).toContainText('Проверить категории');
+  await context.getByRole('tab',{name:'Полный запрос'}).click();
+  await expect(context.getByRole('tabpanel').locator('pre')).toContainText('Проверить категории');
   await panel.getByRole('button',{name:'Цепочки задач',exact:true}).click();
   await panel.getByRole('button',{name:/Обновление каталога/}).click();
   await panel.getByRole('button',{name:'Остановить цепочку'}).click();

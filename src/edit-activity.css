@@ -9,6 +9,10 @@
 .edit-activity[open] .edit-chevron{transform:rotate(90deg)}
 .edit-summary-line .tool-diffstat{display:inline-flex;gap:.38em}
 .edit-live-dot{width:.52em;height:.52em;flex:none;border-radius:50%;background:var(--status-done)}
+.edit-activity .edit-live-snippet{max-height:7.2em;box-sizing:border-box;}
+.edit-activity .edit-live-snippet code{white-space:pre-wrap;overflow-wrap:anywhere;background:none;font:inherit;color:inherit;border:0;padding:0}
+.edit-activity .edit-live-snippet code::after{content:"";display:inline-block;width:.16em;height:.94em;vertical-align:-.13em;margin-inline-start:.14em;background:var(--accent);border-radius:1px}
+@media(prefers-reduced-motion:no-preference){.edit-live-snippet code::after{animation:edit-caret 1.3s ease-in-out infinite}@keyframes edit-caret{50%{opacity:.25}}}
 :root[data-theme] .edit-activity>summary .edit-live-snippet{display:block;overflow:hidden;margin:.5em 0 .25em 1.45em;padding:.65em .95em;border-radius:10px;background:color-mix(in srgb,var(--text) 7%,var(--panel));color:var(--muted);font:.96em/1.5 var(--font-mono);white-space:pre;tab-size:4}
 :root[data-theme] .edit-activity[open]>summary .edit-live-snippet{display:none}
 .edit-expanded{min-width:0;padding:0 0 .38em 1.6em}

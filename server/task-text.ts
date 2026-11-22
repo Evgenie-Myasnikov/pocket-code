@@ -1,9 +1,11 @@
-import type {Express} from 'express';
+import type {Express,Response} from 'express';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {query} from '@anthropic-ai/claude-agent-sdk';
 import {z} from 'zod';
+import type {CatalogueSection,TextProviderIssue} from '../src/task-catalogue.js';
+import {planPrompt,readPlan,taskPlanInput,type PlanExecutor} from './task-plan.js';
 import {claudeExecutableOption} from './claude-executable.js';
 import {HttpError} from './security.js';
 import {CODEX_TASK_TEXT_BYTES, codexTaskTextBytes, taskTextSource} from '../src/task-text-limit.js';
@@ -52,22 +54,42 @@ export const generateClaudeText:GenerateText=async(system,prompt,cwd,abort)=>{
 };
 
 export function mountTaskText(app:Express,options:{
-  providers():Promise<readonly TextProvider[]>;allowProject(cwd:string):Promise<unknown>;
+  providers(refresh?:boolean):Promise<{providers:readonly TextProvider[];unavailable?:TextProviderIssue[]}>;allowProject(cwd:string):Promise<unknown>;
   generate:Partial<Record<TextProvider,GenerateText>>;busy:Set<string>;timeoutMs?:number;
+  executors():Promise<PlanExecutor[]>;accountExecutors?():Promise<PlanExecutor[]>;
   accounts():Promise<{id:string;name:string}[]>;
   custom(account:string,model:string,system:string,prompt:string,signal:AbortSignal):Promise<string>;
 }){
   const active=new Set<AbortController>();
   let closing=false;
-  app.get('/api/task-text/providers',async(_req,res)=>{
-    const [providers,accounts]=await Promise.all([options.providers(),options.accounts()]);
-    res.json({providers,accounts});
-  });
-  app.post('/api/task-text/improve',async(req,res)=>{
-    const input=taskTextInput.parse(req.body);
+  async function section<T>(read:()=>Promise<T>):Promise<T|undefined>{
+    try{return await read();}catch(error){
+      if(error instanceof HttpError&&(error.status===401||error.status===403))throw error;
+      return undefined;
+    }
+  }
+  async function executorCatalogue(){
+    const [local,custom]=await Promise.all([section(options.executors),section(options.accountExecutors??(async()=>[]))]);
+    return {executors:[...(local??[]),...(custom??[])],incomplete:!local||!custom};
+  }
+  async function catalogue(planning:boolean,refresh:boolean){
+    const [local,accounts,runners]=await Promise.all([
+      section(()=>options.providers(refresh)),section(options.accounts),planning?executorCatalogue():undefined
+    ]);
+    const warnings:CatalogueSection[]=[];
+    if(!local)warnings.push('providers');
+    if(!accounts)warnings.push('accounts');
+    if(runners?.incomplete)warnings.push('executors');
+    return {providers:local?.providers??[],accounts:accounts??[],...(runners?{executors:runners.executors}:{}),
+      ...(local?.unavailable?.length?{unavailable:local.unavailable}:{}),...(warnings.length?{warnings}:{})};
+  }
+  app.get('/api/task-text/providers',async(req,res)=>{res.json(await catalogue(false,req.query.refresh==='1'));});
+  app.get('/api/task-text/plan/providers',async(req,res)=>{res.json(await catalogue(true,req.query.refresh==='1'));});
+  type Selection=Pick<Input,'provider'|'cwd'> & {account?:string;model?:string};
+  type Draft=(system:string,prompt:string)=>Promise<string>;
+  // Both drafting actions share provider reservations, disconnect cancellation and the isolated runtime.
+  async function respond(res:Response,input:Selection,work:(generate:Draft)=>Promise<unknown>){
     await options.allowProject(input.cwd);
-    if(input.provider==='codex'&&codexTaskTextBytes(input.text,input.context)>CODEX_TASK_TEXT_BYTES)
-      throw new HttpError(422,'Codex accepts up to 4,000 UTF-8 bytes of field text and context combined. Shorten the input or choose another provider.');
     const busyKey=input.provider==='custom'?'custom:'+input.account:input.provider;
     if(closing)throw new HttpError(503,'The host is stopping.');
     if(options.busy.has(busyKey))throw new HttpError(429,'This provider is already preparing a suggestion.');
@@ -77,28 +99,48 @@ export function mountTaskText(app:Express,options:{
     active.add(abort);
     res.once('close',cancel);
     const timer=setTimeout(cancel,options.timeoutMs??80000);
-    const work=async()=>{
-      const {system,prompt}=taskTextPrompt(input);
-      if(input.provider==='custom') return options.custom(input.account,input.model,system,prompt,abort.signal);
-      const generate=options.generate[input.provider];
-      if(!generate || !(await options.providers()).includes(input.provider))
-        throw new HttpError(503,'The selected text provider is unavailable. Check its sign-in on the PC.');
+    const generate:Draft=async(system,prompt)=>{
       abort.signal.throwIfAborted();
+      if(input.provider==='custom')return options.custom(input.account!,input.model!,system,prompt,abort.signal);
+      const local=options.generate[input.provider];
+      if(!local||!(await section(options.providers))?.providers.includes(input.provider))
+        throw new HttpError(503,'The selected text provider is unavailable. Check its sign-in on the PC.');
       const directory=await mkdtemp(path.join(tmpdir(),'pocket-task-text-'));
-      try {
+      try{
         abort.signal.throwIfAborted();
-        return await generate(system,prompt,directory,abort);
+        return await local(system,prompt,directory,abort);
       } finally {await rm(directory,{recursive:true,force:true,maxRetries:2});}
     };
-    const result=work().finally(()=>{options.busy.delete(busyKey);active.delete(abort);});
+    const result=work(generate).finally(()=>{options.busy.delete(busyKey);active.delete(abort);});
     try{
-      const text=(await Promise.race([result,new Promise<never>((_,reject)=>abort.signal.addEventListener('abort',()=>reject(new HttpError(504,'The text provider did not finish in time.')),{once:true}))])).trim();
-      if(!text||text.length>input.maxLength||(['title','checklist'].includes(input.field)&&/[\r\n]/.test(text)))
-        throw new HttpError(422,'The suggestion does not fit this field. Shorten the brief or try again.');
-      if(!res.destroyed)res.json({text});
+      const value=await Promise.race([result,new Promise<never>((_,reject)=>abort.signal.addEventListener('abort',()=>reject(new HttpError(504,'The text provider did not finish in time.')),{once:true}))]);
+      if(!res.destroyed)res.json(value);
     }catch(error){
       if(!res.destroyed)throw error instanceof HttpError?error:new HttpError(502,'The selected provider could not generate a suggestion. Check its connection and try again.');
     }finally{clearTimeout(timer);res.removeListener('close',cancel);}
+  }
+  app.post('/api/task-text/improve',async(req,res)=>{
+    const input=taskTextInput.parse(req.body);
+    await respond(res,input,async generate=>{
+      if(input.provider==='codex'&&codexTaskTextBytes(input.text,input.context)>CODEX_TASK_TEXT_BYTES)
+        throw new HttpError(422,'Codex accepts up to 4,000 UTF-8 bytes of field text and context combined. Shorten the input or choose another provider.');
+      const {system,prompt}=taskTextPrompt(input);
+      const text=(await generate(system,prompt)).trim();
+      if(!text||text.length>input.maxLength||(['title','checklist'].includes(input.field)&&/[\r\n]/.test(text)))
+        throw new HttpError(422,'The suggestion does not fit this field. Shorten the brief or try again.');
+      return {text};
+    });
+  });
+  app.post('/api/task-text/plan',async(req,res)=>{
+    const input=taskPlanInput.parse(req.body);
+    await respond(res,input,async generate=>{
+      const {executors,incomplete}=await executorCatalogue();
+      if(!executors.length&&incomplete)throw new HttpError(503,'The task executor catalogue could not be loaded. Refresh provider connections and try again.');
+      const {system,prompt}=planPrompt(input,executors);
+      if(input.provider==='codex'&&Buffer.byteLength(prompt)>CODEX_TASK_TEXT_BYTES)
+        throw new HttpError(422,'Codex accepts up to 4,000 UTF-8 bytes including filenames, instructions and executor choices. Select fewer files or choose another planner.');
+      return readPlan(await generate(system,prompt),input.files,executors);
+    });
   });
   return ()=>{closing=true;for(const controller of active)controller.abort();};
 }
