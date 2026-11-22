@@ -118,16 +118,12 @@ for (const provider of ['claude', 'codex'] as const) for (const language of ['en
   test(`${provider} ${language}: chat labels, commands, changes and rich content scale with 8–22px body`, async ({ page }) => {
     await openChat(page, provider, language);
     const transcript = page.locator('.conversation');
-    const group = transcript.locator('.activity-group');
-    await group.locator(':scope > summary').click();
-    await expect(group.locator('.tool-card, .thinking')).toHaveCount(3);
-    for (const toggle of await group.locator('.tool-card > summary, .thinking > summary, .subagent-inline > summary').all()) {
-      await toggle.click();
-    }
+    await expect(transcript.locator('details.thinking .reasoning-content')).toBeVisible();
+    await expect(transcript.locator('.tool-card.combined .tool-output')).toBeVisible();
     const selectors = [
       '.markdown p', '.tool-card.combined summary', '.tool-card.combined .tool-command',
       '.tool-card.combined .tool-title', '.tool-card.combined .tool-output', '.tool-result-content .copy-action',
-      '.activity-group-items .tool-card:not(.combined)>summary', '.tool-diff', '.markdown .code-block pre code', '.code-language', '.markdown table',
+      '.tool-card.activity-row:not(.combined)>summary', '.tool-diff', '.markdown .code-block pre code', '.code-language', '.markdown table',
       '.document-card>strong', '.document-card>pre', '.thinking summary', '.thinking p',
       '.subagent-inline > summary, .subagent-card strong', '.subagent-inline p, .subagent-card small',
     ];

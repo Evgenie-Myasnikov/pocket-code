@@ -13,6 +13,8 @@ Provider selection stays in the chat list. Existing conversations keep their fol
 Right-click a chat to rename it or remove it from Pocket Code on this PC and its
 paired phones. Removal does not erase the original provider history.
 
+Hover over a chat or focus its row and use the bell to mute or restore alerts for that conversation on this device. On touch screens, use the chat actions menu (…). Muting keeps the messages, progress and approval cards visible.
+
 **Microphone** inserts recognized text into the draft; review it and press Send.
 Android uses the installed speech-recognition activity, Windows opens system
 dictation (Win+H), and supported browsers use their speech-recognition service.
@@ -50,7 +52,7 @@ short pause between words. Appearance controls the reveal speed; Instant and
 reduced motion bypass the effect.
 
 <a id="qr"></a>
-The Windows sidebar collapses to an icon rail and remembers that preference. New chat and search are at the top, with history below. More contains Rules, Changelog and Settings. Keyboard shortcuts are available under Settings → Windows application and Ctrl+/; PC connection controls remain in Settings.
+The Windows sidebar groups chats by their project folder. Click a folder to show or hide its chats. The New chat icon (Ctrl+N) stays in the left rail when the sidebar collapses, alongside shortcuts to recent chats. Rules, Changelog and Settings sit at the bottom of the rail. Use the project folder picker to browse folders or search by name or full path. Only projects available to the connected host can be selected.
 
 ## Install and connect
 
@@ -84,17 +86,19 @@ Send with the arrow or **Ctrl+Enter / Cmd+Enter**. A running chat accepts clarif
 
 Only one writer may work in an overlapping project folder. Up to three Pocket Code jobs per provider can run in separate non-overlapping folders. Use separate existing worktrees for isolated work; Pocket Code does not create or merge them automatically.
 
+When the provider streams a file write, the chat shows the file name, received byte and line counts, and the most recent lines. Open the file row to inspect the code or diff. A failed command stays visible in the transcript and expands to show the command and its output.
+
 ## Attachments and history
 
-**AI task drafting (0.28.51).** Use the sparkle button in the composer to **Improve with AI**. For an empty field, choose **Fill with AI** and describe the desired result. Choose an available signed-in Claude or GitHub Copilot provider, add any drafting guidance, and generate a suggestion. You can edit, regenerate or apply the result before sending the message, saving the card or running the tasks.
+**AI task drafting.** Use the sparkle button in the composer to **Improve with AI**. For an empty field, choose **Fill with AI** and describe the desired result. Choose an available Claude, Codex or GitHub Copilot account. To use an OpenAI-compatible API, add its URL and API key in the AI provider settings, then open **API connections** in the drafting dialog and choose the connection and model. The PC sends the field and its displayed context to that provider when you generate a suggestion. Codex appears on supported local runtimes and the dialog shows its remaining input budget. You can edit, regenerate or apply the result before sending the message, saving the card or running the tasks.
 
-In **Markdown tasks**, choose **Enter tasks manually** or **Edit tasks** after importing a plan. AI can draft the chain name, shared context, step titles and instructions. Board card titles, descriptions and individual acceptance criteria offer the same action. Each field has a dedicated template and uses the task context shown in the dialog.
+In **Tasks**, choose **Create task** to enter a plan manually or **Import Markdown** to load a plan. Choose **Edit tasks** to change an imported plan. Each step has a sparkle button beside its instructions to improve the text or fill the empty field. AI can draft the chain name, shared context, step titles and instructions. Board card titles, descriptions and individual acceptance criteria offer the same action. Each field has a dedicated template and uses the task context shown in the dialog.
 
-**Markdown tasks (0.28.51).** Open **+ → Markdown tasks** in the project chat. Choose the main context file and the Markdown files that describe the tasks. If the main file lists task paths or links, the preview uses that order and identifies missing files. For a single-file plan, put the shared context first and start each task with a `## Task title` heading.
+**Markdown tasks.** Open **Tasks**, select the project and provider, then choose **Import Markdown**. Choose the main context file and the Markdown files that describe the tasks. If the main file lists task paths or links, the preview uses that order and identifies missing files. For a single-file plan, put the shared context first and start each task with a `## Task title` heading.
 
 Choose **Start linked chats** to run each step in its own chat. The PC starts one step at a time in the selected project. Each chat receives the common context, the current task and the previous step's result. The host advances after the agent explicitly confirms completion. Open a waiting step's chat to handle approvals. An error or a turn that ends without confirmation halts the chain.
 
-Open **+ → Task chains** to track progress, inspect a step's context and full prompt, or open its conversation. The chain button in a linked chat returns to its steps. Closing the panel leaves the host running the queue. After a host restart, inspect the interrupted step before repeating it. To run the entire batch in one chat, use **Prepare draft → Send**.
+In **Tasks**, open a chain to see its current stage, assistant output and results. Each step includes its context, full prompt and a link to its conversation. Stop an active chain before deleting it. Confirming deletion removes the chain record and preserves its chats. The chain button in a linked chat returns to its steps. Closing the panel leaves the host running the queue. After a host restart, inspect the interrupted step before repeating it. To run the entire batch in one chat, use **Prepare draft → Send**.
 
 Use the paperclip, or paste an image/file on Windows. Image attachments show thumbnails; other files show tiles. Remove an attachment with its cross before sending. A message accepts up to ten attachments, each at most 10 MB. Uploads are stored on the host; a missing file may need to be attached again.
 

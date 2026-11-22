@@ -7,7 +7,7 @@ import { RichBlock, TaskNotificationEvent } from './RichBlocks';
 import {parseClaudeTaskNotification} from './claude-task-notification';
 import type {TurnChanges} from './turn-changes';
 import {ActivityGroup} from './ActivityGroup';
-import {groupThinkingMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode} from './activity-groups';
+import {groupActivityMessages,groupActivityBlocks,visibleMessageBlocks,activityGroupKey,type DetailMode} from './activity-groups';
 import { t, useLanguage } from "./i18n";import { Fragment, memo, useRef, useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import type { ChatMessage, SubagentView, Block } from '../server/types';
@@ -40,9 +40,10 @@ export const MessageList=memo(function MessageList({messages,partialText,running
     else pending.current={text:partialText,key:`live-response:${++sequence.current}`,animate:mounted.current,seen:new Map(messages.map(message=>[message.id,textOf(message)]))};
   }
   mounted.current=true;
-  const runs=groupThinkingMessages(messages,shared.toolResults,runningMessages),visibleIds=new Set(runs.flatMap(run=>run.message?[run.message.id]:[]));
+  const runs=groupActivityMessages(messages,shared.toolResults,runningMessages,shared.mode),visibleIds=new Set(runs.flatMap(run=>run.message?[run.message.id]:[]));
   const content=runs.map(run=>{
     const anchors=run.message?[run.message.id]:[...new Set(run.items!.map(item=>item.messageId))].filter(id=>!visibleIds.has(id));
+    for(const id of anchors)visibleIds.add(id);
     const ids=anchors.length?anchors:[run.key];
     const delivery=run.message?delivered.current.get(run.message.id):undefined,key=delivery?.key||run.key;
     const body=run.message?
@@ -56,7 +57,7 @@ export const MessageList=memo(function MessageList({messages,partialText,running
   const partial=pending.current;
   if(partial){
     const body=<Fragment key={partial.key}><Message key={partial.key} {...shared} animateInitial={partial.animate} message={{id:'partial',role:'assistant',blocks:[{type:'text',text:partial.text}]}}/></Fragment>;
-    content.splice(runs.at(-1)?.items?content.length-1:content.length,0,body);
+    content.push(body);
   }
   return content;
 });
@@ -76,7 +77,7 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   const content = groupActivityBlocks(visibleMessageBlocks(displayMessage,toolResults,running,live),mode).map(run => {
       const {block,result}=run.items[0];
       if(activityGroupKey(run.items[0],mode))return <ActivityGroup key={run.key} items={run.items}/>;
-      return <RichBlock key={block.type==='text'?`text:${message.blocks.slice(0,run.items[0].index).filter(item=>item.type==='text').length}`:run.key} running={running} streaming={streaming&&message.role==='assistant'} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
+      return <RichBlock key={block.type==='text'?`text:${message.blocks.slice(0,run.items[0].index).filter(item=>item.type==='text').length}`:run.key} running={running} streaming={streaming&&message.role==='assistant'&&(block.type!=='thinking'||run.items[0].live)} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent}/>;
     });
   if(!content.length&&!attachments.length)return null;
   return <article tabIndex={-1} data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):message.role==='assistant'?provider:undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>

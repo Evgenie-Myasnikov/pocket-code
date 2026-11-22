@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- Task chains (2026-11-22). Open Tasks on Windows or Android to create or import a Markdown plan. Follow each linked chat, its provider and requested model, current output, exact step context and result. Stopped and completed chains can be deleted while their chats stay available.
+- Task authoring (2026-11-22). Use Improve on a chat draft or individual task field with a supported local Claude, Codex or Copilot account or a configured API-key connection and model. Custom accounts generate an isolated text suggestion through the PC. Apply or edit the suggestion before running a task. A real local Codex 0.171.0 request and simulated OpenAI-compatible API requests were verified.
+- Workspace navigation (2026-11-22). Windows keeps New chat in the icon rail and groups chats by folder. A searchable folder chooser works across Tasks, chats, documents, boards and workspace settings. Short transitions respect reduced motion, and streamed task updates retain their place. Tested with 247 synthetic project folders.
+- Chat presentation and notifications (2026-11-22). Mute a conversation on this device from its bell or action menu. Replies and approval cards stay available. The transcript drops routine continuation and beginning markers. Reasoning, command failures and file edits use compact disclosures. Live file content shows the latest lines, observed byte and line counts, and the final provider result. [Chat examples](docs/USER_GUIDE.md#attachments-and-history)
+
+### Bug Fixes
+- Queued messages on Windows (2026-11-22). The desktop bridge now permits withdrawing a specific queued follow-up, which also enables Edit and Send now. The compiled bridge reproduced the rejection before the fix. Both bridge tests and all five follow-up scenarios then passed.
+
+TypeScript, Vite, Windows and Android debug builds passed. The targeted host suite passed 42 checks. Edge scenarios covered task creation, drafts, live output, mute, project selection, keyboard access and reduced motion. The Android preview matched all 163 web assets and the previous signer. Physical-device checks remain open.
+
+A broader pre-merge host run covered 142 test files (482 passes, 44 failures and one skip). Of 24 suites with failures, 21 also failed on the parent revision and the other three passed when rerun. Four existing small-screen subagent header tests still expect four buttons instead of the current menu.
+
 ## [0.28.51](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.50...v0.28.51) (2026-11-22)
 
 Published [v0.28.51](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.51) from [21ed30b](https://github.com/Evgenie-Myasnikov/pocket-code/commit/21ed30b95bc28772111429e28617ae50d8783883) on branch [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Android version code 138. The 0.28.50 updater accepted the Android, Windows and host packages. The Android application ID and signer match 0.28.50. The source passed [GitHub CI](https://github.com/Evgenie-Myasnikov/pocket-code/actions/runs/45009319617). All four files downloaded from the public release matched the audited local SHA-256 hashes and sizes. Live provider execution and installation on a physical device remain open.

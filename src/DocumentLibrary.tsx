@@ -1,3 +1,4 @@
+import {ProjectFolderPicker} from './ProjectFolderPicker';
 import {useEffect,useState,useRef} from 'react';
 import {BookOpen,FileText,FolderOpen,RefreshCw,ChevronRight} from 'lucide-react';
 import {request,type Connection} from './api';
@@ -31,8 +32,7 @@ export function DocumentLibrary({connection,kind,showHeading,onKind,onChat,onFol
  const [projects,setProjects]=useState<Project[]>([]),[root,setRoot]=useState(''),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0),[reading,setReading]=useState('');
  useEffect(()=>{let cancelled=false;setLoading(true);setError('');request<Project[]>(connection,'/document-projects?kind='+view).then(items=>{if(cancelled)return;setProjects(items);setRoot(old=>items.some(item=>item.root===old)?old:items.find(item=>!item.builtInOnly)?.root||items[0]?.root||'');}).catch(e=>{if(!cancelled)setError(e.message);}).finally(()=>{if(!cancelled)setLoading(false);});return()=>{cancelled=true;};},[connection.url,connection.token,view,revision]);
  useEffect(()=>{setReading('');},[root,view]);
- const labels=projectLabels(projects),authored=projects.filter(item=>!item.builtInOnly),builtInOnly=projects.filter(item=>item.builtInOnly);
- const option=(p:Project)=><option key={p.root} value={p.root}>{labels.get(p.root)}</option>;
+ const labels=projectLabels(projects);
  const choose=(next:DocumentKind)=>{setView(next);onKind?.(next);};
  const tabs:[DocumentKind,string,typeof BookOpen][]=[['rules',t('Правила'),BookOpen],['changelog',t('История изменений'),FileText],['files',t('Файлы'),FolderOpen]];
  return <section className={'document-library'+(reading?' reading':'')}>
@@ -40,7 +40,7 @@ export function DocumentLibrary({connection,kind,showHeading,onKind,onChat,onFol
 
   <div className="document-library-context">
    <button className="icon-button" aria-label={view==='files'?t('Назад'):t('Файлы')} onClick={()=>choose(view==='files'?section.current:'files')}><FolderOpen size={16}/></button>
-   <label><span className="visually-hidden">{t('Git-проект')}</span><select aria-label={t('Git-проект')} disabled={!projects.length} value={root} onChange={e=>setRoot(e.target.value)}>{!projects.length&&<option value="">{loading?t('Ищем проекты…'):t('Нет подходящих проектов')}</option>}{builtInOnly.length&&authored.length?<><optgroup label={t('С правилами проекта')}>{authored.map(option)}</optgroup><optgroup label={t('Только встроенное правило')}>{builtInOnly.map(option)}</optgroup></>:projects.map(option)}</select></label>
+   <ProjectFolderPicker className="document-project-picker" label={t('Git-проект')} paths={projects.map(p=>p.root)} value={root} disabled={!projects.length} placeholder={loading?t('Ищем проекты…'):t('Нет подходящих проектов')} onChange={setRoot} displayNameForPath={path=>labels.get(path)||path} descriptionForPath={path=>view==='rules'?(projects.find(p=>p.root===path)?.builtInOnly?t('Только встроенное правило'):t('С правилами проекта')):undefined}/>
    {reading&&<span className="document-library-crumb" aria-label={t('Открытый файл')}><ChevronRight size={16} aria-hidden="true"/><span>{reading}</span></span>}
    {view==='files'&&<button className="icon-button" aria-label={t('Обновить список проектов')} disabled={loading} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={20} className={loading?'project-docs-refreshing':''}/></button>}
   </div>

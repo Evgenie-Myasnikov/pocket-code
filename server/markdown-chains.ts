@@ -5,6 +5,7 @@ import {buildChainStepPrompt, chainCompletionMarker, type MarkdownChainDetail, t
 import type {CodexAccess} from './codex-access.js';
 import {HttpError} from './security.js';
 import type {JobView} from './types.js';
+import {activityItem} from './activity.js';
 
 export type ChainScope = Pick<MarkdownChainDetail, 'cwd' | 'provider' | 'account'>;
 type Task = Pick<MarkdownChainStep, 'title' | 'body' | 'source'>;
@@ -20,8 +21,10 @@ type LaunchSettings = {
 };
 export type ChainInput = ChainScope & LaunchSettings & {id: string; name: string; context: string; tasks: Task[]};
 type RecordV1 = {version: 1; created: number; fingerprint: string; settings: LaunchSettings; chain: MarkdownChainDetail};
+type DeletedRecord = {version: 1; deletedScope: string};
 type Options = {
   file: string;
+  accountName?(id: string): Promise<string | undefined>;
   start(input: ChainInput, jobId: string, prompt: string): Promise<JobView> | JobView;
   view(jobId: string): Promise<JobView | undefined> | JobView | undefined;
   stop(jobId: string): Promise<void> | void;
@@ -31,6 +34,38 @@ const uuid = /^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const activeStep = (step: MarkdownChainStep) => step.status === 'running' || step.status === 'waiting';
 const sameScope = (chain: ChainScope, scope: ChainScope) =>
   chain.provider === scope.provider && chain.cwd === scope.cwd && chain.account === scope.account;
+const scopeHash = ({cwd, provider, account}: ChainScope) =>
+  createHash('sha256').update(JSON.stringify([cwd, provider, account])).digest('hex');
+const outputLimit = 12000;
+function captureOutput(chain: MarkdownChainDetail, step: MarkdownChainStep, job: JobView) {
+  // Providers may still retain an outstanding delta when a job terminates.
+  // A committed final answer is the source of the completed step's result.
+  let text = job.status === 'done' ? '' : job.partial;
+  for (let i = job.messages.length - 1; !text && i >= 0; --i) {
+    const message = job.messages[i];
+    if (message.role === 'assistant')
+      text = message.blocks.filter(b => b.type === 'text').map(b => b.text || '').join('\n').trimEnd();
+  }
+  if (!text) text = job.partial;
+  const marker = chainCompletionMarker(chain.id, chain.steps.indexOf(step));
+  if (text.trimEnd().split(/\r?\n/).at(-1)?.trim() === marker) {
+    text = text.slice(0, text.lastIndexOf(marker)).trimEnd();
+    delete step.output;
+    delete step.outputTruncated;
+  }
+  if (text) {
+    step.output = text.slice(-outputLimit);
+    if (text.length > outputLimit) step.outputTruncated = true;
+    else delete step.outputTruncated;
+  }
+}
+function livePhase(job: JobView): MarkdownChainStep['phase'] {
+  if (job.status !== 'running') return;
+  if (job.approvals.length) return job.approvals.some(a => a.tool === 'AskUserQuestion') ? 'question' : 'approval';
+  if (job.partial) return 'responding';
+  const action = activityItem(job).action;
+  if (action !== 'responding') return action;
+}
 function summary(chain: MarkdownChainDetail): MarkdownChainSummary {
   return {id: chain.id, name: chain.name, status: chain.status,
     stepsDone: chain.steps.filter(step => step.status === 'done').length, stepCount: chain.steps.length};
@@ -38,6 +73,7 @@ function summary(chain: MarkdownChainDetail): MarkdownChainSummary {
 
 export class MarkdownChains {
   private records = new Map<string, RecordV1>();
+  private deleted = new Map<string, string>();
   private restored?: Promise<void>;
   private tail: Promise<unknown> = Promise.resolve();
   private timer?: ReturnType<typeof setTimeout>;
@@ -49,12 +85,15 @@ export class MarkdownChains {
     this.tail = operation.catch(() => {});
     return operation;
   }
-  private async save(record: RecordV1) {
-    const file = path.join(this.options.file, record.chain.id + '.json');
+  private async writeRecord(id: string, record: RecordV1 | DeletedRecord) {
+    const file = path.join(this.options.file, id + '.json');
     await mkdir(this.options.file, {recursive: true, mode: 0o700});
     await writeFile(file + '.tmp', JSON.stringify(record), {mode: 0o600});
     await rename(file + '.tmp', file);
-    this.records.set(record.chain.id, record);
+  }
+  private async save(record: RecordV1) {
+    await this.writeRecord(record.chain.id, record);
+    this.records.set(record.chain.id.toLowerCase(), record);
   }
   init() {
     return this.restored ??= this.restore();
@@ -67,7 +106,12 @@ export class MarkdownChains {
       names = [];
     }
     for (const name of names.filter(name => name.endsWith('.json') && uuid.test(name.slice(0, -5)))) {
-      const record: RecordV1 = JSON.parse(await readFile(path.join(this.options.file, name), 'utf8'));
+      const record: RecordV1 | DeletedRecord = JSON.parse(await readFile(path.join(this.options.file, name), 'utf8'));
+      if ('deletedScope' in record && record.version === 1 && /^[a-f\d]{64}$/.test(record.deletedScope)) {
+        this.deleted.set(name.slice(0, -5).toLowerCase(), record.deletedScope);
+        continue;
+      }
+      if (!('chain' in record)) throw new Error('Cannot restore Markdown chain record.');
       if (record.version !== 1 || record.chain?.id + '.json' !== name || !Array.isArray(record.chain.steps))
         throw new Error('Cannot restore Markdown chain record.');
       // A durable launch intent might already have reached the provider. Never
@@ -85,7 +129,7 @@ export class MarkdownChains {
         // Saved sessions remain navigable. Previous live job IDs cannot be
         // used to open transcripts on the new process.
         if (hadLinks) await this.save(record);
-        else this.records.set(record.chain.id, record);
+        else this.records.set(record.chain.id.toLowerCase(), record);
       }
     }
   }
@@ -99,11 +143,23 @@ export class MarkdownChains {
   }
   hasWork() { return [...this.records.values()].some(r => r.chain.status === 'running'); }
 
+  private async detail(record: RecordV1) {
+    const chain = structuredClone(record.chain);
+    if (record.settings?.model) chain.model = record.settings.model;
+    if (chain.account && !chain.accountName) {
+      const name = await this.options.accountName?.(chain.account);
+      if (name) chain.accountName = name;
+    }
+    return chain;
+  }
+
   async create(input: ChainInput) {
     await this.init();
     return this.action(async () => {
       if (this.closed) throw new HttpError(503, 'Host is shutting down.');
       if (!uuid.test(input.id) || !input.tasks.length) throw new HttpError(400, 'Invalid task chain.');
+      const key = input.id.toLowerCase();
+      if (this.deleted.has(key)) throw new HttpError(409, 'Chain identifier already used.');
       const {model, mode, reasoningEffort, claudeEffort, claudeAccess, codexAccess, maxBudgetUsd, approvalTimeoutMinutes} = input;
       const settings = {model, mode, reasoningEffort, claudeEffort, claudeAccess, codexAccess, maxBudgetUsd, approvalTimeoutMinutes};
       const chain: MarkdownChainDetail = {
@@ -112,15 +168,16 @@ export class MarkdownChains {
         steps: input.tasks.map(({title, source, body}) => ({title, source, body, status: 'pending'}))
       };
       const fingerprint = createHash('sha256').update(JSON.stringify([settings, chain])).digest('hex');
-      const previous = this.records.get(input.id);
+      const previous = this.records.get(key);
       if (previous) {
         if (previous.fingerprint !== fingerprint) throw new HttpError(409, 'Chain identifier already used.');
-        return structuredClone(previous.chain);
+        return this.detail(previous);
       }
       const record: RecordV1 = {version: 1, created: Date.now(), fingerprint, settings, chain};
+      if (chain.account) chain.accountName = await this.options.accountName?.(chain.account);
       await this.save(record);
       this.schedule();
-      return structuredClone(record.chain);
+      return this.detail(record);
     });
   }
   async list(scope: ChainScope): Promise<MarkdownChainSummary[]> {
@@ -139,19 +196,48 @@ export class MarkdownChains {
     return [];
   }
   private record(id: string, scope: ChainScope) {
-    const record = this.records.get(id);
+    const record = this.records.get(id.toLowerCase());
     if (!record || !sameScope(record.chain, scope)) throw new HttpError(404, 'Task chain not found.');
     return record;
   }
   async get(id: string, scope: ChainScope) {
     await this.init();
-    return structuredClone(this.record(id, scope).chain);
+    const chain = await this.detail(this.record(id, scope));
+    const step = chain.steps.find(activeStep);
+    if (step?.jobId) {
+      const job = await this.options.view(step.jobId);
+      if (job) {
+        captureOutput(chain, step, job);
+        step.phase = livePhase(job);
+      }
+    }
+    // Earlier records kept only the confirmed handoff after completion.
+    for (const s of chain.steps) if (!s.output && s.handoff) {
+      s.output = s.handoff;
+      if (s.handoff.length === 6000 && s.handoff.startsWith('…\n')) s.outputTruncated = true;
+    }
+    return chain;
+  }
+  async remove(id: string, scope: ChainScope) {
+    await this.init();
+    return this.action(async () => {
+      const deletedScope = scopeHash(scope);
+      const key = id.toLowerCase();
+      if (this.deleted.get(key) === deletedScope) return {ok: true};
+      const {chain} = this.record(id, scope);
+      if (chain.status === 'running') throw new HttpError(409, 'Stop the running chain before deleting it.');
+      // A delayed create retry must not resurrect a removed chain and run it again.
+      await this.writeRecord(chain.id, {version: 1, deletedScope});
+      this.deleted.set(key, deletedScope);
+      this.records.delete(key);
+      return {ok: true};
+    });
   }
   async stop(id: string, scope: ChainScope) {
     await this.init();
     return this.action(async () => {
       const record = structuredClone(this.record(id, scope));
-      if (record.chain.status !== 'running') return record.chain;
+      if (record.chain.status !== 'running') return this.detail(record);
       const step = record.chain.steps.find(activeStep);
       if (step?.jobId) {
         const job = await this.options.view(step.jobId);
@@ -163,11 +249,12 @@ export class MarkdownChains {
       if (step && activeStep(step)) step.status = 'stopped';
       if (record.chain.status === 'running') record.chain.status = 'stopped';
       await this.save(record);
-      return structuredClone(record.chain);
+      return this.detail(record);
     });
   }
   private observe(chain: MarkdownChainDetail, step: MarkdownChainStep, job: JobView) {
     if (job.sessionId) step.sessionId = job.sessionId;
+    captureOutput(chain, step, job);
     if (job.status === 'running') {
       step.status = job.approvals.length ? 'waiting' : 'running';
       return;

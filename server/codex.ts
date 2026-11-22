@@ -1,4 +1,5 @@
 import type {BoardMcpConfiguration} from './board-mcp-runtime.js';
+import {updatePatchPreviews,removeWritePreview} from './write-preview.js';
 import { userInputBlocks } from './user-input-blocks.js';
 import { randomUUID } from 'node:crypto';
 import {projectBoardInstructions} from './project-rules.js';
@@ -296,7 +297,7 @@ export class CodexService {
     });
     return this.view(job);
   }
-  list() { return [...this.jobs.values()].map(job => ({ ...this.view(job), messages: [], partial: '' })); }
+  list() { return [...this.jobs.values()].map(job => ({ ...this.view(job), messages: [], partial: '', writePreviews:undefined })); }
   get(id: string) { const job = this.jobs.get(id); if (!job) throw new HttpError(404, 'Codex job not found. Reopen the saved chat.'); return job; }
   trimCompleted() {
     for (const job of [...this.jobs.values()].filter(j => j.status !== 'running').sort((a, b) => a.startedAt - b.startedAt)) {
@@ -370,9 +371,13 @@ export class CodexService {
       switch (message.method) {
         case 'turn/started': job.turnId = p.turn.id; break;
         case 'item/agentMessage/delta': job.partial += p.delta || ''; break;
+        case 'item/fileChange/patchUpdated':
+          if (!job.cancelled) updatePatchPreviews(job,p.itemId,p.changes);
+          break;
         case 'item/started': case 'item/completed': {
           if (p.item?.type === 'userMessage') break; // Initial user input already appears immediately.
           const item = await codexMessage(p.item, [...this.roots, ...(this.options.attachmentRoots || [])], true);
+          if (message.method === 'item/completed' && p.item?.type === 'fileChange') removeWritePreview(job,p.item.id);
           if (item) { const index = job.messages.findIndex(m => m.id === item.id); if (index < 0) job.messages.push(item); else job.messages[index] = item; }
           if (p.item?.type === 'agentMessage') job.partial = '';
           break;
@@ -390,6 +395,7 @@ export class CodexService {
     this.finish(job, job.cancelled || turn.status === 'interrupted' ? 'stopped' : turn.status === 'failed' ? 'error' : 'done', turn.error?.message);
   }
   private finish(job: CodexJob, status: JobView['status'], error?: string) {
+    delete job.writePreviews;
     job.status = status; job.acceptingEvents = false;
     if (status === 'error') job.error = error || 'Codex stopped with an error.';
     for (const pending of [...job.pending.values()]) pending.finish(false);
@@ -446,6 +452,7 @@ export class CodexService {
   }
   stop(id: string) {
     const job = this.get(id); if (job.status !== 'running') return;
+    delete job.writePreviews;
     job.cancelled = true;
     for (const pending of [...job.pending.values()]) pending.finish(false);
     job.revision++;

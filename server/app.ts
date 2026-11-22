@@ -1,5 +1,6 @@
 import {mountSpeech} from './speech.js';
-import {generateClaudeText,mountTaskText,textProviders,type TextProvider} from './task-text.js';
+import {generateClaudeText,mountTaskText,textProviders} from './task-text.js';
+import {codexTaskTextAvailable,generateCodexTaskText} from './codex-task-text.js';
 import {claudeRuntime,updateInstalledClaude} from './claude-executable.js';
 import {ChatLibrary} from './chat-library.js';
 import {BoardMcpRuntime} from './board-mcp-runtime.js';
@@ -55,7 +56,7 @@ import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 
-export type Config = { port?:number; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { port?:number; customProviders?:CustomProviders; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages; forkSession?:typeof forkSession };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -74,8 +75,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
   const engineFor=(provider:string)=>provider==='copilot'?copilot():provider==='codex'?codex():jobs;
   const allJobs = () => [...jobs.list(), ...(config.codex?.list() || []),...(config.copilot?.list()||[])];
-  const textInFlight=new Set<TextProvider>();
-  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status()},id=>(id!=='codex'&&textInFlight.has(id))||allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!taskChains?.hasWork()||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();},()=>copilot().logout());
+  const textInFlight=new Set<string>();
+  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status()},id=>textInFlight.has(id)||allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!taskChains?.hasWork()||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();},()=>copilot().logout());
   const jobView = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot.get(id):config.codex?.list().some(j => j.id === id) ? config.codex.view(config.codex.get(id)) : jobs.view(jobs.get(id));
   const engineForJob = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot:config.codex?.list().some(j => j.id === id) ? config.codex : jobs;
   function guardProject(cwd: string, id: string) {
@@ -165,14 +166,20 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.once('finish', release); res.once('close',release); next();
   });
   await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}},boardMcp,path.join(config.uploads,'.boards','backups'));
+  const customProviders=config.customProviders??new CustomProviders(new WindowsJiraStore(path.join(config.uploads,'..','custom-providers.dat')));
+  const guardCustomProviders=()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can use custom providers');};
   const closeText=mountTaskText(app,{
     busy:textInFlight,allowProject:cwd=>allowedPath(accessRoots(),cwd,true),
     providers:async()=>{
       const {providers}=await providerConnections.status();
-      return textProviders.filter(id=>(id!=='copilot'||!!config.copilot)&&providers.some((p:{id:string;installed:boolean;authenticated:boolean|null;server:string})=>
+      const available=textProviders.filter(id=>(id!=='copilot'||!!config.copilot)&&providers.some((p:{id:string;installed:boolean;authenticated:boolean|null;server:string})=>
         p.id===id&&p.installed&&p.authenticated===true&&p.server!=='unavailable'));
+      const canSample=!!config.codex && available.includes('codex') && await codexTaskTextAvailable();
+      return available.filter(id=>id!=='codex'||canSample);
     },
-    generate:{claude:generateClaudeText,...(config.copilot?{copilot:config.copilot.generateTaskText?.bind(config.copilot)}:{})}
+    generate:{claude:generateClaudeText,...(config.codex?{codex:generateCodexTaskText}:{}),...(config.copilot?{copilot:config.copilot.generateTaskText?.bind(config.copilot)}:{})},
+    accounts:async()=>{guardCustomProviders();return (await customProviders.list()).filter(p=>p.hasKey).map(({id,name})=>({id,name}));},
+    custom:(account,model,system,prompt,signal)=>{guardCustomProviders();return customProviders.generateTaskText(account,model,system,prompt,signal);}
   });
   mountSpeech(app,path.join(path.dirname(config.uploads),'speech'));
   mountMiro(app,{integration:new MiroIntegration(new WindowsMiroStore(path.join(config.uploads,'.miro','credentials.vault'))),roots,access:workspaceAccess});
@@ -405,8 +412,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
     res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
   });
-  const customProviders=new CustomProviders(new WindowsJiraStore(path.join(config.uploads,'..','custom-providers.dat')));
-  mountCustomProviders(app,customProviders,()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can use custom providers');});
+  mountCustomProviders(app,customProviders,guardCustomProviders);
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
   app.post('/api/provider-connections/:provider/login/cancel',async(req,res)=>res.json(await providerConnections.cancel(providerSchema.parse(req.params.provider))));
   app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));
@@ -635,6 +641,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   }
   taskChains=new MarkdownChains({
     file:path.join(config.uploads,'.tasks','markdown-chains'),
+    accountName:id=>customProviders.name(id).catch(()=>undefined),
     view:id=>{
       try{return jobView(id);}catch(error){if(error instanceof HttpError&&error.status===404)return undefined;throw error;}
     },
@@ -683,6 +690,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   app.get('/api/task-chains/:id',async(req,res)=>res.json(await taskChains.get(uuid.parse(req.params.id),await chainScope(req.query))));
   app.post('/api/task-chains/:id/stop',async(req,res)=>res.json(await taskChains.stop(uuid.parse(req.params.id),await chainScope(req.body))));
+  app.post('/api/task-chains/:id/delete',async(req,res)=>res.json(await taskChains.remove(uuid.parse(req.params.id),await chainScope(req.body))));
   app.post('/api/jobs', async (req, res) => {
     const body = jobSettings.extend({id:uuid,sessionId:uuid.optional(),text:z.string().max(100000),attachments:z.array(uuid).max(10).default([]),
       taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed:z.boolean().default(false)}).parse(req.body);

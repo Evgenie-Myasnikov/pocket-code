@@ -40,6 +40,27 @@ async function setup(t: any) {
   return { root, service, first, second, input: { id: 'first-job', cwd: root, text: 'Synthetic', mode: 'default' as const, maxBudgetUsd: 1 } };
 }
 
+test('Codex replaces provider patch snapshots per item and commits each file change only once',async t=>{
+  const {service,first,input}=await setup(t);
+  service.start(input);await until(()=>Boolean(service.get(input.id).turnId));
+  const job=service.get(input.id);
+  const file=(diff:string)=>({path:'sample.ts',kind:{type:'update',move_path:null},diff});
+  first.notification('item/fileChange/patchUpdated',{itemId:'change',changes:[{...file('+first'),extra:'ignored'}]});
+  await until(()=>Boolean(job.writePreviews));
+  assert.deepEqual(job.writePreviews,[{id:'change',path:'sample.ts',tool:'Patch',content:'+first',totalLines:1,totalBytes:6}]);
+  first.notification('item/fileChange/patchUpdated',{itemId:'change',changes:[file('+first\n+more')]});
+  await until(()=>job.writePreviews?.[0].totalLines===2);
+  assert.equal(job.messages.length,1);assert.equal(service.list()[0].writePreviews,undefined);
+  first.notification('item/completed',{item:{id:'change',type:'fileChange',status:'completed',changes:[file('+first\n+more')]}});
+  await until(()=>job.messages.length===2);
+  assert.equal(job.writePreviews,undefined);
+  first.notification('item/fileChange/patchUpdated',{itemId:'other',changes:[file('+pending')]});
+  await until(()=>Boolean(job.writePreviews));
+  first.notification('turn/completed',{turn:{id:'turn-one',status:'completed'}});
+  await until(()=>job.status==='done');
+  assert.equal(job.writePreviews,undefined);assert.equal(job.messages.length,2);
+});
+
 test('Codex cancellation during delayed turn/start waits for the turn ID and stops after the interrupt acknowledgement', async t => {
   const { service, first, input } = await setup(t); let started!: (value: any) => void;
   first.startResult = new Promise(resolve => { started = resolve; });

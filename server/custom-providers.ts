@@ -40,8 +40,10 @@ export class CustomProviders{
    const saved={name:data.name,url:providerUrl(data.url),key:data.key||'',id:randomUUID(),messages:[]};await this.store.save({profiles:[...list,saved]});return {id:saved.id};});
  }
  private async get(id:string){const found=(await this.load()).find(p=>p.id===id);if(!found)throw new HttpError(404,'Provider not found');return found;}
- private async call(p:z.infer<typeof profile>,suffix:string,body?:unknown){
-  let response:Response;try{response=await this.send(providerUrl(p.url)+'/'+suffix,{method:body?'POST':'GET',headers:{...(p.key?{Authorization:'Bearer '+p.key}:{}),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(body?90000:15000)});}catch{throw new HttpError(502,'Provider connection failed or timed out','provider_unreachable');}
+ private async call(p:z.infer<typeof profile>,suffix:string,body?:unknown,callerSignal?:AbortSignal){
+  const timeout=AbortSignal.timeout(body?90000:15000);
+  const signal=callerSignal?AbortSignal.any([timeout,callerSignal]):timeout;
+  let response:Response;try{signal.throwIfAborted();response=await this.send(providerUrl(p.url)+'/'+suffix,{method:body?'POST':'GET',headers:{...(p.key?{Authorization:'Bearer '+p.key}:{}),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal});}catch{throw new HttpError(502,'Provider connection failed or timed out','provider_unreachable');}
   if(!response.ok){await response.body?.cancel();throw new HttpError(502,response.status===401||response.status===403?'Provider rejected the API key (HTTP '+response.status+')':'Provider returned HTTP '+response.status,'provider_http_'+response.status);}
   const reader=response.body?.getReader();if(!reader)throw new HttpError(502,'Empty provider response');const chunks:Uint8Array[]=[];let size=0;while(true){const next=await reader.read();if(next.done)break;size+=next.value.length;if(size>2_000_000){await reader.cancel();throw new HttpError(502,'Provider response is too large');}chunks.push(next.value);}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new HttpError(502,'Provider returned invalid JSON');}
  }
@@ -68,6 +70,30 @@ export class CustomProviders{
  }
  async name(id:string){return (await this.get(id)).name;}
  async models(id:string){return parseModelCatalog(await this.call(await this.get(id),'models'));}
+ /** Single text transformation with the selected account; never joins its chat history. */
+ async generateTaskText(id:string,model:string,system:string,prompt:string,signal:AbortSignal){
+  signal.throwIfAborted();
+  const p=await this.get(id);
+  if(!p.key)throw new HttpError(409,'Sign in to this provider with an API key first','provider_no_key');
+  try{
+   const models=parseModelCatalog(await this.call(p,'models',undefined,signal));
+   if(!models.includes(model))throw new HttpError(400,'Choose a model from the provider catalog');
+   const messages=[{role:'system',content:system},{role:'user',content:prompt}];
+   const raw=await this.call(p,'chat/completions',{model,messages,stream:false},signal);
+   const answer=z.object({choices:z.array(z.object({message:z.object({
+    content:z.string().trim().min(1).max(100000),tool_calls:z.array(z.never()).nullish(),function_call:z.null().optional()
+   })})).min(1)}).safeParse(raw);
+   if(!answer.success)throw new HttpError(502,'Provider returned no usable text answer');
+   const text=answer.data.choices[0].message.content;
+   if(text.includes(p.key))throw new HttpError(502,'Provider returned an invalid text answer');
+   return text;
+  }catch(error){
+   if(signal.aborted)throw new HttpError(504,'The text provider did not finish in time.');
+   if(error instanceof HttpError)throw error;
+   // Network response streams can fail after headers; their errors are provider-controlled.
+   throw new HttpError(502,'Provider connection failed or timed out','provider_unreachable');
+  }
+ }
  async history(id:string){return (await this.get(id)).messages;}
  async chat(id:string,input:unknown){const data=z.object({model:z.string().min(1).max(300),text:z.string().trim().min(1).max(16000)}).strict().parse(input);return this.transaction(async()=>{const p=await this.get(id),models=parseModelCatalog(await this.call(p,'models'));if(!models.includes(data.model))throw new HttpError(400,'Choose a model from the provider catalog');const messages=[...p.messages.slice(-38),{role:'user' as const,content:data.text}];const raw=await this.call(p,'chat/completions',{model:data.model,messages,stream:false});const answer=z.object({choices:z.array(z.object({message:z.object({content:z.string().max(32000)})})).min(1)}).safeParse(raw);if(!answer.success)throw new HttpError(502,'Provider returned no text answer');const updated=[...messages,{role:'assistant' as const,content:answer.data.choices[0].message.content}];const list=await this.load();await this.store.save({profiles:list.map(v=>v.id===id?{...v,messages:updated}:v)});return updated;});}
  async remove(id:string){return this.transaction(async()=>{await this.store.save({profiles:(await this.load()).filter(p=>p.id!==id)});});}

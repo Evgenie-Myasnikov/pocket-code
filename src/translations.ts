@@ -145,6 +145,8 @@ export const english: Record<string, string> = {
 "Команда":"Command",
 "Изменения файлов":"File changes",
 "Выполнил команду":"Ran command",
+"Команда не выполнилась":"Command failed",
+"Не удалось":"Failed",
 "Изменяет файлы":"Editing files",
 "Изменил файлы":"Edited files",
 "Выполняет действие":"Running action",

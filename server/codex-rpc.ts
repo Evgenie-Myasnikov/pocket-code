@@ -95,9 +95,9 @@ export class StdioCodexRpc extends EventEmitter implements CodexRpc {
   private sequence = 0;
   private ended = false;
   private pending = new Map<number, { method: string; resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
-  constructor(executable: string, private timeoutMs = 45000) {
+  constructor(executable: string, private timeoutMs = 45000, options: {cwd?: string; configArgs?: string[]} = {}) {
     super();
-    this.child = spawn(executable, ['app-server', '--listen', 'stdio://'], { windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    this.child = spawn(executable, ['app-server', '--listen', 'stdio://', ...(options.configArgs || [])], {cwd:options.cwd, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     this.child.stdout.setEncoding('utf8');
     this.child.stdout.on('data', (chunk: string) => this.read(chunk));
     // Drain diagnostics without exposing local configuration, account data, or tokens.
@@ -133,8 +133,11 @@ export class StdioCodexRpc extends EventEmitter implements CodexRpc {
     }
   }
   request(method: string, params: unknown): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const id = ++this.sequence;
+    return this.startRequest(method, params).response;
+  }
+  startRequest(method: string, params: unknown): {id:number; response:Promise<any>} {
+    const id = ++this.sequence;
+    const response = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         // A timed-out mutation might still execute. Close the transport so it cannot run unobserved.
         this.disconnect(new Error(`Codex did not respond to ${method} in time.`)); this.child.kill();
@@ -142,6 +145,7 @@ export class StdioCodexRpc extends EventEmitter implements CodexRpc {
       this.pending.set(id, { method, resolve, reject, timer });
       try { this.send({ id, method, params }); } catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
     });
+    return {id, response};
   }
   notify(method: string, params?: unknown) { this.send({ method, ...(params === undefined ? {} : { params }) }); }
   respond(id: string | number, result: unknown) { if (!this.ended) this.send({ id, result }); }

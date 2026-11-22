@@ -1,3 +1,4 @@
+import {ProjectFolderPicker} from './ProjectFolderPicker';
 import {useEffect,useState} from 'react';
 import {ChevronDown} from 'lucide-react';
 import {request,type Connection} from './api';
@@ -19,7 +20,7 @@ export function MiroSettings({connection,roots}:{connection:Connection|null;root
  const showField=!linked||editing;
  return <div className="miro-settings"><form onSubmit={e=>{e.preventDefault();void save();}}>
   <p className="muted">{t('Привяжите доску Miro к проекту. Она откроется в разделе «Доска» с интерфейсом Miro.')}</p>
-  <label>{t('Проект')}<select aria-label={t('Проект Miro')} value={root} disabled={busy} onChange={e=>setRoot(e.target.value)}>{roots.map(r=><option key={r} value={r}>{r.split(/[\\/]/).at(-1)||r}</option>)}</select></label>
+  <div className="project-folder-field"><span>{t('Проект')}</span><ProjectFolderPicker paths={roots} value={root} label={t('Проект Miro')} disabled={busy||!roots.length} onChange={setRoot}/></div>
   {!roots.length&&<p>{t('На подключённом ПК нет доступных проектов.')}</p>}
   {loading&&<p role="status">{t('Загрузка…')}</p>}
   {linked&&!loading&&<div className="miro-linked"><p className="miro-linked-status" role="status"><span className="connect-dot online" aria-hidden="true"/>{t('Доска Miro подключена')}: <strong>{boardName(linked)}</strong></p>{!editing&&!confirm&&<div className="miro-settings-actions"><button type="button" className="secondary" disabled={busy||!canEdit} onClick={()=>setEditing(true)}>{t('Изменить ссылку')}</button><button type="button" className="secondary danger" disabled={busy||!canEdit} onClick={()=>setConfirm(true)}>{t('Отключить')}</button></div>}

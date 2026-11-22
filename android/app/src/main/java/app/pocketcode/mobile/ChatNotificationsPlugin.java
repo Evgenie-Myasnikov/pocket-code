@@ -17,6 +17,18 @@ public class ChatNotificationsPlugin extends Plugin {
     private boolean asked;
     private Intent latest,feed;
     private boolean askedFeed;
+    @PluginMethod public void setMuted(PluginCall call){
+        String url=call.getString("url","");
+        org.json.JSONArray chats=call.getArray("mutedChats");
+        if(chats==null){call.reject("Missing chat mute list");return;}
+        getActivity().runOnUiThread(()->{
+            try{
+                ChatMutes.replace(getContext(),url,chats);
+                ChatWatchService.applyMutes();
+                call.resolve();
+            }catch(Exception error){call.reject("Invalid chat mute configuration");}
+        });
+    }
     @PluginMethod public void watch(PluginCall call) {
         ChatWatchService.attentionEnabled=call.getBoolean("alerts",true);
         try{latest=configuration(call);}catch(Exception error){call.reject("Invalid chat notification configuration");return;}
@@ -33,8 +45,7 @@ public class ChatNotificationsPlugin extends Plugin {
     }
     private Intent configuration(PluginCall call)throws Exception{
             String url=call.getString("url","");
-            java.net.URI uri=new java.net.URI(url);
-            if(!("https".equals(uri.getScheme())||"http".equals(uri.getScheme()))||uri.getHost()==null||uri.getUserInfo()!=null)throw new Exception();
+            ChatMutes.hostKey(url);
             Intent intent=new Intent(getContext(),ChatWatchService.class);
             for(String key:new String[]{"url","token","provider","sessionId","jobId","cwd","title","language"})intent.putExtra(key,call.getString(key,""));
             intent.putExtra("alerts",String.valueOf(call.getBoolean("alerts",true)));
@@ -43,7 +54,8 @@ public class ChatNotificationsPlugin extends Plugin {
     private void start(PluginCall call){
         try{
             if(latest!=null){
-                if(Build.VERSION.SDK_INT>=26)getContext().startForegroundService(latest);
+                if(ChatMutes.contains(getContext(),latest))getContext().stopService(new Intent(getContext(),ChatWatchService.class));
+                else if(Build.VERSION.SDK_INT>=26)getContext().startForegroundService(latest);
                 else getContext().startService(latest);
             }
             call.resolve();

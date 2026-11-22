@@ -25,31 +25,36 @@ export function activityGroupKey({block,result,running,live}:ActivityBlock,mode:
   if(mode==='brief')return 'activity';
   return view.kind==='tool'?'tool|'+(view.mcp||block.name||''):view.kind;
  }
- if(block.type==='thinking')return live?undefined:mode==='brief'?'activity':'thinking';
+ if(block.type==='thinking')return live?undefined:'thinking';
  return undefined;
 }
 // A plan update never splits the work around it: it joins the group it falls into.
-const runKey=(items:ActivityBlock[],mode:DetailMode)=>items.map(item=>activityGroupKey(item,mode)).find(key=>key!=='plan')||'plan';
-const joins=(key:string|undefined,items:ActivityBlock[]|undefined,mode:DetailMode)=>{if(!key||!items)return false;const current=runKey(items,mode);return current!==undefined&&activityGroupKey(items[0],mode)!==undefined&&(key===current||key==='plan'||current==='plan');};
+const joins=(key:string|undefined,current:string|undefined)=>{
+ if(!key||!current)return false;
+ return key===current||(key!=='thinking'&&current!=='thinking'&&(key==='plan'||current==='plan'));
+};
 export type ActivityRun={key:string;items:ActivityBlock[]};
 export function groupActivityBlocks(blocks:ActivityBlock[],mode:DetailMode='detailed'):ActivityRun[]{
  const runs:ActivityRun[]=[];
+ let current:string|undefined;
  for(const item of blocks){const key=activityGroupKey(item,mode),last=runs.at(-1);
-  if(joins(key,last?.items,mode))last!.items.push(item);
-  else runs.push({key:`${item.messageId}:${item.index}`,items:[item]});
+  if(last&&joins(key,current)){last.items.push(item);if(current==='plan')current=key;}
+  else {runs.push({key:`${item.messageId}:${item.index}`,items:[item]});current=key;}
  }
  return runs;
 }
 export type TranscriptRun={key:string;message?:ChatMessage;items?:ActivityBlock[]};
 export function groupActivityMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null,mode:DetailMode='detailed'):TranscriptRun[]{
  const runs:TranscriptRun[]=[];
+ let current:string|undefined;
  for(const message of messages){
   const items=visibleMessageBlocks(message,results,running?.has(message),message===messages.at(-1));
   if(!items.length)continue;
-  if(!items.every(item=>activityGroupKey(item,mode)!==undefined)){runs.push({key:message.id,message});continue;}
-  for(const item of items){const last=runs.at(-1);
-   if(joins(activityGroupKey(item,mode),last?.items,mode))last!.items!.push(item);
-   else runs.push({key:`${message.id}:${item.index}`,items:[item]});
+  const keys=items.map(item=>activityGroupKey(item,mode));
+  if(keys.includes(undefined)){runs.push({key:message.id,message});current=undefined;continue;}
+  for(const [index,item] of items.entries()){const last=runs.at(-1),key=keys[index];
+   if(last?.items&&joins(key,current)){last.items.push(item);if(current==='plan')current=key;}
+   else {runs.push({key:`${message.id}:${item.index}`,items:[item]});current=key;}
   }
  }
  return runs;
@@ -78,30 +83,4 @@ export function summarizeActivity(items:ActivityBlock[]){
  if(!parts.length&&plans)parts.push(t('Обновил план'));
  if(thinking)parts.push(t('Рассуждения'));
  return parts.map((part,index)=>index?part.charAt(0).toLowerCase()+part.slice(1):part).join(' · ');
-}
-
-/** Group internal work per turn; ordinary assistant prose stays visible. */
-export function groupThinkingMessages(messages:ChatMessage[],results?:Map<string,Block>,running?:Set<ChatMessage>|null):TranscriptRun[]{
- const runs:TranscriptRun[]=[];let turn:ChatMessage[]=[];
- const flush=()=>{
-  if(!turn.length)return;
-  const all=turn.flatMap(message=>visibleMessageBlocks(message,results,running?.has(message)));
-  const visible=(item:ActivityBlock)=>['text','image','attachment','document'].includes(item.block.type);
-  const activity:ActivityBlock[]=[],visibleBlocks=new Map<string,Block[]>();
-  for(const item of all){
-   if(!visible(item)){activity.push(item);continue;}
-   const blocks=visibleBlocks.get(item.messageId)||[];blocks.push(item.block);visibleBlocks.set(item.messageId,blocks);
-  }
-  for(const message of turn){
-   const blocks=visibleBlocks.get(message.id);
-   if(blocks?.length)runs.push({key:message.id,message:blocks.length===message.blocks.length?message:{...message,blocks}});
-  }
-  if(activity.length)runs.push({key:`thinking:${turn[0].id}`,items:activity});
-  turn=[];
- };
- for(const message of messages){
-  if(message.role==='user'&&message.blocks.some(b=>b.type!=='tool_result')){flush();runs.push({key:message.id,message});}
-  else turn.push(message);
- }
- flush();return runs;
 }

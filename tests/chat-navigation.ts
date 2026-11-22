@@ -25,3 +25,10 @@ export async function chooseProvider(page:Page,provider:string){
  if(await back.count())await back.click();
  const picker=page.locator('.sidebar .provider-picker-trigger:visible').first();await picker.click();await page.getByRole('menuitemradio',{name:new RegExp('^'+name)}).click();
 }
+
+export async function chooseProjectFolder(page:Page,label:string,path:string){
+  await page.getByRole('button',{name:label,exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:label,exact:true});
+  await dialog.getByRole('searchbox').fill(path);
+  await dialog.getByRole('button',{name:path,exact:true}).click();
+}

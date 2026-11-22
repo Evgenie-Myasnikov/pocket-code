@@ -57,7 +57,10 @@
 .desktop-app>.desktop-rail.rail-collapsed .desktop-rail-content>.desktop-rail-heading{order:3}
 .desktop-app>.desktop-rail.rail-collapsed nav>button{width:44px}
 @media(pointer:coarse){.desktop-app>.desktop-rail>nav{width:52px}.desktop-rail-content{margin-left:52px}.desktop-app>.desktop-rail .desktop-sessions>button{min-height:44px}.desktop-app>.desktop-rail>nav>button{width:44px;min-height:44px}}
-.desktop-app>.desktop-rail>nav{align-content:start;gap:6px}
+.desktop-app>.desktop-rail>nav{align-content:start;gap:6px;border-inline-end:1px solid var(--line)}
+.desktop-app>.desktop-rail>nav>.desktop-new-chat{color:var(--accent);background:var(--bg-hover);border:1px solid var(--line);margin-bottom:6px}
+.desktop-app>.desktop-rail>nav>.desktop-new-chat:disabled{color:var(--muted);opacity:.65}
+.desktop-app>.desktop-rail.rail-collapsed>nav{border-inline-end:0}
 
 /* One scroll track spans the library instead of separate project/recent panes. */
 .desktop-app>.desktop-rail .desktop-rail-content{margin-right:9px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent;overscroll-behavior-y:contain;box-sizing:border-box}
@@ -96,3 +99,33 @@
 
 /* A chat started from a board carries the board mark before its title. */
 .desktop-sessions strong>.desktop-chat-board{display:inline-block;flex-shrink:0;margin-right:5px;vertical-align:-2px;color:var(--accent)}
+
+/* Keep the workspace list scrollable and the rail controls fixed in both modes. */
+.desktop-app>.desktop-rail>nav {
+ display:flex; flex-direction:column; align-items:center;
+ padding-block:8px; box-sizing:border-box; overflow-y:auto; scrollbar-width:none;
+}
+.desktop-app>.desktop-rail.rail-collapsed>nav { flex:1; min-height:0; }
+.desktop-app>.desktop-rail.rail-collapsed .desktop-rail-content { display:none; }
+.desktop-app>.desktop-rail>nav>[data-rail-utility] { margin-top:auto; }
+.desktop-app>.desktop-rail>nav>button { flex-shrink:0; }
+.desktop-app>.desktop-rail>nav>.desktop-new-chat {
+ color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,var(--panel));
+ border-color:color-mix(in srgb,var(--accent) 26%,var(--panel));
+}
+.rail-quick-chats { display:flex; flex-direction:column; gap:4px; flex-shrink:1; min-height:0; overflow-y:auto; scrollbar-width:none; }
+.desktop-rail .rail-quick-chats button { position:relative; display:grid; place-items:center; min-height:38px; width:40px; padding:6px; border-radius:var(--radius-sm); }
+.desktop-rail .rail-quick-chats button[aria-pressed=true],.desktop-rail .rail-quick-chats button:hover { color:var(--text); background:var(--bg-active); }
+.rail-quick-chats small { position:absolute; right:3px; bottom:2px; font-size:10px; font-variant-numeric:tabular-nums; }
+.desktop-rail .rail-chat-folder { margin:0 0 6px; }
+.desktop-rail .rail-chat-folder>summary {
+ display:flex; align-items:center; gap:6px; min-height:34px;
+ padding-inline:4px; cursor:pointer; color:var(--text); font-weight:var(--fw-medium);
+}
+.rail-chat-folder>summary::-webkit-details-marker { display:none; }
+.rail-chat-folder[open]>summary>svg:first-child { transform:rotate(90deg); }
+.rail-chat-folder>summary>svg { color:var(--muted); flex:none; }
+.rail-chat-folder>summary>span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rail-chat-folder>summary:focus-visible,.rail-quick-chats button:focus-visible { outline:2px solid var(--ring); outline-offset:-2px; }
+.desktop-rail .rail-chat-folder .desktop-sessions { margin-inline-start:14px; padding-inline-start:4px; border-inline-start:1px solid var(--border-subtle); }
+@media(pointer:coarse){.desktop-rail .rail-quick-chats button,.desktop-rail .rail-chat-folder>summary{min-height:44px}}

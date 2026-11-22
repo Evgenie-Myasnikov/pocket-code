@@ -42,15 +42,18 @@ public class ChatWatchService extends Service {
         if(intent==null){stopSelf();return START_NOT_STICKY;}
         boolean same=selection!=null&&key(selection).equals(key(intent));
         selection=new Intent(intent);
-        if(same)return START_NOT_STICKY;
+        if(same){stopIfMuted();return START_NOT_STICKY;}
         int epoch=++generation;started=System.currentTimeMillis();lastState="";alerts.reset();keepNotification=false;
         if(scheduled!=null)scheduled.cancel(true);
         if(request!=null)request.disconnect();
-        Notification initial=notification(text("Checking chat status","Проверяем состояние чата"),true);
+        boolean muted=ChatMutes.contains(this,selection);
+        // A foreground start already queued by Android must meet its lifecycle deadline.
+        Notification initial=muted?neutralNotification():notification(text("Checking chat status","Проверяем состояние чата"),true);
         try{
             if(Build.VERSION.SDK_INT>=29)startForeground(NOTIFICATION_ID,initial,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
             else startForeground(NOTIFICATION_ID,initial);
         }catch(RuntimeException error){stopSelf();return START_NOT_STICKY;}
+        if(muted){stopIfMuted();return START_NOT_STICKY;}
         Intent snapshot=new Intent(selection);failures=0;
         scheduled=worker.schedule(()->cycle(snapshot,epoch),0,TimeUnit.SECONDS);
         return START_NOT_STICKY;
@@ -108,7 +111,7 @@ public class ChatWatchService extends Service {
     }
     private void publish(int epoch,String state,boolean terminal){
         main.post(()->{
-            if(epoch!=generation)return;
+            if(epoch!=generation||stopIfMuted())return;
             if(!state.equals(lastState)){
                 lastState=state;
                 getSystemService(NotificationManager.class).notify(NOTIFICATION_ID,notification(statusText(state),!terminal));
@@ -123,6 +126,9 @@ public class ChatWatchService extends Service {
         String key=NotificationIdentity.event(value(config,"url"),value(config,"provider"),jobId,version,state);
         android.content.SharedPreferences seen=getSharedPreferences("chat-alerts",MODE_PRIVATE);
         if(seen.contains(key))return;
+        if(ChatMutes.contains(this,value(config,"url"),value(config,"provider"),sessionId,jobId)){
+            rememberAlert(seen,key);return;
+        }
         NotificationManager manager=getSystemService(NotificationManager.class);
         String channel=AlertChannels.forState(state);
         if(!AlertChannels.enabled(manager,channel))return;
@@ -170,13 +176,25 @@ public class ChatWatchService extends Service {
         String title=value(selection,"title");if(title.isEmpty())title="Pocket Code";
         Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,attention?alertChannel:CHANNEL):new Notification.Builder(this);
         if(attention)builder.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
-        return builder.setSmallIcon(R.drawable.ic_chat_notification)
+        Notification notice=builder.setSmallIcon(R.drawable.ic_chat_notification)
             .setContentTitle(title.substring(0,Math.min(title.length(),120))).setContentText(status)
             .setSubText("copilot".equals(value(selection,"provider"))?"Copilot":"codex".equals(value(selection,"provider"))?"Codex":"Claude")
             .setContentIntent(pending).setOnlyAlertOnce(!attention).setOngoing(ongoing).setAutoCancel(!ongoing)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setCategory(attention?Notification.CATEGORY_MESSAGE:Notification.CATEGORY_PROGRESS).build();
+        return ChatMutes.identify(notice,value(selection,"url"),value(selection,"provider"),value(selection,"sessionId"),value(selection,"jobId"));
     }
+    private Notification neutralNotification(){
+        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this);
+        return builder.setSmallIcon(R.drawable.ic_chat_notification).setContentTitle("Pocket Code")
+            .setOnlyAlertOnce(true).setOngoing(true).setVisibility(Notification.VISIBILITY_PRIVATE).build();
+    }
+    private boolean stopIfMuted(){
+        if(!ChatMutes.contains(this,selection))return false;
+        generation++;keepNotification=false;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return true;
+    }
+    static void applyMutes(){if(active!=null)active.stopIfMuted();}
     @Override public void onTimeout(int startId,int fgsType){
+        if(stopIfMuted())return;
         // Android 15+ limits data sync to six hours a day: say so instead of silently stopping alerts.
         getSystemService(NotificationManager.class).notify(NOTIFICATION_ID,notification(statusText("timeout"),false));
         keepNotification=true;stopForeground(STOP_FOREGROUND_DETACH);stopSelf();

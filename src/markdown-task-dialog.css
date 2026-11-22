@@ -1,25 +1,34 @@
-.confirm-modal.markdown-task-dialog {
-  width: min(100%, 32rem);
-  max-width: none;
-  display: grid;
-  gap: 1rem;
-  overflow-wrap: anywhere;
+.confirm-modal.markdown-task-dialog { width:min(100%,40rem);max-width:none;display:grid;gap:1rem;overflow-wrap:anywhere;color:var(--text);padding:clamp(18px,3vw,28px);background:var(--panel);overscroll-behavior:contain; }
+.markdown-task-dialog :is(h2,h3,p,ol,ul) { margin:0; }
+.markdown-task-dialog header { padding:0 0 1rem;border-bottom:1px solid var(--line); }
+.markdown-task-dialog header h2 { font-size:1.45rem;line-height:1.25;letter-spacing:-.025em; }
+.markdown-task-dialog header .markdown-project { margin-top:.35rem;color:var(--muted);font-size:.78rem; }
+.markdown-task-dialog h3 { font-size:.97rem;margin-bottom:.5rem; }
+.markdown-task-dialog label { display:grid;gap:.4rem;font-size:.87rem;font-weight:var(--fw-medium); }
+.markdown-task-dialog :is(input:not([type=file]),textarea) { width:100%;min-width:0;box-sizing:border-box;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);font:inherit;padding:.55rem .7rem;line-height:1.5; }
+.markdown-task-dialog input[type=file] { width:100%;min-width:0;padding:.45rem;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:8px; }
+.markdown-task-dialog input::file-selector-button { border:1px solid var(--line);border-radius:5px;padding:.4rem .65rem;background:var(--panel);color:var(--text);font:inherit;margin-inline-end:.7rem;cursor:pointer; }
+.markdown-task-dialog :is(ul,ol) { padding-inline-start:1.5rem; }
+.markdown-task-dialog li+li { margin-top:.35rem; }
+.markdown-task-dialog summary { cursor:pointer;color:var(--text); }
+.markdown-task-dialog pre { white-space:pre-wrap;font:inherit;font-size:.87rem;line-height:1.5; }
+.markdown-task-dialog footer { display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:.5rem;border-top:1px solid var(--line);padding-top:1rem; }
+.markdown-task-dialog footer button:first-child { margin-inline-end:auto;border-color:transparent;background:transparent;color:var(--muted); }
+.markdown-task-dialog button { width:auto;margin:0; }
+.markdown-task-files button { margin-inline-start:.5rem; }
+.markdown-task-editor,.markdown-step-editor { min-width:0;margin:0;display:grid;gap:.8rem;border:0;padding:0; }
+.markdown-step-editor { padding:.75rem 1rem 1rem;border:1px solid var(--line);border-radius:10px; }
+.markdown-step-editor legend { padding:0 .4rem;font-weight:var(--fw-semibold);font-size:.87rem; }
+.markdown-edit-field { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.25rem .5rem; }
+.markdown-edit-field>label { grid-column:1;grid-row:1; }
+.markdown-edit-field>button { grid-column:2;grid-row:1;justify-self:end; }
+.markdown-edit-field>input,.markdown-edit-field>textarea { grid-column:1/-1; }
+.markdown-edit-field textarea { resize:vertical;min-height:4rem; }
+.markdown-task-editor>button,.markdown-step-editor>button { justify-self:start; }
+.markdown-preview-steps li>div { display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap; }
+.markdown-preview-steps details { flex:1 1 12rem;min-width:0; }
+@media (max-width:480px) {
+  .confirm-modal.markdown-task-dialog { padding:16px; }
+  .markdown-step-editor { padding:.5rem .6rem .8rem; }
+  .markdown-task-dialog footer .primary { flex:1 1 100%; }
 }
-.markdown-task-dialog :is(h2, h3, p, ol, ul) { margin: 0; }
-.markdown-task-dialog :is(h2, h3, summary, label) { color: var(--text); }
-.markdown-task-dialog h3 { font-size: 1rem; margin-bottom: .4rem; }
-.markdown-task-dialog label { display: grid; gap: .35rem; }
-.markdown-task-dialog input { width: 100%; min-width: 0; }
-.markdown-task-dialog :is(ul, ol) { padding-inline-start: 1.5rem; }
-.markdown-task-dialog li + li { margin-top: .35rem; }
-.markdown-task-dialog summary { cursor: pointer; }
-.markdown-task-dialog pre { white-space: pre-wrap; font-size: .85em; }
-.markdown-task-dialog footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
-.markdown-task-dialog button { width: auto; margin: 0; }
-.markdown-task-files button { margin-inline-start: .5rem; }
-.markdown-task-editor,.markdown-step-editor { min-width:0; margin:0; display:grid; gap:.75rem; border:0; padding:0; }
-.markdown-task-editor legend,.markdown-step-editor legend { padding:0; margin-bottom:.55rem; font-weight:var(--fw-semibold); }
-.markdown-step-editor { border-top:1px solid var(--line); padding-top:.4rem; }
-.markdown-edit-field textarea { resize:vertical; min-height:4rem; width:100%; box-sizing:border-box; font:inherit; }
-.markdown-edit-field { display:grid; gap:.25rem; }
-.markdown-edit-field>button,.markdown-task-editor>button { justify-self:start; }

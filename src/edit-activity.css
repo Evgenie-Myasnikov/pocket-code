@@ -1,0 +1,26 @@
+.tool-card.edit-activity{min-width:0;margin:.2em 0;border:0;background:transparent;box-shadow:none}
+:root[data-theme] .message .tool-card.edit-activity>summary{display:block;list-style:none;padding:.45em 0;color:var(--text);cursor:pointer;font-size:var(--chat-font-size,14px)}
+.edit-activity summary::-webkit-details-marker{display:none}
+.edit-summary-line,.edit-metrics,.edit-file>header{display:flex;align-items:center;gap:.52em;min-width:0}
+.edit-summary-line{flex-wrap:wrap}
+:root[data-theme] .edit-activity>summary .tool-title{min-width:0;overflow-wrap:anywhere;font-weight:var(--fw-semibold);color:var(--text)}
+:root[data-theme] .edit-activity>summary .edit-metrics{color:var(--muted);font-size:.9em;font-variant-numeric:tabular-nums}
+.edit-chevron{flex:none;color:var(--muted)}
+.edit-activity[open] .edit-chevron{transform:rotate(90deg)}
+.edit-summary-line .tool-diffstat{display:inline-flex;gap:.38em}
+.edit-live-dot{width:.52em;height:.52em;flex:none;border-radius:50%;background:var(--status-done)}
+:root[data-theme] .edit-activity>summary .edit-live-snippet{display:block;overflow:hidden;margin:.5em 0 .25em 1.45em;padding:.65em .95em;border-radius:10px;background:color-mix(in srgb,var(--text) 7%,var(--panel));color:var(--muted);font:.96em/1.5 var(--font-mono);white-space:pre;tab-size:4}
+:root[data-theme] .edit-activity[open]>summary .edit-live-snippet{display:none}
+.edit-expanded{min-width:0;padding:0 0 .38em 1.6em}
+.edit-file>header{padding:.35em 0;color:var(--muted);font-size:.84em}
+.edit-file>header>span{min-width:0;overflow-wrap:anywhere}
+.edit-file>header>.copy-action{margin-inline-start:auto;flex:none}
+.tool-card .edit-diff{display:block;max-width:100%;overflow:auto;margin:.2em 0 .55em;padding:.25em 0;background:var(--surface);border:0;border-radius:8px;white-space:pre;line-height:1.48;tab-size:4}
+.edit-diff .edit-source-line{display:block;min-width:100%;width:max-content;line-height:1.48}
+.edit-source-line code,.edit-source-line .edit-sign{font:inherit}
+.edit-source-line code{color:var(--text);background:none;border:0;padding:0 .7em 0 0}
+.edit-sign{display:inline-block;width:2em;text-align:center;user-select:none}
+.edit-diff [data-line=meta] code{color:var(--muted)}
+:root[data-theme] .edit-activity:is([data-status=failed],[data-status=denied])>summary .tool-title{color:var(--status-error)}
+@media(max-width:570px){.edit-expanded{padding-inline-start:.4em}.edit-live-snippet{margin-inline-start:.4em}}
+@media(forced-colors:active){.edit-live-dot{background:Highlight}.edit-live-snippet,.tool-card .edit-diff{border:1px solid CanvasText}}

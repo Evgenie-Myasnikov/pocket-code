@@ -25,10 +25,48 @@ public sealed class DesktopPreferences {
     public long NotificationCursor=0;
     public string[] NotificationSeen=new string[0];
     public object[] PendingRunAlerts=new object[0];
+    // An active alias uses MaxValue. An unmuted alias suppresses older journal events until the next catch-up.
+    public Dictionary<string,long> RunAlertMutes=new Dictionary<string,long>();
 }
 /** Cursor/queue logic is independent of a visible WebView and can be checked without showing notifications. */
 public static class DesktopRunAlertBatch {
     static string Field(Dictionary<string,object> item,string name){object value;return item.TryGetValue(name,out value)?Convert.ToString(value):"";}
+    static IEnumerable<string> ChatKeys(Dictionary<string,object> item){
+        string provider=Field(item,"provider");
+        if(provider!="claude"&&provider!="codex"&&provider!="copilot")yield break;
+        foreach(string field in new[]{"sessionId","jobId"}){
+            string id=Field(item,field);
+            if(id!="")yield return provider+":"+field+":"+id;
+        }
+    }
+    public static bool Suppressed(DesktopPreferences preferences,Dictionary<string,object> item){
+        if(item==null)return true;
+        if(preferences.RunAlertMutes==null||preferences.RunAlertMutes.Count==0)return false;
+        long at;Int64.TryParse(Field(item,"at"),out at);
+        foreach(string key in ChatKeys(item)){
+            long until;if(preferences.RunAlertMutes.TryGetValue(key,out until)&&at<=until)return true;
+        }
+        return false;
+    }
+    public static void SetMuted(DesktopPreferences preferences,object raw,long now){
+        var rows=raw as System.Collections.IList;
+        if(rows==null)throw new ArgumentException("Invalid chat mute list.");
+        var keys=new HashSet<string>();
+        foreach(object row in rows){
+            var chat=row as Dictionary<string,object>;
+            if(chat==null)throw new ArgumentException("Invalid chat mute.");
+            foreach(string key in ChatKeys(chat))keys.Add(key);
+        }
+        var changes=preferences.RunAlertMutes??new Dictionary<string,long>();
+        foreach(string key in new List<string>(changes.Keys)){
+            if(changes[key]==Int64.MaxValue&&!keys.Contains(key))changes[key]=Math.Max(now,preferences.NotificationCursor);
+        }
+        foreach(string key in keys)changes[key]=Int64.MaxValue;
+        preferences.RunAlertMutes=changes;
+        var pending=new List<object>(preferences.PendingRunAlerts??new object[0]);
+        pending.RemoveAll(item=>Suppressed(preferences,item as Dictionary<string,object>));
+        preferences.PendingRunAlerts=pending.ToArray();
+    }
     public static bool Accept(DesktopPreferences preferences,Dictionary<string,object> body){
         if(body==null||!body.ContainsKey("events")||!body.ContainsKey("now"))return false;
         bool baseline=preferences.NotificationCursor==0;
@@ -40,9 +78,11 @@ public static class DesktopRunAlertBatch {
         foreach(object raw in events){
             var item=raw as Dictionary<string,object>;if(item==null)continue;
             string identity=Field(item,"id");if(identity==""||!seen.Add(identity))continue;retained.Add(identity);
-            if(!baseline&&Regex.IsMatch(Field(item,"provider"),@"^(claude|codex|copilot)$")&&Regex.IsMatch(Field(item,"status"),@"^(done|error|stopped|needs_input)$"))waiting.Add(item);
+            if(!baseline&&!Suppressed(preferences,item)&&Regex.IsMatch(Field(item,"provider"),@"^(claude|codex|copilot)$")&&Regex.IsMatch(Field(item,"status"),@"^(done|error|stopped|needs_input)$"))waiting.Add(item);
         }
         preferences.NotificationCursor=Convert.ToInt64(body["now"]);
+        if(preferences.RunAlertMutes!=null)foreach(string key in new List<string>(preferences.RunAlertMutes.Keys))
+            if(preferences.RunAlertMutes[key]<preferences.NotificationCursor-120000)preferences.RunAlertMutes.Remove(key);
         if(retained.Count>1000)retained.RemoveRange(0,retained.Count-1000);
         if(waiting.Count>100)waiting.RemoveRange(0,waiting.Count-100);
         preferences.NotificationSeen=retained.ToArray();preferences.PendingRunAlerts=waiting.ToArray();return true;
@@ -59,7 +99,9 @@ public static class DesktopReadPolicy {
         string path=endpoint.Split('?')[0];
         if(path=="/speech/install"||path=="/speech/synthesize")return true;
         if(path=="/task-text/improve")return true;
-        if(Regex.IsMatch(path,@"^/task-chains(?:/[a-f0-9-]+/stop)?$"))return true;
+        const string uuid=@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+        if(Regex.IsMatch(path,@"^/jobs/"+uuid+"/messages/"+uuid+"/cancel$"))return true;
+        if(Regex.IsMatch(path,@"^/task-chains(?:/[a-f0-9-]+/(?:stop|delete))?$"))return true;
         if(path=="/chat-library/projects"||Regex.IsMatch(path,@"^/sessions/[A-Za-z0-9_%.-]+/(manage|branch)$"))return true;
         if(Regex.IsMatch(path,@"^/(task-runs|task-runs/[a-f0-9-]+/(check|checks|approve|resume)|miro/(config|oauth/start|token|access|disconnect|items/update))$"))return true;
         return Regex.IsMatch(path,@"^/(custom-providers|custom-providers/remove|custom-providers/[a-f0-9-]+/chat|jobs|uploads|project-rules|project-board|project-board/mcp|project-board/view|project-board/create|project-board/delete|project-board/repair|project-board/restore|project-board/chat|engine-updates/claude|project-board/miro|project-board/image|board-snapshots/import|task-notifications/read|board-notifications/read|workspaces|workspaces/[a-f0-9-]+/(member|profile|invitation|delete)|boards|boards/[a-f0-9-]+|boards/[a-f0-9-]+/(tasks|settings|branch|delete|snapshot|attention)|boards/[a-f0-9-]+/tasks/[a-f0-9-]+/action)$")||Regex.IsMatch(path,@"^/jobs/[a-f0-9-]+/(messages|stop|approvals/[a-f0-9-]+)$");
@@ -254,6 +296,13 @@ public sealed class PocketDesktop:Form {
                     if(!preferences.RunAlerts){preferences.PendingRunAlerts=new object[0];preferences.NotificationCursor=0;preferences.NotificationSeen=new string[0];activeRunAlert=null;}
                     Save();result=true;
                 }
+            }else if(action=="chat-mutes"){
+                if(!preview){
+                    object rows;if(!message.TryGetValue("mutedChats",out rows))throw new ArgumentException("Missing chat mute list.");
+                    DesktopRunAlertBatch.SetMuted(preferences,rows,DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                    Save();
+                }
+                result=true;
             }else if(action=="notification-pending"){
                 result=new{chat=pendingChat};pendingChat=null;
             }else if(action=="provider-logout"){
@@ -319,9 +368,13 @@ public sealed class PocketDesktop:Form {
         }catch{/* A transient host failure keeps the cursor and queued targets for reconnect. */}
     }
     void ShowNextRunAlert(){
-        if(activeRunAlert!=null||!preferences.RunAlerts||preferences.PendingRunAlerts==null||preferences.PendingRunAlerts.Length==0)return;
-        activeRunAlert=preferences.PendingRunAlerts[0] as Dictionary<string,object>;
-        if(activeRunAlert==null){CompleteRunAlert();return;}
+        if(activeRunAlert!=null||!preferences.RunAlerts)return;
+        var waiting=new List<object>(preferences.PendingRunAlerts??new object[0]);
+        if(waiting.RemoveAll(item=>DesktopRunAlertBatch.Suppressed(preferences,item as Dictionary<string,object>))!=0){
+            preferences.PendingRunAlerts=waiting.ToArray();Save();
+        }
+        if(waiting.Count==0)return;
+        activeRunAlert=waiting[0] as Dictionary<string,object>;
         bool ru=preferences.RunLanguage=="ru";string state=Field(activeRunAlert,"status");
         string text=state=="needs_input"?(ru?"Ожидает вашего ответа":"Waiting for your answer"):state=="error"?(ru?"Ошибка — подробности в чате":"Error — open the chat for details"):state=="stopped"?(ru?"Остановлено":"Stopped"):(ru?"Завершено — откройте результат":"Completed — open to view the result");
         string title=Field(activeRunAlert,"title");if(title.Length>120)title=title.Substring(0,120);
@@ -329,13 +382,14 @@ public sealed class PocketDesktop:Form {
     }
     void CompleteRunAlert(){
         if(activeRunAlert==null)return;
-        activeRunAlert=null;
-        var waiting=new List<object>(preferences.PendingRunAlerts??new object[0]);if(waiting.Count>0)waiting.RemoveAt(0);
+        string shownId=Field(activeRunAlert,"id");activeRunAlert=null;
+        var waiting=new List<object>(preferences.PendingRunAlerts??new object[0]);
+        waiting.RemoveAll(item=>item is Dictionary<string,object>&&Field((Dictionary<string,object>)item,"id")==shownId);
         preferences.PendingRunAlerts=waiting.ToArray();try{Save();}catch{}
         // The next native poll presents the next item after Windows finishes its close/click events.
     }
     void OpenRunAlert(){
-        if(activeRunAlert==null)return;
+        if(activeRunAlert==null||DesktopRunAlertBatch.Suppressed(preferences,activeRunAlert))return;
         pendingChat=new Dictionary<string,object>();
         foreach(string name in new[]{"provider","sessionId","jobId","cwd","title"})pendingChat[name]=Field(activeRunAlert,name);
         RestoreWindow();Reply(new{chatNotification=true});

@@ -42,7 +42,7 @@ test('brief transcript folds routine work, keeps errors, plan, changes and notic
  await expect(page.locator('.plan-bar')).toContainText('Plan 1/3');await expect(page.locator('.plan-bar')).toContainText('Fixing the check');
  await page.locator('.plan-bar-toggle').click();await expect(page.locator('.plan-bar .plan-checklist li')).toHaveCount(3);
  await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitemradio',{name:'Detailed'}).click();
- await expect(page.locator('.activity-group')).toHaveCount(1);await expect(page.locator('.tool-card .tool-title',{hasText:'Edited form.ts'})).toBeVisible();
+ await expect(page.locator('.activity-group')).toHaveCount(1);await expect(page.locator('.edit-activity .tool-title',{hasText:'File change · form.ts'})).toBeVisible();
  await page.screenshot({path:'.local/transcript-review.png'});
 });
 test('the round latest button replaces the two pills and the beginning lives in the menu',async({page})=>{

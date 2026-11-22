@@ -27,6 +27,29 @@ async function fixture(t: TestContext) {
   return {input, chains, options, jobs, prompts, stopped};
 }
 
+test('chain details retain the launch model and account label across retries and restarts',async t=>{
+  const {input,options}=await fixture(t);
+  let label='Example connection';
+  const account=randomUUID(),plan={...input,provider:'claude' as const,account,model:'catalog-editor'};
+  const configured={...options,accountName:async(id:string)=>id===account?label:undefined};
+  const store=new MarkdownChains(configured);
+  try{
+    const created=await store.create(plan);
+    assert.equal(created.model,plan.model);assert.equal(created.accountName,label);
+    label='Renamed connection';
+    assert.equal((await store.create(plan)).accountName,'Example connection');
+    const stopped=await store.stop(plan.id,plan);
+    assert.equal(stopped.model,plan.model);assert.equal(stopped.accountName,'Example connection');
+  }finally{await store.close();}
+  const restored=new MarkdownChains(configured);
+  try{
+    const detail=await restored.get(plan.id,plan);
+    assert.equal(detail.model,plan.model);assert.equal(detail.accountName,'Example connection');
+    const legacy=await restored.create({...input,id:randomUUID()});
+    assert.equal(legacy.model,undefined);assert.equal(legacy.accountName,undefined);
+  }finally{await restored.close();}
+});
+
 test('chains record real chat IDs, approval state and ordered completion with a bounded handoff', async t => {
   const {chains, input, jobs, prompts} = await fixture(t);
   await Promise.all([chains.create(input), chains.create(input)]);
@@ -126,4 +149,59 @@ test('a launch refusal records failure without a dead chat link', async t => {
     assert.equal(chain.steps[0].jobId, undefined);
     assert.equal(chain.steps[1].status, 'pending');
   } finally { await refused.close(); }
+});
+
+test('step output follows the current assistant reply, excludes tool and reasoning blocks and survives restart', async t => {
+  const {chains, input, options, jobs} = await fixture(t);
+  await chains.create(input); await chains.tick();
+  const job = [...jobs.values()][0];
+  job.messages = [
+    {id: 'prompt', role: 'user', blocks: [{type: 'text', text: 'Input only'}]},
+    {id: 'tool', role: 'assistant', blocks: [{type: 'thinking', thinking: 'Reasoning only'},
+      {type: 'tool_use', id: 'call', name: 'Command', input: {command: 'tool argument'}}]}
+  ];
+  const step = async () => (await chains.get(input.id, input)).steps[0];
+  assert.equal((await step()).output, undefined);
+  assert.equal((await step()).phase, 'command');
+  job.partial = 'Working on the outline';
+  assert.equal((await step()).output, job.partial);
+  assert.equal((await step()).phase, 'responding');
+  job.approvals = [{id: 'ask', tool: 'AskUserQuestion', input: {}, expiresAt: 0}];
+  assert.equal((await step()).phase, 'question');
+  job.approvals = []; job.status = 'done';
+  const result = 'Result line.\n'.repeat(2000) + 'Verified.';
+  job.messages.push({id: 'result', role: 'assistant', blocks: [{type: 'text', text: result + '\n' + chainCompletionMarker(input.id, 0)}]});
+  await chains.tick();
+  const final = await step();
+  assert.equal(final.output, result.slice(-12000));
+  assert.equal(final.outputTruncated, true);
+  assert.equal(final.phase, undefined);
+  await chains.close();
+  const restored = new MarkdownChains(options);
+  try {
+    assert.equal((await restored.get(input.id, input)).steps[0].output, final.output);
+  } finally { await restored.close(); }
+});
+
+test('removal erases terminal task content durably, retains chats and rejects stale launches', async t => {
+  const {chains, input, options, jobs} = await fixture(t);
+  await chains.create(input); await chains.tick();
+  await assert.rejects(chains.remove(input.id, input), /Stop the running/);
+  const job = [...jobs.values()][0]; job.partial = 'Last observed answer';
+  const stopped = await chains.stop(input.id, input);
+  assert.equal(stopped.steps[0].output, job.partial);
+  await assert.rejects(chains.remove(input.id, {...input, account: randomUUID()}), /not found/);
+  for (const id of [input.id, input.id.toUpperCase()]) assert.deepEqual(await chains.remove(id, input), {ok: true});
+  assert.equal(jobs.get(job.id), job);
+  const tombstone = JSON.parse(await readFile(path.join(options.file, input.id + '.json'), 'utf8'));
+  assert.deepEqual(Object.keys(tombstone).sort(), ['deletedScope', 'version']);
+  await chains.close();
+  const restored = new MarkdownChains(options);
+  try {
+    assert.deepEqual(await restored.list(input), []);
+    assert.deepEqual(await restored.remove(input.id, input), {ok: true});
+    await assert.rejects(restored.get(input.id, input), /not found/);
+    await assert.rejects(restored.create(input), /already used/);
+    await assert.rejects(restored.remove(input.id, {...input, cwd: 'other'}), /not found/);
+  } finally { await restored.close(); }
 });

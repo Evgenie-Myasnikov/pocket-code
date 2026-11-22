@@ -96,10 +96,13 @@ public class RunFeedService extends Service {
         NotificationManager manager=getSystemService(NotificationManager.class);
         String provider=event.optString("provider"),sessionId=event.optString("sessionId"),title=event.optString("title","Pocket Code");
         String jobId=event.optString("jobId"),state=event.optString("status"),channel=AlertChannels.forState(state);
-        if(!AlertChannels.enabled(manager,channel))return;
         String fingerprint=NotificationIdentity.event(value(config,"url"),provider,jobId.isEmpty()?event.optString("id"):jobId,event.optString("version"),state);
         android.content.SharedPreferences alerts=getSharedPreferences("chat-alerts",MODE_PRIVATE);
         if(alerts.contains(fingerprint))return;
+        if(ChatMutes.contains(this,value(config,"url"),provider,sessionId,jobId)){
+            ChatWatchService.rememberAlert(alerts,fingerprint);return;
+        }
+        if(!AlertChannels.enabled(manager,channel))return;
         String target=NotificationIdentity.target(value(config,"url"),provider,sessionId,jobId);
         Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("chatNotification",true)
             .setData(android.net.Uri.parse("pocket-code://chat/"+target)).putExtra("connectionUrl",value(config,"url"))
@@ -112,6 +115,7 @@ public class RunFeedService extends Service {
         Notification notification=builder.setSmallIcon(R.drawable.ic_chat_notification).setContentTitle(title.substring(0,Math.min(title.length(),120))).setContentText(status)
             .setSubText("copilot".equals(provider)?"Copilot":"codex".equals(provider)?"Codex":"Claude").setContentIntent(pending).setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setCategory(Notification.CATEGORY_MESSAGE).build();
+        ChatMutes.identify(notification,value(config,"url"),provider,sessionId,jobId);
         // One notification per chat: a later result replaces the earlier one instead of stacking.
         try{manager.notify("run:"+target,ChatWatchService.ALERT_ID,notification);ChatWatchService.rememberAlert(alerts,fingerprint);}catch(SecurityException ignored){}
     }

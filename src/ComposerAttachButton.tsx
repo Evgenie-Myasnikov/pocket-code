@@ -1,28 +1,17 @@
-import {useEffect,useId,useLayoutEffect,useRef,useState,type KeyboardEvent,type ReactNode} from 'react';
+import {useEffect,useId,useLayoutEffect,useRef,useState,type KeyboardEvent} from 'react';
 import {createPortal} from 'react-dom';
-import {GitBranch,ListOrdered,LoaderCircle,Paperclip,Plus} from 'lucide-react';
+import {Folder,LoaderCircle,Paperclip,Plus} from 'lucide-react';
 import {useAnchoredPlace} from './anchored-popup';
 import {useBackAction} from './navigation';
 import {t} from './i18n';
-import type {ImproveScope} from './ImproveTaskText';
-import {MarkdownTaskDialog} from './MarkdownTaskDialog';
-import {MarkdownChainPanel,type MarkdownChainControls} from './MarkdownChainPanel';
-import type {MarkdownChainDetail} from './markdown-chain';
-import {useLanguage} from './i18n';
+import {ProjectFolderDialog,type ProjectFolderPickerProps} from './ProjectFolderPicker';
 
-export function ComposerAttachButton({scopeKey,disabled,uploading,projectPicker,chooseFiles,maxBatchLength,onPrepareBatch,chainControls,improveScope}:{
-  scopeKey?:string;
-  disabled?:boolean; uploading:boolean; projectPicker?:ReactNode; chooseFiles():void;
-  maxBatchLength:number; onPrepareBatch(value:string):void;
-  chainControls?:MarkdownChainControls; improveScope?:ImproveScope;
+export function ComposerAttachButton({disabled,uploading,projectPicker,chooseFiles}:{
+  disabled?:boolean; uploading:boolean; projectPicker?:ProjectFolderPickerProps; chooseFiles():void;
 }){
-  const [open,setOpen]=useState(false);
-  const [tasksOpen,setTasksOpen]=useState(false);
-  const [chainPanel,setChainPanel]=useState<{initial?:MarkdownChainDetail}|null>(null);
-  useLayoutEffect(()=>{setTasksOpen(false);setChainPanel(null);},[scopeKey]);
-  const ru=useLanguage()==='ru';
+  const [open,setOpen]=useState(false),[projectsOpen,setProjectsOpen]=useState(false);
   const trigger=useRef<HTMLButtonElement>(null),popup=useRef<HTMLDivElement>(null);
-  const id=useId(),available=!disabled||!!chainControls,visible=open&&available;
+  const id=useId(),available=!disabled,visible=open&&available;
   const place=useAnchoredPlace(visible,trigger,300);
   const label=t('Прикрепить файлы');
   function dismiss(){
@@ -72,15 +61,9 @@ export function ComposerAttachButton({scopeKey,disabled,uploading,projectPicker,
     {visible&&createPortal(<div id={id} ref={popup} className="composer-add-menu" style={place}
       role="group" aria-label={label} onKeyDown={navigate}>
       <button type="button" disabled={disabled} onClick={()=>{dismiss();chooseFiles();}}><Paperclip size={16}/>{label}</button>
-      {!disabled&&projectPicker&&<div onChange={dismiss}>{projectPicker}</div>}
-      <button type="button" disabled={disabled} onClick={()=>{dismiss();setTasksOpen(true);}}><ListOrdered size={16}/>{t('Задачи из Markdown')}</button>
-      {chainControls&&<button type="button" onClick={()=>{dismiss();setChainPanel({});}}><GitBranch size={16}/>{ru?'Цепочки задач':'Task chains'}</button>}
+      {!disabled&&projectPicker&&<button type="button" disabled={projectPicker.disabled} aria-label={projectPicker.label} aria-haspopup="dialog"
+        onClick={()=>{dismiss();setProjectsOpen(true);}}><Folder size={16}/>{projectPicker.label}</button>}
     </div>,document.body)}
-    {tasksOpen&&!disabled&&<MarkdownTaskDialog improveScope={improveScope} maxLength={maxBatchLength}
-      controls={chainControls} onStarted={chain=>{setTasksOpen(false);setChainPanel({initial:chain});}}
-      onClose={()=>{setTasksOpen(false);trigger.current?.focus({preventScroll:true});}}
-      onPrepare={value=>{onPrepareBatch(value);setTasksOpen(false);}}/>}
-    {chainPanel&&chainControls&&<MarkdownChainPanel controls={chainControls} initial={chainPanel.initial}
-      onClose={()=>{setChainPanel(null);trigger.current?.focus({preventScroll:true});}}/>}
+    {projectsOpen&&projectPicker&&!disabled&&<ProjectFolderDialog {...projectPicker} onClose={()=>{setProjectsOpen(false);trigger.current?.focus({preventScroll:true});}}/>}
   </div>;
 }

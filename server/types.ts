@@ -1,6 +1,8 @@
 export type SubagentView = { id: string; name: string; status: 'running' | 'completed' | 'error' | 'stopped' | 'unknown'; prompt?: string; result?: string; sessionId?: string; provider: 'claude' | 'codex' | 'copilot' };
 export type Block = { type: string; attachmentPath?: string; agent?: SubagentView; text?: string; name?: string; input?: unknown; content?: unknown; id?: string; tool_use_id?: string; thinking?: string; is_error?: boolean; title?: string; source?: { type?: string; media_type?: string; data?: string; url?: string; text?: string }; data?: string; mimeType?: string };
 export type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; blocks: Block[] };
+/** In-flight provider-supplied file input. Content may be a bounded tail; counts describe all text received. */
+export type WritePreview = {id:string;tool:'Write'|'Edit'|'Patch';path:string;content:string;totalBytes:number;totalLines:number;truncated?:boolean};
 /** expiresAt 0 means the request waits until the person answers or the run stops. suggestions are the provider's own "allow such actions" rules. */
 export type Approval = { id: string; tool: string; input: Record<string, unknown>; expiresAt: number; suggestions?: unknown[] };
 /** How the person decided: a denial carries an optional comment for the agent; remember applies the provider's suggested rules; mode sets how an approved plan runs. */
@@ -15,6 +17,7 @@ export type ActivityItem = {
   action?: 'command' | 'files' | 'search' | 'agent' | 'responding' | 'tool';
 };
 export type JobView = {
+  writePreviews?:WritePreview[];
   /** Changes whenever the transcript does; token deltas only change `partial`. */
   messagesRevision?:number;
   /** A poll that already has this transcript receives only the rest of the job. */

@@ -8,6 +8,7 @@ import { normalize, type Approval, type ApprovalDecision, type ChatMessage, type
 import { updateClaudeAgents, updateClaudeAgentResults } from './subagents.js';
 import {Followups,type FollowupInput} from './followups.js';
 import {PromptStream} from './prompt-stream.js';
+import {ToolInputPreviews} from './write-preview.js';
 import {projectBoardInstructions} from './project-rules.js';
 
 type Run = typeof query;
@@ -45,7 +46,7 @@ export class Jobs {
     const { controller, pending, inputs, waiting, followups, acceptingInput, query, approvalTimeoutMs, stopRequested, ...view } = job;
     return view;
   }
-  list() { return [...this.jobs.values()].map(j => ({ ...this.view(j), messages: [], partial: '' })); }
+  list() { return [...this.jobs.values()].map(j => ({ ...this.view(j), messages: [], partial: '', writePreviews:undefined })); }
   trimCompleted() {
     for (const job of [...this.jobs.values()].filter(j => j.status !== 'running').sort((a, b) => a.startedAt - b.startedAt)) {
       if (this.jobs.size < 90) break;
@@ -93,13 +94,14 @@ export class Jobs {
       controller: new AbortController(), pending: new Map(),inputs:new PromptStream(),waiting:[],followups:new Followups(),acceptingInput:true,approvalTimeoutMs:input.approvalTimeoutMs??0,
       permissionMode: input.mode==='plan'?'plan':input.claudeAccess||'default' };
     job.inputs.push(job.messages[0].id,input.text,input.sessionId);
-    job.controller.signal.addEventListener('abort',()=>{job.acceptingInput=false;job.inputs.close();},{once:true});
+    job.controller.signal.addEventListener('abort',()=>{job.acceptingInput=false;job.inputs.close();delete job.writePreviews;job.revision++;},{once:true});
     this.jobs.set(job.id, job);
     void this.execute(job, input);
     return this.view(job);
   }
   async execute(job: Job, input: Parameters<Jobs['start']>[0]) {
     let stream: ReturnType<Run> | undefined;
+    const previews=new ToolInputPreviews();
     let historySize = JSON.stringify(job.messages).length;
     let historyCount = job.messages.length;
     try {
@@ -122,6 +124,15 @@ export class Jobs {
         // Forwarded child messages have their own session/deltas/results. They must
         // neither replace the parent identity nor be appended to its transcript.
         if ('parent_tool_use_id' in event && event.parent_tool_use_id) { job.revision++; continue; }
+        if (event.type==='stream_event' && !job.stopRequested && !job.controller.signal.aborted) {
+          const part=event.event;
+          if (part.type==='message_start') previews.clear(job);
+          if (part.type==='content_block_start' && part.content_block.type==='tool_use' && ['Write','Edit'].includes(part.content_block.name))
+            previews.start(part.content_block.id,part.content_block.name,part.index);
+          if (part.type==='content_block_delta' && part.delta.type==='input_json_delta')
+            previews.append(job,part.index,part.delta.partial_json);
+          if (part.type==='content_block_stop') previews.endBlock(part.index);
+        }
         if ('session_id' in event && event.session_id && job.sessionId !== event.session_id) { job.sessionId = event.session_id; this.announceSession(job); }
         updateClaudeAgentResults(job.messages, event);
         const notice = claudeNotice(job, event);
@@ -129,6 +140,10 @@ export class Jobs {
         const msg = normalize(event);
         // The initial prompt is already visible; tool-result user events are kept.
         if (msg && !(msg.role === 'user' && msg.blocks.every(b => b.type === 'text'))) {
+          for (const block of msg.blocks) {
+            if (block.type==='tool_use') previews.remove(job,block.id);
+            if (block.type==='tool_result') previews.remove(job,block.tool_use_id);
+          }
           const index = job.messages.findIndex(m => m.id === msg.id);
           if (index < 0) job.messages.push(msg); else job.messages[index] = msg;
           for (const block of msg.blocks) if (block.type === 'subagent' && block.agent) block.agent.status = 'running';
@@ -137,6 +152,7 @@ export class Jobs {
         if (event.type === 'stream_event' && event.event.type === 'content_block_delta' && event.event.delta.type === 'text_delta')
           job.partial += event.event.delta.text;
         if (event.type === 'result') {
+          previews.clear(job);
           job.cost = event.total_cost_usd;
           if (job.stopRequested) job.status = 'stopped';
           else if (event.is_error) {
@@ -170,6 +186,7 @@ export class Jobs {
       if (job.status === 'error') job.error = error instanceof Error ? error.message : 'Не удалось запустить Claude';
       job.controller.abort();
     } finally {
+      previews.clear(job);
       job.acceptingInput=false;job.inputs.close();
       job.query=undefined;
       try {stream?.close?.();} catch { /* Preserve the original job outcome. */ }
@@ -211,6 +228,7 @@ export class Jobs {
    */
   stop(id: string, graceMs = 5000) {
     const job = this.get(id); job.revision++;
+    delete job.writePreviews;
     if (job.status !== 'running') return;
     const query = job.query;
     if (job.stopRequested || !query?.interrupt) { job.controller.abort(); return; }

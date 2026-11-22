@@ -2,7 +2,7 @@ import { memo, useState, useRef, useMemo, useEffect, useId, type ComponentProps,
 import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
-import {WrapText} from 'lucide-react';
+import {ChevronDown,Lightbulb,WrapText,X} from 'lucide-react';
 import {useStreamingReveal} from './useStreamingReveal';
 import {usePacedText} from './usePacedText';
 import {useStreamSpeed} from './stream-speed';
@@ -15,6 +15,7 @@ import {Terminal,Pencil,Wrench,FileText,Search,ListChecks,Bot,MessageCircle,Glob
 import {describeTool,stripAnsi,toolText,type PlanItem,type ToolView} from './tool-registry';
 import {plural} from './plural';
 import {ImageViewer} from './ImageViewer';
+import {EditActivity} from './EditActivity';
 import {isClaudeTaskNotificationPrefix, parseClaudeTaskNotification, type ClaudeTaskNotification} from './claude-task-notification';
 
 import {Installer as Documents} from './native-update';
@@ -33,7 +34,7 @@ function Picture({src,alt}:{src:string;alt:string}) {
   return <><button className="image-preview" aria-label={t('Открыть изображение')} onClick={()=>setExpanded(true)}><img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></button>{expanded&&<ImageViewer src={src} title={alt} onClose={()=>setExpanded(false)}/>}</>;
 }
 /** A labelled copy action; the text is read when pressed, so streamed or revealed content is copied in full. */
-export function CopyAction({text,label}:{text:string|(()=>string);label:string}){
+export function CopyAction({text,label,compact=false}:{text:string|(()=>string);label:string;compact?:boolean}){
   const [result,setResult]=useState<'idle'|'copied'|'failed'>('idle');
   const attempt=useRef(0), reset=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const statusId=useId();
@@ -57,7 +58,7 @@ export function CopyAction({text,label}:{text:string|(()=>string);label:string})
     <button type="button" className="copy-action" data-copied={copied||undefined}
       aria-label={label} aria-describedby={failed?statusId:undefined} title={label} onClick={copy}>
       {copied?<Check size={14} aria-hidden="true"/>:<Copy size={14} aria-hidden="true"/>}
-      <span>{copied?t('Скопировано'):label}</span>
+      {!compact&&<span>{copied?t('Скопировано'):label}</span>}
     </button>
     <span id={statusId} role="status" className={failed?'copy-error':'visually-hidden'}>{message}</span>
   </span>;
@@ -160,6 +161,13 @@ function Document({block}:{block:Block}) {
   const title=block.title || t('Документ');
   return <section className="document-card"><strong>📎 {title}</strong>{source?.text && <pre>{source.text}</pre>}{pdf && (Capacitor.isNativePlatform()?<button className="secondary" onClick={()=>void Documents.openDocument({data:pdf,name:title}).catch(e=>setError(e.message))}>{t('Открыть PDF')}</button>:<a href={`data:application/pdf;base64,${pdf}`} download="document.pdf">{t('Скачать PDF')}</a>)}{safeWebUrl(source?.url) && <a href={safeWebUrl(source?.url)!} target="_blank" rel="noopener noreferrer">{t('Открыть документ')}</a>}{error && <p className="error-banner">{t(error)}</p>}</section>;
 }
+export function ReasoningDisclosure({paragraphs,live=false}:{paragraphs:string[];live?:boolean}){
+  const label=t('Рассуждения');
+  if(!paragraphs.some(text=>text.trim()))return null;
+  return <Disclosure className="thinking" defaultOpen={live} summary={<><Lightbulb size={15} aria-hidden="true"/><span>{label}</span><ChevronRight size={12} className="chat-disclosure-chevron" aria-hidden="true"/></>}>
+    {()=> <div role="region" aria-label={label} tabIndex={0} className="reasoning-content">{paragraphs.map((text,index)=>text&&<p key={index}>{text}</p>)}</div>}
+  </Disclosure>;
+}
 const TAIL=12;
 /** Command output keeps its exact text: monospace, ANSI removed, the last lines first, with copy actions and an error stripe. */
 export function ToolOutput({text,failed=false,command}:{text:string;failed?:boolean;command?:string}){
@@ -167,8 +175,8 @@ export function ToolOutput({text,failed=false,command}:{text:string;failed?:bool
   const hidden=expanded?0:Math.max(0,all.length-TAIL);
   return <div className={'tool-output-block'+(failed?' failed':'')}>
     {hidden>0&&<button type="button" className="text-button tool-output-more" onClick={()=>setExpanded(true)}>{plural(hidden,['… ещё {0} строка','… ещё {0} строки','… ещё {0} строк'])}</button>}
-    {clean?<pre className="tool-output">{hidden?all.slice(-TAIL).join('\n'):clean}</pre>:<p className="tool-output-empty">{t('Нет вывода')}</p>}
-    {(command||clean)&&<div className="tool-output-actions">{command&&<CopyAction text={command} label={t('Копировать команду')}/>}{clean&&<CopyAction text={clean} label={t('Копировать вывод')}/>}</div>}
+    {clean?<pre className="tool-output" tabIndex={0} role="region" aria-label={t('Результат инструмента')}>{hidden?all.slice(-TAIL).join('\n'):clean}</pre>:<p className="tool-output-empty">{t('Нет вывода')}</p>}
+    {(command||clean)&&<div className="tool-output-actions">{command&&<CopyAction compact text={command} label={t('Копировать команду')}/>}{clean&&<CopyAction compact text={clean} label={t('Копировать вывод')}/>}</div>}
   </div>;
 }
 function ToolResultContent({block,depth,command,prose=false}:{block:Block;depth:number;command?:string;prose?:boolean}) {
@@ -213,13 +221,19 @@ export function ToolFields({input}:{input:unknown}){
 }
 function ToolRow({block,result,running,depth}:{block:Block;result?:Block;running:boolean;depth:number}){
   const view=describeTool(block,result,running),Icon=toolIcon(view),input=(block.input&&typeof block.input==='object'?block.input:{}) as Record<string,unknown>;
+  if(view.kind==='edit')return <EditActivity view={view} input={input} name={(block.name||'').toLowerCase()}
+    created={!!result&&!result.is_error&&/^File created successfully at:/i.test(toolText(result.content).trim())}
+    copy={(text,label)=><CopyAction text={text} label={label} compact/>} fallback={<ToolFields input={block.input}/>}
+    result={result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}/>;
   const prose=view.kind==='agent'||view.kind==='web';
-  return <Disclosure className={`tool-card activity-row ${result?'combined':''} ${view.failed?'failed':''}`} summary={<>
-    <Icon size={16} aria-hidden="true"/><span className={'tool-title'+(view.mono?' mono':'')} title={view.command||undefined}>{view.title}</span>
-    {view.kind==='edit'&&(view.added>0||view.removed>0)&&<span className="tool-diffstat" aria-label={t('Добавлено строк: {0}, удалено: {1}',view.added,view.removed)}><b>+{view.added}</b> <i>−{view.removed}</i></span>}
-    <ToolState view={view}/>
+  const commandRow=view.kind==='command';
+  return <Disclosure className={`tool-card activity-row ${commandRow?'command-row':''} ${result?'combined':''} ${view.failed?'failed':''}`} summary={<>
+    {commandRow?<><ChevronDown size={14} className="command-chevron" aria-hidden="true"/><span className="command-label">{view.status==='failed'?t('Команда не выполнилась'):view.title}</span>
+      {view.command&&<><span className="command-separator" aria-hidden="true">·</span><span className="tool-title mono" title={view.command}>{view.command}</span></>}</>:
+      <><Icon size={16} aria-hidden="true"/><span className={'tool-title'+(view.mono?' mono':'')}>{view.title}</span></>}
+    {commandRow&&view.status==='failed'?<span className="tool-state" data-status="failed"><X size={13} aria-hidden="true"/><span>{t('Не удалось')}</span></span>:<ToolState view={view}/>}
   </>}>{()=> <div className="activity-details">
-    {view.kind==='command'?view.command&&<pre className="tool-command">{view.command}</pre>:view.kind==='edit'?<DiffBody input={input} name={(block.name||'').toLowerCase()}/>:view.plan?<PlanChecklist items={view.plan}/>:<ToolFields input={block.input}/>}
+    {commandRow?view.command&&<pre className="tool-command">{view.command}</pre>:view.plan?<PlanChecklist items={view.plan}/>:<ToolFields input={block.input}/>}
     {result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth} command={view.command} prose={prose}/></div>}
   </div>}</Disclosure>;
 }
@@ -251,7 +265,7 @@ export function RichBlock({block,depth=0,result,onSubagent,running=false,streami
   if(block.type==='tool_result')return <Disclosure className={`tool-card result ${block.is_error?'failed':''}`} summary={block.is_error?t('Ошибка инструмента'):t('Результат инструмента')}>{()=> <ToolResultContent block={block} depth={depth}/>}</Disclosure>;
   if(block.type==='tool_use')return <ToolRow block={block} result={result} running={running} depth={depth}/>;
   // Reasoning stays open while it is being written and folds once the turn moves on.
-  if(block.type==='thinking')return <Disclosure key={streaming&&running?'live':'done'} defaultOpen={streaming&&running} className="thinking" summary={t('Рассуждения')}>{()=> <p>{block.thinking}</p>}</Disclosure>;
+  if(block.type==='thinking')return <ReasoningDisclosure key={streaming&&running?'live':'done'} live={streaming&&running} paragraphs={[block.thinking||'']}/>;
   if(block.type==='redacted_thinking')return <p className="muted">{t('Этот блок размышлений скрыт провайдером')}</p>;
   return <Disclosure className="tool-card" summary={block.type==='codexItem'?t('Подробности действия'):<>{t('Дополнительные данные')} · {block.type}</>}>{()=> <pre>{JSON.stringify(block,null,2)}</pre>}</Disclosure>;
 }

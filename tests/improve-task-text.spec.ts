@@ -1,7 +1,7 @@
 import {expect,test,type Page,type Route} from '@playwright/test';
 import {newChat,openChatList} from './chat-navigation';
 
-async function chat(page:Page,generate:(route:Route)=>Promise<void>,providers=()=>['claude','copilot']){
+async function chat(page:Page,generate:(route:Route)=>Promise<void>,providers=()=>['claude','codex','copilot']){
   const calls:{endpoint:string;method:string}[]=[];
   await page.setViewportSize({width:320,height:760});
   await page.addInitScript(()=>{
@@ -19,7 +19,7 @@ async function chat(page:Page,generate:(route:Route)=>Promise<void>,providers=()
     if(endpoint==='/task-text/improve')return generate(route);
     return route.fulfill({status:404,json:{error:'Fixture endpoint unavailable'}});
   });
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);await newChat(page);
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);await newChat(page);
   return {calls,draft:page.getByRole('textbox',{name:'Message Claude'})};
 }
 
@@ -37,7 +37,11 @@ test('Improve previews the selected provider response and applies only the revie
   expect(a.x+a.width).toBeLessThanOrEqual(b.x+1);
   await trigger.click();
   const dialog=page.getByRole('dialog',{name:'Improve with AI · Instructions'});
-  await dialog.getByRole('combobox',{name:'Provider',exact:true}).selectOption('copilot');
+  await dialog.getByRole('radio',{name:'Claude',exact:true}).focus();
+  await page.keyboard.press('ArrowRight');await expect(dialog.getByRole('radio',{name:'Codex',exact:true})).toBeChecked();
+  const emptyBriefBytes=Buffer.byteLength(JSON.stringify({currentField:'Check the sample.',brief:''}));
+  await expect(dialog.getByText(`Codex · ${4000-emptyBriefBytes} of 4000 UTF-8 bytes remaining.`)).toBeVisible();
+  await page.keyboard.press('ArrowRight');await expect(dialog.getByRole('radio',{name:'GitHub Copilot',exact:true})).toBeChecked();
   await dialog.getByLabel('Drafting guidance').fill('Include a verifiable check.');
   await dialog.getByRole('button',{name:'Generate suggestion'}).click();
   await expect(dialog.getByLabel('Suggested text')).toHaveValue('Check the sample and report the result.');
@@ -59,7 +63,7 @@ test('an empty field can be filled from guidance and dismissed without changing 
   await expect(dialog.getByRole('alert')).toContainText('No providers');
   available=true;
   await dialog.getByRole('button',{name:'Refresh providers'}).click();
-  await expect(dialog.getByRole('combobox',{name:'Provider',exact:true})).toHaveValue('copilot');
+  await expect(dialog.getByRole('radio',{name:'GitHub Copilot',exact:true})).toBeChecked();
   const generate=dialog.getByRole('button',{name:'Generate suggestion'});
   await expect(generate).toBeDisabled();
   await dialog.getByLabel('Drafting guidance').fill('Review the examples.');
@@ -67,9 +71,46 @@ test('an empty field can be filled from guidance and dismissed without changing 
   await dialog.getByRole('button',{name:'Generate again'}).click();
   await expect(dialog.getByLabel('Suggested text')).toHaveValue('Review the examples.');
   await dialog.getByRole('button',{name:'Apply',exact:true}).focus();await page.keyboard.press('Tab');
-  await expect(dialog.getByRole('combobox',{name:'Provider',exact:true})).toBeFocused();
+  await expect(dialog.getByRole('radio',{name:'GitHub Copilot',exact:true})).toBeFocused();
   await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(draft).toHaveValue('');
   await expect(trigger).toBeFocused();
+});
+
+test('API connections load models on selection, recover from a failed catalogue and apply the chosen model response',async({page})=>{
+  const posts:Record<string,unknown>[]=[];
+  const {draft}=await chat(page,route=>{
+    posts.push(route.request().postDataJSON());return route.fulfill({json:{text:'Reviewed instruction.'}});
+  });
+  const accounts=Array.from({length:14},(_,i)=>({id:'account-'+i,name:'Example connection '+(i+1)}));
+  await page.route('**/api/task-text/providers',route=>route.fulfill({json:{providers:['claude','codex','copilot'],accounts}}));
+  const reads:string[]=[];
+  let failed=false;
+  await page.route('**/api/custom-providers/*/models',route=>{
+    const target=new URL(route.request().url()).pathname.split('/').at(-2)!;reads.push(target);
+    if(!failed){failed=true;return route.fulfill({status:503,json:{error:'Catalogue unavailable'}});}
+    return route.fulfill({json:['sample-fast','sample-precise']});
+  });
+  await draft.fill('Review this instruction.');
+  await page.getByRole('button',{name:'Improve with AI · Instructions'}).click();
+  const dialog=page.getByRole('dialog',{name:'Improve with AI · Instructions'});
+  await expect(dialog.getByRole('radio')).toHaveCount(3);
+  const section=dialog.locator('summary',{hasText:'API connections'});
+  await section.focus();await section.press('Enter');
+  expect(reads).toEqual([]);
+  await dialog.getByRole('combobox',{name:'Connection',exact:true}).selectOption('account-13');
+  await expect(dialog.getByRole('alert')).toContainText('Catalogue unavailable');
+  const generate=dialog.getByRole('button',{name:'Generate suggestion'});
+  await expect(generate).toBeDisabled();
+  await dialog.getByRole('button',{name:'Refresh models'}).click();
+  await dialog.getByRole('combobox',{name:'Model',exact:true}).selectOption('sample-precise');
+  expect(reads).toEqual(['account-13','account-13']);
+  expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  await generate.click();
+  await expect(dialog.getByLabel('Suggested text')).toHaveValue('Reviewed instruction.');
+  await expect(draft).toHaveValue('Review this instruction.');
+  expect(posts).toHaveLength(1);
+  expect(posts[0]).toMatchObject({provider:'custom',account:'account-13',model:'sample-precise',text:'Review this instruction.'});
+  await dialog.getByRole('button',{name:'Apply',exact:true}).click();await expect(draft).toHaveValue('Reviewed instruction.');
 });
 
 test('a late suggestion cannot replace a newer version of the input',async({page})=>{

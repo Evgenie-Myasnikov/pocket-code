@@ -1,0 +1,25 @@
+@media (prefers-reduced-motion:no-preference) and (forced-colors:none) {
+  body:not(.desktop-resizing) .desktop-app:not(:has(.desktop-rail-resizer:focus-visible)) {
+    transition:grid-template-columns var(--dur-medium) var(--ease-standard);
+  }
+  .tasks-page-inner, .document-library, .settings-categorized, .work-boards {
+    animation:workspace-appear var(--dur-short) var(--ease-standard);
+  }
+  .chain-context, .task-live-response, .improve-suggestion,
+  .project-folder-dialog, .improve-dialog, .markdown-task-dialog {
+    animation:workspace-reveal var(--dur-medium) var(--ease-emphasized-decelerate);
+  }
+  .chain-steps>li, .chain-node {
+    transition:background-color var(--dur-medium),border-color var(--dur-medium),color var(--dur-short);
+  }
+  .task-step-result summary svg, .chain-context summary svg, .improve-source summary svg {
+    transition:transform var(--dur-short) var(--ease-standard);
+  }
+}
+@keyframes workspace-appear {
+  from { opacity:.65; } to { opacity:1; }
+}
+@keyframes workspace-reveal {
+  from { opacity:.45; transform:translateY(4px); }
+  to { opacity:1; transform:translateY(0); }
+}

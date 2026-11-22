@@ -7,8 +7,8 @@ function markdown(name:string,text:string){
 }
 
 async function openTaskDialog(page:Page){
-  await page.getByRole('button',{name:'Attach files',exact:true}).click();
-  await page.getByRole('button',{name:'Markdown tasks',exact:true}).click();
+  await page.locator('.desktop-rail').getByRole('button',{name:'Tasks',exact:true}).click();
+  await page.getByRole('button',{name:'Import Markdown',exact:true}).click();
   return page.getByRole('dialog',{name:'Markdown tasks'});
 }
 
@@ -21,8 +21,11 @@ function sentPrompts(page:Page){
 
 test('a Markdown batch keeps the draft and sends all tasks in manifest order',async({page})=>{
   await desktop(page);
+  await page.evaluate(()=>{(window as any).testHealthGate=new Promise<void>(resolve=>{(window as any).finishHealth=resolve;});});
   await page.getByRole('button',{name:'New chat',exact:true}).click();
   const draft=page.getByRole('textbox',{name:'Message Claude',exact:true});
+  await expect(draft).toHaveCount(0);
+  await page.evaluate(()=>{(window as any).finishHealth();});
   await draft.fill('Use the sample workspace.');
   const dialog=await openTaskDialog(page);
   await dialog.getByLabel('Main context (.md)',{exact:true}).setInputFiles(markdown('queue.md',[
@@ -34,7 +37,6 @@ test('a Markdown batch keeps the draft and sends all tasks in manifest order',as
   const prepare=dialog.getByRole('button',{name:'Prepare draft'});
   await expect(dialog).toContainText('outline.md');
   await expect(prepare).toBeDisabled();
-  await expect(draft).toHaveValue('Use the sample workspace.');
 
   // Select in reverse order: the manifest determines what the agent receives.
   await dialog.getByLabel('Task files (.md)',{exact:true}).setInputFiles([
@@ -86,20 +88,26 @@ test('linked chats show execution order, per-step context and project history',a
   await page.addInitScript(()=>{
     localStorage.setItem('pocket-code-language-v1','ru');
     let chain:MarkdownChainDetail|undefined;
-    type Start={id:string;name:string;cwd:string;provider:'claude';context:string;tasks:MarkdownChainStep[]};
+    const account='00000000-0000-4000-8000-000000000001';
+    (window as any).testTaskTextAccounts=[{id:account,name:'Учебный API'}];
+    (window as any).testTaskTextModels={[account]:['catalog-editor']};
+    type Start={id:string;name:string;cwd:string;provider:'claude';account?:string;model?:string;context:string;tasks:MarkdownChainStep[]};
     (window as any).testChainRequest=(path:string,data:Start|undefined,params:URLSearchParams)=>{
       if(path==='/task-chains'&&data){
         if(!chain){
-          chain={id:data.id,name:data.name,cwd:data.cwd,provider:data.provider,context:data.context,status:'running',
+          chain={id:data.id,name:data.name,cwd:data.cwd,provider:data.provider,account:data.account,accountName:data.account===account?'Учебный API':undefined,model:data.model,context:data.context,status:'running',
             steps:data.tasks.map((task,i)=>({...task,status:i===0?'done':i===1?'running':'pending'}))};
           Object.assign(chain.steps[0],{sessionId:'alpha',handoff:'Собраны 12 карточек. Для каждой записаны название и категория.'});
-          chain.steps[1].sessionId='beta';
+          Object.assign(chain.steps[1],{sessionId:'beta',phase:'responding',output:'Сверяю первые четыре категории.'});
+          const running=chain.steps[1];
+          (window as any).advanceSyntheticReply=()=>{running.output+=' Проверка продолжается.';};
           return {error:'Ответ хоста потерян',status:503};
         }
         if(data.id!==chain.id)return {error:'Duplicate chain created',status:409};
         return {value:chain};
       }
       if(path==='/task-chains')return {value:chain?[{id:chain.id,name:chain.name,status:chain.status,stepsDone:1,stepCount:3,stepIndex:chain.steps.findIndex(step=>step.sessionId===params.get('sessionId'))}]:[]};
+      if(path.endsWith('/delete')){chain=undefined;return {value:{ok:true}};}
       if(path.endsWith('/stop')&&chain){chain.status='stopped';chain.steps[1].status='stopped';}
       return {value:chain};
     };
@@ -108,9 +116,11 @@ test('linked chats show execution order, per-step context and project history',a
   await page.getByRole('button',{name:'Новый чат',exact:true}).click();
   const draft=page.getByRole('textbox',{name:'Сообщение Claude'});
   await draft.fill('Черновик сообщения');
-  const menu=page.locator('.composer-attach');
-  await menu.click();
-  await page.getByRole('button',{name:'Задачи из Markdown',exact:true}).click();
+  const tasksNav=page.locator('.desktop-rail').getByRole('button',{name:'Задачи',exact:true});
+  await tasksNav.click();
+  await page.getByRole('region',{name:'Задачи',exact:true}).getByRole('button',{name:'Claude',exact:true}).click();
+  await page.getByRole('menuitemradio',{name:'Учебный API'}).click();
+  await page.getByRole('button',{name:'Импорт Markdown',exact:true}).click();
   const importer=page.getByRole('dialog',{name:'Задачи из Markdown'});
   await importer.getByLabel('Основной контекст (.md)').setInputFiles(markdown('Обновление каталога.md',[
     'Используй учебный каталог. Сохрани названия и порядок разделов.',
@@ -122,30 +132,53 @@ test('linked chats show execution order, per-step context and project history',a
   await start.click();
   await expect(importer.getByRole('alert')).toHaveText('Ответ хоста потерян');
   await start.click();
-  const panel=page.getByRole('dialog',{name:'Цепочки задач'});
+  const panel=page.getByRole('region',{name:'Задачи',exact:true});
   await expect(panel.getByText('Готово 1 / 3')).toBeVisible();
   const steps=panel.locator('.chain-steps > li');
   await expect(steps).toHaveCount(3);
   await expect(steps.nth(1)).toHaveAttribute('data-status','running');
+  await expect(steps.nth(1)).toContainText('Сверяю первые четыре категории.');
+  await expect(steps.nth(1).locator('.task-phase strong')).toHaveText('Claude · Учебный API');
   await expect(steps.nth(2).getByRole('button',{name:'Открыть чат'})).toHaveCount(0);
   const capture=process.env.POCKET_CHAIN_PREVIEW;
-  if(capture){await page.evaluate(()=>document.fonts.ready.then(()=>true));await panel.screenshot({path:capture});}
+  if(capture){await page.evaluate(()=>document.fonts.ready.then(()=>true));await page.screenshot({path:capture});}
   await steps.nth(1).getByRole('button',{name:'Контекст шага'}).click();
   const context=steps.nth(1).locator('.chain-context');
+  await expect(context.locator('.chain-run-settings')).toContainText('catalog-editor');
   await expect(context.getByText('Собраны 12 карточек.',{exact:false}).first()).toBeVisible();
   await expect(context.getByText('Используй учебный каталог.',{exact:false}).first()).toBeVisible();
   if(capture)await panel.screenshot({path:capture.replace(/\.png$/,'-context.png')});
+  const live=steps.nth(1).locator('.task-live-response');
+  await expect(live).toHaveCSS('animation-name','workspace-reveal');
+  await live.evaluate(element=>{
+    (window as any).originalReply=element;
+    (window as any).replyRestarts=0;
+    element.addEventListener('animationstart',()=>{(window as any).replyRestarts++;});
+    (window as any).advanceSyntheticReply();
+  });
+  await expect(live).toContainText('Проверка продолжается.');
+  expect(await live.evaluate(element=>element===(window as any).originalReply&&(window as any).replyRestarts===0)).toBe(true);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(context).toHaveCSS('animation-name','none');
   await context.locator('summary').click();
   await expect(context.locator('details pre')).toContainText('Проверить категории');
-  await panel.getByRole('button',{name:'Закрыть',exact:true}).click();
-  await expect(draft).toHaveValue('Черновик сообщения');
-  await menu.click();await page.getByRole('button',{name:'Цепочки задач',exact:true}).click();
+  await panel.getByRole('button',{name:'Цепочки задач',exact:true}).click();
   await panel.getByRole('button',{name:/Обновление каталога/}).click();
   await panel.getByRole('button',{name:'Остановить цепочку'}).click();
   await expect(steps.nth(1)).toHaveAttribute('data-status','stopped');
+  await steps.first().getByRole('button',{name:'Контекст шага'}).click();
+  const settings=steps.first().locator('.chain-run-settings');
+  await expect(settings).toContainText('Claude · Учебный API');await expect(settings).toContainText('catalog-editor');
   await steps.first().getByRole('button',{name:'Открыть чат'}).click();
   await expect(panel).toBeHidden();
   await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((call:any)=>call.endpoint?.includes('/sessions/alpha/messages')))).toBe(true);
   await page.getByRole('button',{name:/Шаг 1 \/ 3/}).click();
   await expect(panel.getByRole('heading',{name:'Обновление каталога.md'})).toBeVisible();
+  await panel.getByRole('button',{name:'Удалить цепочку'}).click();
+  await page.getByRole('button',{name:'Отмена',exact:true}).click();
+  await expect(panel.getByRole('heading',{name:'Обновление каталога.md'})).toBeVisible();
+  await panel.getByRole('button',{name:'Удалить цепочку'}).click();
+  await page.getByRole('button',{name:'Удалить',exact:true}).click();
+  await expect(panel.getByRole('button',{name:/Обновление каталога/})).toHaveCount(0);
+  await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((call:any)=>call.endpoint?.endsWith('/delete')).length)).toBe(1);
 });

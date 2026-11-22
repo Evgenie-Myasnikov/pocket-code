@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {Capacitor,registerPlugin} from '@capacitor/core';
 import type {Connection} from './api';
 import {desktopCall} from './desktop-bridge';
+import {muteScope,useChatMute,useMutedChats,type MutedChat} from './chat-mute';
 export type WatchedChat={provider:string;sessionId?:string;jobId?:string;cwd:string;title:string;connectionUrl?:string};
 const desktop=()=>new URLSearchParams(location.search).get('desktop')==='1';
 const native=registerPlugin<{
@@ -10,6 +11,7 @@ const native=registerPlugin<{
   pending():Promise<{chat?:WatchedChat}>;
   watchAll(value:{url:string;token:string;language:string}):Promise<void>;
   stopAll():Promise<void>;
+  setMuted(value:{url:string;mutedChats:MutedChat[]}):Promise<void>;
 }>('ChatNotifications');
 
 const runAlertsKey='pocket-code-run-alerts';
@@ -24,6 +26,13 @@ export function useRunAlertsPreference(){
 /** Completion alerts for every PC chat, including ones started on the PC; native so they continue while the WebView sleeps. */
 export function useRunNotifications(connection:Connection|null,language:string,nativeDesktop=false){
   const enabled=useRunAlertsPreference();
+  const mutedChats=useMutedChats(nativeDesktop?'desktop':muteScope(connection));
+  useEffect(()=>{
+    if(nativeDesktop){void desktopCall('chat-mutes',{mutedChats}).catch(()=>{});return;}
+    if(!desktop()&&connection?.url&&Capacitor.getPlatform()==='android'){
+      void native.setMuted({url:connection.url,mutedChats}).catch(()=>{});
+    }
+  },[nativeDesktop,connection?.url,mutedChats]);
   useEffect(()=>{
     // A temporary native host outage must not turn the user's preference off or discard queued targets.
     if(desktop()){if(nativeDesktop)void desktopCall('run-alerts',{enabled,language}).catch(()=>{});return;}
@@ -56,12 +65,13 @@ function usePendingNotification(connection:Connection|null,onOpen:(chat:WatchedC
 /** Native polling survives WebView suspension. Credentials stay in process memory. */
 export function useChatNotifications(connection:Connection|null,chat:WatchedChat|null|undefined,language:string,onOpen:(chat:WatchedChat)=>void){
   const alerts=useRunAlertsPreference();
+  const {muted}=useChatMute(connection,chat?.provider||'',chat?.sessionId||'',chat?.jobId);
   usePendingNotification(connection,onOpen);
   const signature=chat?JSON.stringify(chat):chat;
   useEffect(()=>{
     if(Capacitor.getPlatform()!=='android')return;
-    if(!connection||chat===null){void native.clear().catch(()=>{});return;}
+    if(!connection||chat===null||chat&&muted){void native.clear().catch(()=>{});return;}
     // undefined means another main section is open; retain the last chat.
     if(chat)void native.watch({...chat,url:connection.url,token:connection.token,language,alerts}).catch(()=>{});
-  },[connection,signature,language,alerts]);
+  },[connection,signature,language,alerts,muted]);
 }

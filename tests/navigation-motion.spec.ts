@@ -24,11 +24,11 @@ test('rail labels support hover, keyboard and Escape outside a collapsed sidebar
  await board.hover();const tooltip=page.getByRole('tooltip');await expect(tooltip).toHaveText('Board');
  const tip=(await tooltip.boundingBox())!,bounds=(await rail.boundingBox())!;expect(tip.x+tip.width).toBeGreaterThan(bounds.x+bounds.width);expect(tip.x+tip.width).toBeLessThan(1440);
  await tooltip.hover();await expect(tooltip).toBeVisible();await page.keyboard.press('Escape');await expect(tooltip).toHaveCount(0);
- await page.mouse.move(900,700);await chats.focus();await page.keyboard.press('Tab');await expect(board).toBeFocused();await expect(tooltip).toHaveText('Board');
+ await page.mouse.move(900,700);await chats.focus();await page.keyboard.press('Tab');await expect(rail.getByRole('button',{name:'Tasks',exact:true})).toBeFocused();await page.keyboard.press('Tab');await expect(board).toBeFocused();await expect(tooltip).toHaveText('Board');
  for(const theme of ['dark','light']){await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.screenshot({path:`.local/interaction-rail-tooltip-${theme}.png`,animations:'disabled'});}
  await page.keyboard.press('Escape');await expect(tooltip).toHaveCount(0);await expect(board).toBeFocused();await expect(chats).toHaveAttribute('aria-current','page');
  await page.keyboard.press('Enter');await expect(board).toHaveAttribute('aria-current','page');await expect(tooltip).toHaveCount(0);
- await page.emulateMedia({reducedMotion:'reduce'});await page.keyboard.press('Tab');await expect(tooltip).toHaveText('Rules');expect(await activeAnimations(page,'.rail-tooltip')).toBe(0);
+ await page.emulateMedia({reducedMotion:'reduce'});await rail.locator('.rail-quick-chats button').last().focus();await page.keyboard.press('Tab');await expect(tooltip).toHaveText('Rules');expect(await activeAnimations(page,'.rail-tooltip')).toBe(0);
  await page.emulateMedia({forcedColors:'active'});expect(await activeAnimations(page,'.rail-tooltip')).toBe(0);await expect(tooltip).toHaveCSS('border-top-style','solid');
 });
 
@@ -79,7 +79,7 @@ test('rapid menu dismissal cancels Motion effects and reopening retains focus an
 });
 
 test('Motion press follows replacement rail icons and cancels on release, blur and reduced motion',async({page})=>{
- await desktop(page);const toggle=page.locator('.desktop-rail-heading button'),selector='.desktop-rail-heading button';
+ await desktop(page);const toggle=page.locator('.desktop-rail-toggle'),selector='.desktop-rail-toggle';
  const press=async(keyboard=false)=>page.evaluate(async({selector,keyboard})=>{
   const button=document.querySelector<HTMLButtonElement>(selector)!;button.focus();
   button.dispatchEvent(keyboard?new KeyboardEvent('keydown',{key:' ',bubbles:true}):new PointerEvent('pointerdown',{button:0,isPrimary:true,pointerType:'mouse',bubbles:true}));

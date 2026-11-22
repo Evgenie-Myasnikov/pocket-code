@@ -1,0 +1,30 @@
+.project-folder-field{display:grid;gap:.4rem;min-width:0}
+button.project-folder-trigger{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;min-height:38px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;text-align:left}
+.project-folder-trigger>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.project-folder-trigger>svg,.project-folder-dialog button>svg{flex-shrink:0}
+.modal-backdrop.project-folder-backdrop{backdrop-filter:blur(2px);background:color-mix(in srgb,var(--scrim) 78%,transparent)}
+.project-folder-dialog{box-sizing:border-box;display:flex;flex-direction:column;gap:12px;width:min(34rem,calc(100vw - 24px));height:min(34rem,82dvh);padding:clamp(16px,3vw,24px);border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--text);overflow:hidden;text-align:start;box-shadow:0 14px 48px var(--shadow-soft)}
+.project-folder-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.project-folder-dialog h2{margin:0;font-size:1.14rem}
+.project-folder-dialog>header .icon-button{width:36px;height:36px;min-height:36px}
+.project-folder-search{display:flex;align-items:center;gap:8px;min-width:0;border:1px solid var(--line);border-radius:8px;padding:0 10px;color:var(--muted)}
+.project-folder-search:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.project-folder-dialog .project-folder-search input[type=search]{width:100%;min-width:0;padding:9px 0;border:none;outline:none;box-shadow:none;background:transparent;color:var(--text);font:inherit}
+.project-folder-crumbs{display:flex;align-items:center;flex-wrap:wrap;overflow:auto;max-height:4.8rem;gap:3px;font-size:.85rem}
+.project-folder-crumbs span{display:inline-flex;align-items:center;min-width:0;gap:2px}
+.project-folder-crumbs button{border:none;background:transparent;color:var(--muted);font:inherit;overflow-wrap:anywhere;padding:5px}
+.project-folder-crumbs button[aria-current=location]{color:var(--text);font-weight:var(--fw-semibold)}
+.project-folder-rows{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;text-align:start}
+.project-folder-row{display:flex;gap:3px;align-items:stretch;border-bottom:1px solid var(--line)}
+.project-folder-row button{display:flex;align-items:center;gap:10px;min-height:43px;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:var(--text);font:inherit;text-align:start}
+.project-folder-choice{flex:1;min-width:0}
+.project-folder-choice>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.project-folder-choice>span strong{font-weight:var(--fw-medium)}
+.project-folder-choice small{display:block;color:var(--muted);font-size:.83em}
+.project-folder-row button:hover,.project-folder-crumbs button:hover{background:var(--surface)}
+.project-folder-choice[aria-pressed=true]{color:var(--accent)}
+.project-folder-row .project-folder-into{justify-content:center;flex:none;width:44px}
+.project-folder-dialog footer{display:flex;justify-content:flex-end}
+.project-folder-dialog :focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tasks-scope .project-folder-field{display:flex;align-items:center;gap:.65rem}
+.desktop-project-links .project-folder-trigger{width:100%}

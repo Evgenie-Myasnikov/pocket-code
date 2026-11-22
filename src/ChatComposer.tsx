@@ -8,18 +8,18 @@ import {ArrowUp,Square,LoaderCircle,ListPlus,CornerDownRight,Clock,RefreshCw} fr
 import {AttachmentTray,type DraftAttachment} from './AttachmentTray';
 import {t} from './i18n';
 import {ImproveTaskText,type ImproveScope} from './ImproveTaskText';
+import type {ProjectFolderPickerProps} from './ProjectFolderPicker';
 import {ComposerAttachButton} from './ComposerAttachButton';
-import type {MarkdownChainControls} from './MarkdownChainPanel';
 import './composer-controls.css';
 
 /** A paste this long becomes a text attachment that can be put back into the message. */
 export const LONG_PASTE=10000;
 type Props={
   scopeKey?:string;
-  chainControls?:MarkdownChainControls; improveScope?:ImproveScope;
+  improveScope?:ImproveScope;
   boardSelection?:BoardSelection|null;onRevealBoardSelection?(id:string):void;
   text:string;label:string;placeholder:string;disabled?:boolean;uploading:boolean;canSend:boolean;
-  attachments:DraftAttachment[];controls:ReactNode;projectPicker?:ReactNode;usage?:ReactNode;stopLabel:string;
+  attachments:DraftAttachment[];controls:ReactNode;projectPicker?:ProjectFolderPickerProps;usage?:ReactNode;stopLabel:string;
   /** A send is in flight: Send waits, the field keeps focus and the keyboard stays open. */
   busy?:boolean;stopping?:boolean;
   /** While a turn runs Send says what it does: queue or steer; without the PC it waits to send. */
@@ -41,7 +41,7 @@ function useShortScreen(){
 }
 
 /** Shared Windows/Android input. Resizing never changes the draft or selection. */
-export function ChatComposer({scopeKey,chainControls,improveScope,boardSelection,onRevealBoardSelection,text,label,placeholder,disabled,uploading,canSend,attachments,controls,projectPicker,usage,stopLabel,busy=false,stopping=false,mode='send',blockedReason,stopRetry=false,enterSends=false,keyHint=false,onText,onRemove,onFiles,onBoardImage,onRetry,onInsertText,onRecall,onSend,onStop}:Props){
+export function ChatComposer({scopeKey,improveScope,boardSelection,onRevealBoardSelection,text,label,placeholder,disabled,uploading,canSend,attachments,controls,projectPicker,usage,stopLabel,busy=false,stopping=false,mode='send',blockedReason,stopRetry=false,enterSends=false,keyHint=false,onText,onRemove,onFiles,onBoardImage,onRetry,onInsertText,onRecall,onSend,onStop}:Props){
   const input=useRef<HTMLTextAreaElement>(null),files=useRef<HTMLInputElement>(null),hadFocus=useRef(false),focusAtPress=useRef(false);
   const [wave,setWave]=useState<{id:number;x:number;y:number}|null>(null),waveSequence=useRef(0),wavePointer=useRef(0);
   const ripple=()=>{if(disabled||matchMedia('(prefers-reduced-motion: reduce), (forced-colors: active)').matches)return;const rect=input.current?.closest('.prompt-composer')?.getBoundingClientRect();if(rect?.width&&rect.height)setWave({id:++waveSequence.current,x:1+16/rect.width,y:1+16/rect.height});};
@@ -60,21 +60,6 @@ export function ChatComposer({scopeKey,chainControls,improveScope,boardSelection
   // The field is never disabled while sending, so Android keeps the keyboard; focus returns if anything took it.
   useEffect(()=>{if(!busy&&hadFocus.current){hadFocus.current=false;if(document.activeElement!==input.current&&!document.querySelector('[aria-modal="true"]'))input.current?.focus({preventScroll:true});}},[busy]);
   const send=()=>{if(!canSend)return;hadFocus.current=focusAtPress.current||document.activeElement===input.current;focusAtPress.current=false;onSend();};
-  const draftPrefix=text ? text+'\n\n' : '';
-  const inlineRoom=Math.max(0,100000-draftPrefix.length);
-  const hasBatchFileSlot=attachments.length+(boardSelection?.ids.length?1:0)<10;
-  const fileInstruction=t('Выполни по порядку задачи из вложенного файла markdown-tasks.md.');
-  const canAttachBatch=hasBatchFileSlot&&inlineRoom>=fileInstruction.length;
-  function prepareBatch(prompt:string){
-    if(canAttachBatch&&draftPrefix.length+prompt.length>60000){
-      onFiles([new File([prompt],'markdown-tasks.md',{type:'text/markdown'})]);
-      onText(draftPrefix+fileInstruction);
-    }else{
-      onText(draftPrefix+prompt);
-    }
-    // The dialog releases its focus trap after this event has committed.
-    requestAnimationFrame(()=>input.current?.focus({preventScroll:true}));
-  }
   // Pressing a button would move focus off the field and close the phone keyboard; keep it in the field.
   const keepFocus=(event:React.PointerEvent)=>{focusAtPress.current=document.activeElement===input.current;if(focusAtPress.current)event.preventDefault();};
   const empty=!text.trim()&&!attachments.length,stopOnly=Boolean(onStop)&&empty;
@@ -119,8 +104,7 @@ export function ChatComposer({scopeKey,chainControls,improveScope,boardSelection
     {blockedReason&&<p className="composer-hint composer-blocked" role="status">{blockedReason}</p>}
     <div className="composer-tools">
       <input hidden ref={files} type="file" multiple onChange={event=>{const incoming=Array.from(event.target.files||[]);event.target.value='';if(incoming.length)onFiles(incoming);}}/>
-      <ComposerAttachButton improveScope={improveScope} scopeKey={scopeKey} chainControls={chainControls} disabled={disabled} uploading={uploading} projectPicker={projectPicker} chooseFiles={()=>files.current?.click()}
-        maxBatchLength={canAttachBatch?1024*1024:inlineRoom} onPrepareBatch={prepareBatch}/>
+      <ComposerAttachButton disabled={disabled} uploading={uploading} projectPicker={projectPicker} chooseFiles={()=>files.current?.click()}/>
       <div className="composer-models">{controls}</div>
       <div className="composer-actions">
         {improveScope&&<ImproveTaskText key={'improve:'+scopeKey} {...improveScope} compact field="instructions" value={text} maxLength={100000} onApply={onText} disabled={disabled||busy}/>}

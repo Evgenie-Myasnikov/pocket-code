@@ -54,6 +54,11 @@ test('chain API runs distinct chats with their settings and isolates saved conte
   assert.equal(starts[0].mode,'plan');assert.equal(starts[0].maxBudgetUsd,2);assert.equal(starts[0].sessionId,undefined);
   assert.match(starts[0].text,/Shared example/);assert.doesNotMatch(starts[0].text,/Expect the sample/);
   const first=active.get(starts[0].id)!;
+  first.partial='Live example.';
+  const live:MarkdownChainDetail=await (await request(detail)).json();
+  assert.equal(live.steps[0].output,first.partial);assert.equal(live.steps[0].phase,'responding');
+  assert.equal((await request('/'+id+'/delete',scope)).status,409);
+  first.partial='';
   first.messages=[{id:randomUUID(),role:'assistant',blocks:[{type:'text',text:'Found the sample.\n'+chainCompletionMarker(id,0)}]}];first.status='done';
   await waitForStarts(2);
   assert.notEqual(starts[1].id,first.id);assert.equal(starts[1].sessionId,undefined);
@@ -62,6 +67,7 @@ test('chain API runs distinct chats with their settings and isolates saved conte
   assert.ok(full.includes(plan.tasks[1].body.trim()));assert.ok(full.includes('Found the sample.'));
   const chain:MarkdownChainDetail=await (await request(detail)).json();
   assert.equal(chain.steps[0].sessionId,first.sessionId);assert.equal(chain.steps[0].status,'done');
+  assert.equal(chain.steps[0].output,'Found the sample.');
   const [backlink]=await (await request(query+'&sessionId='+first.sessionId)).json();
   assert.equal(backlink.id,id);assert.equal(backlink.stepIndex,0);assert.equal(backlink.context,undefined);
   assert.deepEqual(await (await request(query+'&sessionId='+randomUUID())).json(),[]);
@@ -70,4 +76,8 @@ test('chain API runs distinct chats with their settings and isolates saved conte
   const [summary]=await (await request(query)).json();
   assert.equal(summary.status,'stopped');assert.equal(summary.stepCount,2);assert.equal(summary.stepsDone,1);
   assert.equal(summary.context,undefined);assert.equal(summary.steps,undefined);
+  assert.equal((await request('/'+id+'/delete',{...scope,cwd:other})).status,404);
+  assert.deepEqual(await (await request('/'+id+'/delete',scope)).json(),{ok:true});
+  assert.equal((await request(detail)).status,404);assert.deepEqual(await (await request(query)).json(),[]);
+  assert.equal((await request('',plan)).status,409);
 });

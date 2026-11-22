@@ -13,7 +13,7 @@ test('repeated calls collapse into a counted row and expose every command and re
  ],previous:null,next:null}}));
  await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openChatList(page);await page.getByRole('button',{name:/Grouped actions/}).click();
  const group=page.locator('.activity-group');await expect(group).toHaveCount(1);await expect(group.locator(':scope > summary')).toHaveText('Ran 2 commands');
- await expect(page.locator('.conversation .lucide-chevron-right')).toHaveCount(0);
+ await expect(group.locator(':scope > summary .chat-disclosure-chevron')).toBeVisible();
  await expect(page.locator('[data-message-id=second]')).toHaveCount(1);await expect(page.getByText('echo first',{exact:false})).toHaveCount(0);
  await expect(page.locator('.tool-card.failed > summary')).toBeVisible();await group.locator(':scope > summary').click();
  await expect(group.locator('.activity-group-items > details')).toHaveCount(2);for(const details of await group.locator('.activity-group-items > details').all())await details.locator('summary').click();

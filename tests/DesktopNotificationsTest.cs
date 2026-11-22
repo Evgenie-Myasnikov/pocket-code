@@ -24,6 +24,26 @@ public static class DesktopNotificationsTest {
         Check(DesktopReadPolicy.Allows("/miro/status")&&DesktopReadPolicy.AllowsWrite("/miro/items/update"),"Miro scoped routes allowed");
         Check(DesktopReadPolicy.Allows("/speech/status")&&DesktopReadPolicy.AllowsWrite("/speech/install")&&DesktopReadPolicy.AllowsWrite("/speech/synthesize"),"Speech endpoints allowed");
         Check(!DesktopReadPolicy.AllowsWrite("/speech/delete")&&!DesktopReadPolicy.Allows("/speech/synthesize"),"Speech access stays scoped");
-        Console.WriteLine("Desktop notifications: 13 checks passed without displaying OS notifications");return 0;
+        // WebView JSON arrives as a list of dictionaries, just like the bridge message.
+        var target=json.Deserialize<Dictionary<string,object>>("{\"mutedChats\":[{\"provider\":\"codex\",\"sessionId\":\"synthetic-session\",\"jobId\":\"exact-run\"}]}");
+        DesktopRunAlertBatch.SetMuted(preferences,target["mutedChats"],325);
+        Check(preferences.PendingRunAlerts.Length==1,"Mute removes queued matches while keeping the other provider");
+        Check(preferences.NotificationCursor==300&&preferences.NotificationSeen.Length==4,"Mute preserves cursor and acknowledgements");
+        preferences=json.Deserialize<DesktopPreferences>(json.Serialize(preferences));
+        var byJob=Event("by-job","codex","error","exact-run");byJob.Remove("sessionId");byJob["at"]=350;
+        var bySession=Event("by-session","codex","done","later-run");bySession["at"]=351;
+        var other=Event("other","claude","done","exact-run");other["at"]=352;
+        DesktopRunAlertBatch.Accept(preferences,Batch(400,byJob,bySession,other));
+        Check(preferences.PendingRunAlerts.Length==2,"Persisted aliases suppress job-only and session-only matches, scoped by provider");
+        Check(preferences.NotificationSeen.Length==7&&preferences.NotificationCursor==400,"Muted events advance the cursor and are acknowledged");
+        DesktopRunAlertBatch.SetMuted(preferences,new object[0],420);
+        var delayed=Event("delayed","codex","error","exact-run");delayed["at"]=410;
+        var next=Event("next","codex","done","exact-run");next["at"]=421;
+        DesktopRunAlertBatch.Accept(preferences,Batch(500,delayed,byJob,bySession,next));
+        Check(preferences.PendingRunAlerts.Length==3,"Unmute delivers new events, including after an overlapping offline catch-up");
+        Check(!DesktopRunAlertBatch.Suppressed(preferences,next)&&DesktopRunAlertBatch.Suppressed(preferences,delayed),"Presentation uses the same mute boundary");
+        DesktopRunAlertBatch.Accept(preferences,Batch(130000));
+        Check(preferences.RunAlertMutes.Count==0,"Unmuted aliases expire when the journal overlap passes");
+        Console.WriteLine("Desktop notifications: cursor, queue, bridge policy and per-chat mute checks passed");return 0;
     }
 }

@@ -8,6 +8,7 @@ import {allowedPath,HttpError} from './security.js';
 import type {ChatMessage,JobView} from './types.js';
 import {Followups,type FollowupInput} from './followups.js';
 import {coalesceReads} from './read-coalescer.js';
+import {ToolInputPreviews} from './write-preview.js';
 import {copilotUsage} from './copilot-usage.js';
 import type {CodexUsageSnapshot} from './codex-usage.js';
 
@@ -86,7 +87,7 @@ export class CopilotService{
   const client=await this.connect();const session=await client.resumeSession(id,{onPermissionRequest:()=>({kind:'denied-interactively-by-user'}),onUserInputRequest:()=>({answer:'',wasFreeform:true})});
   try{return(await session.getEvents()).map(copilotMessage).filter((message):message is ChatMessage=>!!message);}finally{await session.disconnect();}
  }
- list(){return [...this.runs.values()].map(run=>({...run.view,messages:[],partial:''}));}
+ list(){return [...this.runs.values()].map(run=>({...run.view,messages:[],partial:'',writePreviews:undefined}));}
  get(id:string){const run=this.runs.get(id);if(!run)throw new HttpError(404,'Copilot task not found.');return run.view;}
  view(job:JobView){return job;}
  start(input:Input){
@@ -111,13 +112,28 @@ export class CopilotService{
    onUserInputRequest:async(request:any)=>{if(run.view.status!=='running')return{answer:'Cancelled',wasFreeform:true};const response=await this.ask(run,'AskUserQuestion',{questions:[{question:request.question,allowFreeform:request.allowFreeform,options:request.choices?.map((label:string)=>({label}))}]});const answer=response.allow?response.answers?.[request.question]||'':'Cancelled';return{answer,wasFreeform:!response.allow||!request.choices?.includes(answer)};}};
   run.session=input.sessionId?await client.resumeSession(input.sessionId,config):await client.createSession(config);run.view.sessionId=run.session.sessionId;run.view.revision++;
   if(run.view.status!=='running'){await run.session.abort();return;}
-  unsubscribe=run.session.on(event=>{if(run.view.status!=='running')return;if(event.type==='assistant.message_delta')run.view.partial+=(event.data as any).deltaContent||'';const message=copilotMessage(event);if(message&&message.role!=='user'){run.view.messages.push(message);if(event.type==='assistant.message')run.view.partial='';}if(event.type==='session.error'){run.view.error=(event.data as any).message||'Copilot failed';run.view.status='error';}run.view.revision++;});
+  const previews=new ToolInputPreviews();
+  unsubscribe=run.session.on(event=>{
+    if(run.view.status!=='running')return;
+    if(!event.agentId){
+      if(event.type==='assistant.tool_call_delta'){
+        const {toolCallId,inputDelta,toolName}=event.data;
+        if(!toolName||toolName==='create'||toolName==='edit') previews.append(run.view,toolCallId,inputDelta,toolName);
+      }
+      if(event.type==='tool.execution_start'||event.type==='tool.execution_complete') previews.remove(run.view,event.data.toolCallId);
+    }
+    if(event.type==='assistant.message_delta')run.view.partial+=event.data.deltaContent||'';
+    const message=copilotMessage(event);
+    if(message&&message.role!=='user'){run.view.messages.push(message);if(event.type==='assistant.message')run.view.partial='';}
+    if(event.type==='session.error'){previews.clear(run.view);run.view.error=event.data.message||'Copilot failed';run.view.status='error';}
+    run.view.revision++;
+  });
   await run.session.sendAndWait({prompt:input.text,attachments:input.attachmentPaths?.map(file=>({type:'file' as const,path:file}))},3600000);
   if(run.view.status==='running')run.view.status='done';
  }catch(error){if(run.view.status!=='stopped'){run.view.status='error';run.view.error=error instanceof Error?error.message:'Copilot failed';}}
- finally{unsubscribe?.();for(const finish of run.pending.values())finish(false);run.view.partial='';run.view.revision++;await run.session?.disconnect().catch(()=>{});}}
+ finally{unsubscribe?.();delete run.view.writePreviews;for(const finish of run.pending.values())finish(false);run.view.partial='';run.view.revision++;await run.session?.disconnect().catch(()=>{});}}
  async followup(id:string,input:FollowupInput){const run=this.runs.get(id);if(!run)throw new HttpError(404,'Copilot task not found');await run.followups.run(input,async()=>{if(run.view.status!=='running'||!run.session)throw new HttpError(409,'Copilot is not ready for a follow-up. Your draft is preserved.');await run.session.send({prompt:input.text,mode:'enqueue',attachments:input.attachmentPaths?.map(file=>({type:'file' as const,path:file}))});run.view.messages.push({id:input.id,role:'user',blocks:userInputBlocks(input)});run.view.revision++;});return run.view;}
- stop(id:string){const run=this.runs.get(id);if(!run)return;run.view.status='stopped';run.view.revision++;for(const finish of run.pending.values())finish(false);void run.session?.abort().catch(()=>{});}
+ stop(id:string){const run=this.runs.get(id);if(!run)return;delete run.view.writePreviews;run.view.status='stopped';run.view.revision++;for(const finish of run.pending.values())finish(false);void run.session?.abort().catch(()=>{});}
  approve(id:string,approval:string,allow:boolean,answers?:Record<string,string>,_decision?:{message?:string;remember?:boolean;mode?:string}){const run=this.runs.get(id),finish=run?.pending.get(approval);if(!finish)throw new HttpError(404,'This question is no longer pending');finish(allow,answers);}
  loginStatus(){return this.authLogin.status();}
  async login(){if(this.list().some(job=>job.status==='running'))throw new HttpError(409,'Finish Copilot jobs before signing in.');if((await this.status()).authenticated)return{state:'connected',error:''};return this.authLogin.start();}

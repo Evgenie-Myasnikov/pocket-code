@@ -2,4 +2,48 @@
 .activity-group-items>.tool-card{margin-block:4px}
 .activity-group-items>.thinking{margin-block:8px}
 .activity-group-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
+.message .thinking>summary{display:flex;align-items:center;gap:.5em;width:fit-content;max-width:100%;cursor:pointer;color:var(--muted)}
+.message .thinking>summary>svg{flex:none}
+.message .reasoning-content{max-height:min(32dvh,16rem);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;border-inline-start:2px solid var(--line);padding-inline:1em;line-height:1.6;color:var(--muted)}
+:root[data-theme] .message .reasoning-content{scrollbar-width:auto;scrollbar-color:auto}
+.reasoning-content::-webkit-scrollbar{width:7px}
+.reasoning-content::-webkit-scrollbar-thumb{border-radius:8px;background:color-mix(in srgb,var(--muted) 55%,transparent)}
+.reasoning-content::-webkit-scrollbar-track{background:transparent}
+.message .thinking[open]>summary>.chat-disclosure-chevron{transform:rotate(-90deg)}
+.message .reasoning-content p{margin:0;padding:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.message .reasoning-content p+p{margin-block-start:.75em}
+.message .thinking+.command-row{margin-block-start:1em}
+.message .tool-card.command-row>summary{display:flex;gap:.42em;flex-wrap:nowrap;justify-content:flex-start;color:var(--muted)}
+:root[data-theme] .message .tool-card.command-row>summary{color:var(--muted)}
+.message .command-row>summary :is(.tool-state,.command-label,.command-separator,.tool-title){margin:0;color:inherit}
+.message .tool-card.command-row>summary .command-label{flex:0 0 auto;font-weight:var(--fw-medium)}
+.message .tool-card.command-row>summary .tool-title{flex:0 1 auto;max-width:45ch;min-width:1ch;font-family:var(--font-mono);text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.message .command-row>summary>.command-chevron{flex:none;margin:0;width:.9em;height:.9em}
+.message .command-row[open]>summary>.command-chevron{transform:rotate(180deg)}
+.message .command-row .tool-state{display:inline-flex;align-items:center;gap:.25em;font-weight:var(--fw-regular)}
+.message .command-row>summary .tool-state[data-status=failed]{color:var(--muted)}
+.message .command-row>.activity-details{margin:0;padding:0 0 .5em 1.38em;border:0}
+.message .command-row .tool-result-content{padding:0}
+.message .command-row .tool-output-block{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:.2em .6em;margin:.65em 0 0;padding:0;border:0}
+:root[data-theme] .chat-canvas .message .command-row :is(pre.tool-command,pre.tool-output),
+.message .tool-card.command-row :is(pre.tool-command,pre.tool-output){margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--muted);line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.message .tool-card.command-row .tool-command{font-family:var(--font-mono)}
+.message .tool-card.command-row.failed .tool-output{font-family:inherit}
+.command-row .tool-output-more{grid-column:1/-1;justify-self:start}
+.command-row .tool-output-actions{display:flex;gap:0}
+.message .command-row .copy-action{width:40px;min-height:32px;justify-content:center;padding:0}
+@media (hover:hover) and (pointer:fine){
+ .command-row:not(:hover):not(:focus-within) .tool-output-actions{opacity:0}
+}
+@media(max-width:700px),(pointer:coarse){
+ .message .command-row .tool-output-block{display:block}
+ .message .command-row .tool-output-actions{margin-block-start:.2em}
+ .message .command-row .copy-action{width:48px;min-height:48px}
+}
+@media(max-width:460px){
+ .command-row>summary .tool-state[data-status=failed]>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+}
+:root .chat-canvas .conversation .message :is(.reasoning-content,.reasoning-content p,.command-row .tool-command,.command-row .tool-output){-webkit-user-select:text;user-select:text}
+.message .tool-output-block>.tool-output{max-height:min(36dvh,20rem);overscroll-behavior:contain;scrollbar-width:thin}
+.message :is(.reasoning-content,.tool-output):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .activity-message-anchor{position:absolute;top:0;left:0;width:1px;height:1px;pointer-events:none}

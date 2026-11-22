@@ -63,7 +63,8 @@ test('only an explicitly added composer folder becomes a sidebar project',async(
  await page.getByRole('button',{name:'Attach files',exact:true}).click();
  // The menu opens above the composer; the scrolling overlay must not clip it.
  await expect.poll(()=>page.getByLabel('Add project folder').evaluate(select=>{const r=select.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&Boolean(hit&&select.contains(hit));})).toBe(true);
- await page.getByLabel('Add project folder').selectOption('C:\\Demo\\Garden');
+ await page.getByRole('button',{name:'Add project folder'}).click();
+ await page.getByRole('dialog',{name:'Add project folder'}).getByRole('button',{name:'C:\\Demo\\Garden',exact:true}).click();
  await expect(page.locator('.desktop-project-links button')).toHaveCount(1);
  await expect(page.locator('.desktop-project-links button')).toHaveText('Garden');
  await expect(page.locator('.desktop-sessions>button')).toHaveCount(2);
@@ -76,20 +77,20 @@ test('keyboard and Back keep the composer attachment picker within the draft',as
  const draft=page.getByRole('textbox',{name:'Message Claude',exact:true});
  const trigger=page.locator('.composer-attach');
  const attach=page.getByRole('group',{name:'Attach files'}).getByRole('button',{name:'Attach files'});
- const folder=page.getByRole('combobox',{name:'Add project folder'});
+ const folder=page.getByRole('button',{name:'Add project folder'});
  await draft.fill('Synthetic draft');
  await trigger.focus();await page.keyboard.press('Enter');
  await expect(attach).toBeFocused();await page.keyboard.press('Tab');await expect(folder).toBeFocused();
  await page.keyboard.press('Escape');await expect(attach).toHaveCount(0);await expect(trigger).toBeFocused();
  await trigger.press('Enter');await page.keyboard.press('Shift+Tab');await expect(trigger).toBeFocused();await expect(attach).toHaveCount(0);
  await trigger.press('Enter');await page.keyboard.press('Tab');await page.keyboard.press('Tab');
- await expect(page.getByRole('button',{name:'Markdown tasks'})).toBeFocused();await page.keyboard.press('Tab');
- await expect(page.getByRole('button',{name:'Task chains',exact:true})).toBeFocused();await page.keyboard.press('Tab');
+ await expect(page.getByRole('button',{name:'Markdown tasks',exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:/^Access mode:/})).toBeFocused();await expect(attach).toHaveCount(0);
  await trigger.focus();
  await page.keyboard.press('Space');await expect(attach).toBeFocused();
  await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
  await expect(attach).toHaveCount(0);await expect(trigger).toBeFocused();
- await page.keyboard.press('Enter');await folder.selectOption('C:\\Demo\\Garden');
+ await page.keyboard.press('Enter');await folder.click();
+ await page.getByRole('dialog',{name:'Add project folder'}).getByRole('button',{name:'C:\\Demo\\Garden',exact:true}).click();
  await expect(attach).toHaveCount(0);await expect(trigger).toBeFocused();await expect(draft).toHaveValue('Synthetic draft');
 });

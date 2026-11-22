@@ -19,12 +19,12 @@ async function host(page:Page){
     return route.fulfill({status:404,json:{error:'Synthetic endpoint unavailable'}});
   });
 }
-async function connect(page:Page,provider='codex'){
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);
+async function connect(page:Page,provider='codex',firstMessage=1){
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await chooseProvider(page,provider);
   await page.getByRole('button',{name:`Saved ${provider} chat`}).click();
-  await expect(page.getByText('History message 1',{exact:true})).toHaveCount(1);
+  await expect(page.getByText(`History message ${firstMessage}`,{exact:true})).toHaveCount(1);
 }
 async function submit(page:Page){
   await page.getByRole('button',{name:'Send message',exact:true}).click();
@@ -78,50 +78,50 @@ test('scrolling to history edges loads automatically once and preserves the visi
   await page.route('**/api/sessions/saved-chat/messages?*',async route=>{
     const url=new URL(route.request().url()),window=Number(url.searchParams.get('window')),fromStart=url.searchParams.get('from')==='start';
     windows.push(window);
-    if(window===200&&!fromStart)await expansion.promise;
-    const start=fromStart?1:window===100?101:1,count=window===100?100:201;
+    if(window===300&&!fromStart)await expansion.promise;
+    const count=Math.min(window,300),start=fromStart?1:301-count;
     const messages=Array.from({length:count},(_,i)=>message(start+i));
-    if(window===200)messages.push(message(201)); // Repeated server item must not duplicate a bubble.
-    return route.fulfill({json:{messages,previous:!fromStart&&window===100?100:null,next:fromStart&&window===100?100:null}});
+    if(count===300)messages.push(message(300)); // Repeated server item must not duplicate a bubble.
+    return route.fulfill({json:{messages,previous:!fromStart&&start>1?start-1:null,next:fromStart&&count<300?count:null}});
   });
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
-  await expect(page.locator('.message')).toHaveCount(100);
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
+  await expect(page.locator('.message')).toHaveCount(200);
   await expect(page.getByRole('button',{name:/Load earlier messages|Load next messages/})).toHaveCount(0);
   const scroller=page.locator('.conversation');
   await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
   await scroller.evaluate(el=>{el.scrollTo({top:0,behavior:'instant'});el.dispatchEvent(new Event('scroll'));el.dispatchEvent(new Event('scroll'));});
-  await expect.poll(()=>windows.filter(window=>window===200).length).toBe(1);
+  await expect.poll(()=>windows.filter(window=>window===300).length).toBe(1);
   const oldAnchor=page.locator('.message').filter({has:page.getByText('History message 101',{exact:true})});
   await expect(page.getByText('Loading messages…',{exact:true})).toBeVisible();
   const oldTop=await oldAnchor.evaluate(el=>el.getBoundingClientRect().top);expansion.resolve();
-  await expect(page.locator('.message')).toHaveCount(201);
+  await expect(page.locator('.message')).toHaveCount(300);
   await expect.poll(()=>oldAnchor.evaluate(el=>el.getBoundingClientRect().top)).toBeCloseTo(oldTop,0);
-  expect(windows.filter(window=>window===200)).toHaveLength(1);await expect(page.getByText('Beginning of chat',{exact:true})).toHaveCount(1);
+  expect(windows.filter(window=>window===300)).toHaveLength(1);await expect(page.getByText('Beginning of chat',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'More actions',exact:true}).click();await page.getByRole('menuitem',{name:'Go to beginning'}).click();await expect(page.locator('.message')).toHaveCount(100);
   await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(0);
   await scroller.evaluate(el=>{el.scrollTo({top:el.scrollHeight,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
-  await expect(page.locator('.message')).toHaveCount(201);await expect(page.getByText('History message 201',{exact:true})).toHaveCount(1);
+  await expect(page.locator('.message')).toHaveCount(200);await expect(page.getByText('History message 200',{exact:true})).toHaveCount(1);
 });
 
 test('a failed edge load waits for another user scroll before retrying',async({page})=>{
   await host(page);let attempts=0;
   await page.route('**/api/sessions/saved-chat/messages?*',route=>{
     const window=Number(new URL(route.request().url()).searchParams.get('window'));
-    if(window>100){attempts++;return route.fulfill({status:503,json:{error:'Synthetic offline history'}});}
-    return route.fulfill({json:{messages:Array.from({length:100},(_,i)=>message(i+1)),previous:100,next:null}});
+    if(window>200){attempts++;return route.fulfill({status:503,json:{error:'Synthetic offline history'}});}
+    return route.fulfill({json:{messages:Array.from({length:200},(_,i)=>message(i+101)),previous:100,next:null}});
   });
-  await connect(page,'claude');const scroller=page.locator('.conversation');await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
+  await connect(page,'claude',101);const scroller=page.locator('.conversation');await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
   await scroller.evaluate(el=>{el.scrollTo({top:0,behavior:'instant'});el.dispatchEvent(new Event('scroll'));});
   await expect(page.locator('.history-page-status')).toContainText('History could not be refreshed');await expect(page.locator('.history-page-status')).toContainText('Synthetic offline history');
   await scroller.evaluate(el=>{el.dispatchEvent(new Event('scroll'));el.dispatchEvent(new Event('scroll'));});expect(attempts).toBe(1);
   await scroller.evaluate(el=>{el.scrollTop=100;el.dispatchEvent(new Event('scroll'));el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
-  await expect.poll(()=>attempts).toBe(2);await expect(page.locator('.message')).toHaveCount(100);
+  await expect.poll(()=>attempts).toBe(2);await expect(page.locator('.message')).toHaveCount(200);
 });
 
 test('reading mode hides controls and preserves the chat, draft and scroll on exit and Back',async({page})=>{
   await host(page);await page.setViewportSize({width:390,height:844});
   await page.route('**/api/sessions/saved-chat/messages?*',route=>route.fulfill({json:{messages:Array.from({length:100},(_,i)=>message(i+1)),previous:null,next:null}}));
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
   await page.getByLabel('Message Claude').fill('Draft kept during reading');
   const anchor=page.getByText('History message 40',{exact:true});await anchor.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
   const offset=()=>anchor.evaluate(el=>el.getBoundingClientRect().top-document.querySelector('.conversation')!.getBoundingClientRect().top);
@@ -156,7 +156,7 @@ test('opening a running chat follows its current answer instead of the old bookm
  await page.getByRole('button',{name:'Saved claude chat'}).click();await expect(page.getByText('Current answer is being written here',{exact:true})).toBeVisible();await expect.poll(()=>scroller.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(80);
 });
 
-test('chat position and jump controls survive downward scrolling, tab changes and reload',async({page})=>{
+test('manual scrolling exposes jump controls and explicit chat reopening returns to the latest message',async({page})=>{
  await page.setViewportSize({width:390,height:844});await host(page);
  await page.route('**/api/sessions/saved-chat/messages?*',route=>route.fulfill({json:{messages:Array.from({length:100},(_,i)=>message(i+1)),previous:null,next:null}}));
  await connect(page,'claude');const scroller=page.locator('.conversation');
@@ -164,19 +164,22 @@ test('chat position and jump controls survive downward scrolling, tab changes an
  await scroller.evaluate(el=>{el.scrollTop=1800;el.dispatchEvent(new Event('scroll'));});
  await scroller.evaluate(el=>{el.scrollTop=1900;el.dispatchEvent(new Event('scroll'));});
  await expect(page.getByRole('button',{name:/^Jump to latest messages/})).toBeVisible();
- const before=await scroller.evaluate(el=>el.scrollTop);
+ const distanceFromLatest=()=>scroller.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop);
+ await expect.poll(distanceFromLatest).toBeGreaterThan(1000);
  await openSection(page,'Settings');
  await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
- await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
+ await expect.poll(distanceFromLatest).toBeLessThan(2);
+ await scroller.evaluate(el=>{el.scrollTop=1900;el.dispatchEvent(new Event('scroll'));});
  await page.getByRole('button',{name:'Back to chats',exact:true}).click();
  await page.getByRole('button',{name:'Saved claude chat'}).click();
- await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
+ await expect.poll(distanceFromLatest).toBeLessThan(2);
+ await scroller.evaluate(el=>{el.scrollTop=1900;el.dispatchEvent(new Event('scroll'));});
  await page.reload();await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
- await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(before,0);
- await expect(page.getByRole('button',{name:/^Jump to latest messages/})).toBeVisible();
+ await expect.poll(distanceFromLatest).toBeLessThan(2);
+ await expect(page.getByRole('button',{name:/^Jump to latest messages/})).toBeHidden();
 });
 
-test('more than one hundred loaded messages and their reading position survive an offline reopen',async({page})=>{
+test('an offline reopen restores all cached messages at the latest end',async({page})=>{
  await page.setViewportSize({width:390,height:844});await host(page);
  await page.route('**/api/sessions/saved-chat/messages?*',route=>route.fulfill({json:{messages:Array.from({length:250},(_,i)=>message(i+1)),previous:null,next:null}}));
  await connect(page,'claude');const scroller=page.locator('.conversation');
@@ -187,7 +190,8 @@ test('more than one hundred loaded messages and their reading position survive a
  await page.route('**/api/sessions/saved-chat/messages?*',route=>route.abort());
  await page.reload();await openChatList(page);await page.getByRole('button',{name:'Saved claude chat'}).click();
  await expect(page.locator('[data-message-id]')).toHaveCount(250);
- await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeCloseTo(1900,0);
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(2);
+ await expect(page.getByText('History message 250',{exact:true})).toBeInViewport();
  await expect(page.getByText('History message 1',{exact:true})).toHaveCount(1);
 });
 
@@ -200,7 +204,7 @@ test('Codex byte-limited history advances by returned offsets in both directions
     const start=beginning||older?1:31;
     return route.fulfill({json:{messages:Array.from({length:30},(_,i)=>message(start+i)),previous:start===31?30:null,next:beginning?30:null}});
   });
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await chooseProvider(page,'codex');await page.getByRole('button',{name:'Saved codex chat'}).click();
   await expect(page.locator('.message')).toHaveCount(30);

@@ -11,6 +11,27 @@ function fixture(){let config:any,handler:(event:any)=>void=()=>{},finish:()=>vo
  const service=new CopilotService([process.cwd()],client as any);return{service,session,config:()=>config,emit:(e:any)=>handler(e),finish:()=>finish(),disconnected:()=>disconnected};}
 const input=()=>({id:randomUUID(),cwd:process.cwd(),text:'Fixture',mode:'default' as const,maxBudgetUsd:5});
 
+test('Copilot exposes only allowlisted streaming file arguments and clears previews on execution and failure',async()=>{
+ const f=fixture(),i=input();
+ try{
+  f.service.start(i);await waitFor(()=>!!f.config());
+  const fragment=(toolCallId:string,toolName:string|undefined,inputDelta:string,agentId?:string)=>f.emit({type:'assistant.tool_call_delta',agentId,data:{toolCallId,toolName,inputDelta}});
+  fragment('nested','create','{"path":"hidden","file_text":"hidden"}','child');
+  fragment('shell','bash','{"path":"hidden","file_text":"hidden"}');
+  fragment('new','create','{"path":"sample.ts","file_text":"first\\n');
+  fragment('new',undefined,'line"}');
+  const job=f.service.get(i.id);
+  assert.deepEqual(job.writePreviews,[{id:'new',path:'sample.ts',tool:'Write',content:'first\nline',totalBytes:10,totalLines:2}]);
+  assert.equal(job.messages.length,1);assert.equal(f.service.list()[0].writePreviews,undefined);
+  f.emit({type:'tool.execution_start',id:'execution',data:{toolCallId:'new',toolName:'create',arguments:{path:'sample.ts',file_text:'first\nline'}}});
+  assert.equal(job.writePreviews,undefined);assert.equal(job.messages.length,2);
+  fragment('edit','edit','{"path":"sample.ts","old_str":"hidden","new_str":"replacement');
+  assert.equal(f.service.get(i.id).writePreviews?.[0].content,'replacement');
+  f.emit({type:'session.error',data:{message:'Synthetic provider failure'}});
+  assert.equal(job.status,'error');assert.equal(job.writePreviews,undefined);
+ }finally{f.finish();await f.service.close();}
+});
+
 test('Copilot permits independent histories in one project and rejects duplicate writers',async()=>{
  const f=fixture();
  try{

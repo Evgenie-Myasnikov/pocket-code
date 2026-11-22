@@ -61,13 +61,19 @@ test('Windows read policy permits live board events but not activity writes',{sk
   const code=`using System;using System.Text.RegularExpressions;
 ${source.slice(begin,end)}
 class Probe {public static int Main(){
+ string job="/jobs/12345678-1234-4123-8123-123456789abc";
+ string message=job+"/messages/abcdef12-1234-4123-8123-123456789abc";
+ if(!DesktopReadPolicy.AllowsWrite(message+"/cancel")||DesktopReadPolicy.Allows(message+"/cancel")||
+    DesktopReadPolicy.AllowsWrite(message+"/cancel/extra")||DesktopReadPolicy.AllowsWrite(job+"/messages/not-an-id/cancel"))
+ throw new Exception("Unexpected queued message cancel policy");
  if(!DesktopReadPolicy.Allows("/task-text/providers")||DesktopReadPolicy.AllowsWrite("/task-text/providers")||
     !DesktopReadPolicy.AllowsWrite("/task-text/improve")||DesktopReadPolicy.Allows("/task-text/improve"))
  throw new Exception("Unexpected task text route policy");
  string chain="/task-chains/12345678-1234-4123-8123-123456789abc";
  if(!DesktopReadPolicy.Allows("/task-chains?cwd=sample")||!DesktopReadPolicy.Allows(chain)||
     !DesktopReadPolicy.AllowsWrite("/task-chains")||!DesktopReadPolicy.AllowsWrite(chain+"/stop")||
-    DesktopReadPolicy.Allows(chain+"/stop")||DesktopReadPolicy.AllowsWrite(chain)||DesktopReadPolicy.AllowsWrite(chain+"/delete"))
+    !DesktopReadPolicy.AllowsWrite(chain+"/delete")||DesktopReadPolicy.Allows(chain+"/stop")||DesktopReadPolicy.Allows(chain+"/delete")||
+    DesktopReadPolicy.AllowsWrite(chain)||DesktopReadPolicy.AllowsWrite(chain+"/delete/extra"))
  throw new Exception("Unexpected task chain route policy");
 if(!DesktopReadPolicy.AllowsWrite("/project-board/view")||!DesktopReadPolicy.Allows("/project-board/mcp/status?root=synthetic")||!DesktopReadPolicy.Allows("/project-board/views?root=synthetic")||!DesktopReadPolicy.AllowsWrite("/project-board/mcp")||!DesktopReadPolicy.Allows("/project-board/live?root=synthetic&after=synthetic&wait=1000"))throw new Exception("Live reads denied");foreach(var route in new[]{"/project-board/activity","/project-board/live/extra","/project-board/live#fragment"})if(DesktopReadPolicy.Allows(route))throw new Exception("Unexpected read route");if(DesktopReadPolicy.AllowsWrite("/project-board/views")||DesktopReadPolicy.AllowsWrite("/project-board/view/command")||DesktopReadPolicy.AllowsWrite("/project-board/mcp/status")||DesktopReadPolicy.AllowsWrite("/project-board/live")||DesktopReadPolicy.AllowsWrite("/project-board/activity"))throw new Exception("Unexpected write route");Console.WriteLine("Live route policy passed");return 0;}}`;
   const file=path.join(root,'Probe.cs'),exe=path.join(root,'Probe.exe');writeFileSync(file,code);

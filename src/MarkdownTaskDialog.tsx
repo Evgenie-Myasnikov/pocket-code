@@ -7,13 +7,13 @@ import './markdown-task-dialog.css';
 import type {MarkdownChainControls} from './MarkdownChainPanel';
 import type {MarkdownChainDetail} from './markdown-chain';
 import {MarkdownTaskEditor,type MarkdownTaskDraft} from './MarkdownTaskEditor';
-import type {ImproveScope} from './ImproveTaskText';
+import {ImproveTaskText,type ImproveScope} from './ImproveTaskText';
 
 type Selection = { main?: File; children: File[] };
 type Batch = ReturnType<typeof parseMarkdownTasks>;
 type Preview = { selection: Selection; batch?: Batch; error?: string };
 type Props = {
-  onClose(): void; onPrepare(value: string): void; maxLength: number;
+  onClose(): void; onPrepare?(value: string): void; maxLength: number; manual?:boolean;
   controls?:MarkdownChainControls; improveScope?:ImproveScope; onStarted(chain:MarkdownChainDetail):void;
 };
 
@@ -43,7 +43,7 @@ function batchPrompt(batch: MarkdownTaskDraft, ru: boolean) {
   ].join('\n\n');
 }
 
-export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, improveScope, onStarted}: Props) {
+export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, improveScope, onStarted,manual=false}: Props) {
   const ru = useLanguage() === 'ru';
   const heading = useId();
   const panel = useRef<HTMLElement>(null);
@@ -51,8 +51,8 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
   const [selection, setSelection] = useState<Selection>({children: []});
   const [preview, setPreview] = useState<Preview>();
   const [starting,setStarting]=useState(false),[launchError,setLaunchError]=useState('');
-  const [draft,setDraft]=useState<MarkdownTaskDraft>();
-  const [editing,setEditing]=useState(false);
+  const [draft,setDraft]=useState<MarkdownTaskDraft|undefined>(()=>manual?{name:'',context:'',tasks:[{title:'',body:'',source:'Markdown'}]}:undefined);
+  const [editing,setEditing]=useState(manual);
   const attempt=useRef<{signature:string;id:string}|null>(null),locked=useRef(false),mounted=useRef(false);
   useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;};},[]);
   useEffect(()=>{setLaunchError('');},[selection]);
@@ -103,7 +103,9 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
   }
   return createPortal(<div className="modal-backdrop">
     <section ref={panel} className="confirm-modal markdown-task-dialog" role="dialog" aria-modal="true" aria-labelledby={heading}>
-      <h2 id={heading}>{ru ? 'Задачи из Markdown' : 'Markdown tasks'}</h2>
+      <header><h2 id={heading}>{manual?(ru?'Создать задачу':'Create task'):(ru?'Задачи из Markdown':'Markdown tasks')}</h2>
+        {controls&&<p className="markdown-project">{ru?'Проект цепочки':'Chain project'} · {controls.cwd}</p>}
+      </header>
       {!draft&&<>
       <label>{ru ? 'Основной контекст (.md)' : 'Main context (.md)'}
         <input type="file" accept=".md" disabled={starting} onChange={event => {
@@ -138,9 +140,12 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
       {editing&&draft&&<MarkdownTaskEditor draft={draft} onChange={setDraft} disabled={starting} scope={improveScope}/>}
       {plan&&!editing && <section aria-label={ru ? 'Порядок запуска' : 'Run order'}>
         <h3>{ru ? 'Порядок запуска' : 'Run order'} ({plan.tasks.length})</h3>
-        <ol>{plan.tasks.map((task, index) => <li key={index}><details>
-          <summary>{task.title}</summary><pre>{task.body}</pre>
-        </details></li>)}</ol>
+        <ol className="markdown-preview-steps">{plan.tasks.map((task, index) => <li key={index}><div>
+          <details><summary>{task.title}</summary><pre>{task.body}</pre></details>
+          {improveScope&&<ImproveTaskText {...improveScope} field="instructions" value={task.body}
+            context={[plan.name,plan.context,task.title].filter(Boolean).join('\n\n')} maxLength={1048576} disabled={starting}
+            onApply={body=>setDraft({...plan,tasks:plan.tasks.map((step,i)=>i===index?{...step,body}:step)})}/>}
+        </div></li>)}</ol>
       </section>}
       {plan&&<button type="button" className="text-button" disabled={starting||(editing&&!valid)} onClick={()=>{setDraft(plan);setEditing(!editing);}}>
         {editing?(ru?'Посмотреть порядок':'Preview order'):(ru?'Редактировать задачи':'Edit tasks')}
@@ -158,13 +163,12 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
       {batch?.errors.map((message, index) => <p key={index} role="alert">{diagnostic(message, ru)}</p>)}
       {result?.error && <p role="alert">{result.error}</p>}
       {oversized && <p role="alert">{ru ? 'Черновик превышает лимит символов' : 'Draft exceeds the character limit'} ({maxLength}).</p>}
-      {controls&&<p>{ru?'Проект цепочки':'Chain project'} <strong>{controls.cwd}</strong></p>}
       {launchError&&<p role="alert" className="error-banner">{launchError}</p>}
       <footer>
         <button type="button" className="secondary" onClick={onClose}>{ru ? 'Отмена' : 'Cancel'}</button>
-        <button type="button" className={controls?'secondary':'primary'} disabled={starting || !prompt || oversized} onClick={() => onPrepare(prompt)}>
+        {onPrepare&&<button type="button" className={controls?'secondary':'primary'} disabled={starting || !prompt || oversized} onClick={() => onPrepare(prompt)}>
           {ru ? 'Подготовить черновик' : 'Prepare draft'}
-        </button>
+        </button>}
         {controls&&<button type="button" className="primary" disabled={!prompt||starting||controls.canStart===false} onClick={()=>void startChain()}>
           {starting?(ru?'Запуск…':'Starting…'):(ru?'Запустить связанные чаты':'Start linked chats')}
         </button>}

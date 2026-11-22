@@ -1,3 +1,4 @@
+import {chooseProjectFolder} from './chat-navigation';
 import {desktop} from './desktop-fixture';
 import {readFileSync} from 'node:fs';
 const roadmap=JSON.parse(readFileSync(new URL('../project-boards/board-7b004a10-920c-4ba7-a070-254318083e90.json',import.meta.url),'utf8'));
@@ -160,7 +161,7 @@ test('sidebar divider resizes the rail with mouse and keyboard, persists and res
 
 test('desktop has direct Rules and Changelog with internal Git project selection',async({page})=>{
  await desktop(page);const nav=page.getByRole('navigation');await expect(nav.getByRole('button',{name:'Project',exact:true})).toHaveCount(0);await nav.getByRole('button',{name:'Rules',exact:true}).click();
- await expect(page.getByLabel('Git project')).toHaveValue('C:\\Demo\\Atlas');await expect(page.locator('.project-docs-markdown')).toContainText('Use synthetic data.');await nav.getByRole('button',{name:'Changelog',exact:true}).click();await expect(page.locator('.project-docs-markdown')).toContainText('Synthetic entry');
+ await expect(page.getByLabel('Git project')).toHaveAttribute('title','C:\\Demo\\Atlas');await expect(page.locator('.project-docs-markdown')).toContainText('Use synthetic data.');await nav.getByRole('button',{name:'Changelog',exact:true}).click();await expect(page.locator('.project-docs-markdown')).toContainText('Synthetic entry');
  await expect(page.locator('.document-library').getByRole('button',{name:/^Refresh/})).toHaveCount(1);const before=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length);await page.getByRole('button',{name:'Refresh document',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>c.endpoint?.startsWith('/project-doc?')).length)).toBeGreaterThan(before);await page.screenshot({path:'artifacts/screenshots/desktop-changelog.png'});
  // From the Files tab, the sidebar Changelog/Rules buttons still switch the library back.
  await page.getByRole('button',{name:'Files',exact:true}).click();await expect(page.getByRole('button',{name:'README.md'})).toBeVisible();await nav.getByRole('button',{name:'Changelog',exact:true}).click();await expect(page.getByRole('tab',{name:'Changelog'})).toHaveCount(0);await expect(page.locator('.project-docs-markdown')).toContainText('Synthetic entry');
@@ -196,7 +197,7 @@ test('desktop pastes an image attachment using the native clipboard event',async
 
 test('creates the board for the clicked project without a board selector',async({page})=>{
  await page.addInitScript(()=>{(window as any).missingProjectBoard=true;});await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
- await expect(page.locator('.project-board-row').filter({hasText:'Garden'})).toHaveCount(0);await expect(page.locator('.project-board-row svg.lucide-chevron-right')).toHaveCount(0);await page.getByRole('button',{name:'Add project board',exact:true}).click();await page.getByLabel('Project for new board').selectOption('C:\\Demo\\Garden');await page.getByRole('button',{name:'Create project board',exact:true}).click();
+ await expect(page.locator('.project-board-row').filter({hasText:'Garden'})).toHaveCount(0);await expect(page.locator('.project-board-row svg.lucide-chevron-right')).toHaveCount(0);await page.getByRole('button',{name:'Add project board',exact:true}).click();await chooseProjectFolder(page,'Project for new board','C:\\Demo\\Garden');await page.getByRole('button',{name:'Create project board',exact:true}).click();
  const createdName=await page.evaluate(()=>(window as any).createdProjectBoard.name);await expect(page.getByRole('heading',{name:createdName,exact:true})).toBeVisible();await expect(page.locator('.work-boards select')).toHaveCount(0);
  expect(await page.evaluate(()=>(window as any).createdProjectBoard.root)).toBe('C:\\Demo\\Garden');
  await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Garden'}).getByRole('button').click();await expect(page.getByRole('button',{name:'Create project board',exact:true})).toHaveCount(0);
@@ -217,7 +218,7 @@ test('built-in board rule can be disabled and re-enabled from project Rules',asy
 for(const width of [390,1440])test('Miro board embeds, survives reopening and disconnects without deletion at '+width,async({page})=>{
  await page.setViewportSize({width,height:850});await page.route('https://miro.com/**',r=>r.fulfill({contentType:'text/html',body:'<html><body>Miro synthetic board</body></html>'}));
  await page.addInitScript(()=>{(window as any).missingProjectBoard=true;});await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Board',exact:true}).click();
- await page.getByRole('button',{name:'Add project board',exact:true}).click();await page.getByLabel('Project for new board').selectOption('C:\\Demo\\Garden');await page.getByLabel('Board type').selectOption('miro');await page.getByLabel('Miro board link').fill('https://miro.com/app/board/synthetic_123=/?share_link_id=discard');await page.getByRole('button',{name:'Connect Miro board',exact:true}).click();
+ await page.getByRole('button',{name:'Add project board',exact:true}).click();await chooseProjectFolder(page,'Project for new board','C:\\Demo\\Garden');await page.getByLabel('Board type').selectOption('miro');await page.getByLabel('Miro board link').fill('https://miro.com/app/board/synthetic_123=/?share_link_id=discard');await page.getByRole('button',{name:'Connect Miro board',exact:true}).click();
  const frame=page.locator('iframe[title="Miro live board"]');await expect(frame).toHaveAttribute('src','https://miro.com/app/live-embed/synthetic_123=/?autoplay=true&usePostAuth=true');await expect(page.getByRole('link',{name:'Open in browser'})).toHaveAttribute('href','https://miro.com/app/board/synthetic_123=/');
  await page.getByRole('button',{name:'Back to boards',exact:true}).click();await page.locator('.project-board-row').filter({hasText:'Garden'}).getByRole('button').click();await expect(frame).toBeVisible();
  await page.getByRole('button',{name:'Disconnect Miro board',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('The Miro board is kept.');await page.getByRole('button',{name:'Disconnect',exact:true}).click();await expect(frame).toHaveCount(0);await expect(page.locator('.project-board-row')).toHaveCount(0);
@@ -225,8 +226,8 @@ for(const width of [390,1440])test('Miro board embeds, survives reopening and di
 test('Miro connection is in settings and WorkSpace is absent from navigation',async({page})=>{
  await page.addInitScript(()=>{(window as any).missingProjectBoard=true;});await desktop(page);
  await expect(page.getByRole('navigation').getByRole('button',{name:'WorkSpace',exact:true})).toHaveCount(0);
- await page.getByRole('navigation').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Miro',exact:true}).click();
- await page.getByLabel('Miro project').selectOption('C:\\Demo\\Garden');await page.getByLabel('Miro board link').fill('https://miro.com/app/board/synthetic_123=/');await page.getByRole('button',{name:'Connect Miro board'}).click();await expect(page.getByRole('status')).toContainText('Miro board connected');
+ await page.getByRole('navigation').getByRole('button',{name:'Settings',exact:true}).click();await page.locator('[data-settings-category="board"]').click();
+ await chooseProjectFolder(page,'Miro project','C:\\Demo\\Garden');await page.getByLabel('Miro board link').fill('https://miro.com/app/board/synthetic_123=/');await page.getByRole('button',{name:'Connect Miro board'}).click();await expect(page.getByRole('status')).toContainText('Miro board connected');
  await page.getByRole('button',{name:'Disconnect',exact:true}).click();await expect(page.getByRole('group',{name:'Disconnect Miro board'})).toContainText('The board itself stays in Miro');await page.getByRole('button',{name:'Disconnect link'}).click();await expect(page.getByRole('button',{name:'Disconnect link'})).toHaveCount(0);await expect(page.getByLabel('Miro board link')).toHaveValue('');
 });
 test('composer pointer focus uses a soft background without a textarea outline',async({page})=>{

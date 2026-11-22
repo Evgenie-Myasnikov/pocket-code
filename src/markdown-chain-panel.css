@@ -1,52 +1,85 @@
-.confirm-modal.chain-panel {
-  width: min(100%, 41rem);
-  max-width: none;
-  padding: clamp(18px,4vw,30px);
-  background: var(--panel);
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-.chain-panel .chain-head,.chain-step-heading,.chain-progress>div,.chain-index-row { display:flex;align-items:center;justify-content:space-between;gap:.75rem; }
-.chain-head { margin-bottom: 1rem;color:var(--muted); }
 .chain-panel button { width:auto;margin:0; }
-.chain-panel h2 { color:var(--text);margin:.2rem 0 .45rem;line-height:1.2; }
-.chain-location,.chain-source,.chain-links,.chain-links button,.chain-back { display:flex;align-items:center;gap:.4rem; }
-.chain-location,.chain-source { color:var(--muted);font-size:.8rem; }
-.chain-location svg,.chain-source svg { flex:none; }
-.chain-panel .chain-back,.chain-links button { border:none;background:transparent;padding:.35rem .1rem;color:var(--muted);font:inherit;font-size:.83rem;cursor:pointer; }
-.chain-panel .chain-back:hover,.chain-links button:hover { color:var(--text);text-decoration:underline; }
-.chain-progress { margin:1.3rem 0; }
-.chain-progress>div { font-size:.85rem;margin-bottom:.55rem; }
-.chain-progress span { color:var(--muted);font-variant-numeric:tabular-nums; }
-.chain-progress progress { appearance:none;display:block;width:100%;height:5px;border:none;border-radius:8px;overflow:hidden;background:var(--line);color:var(--accent); }
+.chain-panel .chain-head { margin:0 0 .85rem; }
+.chain-panel .chain-back,.chain-links button {
+  display:inline-flex;align-items:center;gap:.36rem;border:0;border-radius:5px;
+  background:transparent;color:var(--muted);font:inherit;font-size:.82rem;cursor:pointer;
+}
+.chain-panel .chain-back { padding:.3rem 0; }
+.chain-back:hover,.chain-links button:hover { color:var(--text);text-decoration:underline; }
+.chain-heading { display:flex;align-items:center;justify-content:space-between;gap:1.5rem; }
+.chain-heading h2 { margin:0;min-width:0;line-height:1.2;font-size:clamp(1.2rem,2vw,1.6rem);letter-spacing:-.025em;font-weight:var(--fw-semibold); }
+.chain-progress { flex:0 0 8.5rem;display:grid;gap:.4rem; }
+.chain-progress span,.chain-state,.chain-index-row small { color:var(--muted);font-size:.79rem;font-variant-numeric:tabular-nums;white-space:nowrap; }
+.chain-progress span { text-align:right; }
+.chain-progress progress { appearance:none;width:100%;height:5px;border:0;border-radius:5px;overflow:hidden;background:var(--line);color:var(--accent); }
 .chain-progress progress::-webkit-progress-bar { background:var(--line); }
 .chain-progress progress::-webkit-progress-value { background:var(--accent); }
 .chain-progress progress::-moz-progress-bar { background:var(--accent); }
-.chain-steps { list-style:none;margin:0;padding:0; }
-.chain-steps>li { position:relative;display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px; }
-.chain-steps>li:not(:last-child)::before { position:absolute;content:'';left:13px;top:27px;bottom:0;width:1px;background:var(--line); }
-.chain-node { display:grid;place-items:center;align-self:start;width:27px;height:27px;border:1px solid var(--line);border-radius:50%;color:var(--muted);font-size:.79rem;font-variant-numeric:tabular-nums;font-weight:var(--fw-semibold); }
-.chain-step { padding:2px 0 1rem;min-width:0; }
-.chain-step-heading { align-items:baseline;flex-wrap:wrap;column-gap:.5rem;row-gap:.2rem; }
-.chain-step-heading h3 { margin:0;color:var(--text);font-size:1rem;line-height:1.35; }
-.chain-state { color:var(--muted);font-size:.78rem; }
-.chain-steps>li[data-status=done] .chain-node,.chain-steps>li[data-status=done] .chain-state { color:var(--success,var(--accent)); }
-.chain-steps>li[data-status=running] .chain-node { background:var(--accent);border-color:transparent;color:var(--accent-contrast,var(--bg)); }
-.chain-steps>li[data-status=running] .chain-state,.chain-steps>li[data-status=waiting] .chain-state { color:var(--accent);font-weight:var(--fw-semibold); }
-.chain-steps>li[data-status=failed] .chain-state,.chain-panel p.chain-step-error { color:var(--danger); }
-.chain-source { margin-top:.35rem; }
-.chain-links { flex-wrap:wrap;column-gap:1rem;margin-top:.18rem; }
+.chain-outcome { margin:.4rem 0 0;color:var(--muted);font-size:.85rem; }
+.chain-index,.chain-steps { margin:1.1rem 0 0; }
+.chain-index-row { display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;align-items:center;gap:.8rem; }
+.chain-panel .chain-index-row {
+  width:100%;min-height:3.75rem;padding:.75rem .4rem;text-align:left;color:var(--text);
+  border:0;border-bottom:1px solid var(--line);background:transparent;font:inherit;cursor:pointer;
+}
+.chain-index-row:hover { background:var(--surface); }
+.chain-index-row>svg,.chain-empty>svg { color:var(--muted); }
+.chain-index-row[data-status=running] .chain-state,.chain-index-row[data-status=running]>svg:first-child { color:var(--accent); }
+.chain-empty { display:flex;align-items:center;gap:.75rem;padding:1.5rem .25rem;border-block:1px solid var(--line);color:var(--muted); }
+.chain-empty p { margin:0; }
+.chain-steps { list-style:none;padding:0; }
+.chain-steps>li { display:grid;grid-template-columns:26px minmax(0,1fr);gap:.8rem;padding:.95rem .8rem;border-bottom:1px solid var(--line); }
+.chain-steps>li[aria-current=step] {
+  margin:.35rem 0;padding:1.05rem .85rem 1.05rem 1rem;border:1px solid var(--line);
+  border-inline-start:3px solid var(--accent);border-radius:10px;
+  background:color-mix(in srgb,var(--accent) 5%,var(--panel));
+}
+.chain-steps>li:has(+li[aria-current=step]) { border-bottom-color:transparent; }
+.chain-node { display:grid;place-items:center;align-self:start;border-radius:50%;width:25px;height:25px;border:1px solid var(--line);color:var(--muted);font:var(--type-min) var(--font-mono); }
+.chain-steps>li[data-status=done] .chain-node { color:var(--success,var(--accent));border-color:transparent; }
+.chain-steps>li[aria-current=step] .chain-node { color:var(--bg);background:var(--accent);border-color:transparent; }
+.chain-step { min-width:0; }
+.chain-step-heading { display:flex;align-items:baseline;justify-content:space-between;gap:.3rem .75rem;flex-wrap:wrap; }
+.chain-step-heading h3 { min-width:0;margin:0;color:var(--text);font-size:1rem;line-height:1.45;font-weight:var(--fw-semibold); }
+.chain-steps>li[aria-current=step] .chain-step-heading h3 { font-size:1.12rem; }
+.chain-steps>li[aria-current=step] .chain-state { color:var(--accent);font-weight:var(--fw-semibold); }
+.chain-step-error,.chain-steps>li[data-status=failed] .chain-state { color:var(--danger); }
+.chain-links,.chain-source { display:flex;align-items:center;gap:.4rem;flex-wrap:wrap; }
+.chain-links { gap:.2rem 1rem; }
+.chain-links button { padding:.35rem 0;min-height:30px; }
+.chain-links button:focus-visible,.chain-panel summary:focus-visible { outline:2px solid var(--accent);outline-offset:2px; }
 .chain-chevron-open { transform:rotate(90deg); }
-.chain-context { margin:.35rem 0 .5rem;padding:.85rem 1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface); }
-.chain-context h4 { margin:.15rem 0 .5rem;font-size:.85rem; }
-.chain-context pre { margin:0;max-height:16rem;overflow:auto;overscroll-behavior:contain;white-space:pre-wrap;font:inherit;line-height:1.55;font-size:.82rem;color:var(--text); }
-.chain-context pre+h4 { margin-top:.85rem; }
-.chain-context details { margin-top:.75rem; }
-.chain-context summary { font-size:.82rem;cursor:pointer;color:var(--muted); }
-.chain-context details pre { margin-top:.5rem; }
-.chain-panel footer { border-top:1px solid var(--line);padding-top:1rem;display:flex;justify-content:flex-end; }
-.chain-index { margin-top:1.3rem; }
-.chain-panel .chain-index-row { width:100%;text-align:left;min-height:3.75rem;padding:.65rem 0;color:var(--text);border:none;border-bottom:1px solid var(--line);border-radius:0;background:transparent;cursor:pointer;font:inherit; }
-.chain-index-row strong,.chain-index-row small { display:block; }
-.chain-index-row small { color:var(--muted);margin-top:.25rem; }
-@media (max-width:480px) { .chain-steps>li { gap:9px; }.chain-links button { min-height:38px; }.chain-context { padding:.65rem; } }
+.task-live-response { margin:.65rem 0 .45rem; }
+.task-phase { display:flex;align-items:baseline;gap:.65rem;flex-wrap:wrap; }
+.task-phase strong,.chain-context h4 { font-size:.82rem;color:var(--text); }
+.task-phase span,.task-step-result small,.task-live-response small { color:var(--muted);font-size:.79rem; }
+.task-live-response pre,.task-step-result pre,.chain-context pre {
+  white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;max-height:16rem;overscroll-behavior:contain;
+  margin:.4rem 0 .15rem;color:var(--text);font:inherit;font-size:.9rem;line-height:1.55;
+}
+.task-step-result summary,.chain-context summary { cursor:pointer;color:var(--muted);font-size:.82rem; }
+.task-step-result summary,.chain-context summary { display:flex;align-items:center;gap:.35rem; }
+.task-step-result[open]>summary svg,.chain-context details[open]>summary svg { transform:rotate(90deg); }
+.task-step-result { margin:.2rem 0 .1rem; }
+.task-step-result[open] { padding-bottom:.5rem; }
+.chain-context { margin-top:.35rem;padding:1rem;border:1px solid var(--line);border-radius:9px;background:var(--panel); }
+.chain-source { font-size:.78rem;color:var(--muted); }
+.chain-run-settings { display:grid;grid-template-columns:auto minmax(0,1fr);gap:.25rem .7rem;margin:.65rem 0 0;font-size:.8rem; }
+.chain-run-settings dt { color:var(--muted); }
+.chain-run-settings dd { margin:0;overflow-wrap:anywhere; }
+.chain-context h4 { margin:.9rem 0 0;font-weight:var(--fw-semibold); }
+.chain-context details { margin-top:.8rem; }
+.chain-panel footer { display:flex;justify-content:flex-end;margin-top:1rem; }
+.chain-panel footer .secondary { color:var(--muted);background:transparent; }
+@container (max-width:540px) {
+  .chain-index-row { gap:.45rem;grid-template-columns:minmax(0,1fr) auto auto; }
+  .chain-index-row>svg { display:none; }
+  .chain-heading { flex-wrap:wrap;gap:.7rem; }
+  .chain-progress { flex-basis:100%; }
+  .chain-progress span { text-align:start; }
+  .chain-steps>li { padding:.85rem 0;gap:.5rem; }
+  .chain-steps>li[aria-current=step] { padding:.8rem; }
+  .chain-context { padding:.7rem; }
+  .chain-links button { min-height:40px; }
+}
+@media (forced-colors:active) { .chain-steps>li[aria-current=step] { border:2px solid Highlight; } }

@@ -8,12 +8,19 @@ export type MarkdownChainStep = {
   sessionId?: string;
   error?: string;
   handoff?: string;
+  /** Latest visible assistant text, with streaming deltas while the job runs. */
+  output?: string;
+  outputTruncated?: boolean;
+  phase?: 'responding' | 'command' | 'files' | 'search' | 'agent' | 'tool' | 'approval' | 'question';
 };
 export type MarkdownChainDetail = {
   id: string;
   cwd: string;
   provider: 'claude' | 'codex' | 'copilot';
   account?: string;
+  accountName?: string;
+  /** Model requested when the chain was created, including provider aliases. */
+  model?: string;
   name: string;
   context: string;
   status: MarkdownChainStatus;

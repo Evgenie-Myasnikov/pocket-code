@@ -11,7 +11,9 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    if(message.action==='restart-host'){calls.push(message);state={...state,online:true,statusCode:'connected'};reply(message.id,state);return;}
    calls.push(message);const {id,action}=message;if(action==='state'||action==='pairing-role'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){(window as any).testDevices=(window as any).testDevices.filter((d:any)=>d.id!==message.deviceId);reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
    const url=new URL('https://example.invalid'+message.endpoint),p=url.pathname,provider=url.searchParams.get('provider')||'claude';
-   if(p==='/task-text/providers'){reply(id,{providers:['claude','copilot']});return;}
+   if(p==='/task-text/providers'){reply(id,{providers:['claude','codex','copilot'],accounts:(window as any).testTaskTextAccounts});return;}
+   if(p==='/custom-providers'&&(window as any).testTaskTextAccounts){reply(id,(window as any).testTaskTextAccounts.map((a:any)=>({...a,hasKey:true})));return;}
+   if(p.startsWith('/custom-providers/')&&p.endsWith('/models')&&(window as any).testTaskTextModels){reply(id,(window as any).testTaskTextModels[p.split('/')[2]]||[]);return;}
    if(p==='/task-text/improve'&&typeof (window as any).testTaskTextResponse==='string'){reply(id,{text:(window as any).testTaskTextResponse});return;}
    if(p.startsWith('/task-chains')){
      const handler=(window as any).testChainRequest;
@@ -23,7 +25,7 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    if(p.startsWith('/project-board')&&typeof (window as any).boardHostRequest==='function'){void (window as any).boardHostRequest(message.endpoint,message.data).then((result:any)=>{if(result.error)listeners.forEach(listener=>listener({data:{id,error:result.error,status:result.status}}));else reply(id,result.value);});return;}
    const messageBlock=(id:string,text:string)=>({id,role:'assistant',blocks:[{type:'text',text}]});
    if(p==='/pairing-role'){reply(id,{role:'host'});return;}
-   if(p==='/health'){reply(id,{name:'Synthetic PC',roots:['C:\\Demo\\Atlas','C:\\Demo\\Garden'],version:'0.22.7',protocol:1});return;}
+   if(p==='/health'){void Promise.resolve((window as any).testHealthGate).then(()=>reply(id,{name:'Synthetic PC',roots:['C:\\Demo\\Atlas','C:\\Demo\\Garden'],version:'0.22.7',protocol:1}));return;}
    if(p==='/providers'){reply(id,[{id:'claude',available:true,models:[]},{id:'codex',available:true,authenticated:true,models:[]}]);return;}
    if(/^\/workspaces\/[^/]+\/delete$/.test(p)){(window as any).testWorkspaces=(window as any).testWorkspaces.filter((w:any)=>w.id!==p.split('/')[2]);reply(id,{ok:true});return;}
    if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:(window as any).testBoards||[]});return;}
@@ -55,7 +57,7 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    if(p==='/project-doc'){const path=url.searchParams.get('path');reply(id,{path,name:path,kind:path==='AGENTS.md'?'rules':'changelog',source:'project',appliesTo:'all',bytes:40,content:path==='AGENTS.md'?'# Synthetic rules\n\nUse synthetic data.':'# Changelog\n\n- Synthetic entry'});return;}
    if(p==='/files'){const folder=url.searchParams.get('path')||'C:\Demo\Atlas';reply(id,{path:folder,parent:null,entries:[{name:'README.md',directory:false,path:folder+'\README.md'}]});return;}
    if(p==='/file'){reply(id,{name:'README.md',text:'Synthetic readme'});return;}
-   if(p==='/projects'){reply(id,['C:\\Demo\\Atlas','C:\\Demo\\Garden']);return;}
+   if(p==='/projects'){reply(id,(window as any).testProjectPaths||['C:\\Demo\\Atlas','C:\\Demo\\Garden']);return;}
    if(p==='/jobs'){reply(id,(window as any).testRuns||[]);return;}
    if(/^\/jobs\/[^/]+\/messages$/.test(p)&&action==='write'){if((window as any).rejectNextFollowup){(window as any).rejectNextFollowup=false;queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,error:'Synthetic turn closing',status:409}})));return;}const run=(window as any).testRuns.find((r:any)=>r.id===p.split('/')[2]);run.revision++;reply(id,run);return;}
    if(p.startsWith('/jobs/')&&(window as any).expiredBoardJobs){queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,error:'Synthetic expired job',code:'host_response',status:404}})));return;}

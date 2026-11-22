@@ -7,6 +7,7 @@ import type {AddressInfo} from 'node:net';
 import type {CopilotClient} from '@github/copilot-sdk';
 import {createApp} from '../server/app';
 import {CopilotService} from '../server/copilot';
+import {CustomProviders} from '../server/custom-providers';
 import {taskTextInput,taskTextPrompt} from '../server/task-text';
 
 test('field templates preserve supplied source text as data and constrain individual fields',()=>{
@@ -29,7 +30,14 @@ test('Improve authenticates, checks project and provider, isolates generation an
     entered?.();if(wait)await Promise.race([wait,new Promise(resolve=>abort.signal.addEventListener('abort',resolve,{once:true}))]);
     return reply;
   };
-  const {app,closeTaskServices,terminals,isBusy}=await createApp({roots:[project],token,hostName:'Test',uploads:path.join(root,'uploads'),copilot,desktopSessionIndexes:[]});
+  const profile={id:crypto.randomUUID(),name:'Fixture',url:'https://example.invalid/v1',key:'synthetic-key',messages:[]};
+  const calls:string[]=[];
+  const customProviders=new CustomProviders({load:async()=>({profiles:[profile]}),save:async()=>assert.fail('Editor must preserve saved profiles')},async(url,options)=>{
+    calls.push(String(url));
+    assert.equal(new Headers(options?.headers).get('authorization'),'Bearer '+profile.key);
+    return String(url).endsWith('/models')?Response.json({data:[{id:'example'}]}):Response.json({choices:[{message:{content:'Custom suggestion'}}]});
+  });
+  const {app,closeTaskServices,terminals,isBusy}=await createApp({roots:[project],token,hostName:'Test',uploads:path.join(root,'uploads'),copilot,customProviders,desktopSessionIndexes:[]});
   app.locals.providerConnections.status=async()=>({providers:[
     {id:'claude',installed:true,authenticated:false,server:'on-demand'},
     {id:'copilot',installed:true,authenticated:true,server:'ready'},
@@ -42,7 +50,8 @@ test('Improve authenticates, checks project and provider, isolates generation an
   const input={cwd:project,provider:'copilot',field:'title',text:'',context:'Example goal.',maxLength:40};
   const request=(extra:Record<string,unknown>={},signal?:AbortSignal)=>fetch(base+'improve',{method:'POST',headers,body:JSON.stringify({...input,...extra}),signal});
   assert.equal((await fetch(base+'providers')).status,401);
-  assert.deepEqual(await (await fetch(base+'providers',{headers})).json(),{providers:['copilot']});
+  assert.deepEqual(await (await fetch(base+'providers',{headers})).json(),{providers:['copilot'],accounts:[{id:profile.id,name:'Fixture'}]});
+  assert.deepEqual(calls,[]);
   const api='http://127.0.0.1:'+(server.address() as AddressInfo).port+'/api/';
   const post=(route:string,data:object)=>fetch(api+route,{method:'POST',headers,body:JSON.stringify(data)});
   const workspace=await (await post('workspaces',{name:'Example',password:'fixture password',roots:[project]})).json();
@@ -51,9 +60,19 @@ test('Improve authenticates, checks project and provider, isolates generation an
   const guestHeaders={...headers,Authorization:'Bearer '+guest.token};
   assert.equal((await fetch(base+'providers',{headers:guestHeaders})).status,403);
   assert.equal((await fetch(base+'improve',{method:'POST',headers:guestHeaders,body:JSON.stringify(input)})).status,403);
+  const custom={provider:'custom',model:'example',account:profile.id};
+  assert.equal((await fetch(base+'improve',{method:'POST',headers:guestHeaders,body:JSON.stringify({...input,...custom})})).status,403);
+  assert.equal((await request({...custom,cwd:root})).status,403);
+  assert.equal((await request({...custom,account:crypto.randomUUID()})).status,404);
+  assert.deepEqual(calls,[]);
+  assert.deepEqual(await (await request(custom)).json(),{text:'Custom suggestion'});
+  assert.deepEqual(calls,[profile.url+'/models',profile.url+'/chat/completions']);
   assert.equal((await request({cwd:root})).status,403);
   assert.equal((await request({context:' '})).status,400);
-  assert.equal((await request({provider:'codex'})).status,400);
+  assert.equal((await request({provider:'codex'})).status,503);
+  assert.equal((await request({provider:'codex',text:'я'.repeat(2000)})).status,422);
+  assert.equal((await request({provider:'custom',model:'example'})).status,400);
+  assert.equal((await request({account:crypto.randomUUID(),model:'example'})).status,400);
   assert.equal((await request({provider:'claude'})).status,503);
   assert.deepEqual(await (await request()).json(),{text:'Review sample'});
   await assert.rejects(stat(isolated),{code:'ENOENT'});
