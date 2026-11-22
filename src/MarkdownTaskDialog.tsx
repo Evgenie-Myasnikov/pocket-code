@@ -7,7 +7,7 @@ import './markdown-task-dialog.css';
 import type {MarkdownChainControls} from './MarkdownChainPanel';
 import type {ChainSourceInput,MarkdownChainDetail} from './markdown-chain';
 import {ProjectSourcePicker,sourceFileBinding,sourceFileLabel} from './ProjectSourcePicker';
-import {MarkdownTaskEditor,type MarkdownTaskDraft} from './MarkdownTaskEditor';
+import {MarkdownTaskEditor,descriptionTitle,type MarkdownTaskDraft} from './MarkdownTaskEditor';
 import {ImproveTaskText,type ImproveScope} from './ImproveTaskText';
 
 export type MarkdownSelection = { main?: File; children: File[] };
@@ -46,6 +46,12 @@ function batchPrompt(batch: MarkdownTaskDraft, ru: boolean) {
   ].join('\n\n');
 }
 
+function withDescriptionTitles(draft:MarkdownTaskDraft):MarkdownTaskDraft {
+  const tasks=draft.tasks.map(task=>({...task,title:task.title.trim()||descriptionTitle(task.body)}));
+  const name=draft.name.trim()||tasks[0].title.slice(0,512);
+  return {...draft,tasks,name};
+}
+
 export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, improveScope, onStarted,manual=false,initialSelection,onPlan,initialParallelSubtasks=true}: Props) {
   const ru = useLanguage() === 'ru';
   const heading = useId();
@@ -55,7 +61,10 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
   const [selection, setSelection] = useState<Selection>(initialSelection??{children: []});
   const [preview, setPreview] = useState<Preview>();
   const [starting,setStarting]=useState(false),[launchError,setLaunchError]=useState('');
+  const [readingDescription,setReadingDescription]=useState(false);
   const [draft,setDraft]=useState<MarkdownTaskDraft|undefined>(()=>manual?{name:'',context:'',tasks:[{title:'',body:'',source:'Markdown'}]}:undefined);
+  const latestDraft=useRef(draft);
+  useEffect(()=>{latestDraft.current=draft;},[draft]);
   const [editing,setEditing]=useState(manual);
   const attempt=useRef<{signature:string;id:string}|null>(null),locked=useRef(false),mounted=useRef(false);
   useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;};},[]);
@@ -95,15 +104,36 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
   const batch = result?.batch;
   const proseOnly=batch?.errors.length===1&&batch.errors[0]==='Select task files or add level-two task headings.';
   const canPlan=!!batch&&!batch.missing.length&&(batch.errors.length===0||proseOnly);
-  const plan=draft||(main&&batch?.tasks.length&&!batch.missing.length&&!batch.errors.length
+  const compact=manual&&editing&&draft?.tasks.length===1;
+  const editedPlan=manual&&draft?withDescriptionTitles(draft):draft;
+  const plan=editedPlan||(main&&batch?.tasks.length&&!batch.missing.length&&!batch.errors.length
     ? {name:main.name,context:batch.context,tasks:batch.tasks,sourceFiles:result?.sourceFiles}:undefined);
   const valid=plan&&plan.name.trim()&&plan.tasks.length&&plan.tasks.every(task=>task.title.trim()&&task.body.trim());
   const prompt=valid?batchPrompt(plan,ru):'';
   const oversized = prompt.length > maxLength;
   const largeUpload=(result?.uploadBytes??0)>1024*1024;
+  const chainOversized=!!plan&&plan.tasks.reduce((size,task)=>size+task.body.length+task.title.length+task.source.length,plan.context.length)>1024*1024;
   const children = selection.children;
+  async function importDescription(file:File){
+    if(locked.current||readingDescription||!compact||!draft)return;
+    setLaunchError('');
+    const binding=sourceFileBinding(file);
+    setReadingDescription(true);
+    try{
+      if(file.size>1048576)throw Error(ru?'Выберите текстовый файл размером до 1 МиБ.':'Choose a text file of up to 1 MiB.');
+      const body=await file.text();
+      if(!body.trim()||body.includes('\0'))throw Error(ru?'Выберите непустой текстовый файл.':'Choose a non-empty text file.');
+      const current=latestDraft.current;
+      if(!mounted.current||!current||current.tasks.length!==1||locked.current)return;
+      const step=current.tasks[0];
+      const other=(current.sourceFiles??[]).filter(source=>source.name!==step.source);
+      if(other.some(source=>source.name===binding.name))throw Error(ru?'Файл с таким именем уже выбран.':'A source with this name is already selected.');
+      setDraft({...current,sourceFiles:[...other,binding.projectPath?binding:{...binding,text:body}],tasks:[{...step,source:binding.name,body}]});
+    }catch(error){if(mounted.current)setLaunchError(error instanceof Error?error.message:String(error));}
+    finally{if(mounted.current)setReadingDescription(false);}
+  }
   async function startChain(){
-    if(!controls||controls.canStart===false||!plan||!prompt||largeUpload||locked.current)return;
+    if(!controls||controls.canStart===false||!plan||!prompt||largeUpload||chainOversized||locked.current||readingDescription)return;
     locked.current=true;setStarting(true);setLaunchError('');
     const signature=JSON.stringify([plan,parallelSubtasks]);
     if(attempt.current?.signature!==signature)attempt.current={signature,id:crypto.randomUUID()};
@@ -113,10 +143,14 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
     }catch(error){if(mounted.current)setLaunchError(error instanceof Error?error.message:String(error));}
     finally{locked.current=false;if(mounted.current)setStarting(false);}
   }
+  const delegation=controls&&<label className="chain-delegation"><input type="checkbox" disabled={starting} checked={parallelSubtasks} onChange={e=>setParallelSubtasks(e.target.checked)}/>{ru?'Разрешить параллельные подзадачи':'Allow parallel subtasks'}</label>;
+  const prepare=onPrepare&&<button type="button" className={controls?'secondary':'primary'} disabled={starting||readingDescription||!prompt||oversized} onClick={()=>onPrepare(prompt)}>
+    {ru?'Подготовить черновик':'Prepare draft'}
+  </button>;
   return createPortal(<div className="modal-backdrop">
     <section ref={panel} className="confirm-modal markdown-task-dialog" role="dialog" aria-modal="true" aria-labelledby={heading}>
       <header><h2 id={heading}>{manual?(ru?'Создать задачу':'Create task'):(ru?'Задачи из Markdown':'Markdown tasks')}</h2>
-        {controls&&<p className="markdown-project">{ru?'Проект цепочки':'Chain project'} · {controls.cwd}</p>}
+        {controls&&<p className="markdown-project">{ru?'Проект':'Project'} · {controls.cwd}</p>}
       </header>
       {!draft&&<>
       <label>{ru ? 'Основной контекст (.md)' : 'Main context (.md)'}
@@ -160,7 +194,9 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
       </button>}
       {main && !result && <p role="status">{ru ? 'Читаем файлы…' : 'Reading files…'}</p>}
       </>}
-      {editing&&draft&&<MarkdownTaskEditor draft={draft} onChange={setDraft} disabled={starting} scope={improveScope}/>}
+      {editing&&draft&&<MarkdownTaskEditor draft={draft} onChange={setDraft} disabled={starting||readingDescription} scope={improveScope}
+        onImport={compact?importDescription:undefined} moreOptions={<>{delegation}{controls&&prepare}</>}/>}
+      {readingDescription&&<small role="status">{ru?'Читаем файл…':'Reading file…'}</small>}
       {plan&&!editing && <section aria-label={ru ? 'Порядок запуска' : 'Run order'}>
         <h3>{ru ? 'Порядок запуска' : 'Run order'} ({plan.tasks.length})</h3>
         <ol className="markdown-preview-steps">{plan.tasks.map((task, index) => <li key={index}><div>
@@ -170,7 +206,7 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
             onApply={body=>setDraft({...plan,tasks:plan.tasks.map((step,i)=>i===index?{...step,body}:step)})}/>}
         </div></li>)}</ol>
       </section>}
-      {plan&&<button type="button" className="text-button" disabled={starting||(editing&&!valid)} onClick={()=>{setDraft(plan);setEditing(!editing);}}>
+      {plan&&!compact&&<button type="button" className="text-button" disabled={starting||(editing&&!valid)} onClick={()=>{setDraft(plan);setEditing(!editing);}}>
         {editing?(ru?'Посмотреть порядок':'Preview order'):(ru?'Редактировать задачи':'Edit tasks')}
       </button>}
       {!draft&&batch && !batch.tasks.length && !!batch.order.length && <details>
@@ -187,15 +223,14 @@ export function MarkdownTaskDialog({onClose, onPrepare, maxLength, controls, imp
       {result?.error && <p role="alert">{result.error}</p>}
       {oversized && <p role="alert">{ru ? 'Черновик превышает лимит символов' : 'Draft exceeds the character limit'} ({maxLength}).</p>}
       {launchError&&<p role="alert" className="error-banner">{launchError}</p>}
+      {controls&&chainOversized&&<p role="alert">{ru?'Сократите описание или общий контекст. Суммарный лимит цепочки — 1 048 576 символов.':'Shorten the description or shared context. The chain accepts up to 1,048,576 characters in total.'}</p>}
       {controls&&largeUpload&&<p role="alert">{ru?'Для цепочки можно загрузить до 1 МиБ текста. Выберите файлы из проекта или сократите набор.':'A chain accepts up to 1 MiB of uploaded text. Select project files or reduce the upload.'}</p>}
-      {controls&&<label className="chain-delegation"><input type="checkbox" disabled={starting} checked={parallelSubtasks} onChange={e=>setParallelSubtasks(e.target.checked)}/>{ru?'Разрешить параллельные подзадачи':'Allow parallel subtasks'}</label>}
+      {!compact&&delegation}
       <footer>
         <button type="button" className="secondary" onClick={onClose}>{ru ? 'Отмена' : 'Cancel'}</button>
-        {onPrepare&&<button type="button" className={controls?'secondary':'primary'} disabled={starting || !prompt || oversized} onClick={() => onPrepare(prompt)}>
-          {ru ? 'Подготовить черновик' : 'Prepare draft'}
-        </button>}
-        {controls&&<button type="button" className="primary" disabled={!prompt||starting||largeUpload||controls.canStart===false} onClick={()=>void startChain()}>
-          {starting?(ru?'Запуск…':'Starting…'):(ru?'Запустить связанные чаты':'Start linked chats')}
+        {(!compact||!controls)&&prepare}
+        {controls&&<button type="button" className="primary" disabled={!prompt||starting||readingDescription||largeUpload||chainOversized||controls.canStart===false} onClick={()=>void startChain()}>
+          {starting?(ru?'Запуск…':'Starting…'):compact?(ru?'Запустить задачу':'Start task'):(ru?'Запустить связанные чаты':'Start linked chats')}
         </button>}
       </footer>
     </section>

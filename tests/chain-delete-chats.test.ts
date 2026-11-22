@@ -47,7 +47,7 @@ test('chain erasure only confirms known attempts, preserves other chats and retr
   assert.ok(chats.has(other));assert.equal((await get()).error!==undefined,true);
 });
 
-test('folder erasure waits until the chain records the provider result and handoff',async t=>{
+test('folder erasure excludes task chats and explicit erasure waits until the chain records its handoff',async t=>{
   const root=await mkdtemp(path.join(tmpdir(),'chain-active-delete-')),sessionId=randomUUID(),id=randomUUID(),token='test-only-'.repeat(5);
   const scope={cwd:root,provider:'claude'},store=path.join(root,'uploads','.tasks','markdown-chains');
   await mkdir(store,{recursive:true});
@@ -74,12 +74,16 @@ test('folder erasure waits until the chain records the provider result and hando
   assert.equal((await api('task-chains?'+new URLSearchParams(scope))).status,200);
   await ready;run!.status='done';run!.messages=[{id:randomUUID(),role:'assistant',blocks:[{type:'text',text:'Saved handoff.\n'+chainCompletionMarker(id,0)}]}];
   const folder={folder:root,provider:'claude',eraseOriginals:true};
-  assert.deepEqual((await(await api('chat-library/bulk-delete',{...folder,action:'preview'})).json()).running,[sessionId]);
-  assert.deepEqual((await(await api('chat-library/bulk-delete',{...folder,action:'delete',ids:[sessionId]})).json()).running,[sessionId]);
+  const explicit={provider:'claude',eraseOriginals:true,ids:[sessionId]};
+  const preview=await(await api('chat-library/bulk-delete',{...folder,action:'preview'})).json();
+  assert.deepEqual(preview.running,[]);assert.deepEqual(preview.ids,[]);
+  assert.deepEqual((await(await api('chat-library/bulk-delete',{...folder,action:'delete',ids:[sessionId]})).json()).unavailable,[sessionId]);
+  assert.deepEqual((await(await api('chat-library/bulk-delete',{...explicit,action:'delete'})).json()).running,[sessionId]);
   holdObservation=false;
   const deadline=Date.now()+7000;
   while((await(await api('task-chains/'+id+'?'+new URLSearchParams(scope))).json()).status!=='done'){
     assert.ok(Date.now()<deadline,'handoff never saved');await new Promise(resolve=>setTimeout(resolve,25));
   }
-  assert.deepEqual((await(await api('chat-library/bulk-delete',{...folder,action:'preview'})).json()).ids,[sessionId]);
+  assert.deepEqual((await(await api('chat-library/bulk-delete',{...folder,action:'preview'})).json()).ids,[]);
+  assert.deepEqual((await(await api('chat-library/bulk-delete',{...explicit,action:'preview'})).json()).ids,[sessionId]);
 });

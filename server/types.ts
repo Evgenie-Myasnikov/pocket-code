@@ -10,6 +10,7 @@ export type ApprovalDecision = { allow: boolean; answers?: Record<string, string
 /** A follow-up the agent has not received yet: shown in the composer queue, never in the transcript. */
 export type QueuedInput = { id: string; text: string; attachments: number };
 export type ActivityItem = {
+  taskChat?:boolean;
   id: string; provider: 'claude' | 'codex' | 'copilot'; cwd: string; sessionId?: string; title: string;
   status: 'running' | 'needs_input' | 'done' | 'error' | 'stopped'; startedAt: number; version: string;
   /** For completed jobs only: the latest assistant message that must actually be viewed before acknowledging from history. */
@@ -18,6 +19,7 @@ export type ActivityItem = {
 };
 export type GenerationMetrics={outputTokens?:number;outputTokensPerSecond?:number;totalTokens?:number;contextTokens?:number;contextWindow?:number};
 export type JobView = {
+  taskChat?:boolean;
   generation?:GenerationMetrics;
   writePreviews?:WritePreview[];
   /** Changes whenever the transcript does; token deltas only change `partial`. */

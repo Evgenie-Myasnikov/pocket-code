@@ -56,10 +56,10 @@ test('review an AI suggestion inside the manual Markdown editor and prepare the 
   await page.getByRole('button',{name:'Создать задачу',exact:true}).click();
   const editor=page.getByRole('dialog',{name:'Создать задачу'});
   await expect(editor.getByRole('button',{name:'Заполнить с ИИ · Инструкции'})).toBeVisible();
-  await editor.getByLabel('Название цепочки',{exact:true}).fill('Проверка каталога');
+  await editor.getByText('Другие параметры',{exact:true}).click();
   await editor.getByLabel('Общий контекст',{exact:true}).fill('В учебном каталоге у каждой карточки должна быть категория из справочника.');
-  await editor.getByLabel('Название шага',{exact:true}).fill('Сверить категории');
-  const body=editor.getByRole('textbox',{name:'Инструкция',exact:true});
+  await editor.getByLabel('Название (необязательно)',{exact:true}).fill('Сверить категории');
+  const body=editor.getByRole('textbox',{name:'Описание',exact:true});
   await body.fill('Проверь категории.');
   if(process.env.POCKET_INSTRUCTION_PREVIEW){await page.evaluate(()=>document.fonts.ready.then(()=>true));await editor.screenshot({path:process.env.POCKET_INSTRUCTION_PREVIEW});}
   await editor.getByRole('button',{name:'Улучшить с ИИ · Инструкции'}).click();
@@ -99,6 +99,7 @@ test('starting an edited imported chain uses the approved field values and origi
   await desktop(page);
   await page.getByRole('button',{name:'New chat',exact:true}).click();
   await page.locator('.desktop-rail').getByRole('button',{name:'Tasks',exact:true}).click();
+  await page.getByRole('button',{name:'Create chain',exact:true}).click();
   await page.getByRole('button',{name:'Import Markdown',exact:true}).click();
   const importer=page.getByRole('dialog',{name:'Markdown tasks'});
   await importer.getByLabel('Main context (.md)').setInputFiles({
@@ -143,8 +144,8 @@ test('phone Tasks tab fills a blank step instruction without starting a chat',as
   await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');
   await page.locator('.mobile-tabbar').getByRole('button',{name:'Tasks',exact:true}).click();
   await page.getByRole('button',{name:'Create task',exact:true}).click();
-  const instructions=page.getByRole('textbox',{name:'Instructions',exact:true});
-  await page.getByRole('textbox',{name:'Step title',exact:true}).fill('Review glossary');
+  const instructions=page.getByRole('textbox',{name:'Description',exact:true});
+  await page.getByRole('textbox',{name:'Title (optional)',exact:true}).fill('Review glossary');
   await page.getByRole('button',{name:'Fill with AI · Instructions'}).click();
   const ai=page.getByRole('dialog',{name:'Fill with AI · Instructions'});
   await expect(ai).toBeVisible();

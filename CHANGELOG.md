@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- Tasks (2026-11-22). Start a task from a typed description or a text file. The title defaults to its first line and AI can suggest a title or refine the description before launch. Open step chats and prior attempts beside the task, or full-width on phones, with drafts and task context retained on return. Linked chats are excluded from the ordinary chat library and folder deletion. Verified the production build, host filtering, notification routing, task creation and desktop and phone-sized browser flows with synthetic data.
+
 ## [0.28.55](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.54...v0.28.55) (2026-11-22)
 
 Published [0.28.55](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.55) from [d4ef337](https://github.com/Evgenie-Myasnikov/pocket-code/commit/d4ef33787a1447f1a78c4e2a0de1ed54e5dc6f70) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). SHA-256 verified for all four public downloads. All 163 web assets matched across packages. Android version code 142 uses the same signing certificate as 0.28.54. Physical Android installation remains untested.

@@ -46,6 +46,7 @@ function StepPaths({chain,index,ru}:Pick<Props,'chain'|'index'|'ru'>){
   const row=(label:string,value:string)=> <div className="chain-path-row"><dt>{label}</dt><dd><code>{value}</code><CopyAction compact text={value} label={ru?'Копировать путь':'Copy path'}/></dd></div>;
   return <div className="chain-paths">
     <dl>{row(ru?'Проект':'Project',chain.cwd)}
+      {step.branch&&row(ru?'Ветка':'Branch',step.branch)}
       {step.worktreeCwd&&step.worktreeCwd!==step.launchCwd&&row(ru?'Рабочее дерево':'Worktree',step.worktreeCwd)}
       {(step.launchCwd||step.worktreeCwd)&&row(ru?'Рабочая папка шага':'Step working directory',(step.launchCwd||step.worktreeCwd)!)}
     </dl>

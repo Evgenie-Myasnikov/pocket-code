@@ -466,8 +466,15 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/copilot/login',async(_req,res)=>res.json(await copilot().login()));
   // Project folders are shared; conversation histories remain provider-specific.
   const gitProjects=new GitProjects(roots);
+  async function librarySessions(provider:'claude'|'codex'|'copilot'){
+    if(workspaceAccess.current())return [];
+    await taskChains.init();
+    const listed=await sessions(provider);
+    const linked=taskChains.chatMembership(engineFor(provider).list());
+    return listed.filter(chat=>!linked(provider,chat));
+  }
   async function projectFolders() {
-    const results = await Promise.allSettled([sessions('claude'), sessions('codex'),sessions('copilot')]);
+    const results = await Promise.allSettled([librarySessions('claude'), librarySessions('codex'),librarySessions('copilot')]);
     const projects = new Set([...roots,...await gitProjects.list()]);
     for (const result of results) if (result.status === 'fulfilled') {
       for (const session of result.value) {
@@ -480,7 +487,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   }
   app.get('/api/projects',async(_req,res)=>res.json(await projectFolders()));
   app.get('/api/document-projects',async(req,res)=>res.json(await documentProjects(await projectFolders(),z.enum(['rules','changelog','files']).parse(req.query.kind))));
-  app.get('/api/sessions', async (req, res) => res.json(await sessions(providerSchema.parse(req.query.provider))));
+  app.get('/api/sessions', async (req, res) => res.json(await librarySessions(providerSchema.parse(req.query.provider))));
   const chatRuns=(provider:'claude'|'codex'|'copilot')=>{
     const observing=taskChains?.observingJobs();
     return [
@@ -490,6 +497,11 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   };
   const processChats=mountChatBulkDelete(app,chatLibrary,{
     personal:()=>!workspaceAccess.current(),sessions,
+    folderChatFilter:async provider=>{
+      await taskChains.init();
+      const linked=taskChains.chatMembership(engineFor(provider).list());
+      return chat=>!linked(provider,chat);
+    },
     jobs:chatRuns,
     accounts:()=>customProviders.list(),
     originals:createChatOriginals({sdk,codex:config.codex,copilot:config.copilot}),
@@ -682,10 +694,22 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/activity', (_req, res) => {
     // In-memory jobs started by this bridge only. Reading activity must never
     // initialize a provider, inspect desktop history or request model output.
-    const recent = recentActivityJobs(allJobs().filter(j=>visibleRoot(j.cwd)));
-    res.json(recent.map(job => activityItem(jobView(job.id))));
+    const runs=allJobs().filter(j=>visibleRoot(j.cwd));
+    const linked=taskChains.chatMembership(runs);
+    res.json(recentActivityJobs(runs).map(job=>{
+      const item=activityItem(jobView(job.id));
+      return linked(item.provider,job)?{...item,taskChat:true}:item;
+    }));
   });
-  app.get('/api/jobs', async (req, res) => {const provider=providerSchema.parse(req.query.provider),data=await chatLibrary.read();res.json(engineFor(provider).list().filter(j=>visibleRoot(j.cwd)&&(j.status==='running'||!j.sessionId||!data.chats[provider+':'+j.sessionId]?.deleted)));});
+  app.get('/api/jobs', async (req,res)=>{
+    const provider=providerSchema.parse(req.query.provider);
+    if(workspaceAccess.current()){res.json([]);return;}
+    await taskChains.init();
+    const data=await chatLibrary.read(),runs=engineFor(provider).list().filter(job=>visibleRoot(job.cwd));
+    const linked=taskChains.chatMembership(runs);
+    res.json(runs.filter(j=>j.status==='running'||!j.sessionId||!data.chats[provider+':'+j.sessionId]?.deleted)
+      .map(job=>linked(provider,job)?{...job,taskChat:true}:job));
+  });
   app.get('/api/jobs/:id', (req, res) => {
     const job = jobView(uuid.parse(req.params.id));if(!visibleRoot(job.cwd))throw new HttpError(404,"Chat not found");
     if (String(job.revision) === req.query.revision) { res.status(204).end(); return; }
@@ -801,8 +825,16 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json(await taskChains.create({...plan,...scope}));
   });
   app.get('/api/task-chains',async(req,res)=>{
+    const match=z.object({sessionId:z.string().min(1).max(4096).optional(),jobId:uuid.optional()}).parse(req.query);
+    if(req.query.notification==='1'){
+      if(workspaceAccess.current())throw new HttpError(403,'Personal tasks belong to the connected PC');
+      // The old notification payload carries the executor and cwd, but not the custom account.
+      // Cwd here is matched against a recorded launch. No filesystem access is requested.
+      const {provider,cwd}=scopeSchema.pick({cwd:true,provider:true}).parse(req.query);
+      res.json(await taskChains.notificationTarget(provider,cwd,match));
+      return;
+    }
     const scope=await chainScope(req.query);
-    const match=z.object({sessionId:z.string().min(1).max(512).optional(),jobId:uuid.optional()}).parse(req.query);
     res.json(match.jobId||match.sessionId?await taskChains.findStep(scope,match):await taskChains.list(scope));
   });
   app.get('/api/task-chains/:id',async(req,res)=>{

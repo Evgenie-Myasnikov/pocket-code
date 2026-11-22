@@ -126,6 +126,15 @@ test('assigned steps route handoffs, retries and chat links through their own pr
   const link=await store.findStep({...owner,provider:'claude',account},{sessionId:retry.sessionId});
   const previous=await store.findStep({...owner,provider:'claude',account},{sessionId:first.sessionId});
   assert.equal(previous[0]?.stepIndex,0);
+  const notification=await store.notificationTarget('claude',input.cwd,{sessionId:first.sessionId});
+  assert.deepEqual(notification,{id:plan.id,owner:{...owner,account:undefined}});
+  const history=(await store.get(plan.id,owner)).steps[0].previousChats;
+  assert.deepEqual(history,[{provider:'claude',account,cwd:input.cwd,sessionId:first.sessionId,attempt:1}]);
+  const linked=store.chatMembership([]);
+  assert.ok(linked('claude',{sessionId:first.sessionId,account}));
+  assert.ok(linked('claude',{sessionId:retry.sessionId,account}));
+  assert.ok(!linked('claude',{sessionId:first.sessionId}));
+  assert.ok(!linked('codex',{sessionId:first.sessionId,account}));
   const saved=JSON.parse(await readFile(path.join(options.file,plan.id+'.json'),'utf8'));
   assert.deepEqual(saved.attempts.slice(0,2).map((a:{provider:string;account:string;sessionId:string})=>[a.provider,a.account,a.sessionId]),[
     ['claude',account,first.sessionId],['claude',account,retry.sessionId],

@@ -1,8 +1,8 @@
 import {ChainStepReader} from './ChainStepReader';
 import {Disclosure,Markdown} from './RichBlocks';
-import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {ChainDeleteDialog} from './ChainDeleteDialog';
-import {ArrowLeft,ArrowUpRight,Check,ChevronRight,ListOrdered,MessageSquare} from 'lucide-react';
+import {ArrowLeft,Check,ChevronRight,ListOrdered,MessageSquare} from 'lucide-react';
 import {useLanguage} from './i18n';
 import {useBackAction} from './navigation';
 import {type ChainDeleteChat,type ChainDeletePreview,type ChainSourceInput,type ChainExecutor,type MarkdownChainDetail,type MarkdownChainSummary} from './markdown-chain';
@@ -18,7 +18,7 @@ export type MarkdownChainControls = {
   audit?(id:string):Promise<{diff:string}>;
   previewDeletion?(id:string):Promise<ChainDeletePreview>;
   remove?(id:string,chats?:ChainDeleteChat[]):Promise<({ok:boolean}&ChainDeletePreview)|undefined>;
-  openChat(step:MarkdownChainDetail['steps'][number]):void;
+  renderChat(step:MarkdownChainDetail['steps'][number],close:()=>void,actions:HTMLElement):ReactNode;
 };
 
 const labels={
@@ -34,8 +34,10 @@ const phases={
 const providerNames={claude:'Claude',codex:'Codex',copilot:'GitHub Copilot'};
 function statusLabel(status:keyof typeof labels,ru:boolean){return labels[status][ru?0:1];}
 
-export function MarkdownChainPanel({controls,initial,initialId}:{
+export function MarkdownChainPanel({controls,initial,initialId,onChat,onBrowse,drawerId,openSession,openJob}:{
   controls:MarkdownChainControls;initial?:MarkdownChainDetail;initialId?:string;
+  drawerId:string;openSession?:string;openJob?:string;
+  onChat(step:MarkdownChainDetail['steps'][number],trigger:HTMLButtonElement):void;onBrowse():void;
 }){
   const ru=useLanguage()==='ru',title=ru?'Цепочки задач':'Task chains';
   const latest=useRef(controls);
@@ -51,6 +53,7 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
   const view=useRef(0),stopLock=useRef(false);
   useLayoutEffect(()=>{view.current++;return ()=>{view.current++;};},[id]);
   function browse(next?:string){
+    onBrowse();
     select(next);setDetail(undefined);setExpanded(null);setError('');setStopError('');setStopping(false);
     setConfirmDelete(false);
     if(!next)setSummaries(undefined);
@@ -91,7 +94,8 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
   const done=detail?.steps.filter(step=>step.status==='done').length??0;
   const currentStep=useRef<HTMLLIElement>(null);
   const activeIndex=detail?.steps.findIndex(step=>step.status==='running'||step.status==='waiting')??-1;
-  const showProgress=!!detail&&detail.steps.length>0;
+  const single=detail?.steps.length===1;
+  const showProgress=!!detail&&!single;
   return <section className="chain-panel tasks-chain-content" aria-label={title}>
       {id&&<header className="chain-head"><button type="button" className="chain-back" onClick={()=>browse()}><ArrowLeft size={16}/>{title}</button></header>}
       <div className="chain-heading">
@@ -110,7 +114,7 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
       </div>}
       {(!id&&!summaries||id&&!detail)&&!error&&<p role="status">{ru?'Загрузка…':'Loading…'}</p>}
       {detail&&<>
-        {detail.status!=='running'&&<p className="chain-outcome">{statusLabel(detail.status,ru)}</p>}
+        {!single&&detail.status!=='running'&&<p className="chain-outcome">{statusLabel(detail.status,ru)}</p>}
         {detail.status==='done'&&detail.steps[0]?.baseCommit&&detail.steps.at(-1)?.headCommit&&<details><summary>{ru?'Финальный аудит и слияние':'Final review and merge'}</summary>{controls.audit&&<button type="button" onClick={async()=>{try{const result=await controls.audit!(detail.id);setAudit({id:detail.id,text:result.diff||(ru?'Без изменений':'No changes')});}catch(e){setError(String(e));}}}>{ru?'Показать общий diff':'Show cumulative diff'}</button>}{audit?.id===detail.id&&<pre tabIndex={0}>{audit.text}</pre>}<p>{ru?'В целевой ветке проверьте общий diff, затем выполните одно слияние.':'In the target branch, review the cumulative diff, then merge once.'}</p><pre>{'git diff '+detail.steps[0].baseCommit+' '+detail.steps.at(-1)?.headCommit+'\ngit merge --no-ff '+detail.steps.at(-1)?.headCommit}</pre></details>}
         {activeIndex>=3&&<button type="button" className="chain-jump text-button" onClick={()=>{currentStep.current?.scrollIntoView({block:'center'});currentStep.current?.focus({preventScroll:true});}}>{ru?'К текущему шагу':'Go to current step'} · {activeIndex+1}</button>}
         <ol className="chain-steps">{detail.steps.map((step,i)=>{
@@ -126,8 +130,7 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
           return <li key={i} data-status={step.status} aria-current={isActive?'step':undefined} ref={isActive?currentStep:undefined} tabIndex={isActive?-1:undefined}>
           <div className="chain-node" aria-hidden="true">{step.status==='done'?<Check size={15}/>:i+1}</div>
           <div className="chain-step">
-            <div className="chain-step-heading"><h3>{step.title}</h3><span className="chain-state">{step.retryAt ? (ru ? 'Ожидает повтора' : 'Retry scheduled') : statusLabel(step.status,ru)}{step.retryCount ? ` · ${ru ? 'Попытка' : 'Attempt'} ${step.retryCount + 1}` : ''}</span></div>
-            {step.branch&&<small>{step.branch}</small>}
+            <div className="chain-step-heading">{(!single||step.title!==detail.name)&&<h3>{step.title}</h3>}<span className="chain-state">{step.retryAt ? (ru ? 'Ожидает повтора' : 'Retry scheduled') : statusLabel(step.status,ru)}{step.retryCount ? ` · ${ru ? 'Попытка' : 'Attempt'} ${step.retryCount + 1}` : ''}</span></div>
             {step.executor&&!isActive&&<small>{executionProvider}</small>}
             {Boolean(step.subtasks?.length)&&<details className="chain-subtasks">
               <summary>{ru?'Подзадачи':'Subtasks'} · {step.subtasks!.length}</summary>
@@ -142,13 +145,25 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
             {!isActive&&output&&<Disclosure className="task-step-result" summary={<><ChevronRight aria-hidden="true" size={14}/>{ru?'Результат':'Result'}</>}>{()=>outputBody}</Disclosure>}
             <div className="chain-links">
               <button type="button" aria-expanded={expanded===i} onClick={()=>setExpanded(expanded===i?null:i)}><ChevronRight className={expanded===i?'chain-chevron-open':''} size={14}/>{ru?'Контекст шага':'Step context'}</button>
-              {(step.sessionId||step.jobId)&&<button type="button" onClick={()=>controls.openChat(step)}><MessageSquare size={14}/>{ru?'Открыть чат':'Open chat'}<ArrowUpRight size={12}/></button>}
+              {(step.sessionId||step.jobId)&&<button type="button" aria-controls={openSession||openJob?drawerId:undefined} aria-expanded={!!(step.sessionId&&step.sessionId===openSession||step.jobId&&step.jobId===openJob)} onClick={event=>onChat(step,event.currentTarget)}><MessageSquare size={14}/>{ru?'Открыть чат':'Open chat'}</button>}
             </div>
+            {!!step.previousChats?.length&&<details className="chain-subtasks chain-attempts">
+              <summary>{ru?'Предыдущие попытки':'Previous attempts'} · {step.previousChats.length}</summary>
+              <ul>{step.previousChats.map(chat=><li className="chain-links" key={chat.attempt}>
+                <button type="button" aria-controls={openSession||openJob?drawerId:undefined} aria-expanded={chat.sessionId===openSession} onClick={event=>onChat({...step,
+                  title:step.title+' · '+(ru?'Попытка ':'Attempt ')+chat.attempt,
+                  status:'done',sessionId:chat.sessionId,jobId:undefined,launchCwd:chat.cwd,
+                  executor:{provider:chat.provider,account:chat.account},
+                },event.currentTarget)}>
+                  <MessageSquare size={14}/>{ru?'Попытка':'Attempt'} {chat.attempt} · {providerNames[chat.provider]}
+                </button>
+              </li>)}</ul>
+            </details>}
             {expanded===i&&<ChainStepReader key={i} chain={detail} index={i} provider={executionProvider} model={executor.model} ru={ru}/>}
           </div>
         </li>;})}</ol>
         {stopError&&<p role="alert" className="error-banner">{stopError}</p>}
-        {detail.status==='running'&&<footer><button type="button" className="secondary" disabled={stopping} onClick={()=>void stop()}>{ru?'Остановить цепочку':'Stop chain'}</button></footer>}
+        {detail.status==='running'&&<footer><button type="button" className="secondary" disabled={stopping} onClick={()=>void stop()}>{single?(ru?'Остановить задачу':'Stop task'):(ru?'Остановить цепочку':'Stop chain')}</button></footer>}
         {detail.status!=='running'&&controls.remove&&<footer><button type="button" className="secondary" onClick={()=>setConfirmDelete(true)}>{detail.steps.length===1?(ru?'Удалить задачу':'Delete task'):(ru?'Удалить цепочку':'Delete chain')}</button></footer>}
       </>}
       {confirmDelete&&detail&&<ChainDeleteDialog chain={detail} controls={controls} ru={ru} onClose={()=>setConfirmDelete(false)} onDeleted={()=>browse()}/>}

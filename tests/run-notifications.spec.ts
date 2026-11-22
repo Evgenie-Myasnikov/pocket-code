@@ -59,6 +59,10 @@ test('desktop shell opens the exact notification job from Settings with its prov
       if(path==='/projects')result=['/fixture/project'];
       if(path==='/board-notifications')result={items:[],unread:0};
       if(path==='/task-runs')result={runs:[]};
+      if(path==='/task-chains'&&url.searchParams.get('notification')==='1'&&url.searchParams.get('sessionId')==='step-session'){
+        result={id:'chain-one',owner:{cwd:'/fixture/project',provider:'claude'}};
+      }
+      if(path==='/task-chains/chain-one')result={id:'chain-one',name:'Check documentation',provider:'claude',cwd:'/fixture/project',context:'',status:'done',steps:[{title:'Read examples',body:'Read examples',source:'',sessionId:'step-session',status:'done'}]};
       if(path==='/review/availability')result={available:false};
       if(path.endsWith('/messages'))result={messages:[],previous:null,next:null};
       if(path==='/jobs/exact-notification-run')result={id:'exact-notification-run',provider:'codex',sessionId:'target-session',cwd:'/fixture/project',status:'done',startedAt:1700000000000,revision:1,baseMessageCount:0,approvals:[],partial:'',messages:[{id:'result',role:'assistant',blocks:[{type:'text',text:'Exact notification job result'}]}]};
@@ -71,4 +75,8 @@ test('desktop shell opens the exact notification job from Settings with its prov
   await expect(page.locator('.conversation')).toContainText('Exact notification job result');
   await expect.poll(()=>page.evaluate(()=>(window as any).notificationFixture.calls.some((call:any)=>call.endpoint?.startsWith('/jobs/exact-notification-run')))).toBe(true);
   await expect(page.locator('.desktop-rail .provider-picker-trigger')).toContainText('Codex');
+  await page.evaluate(()=>{const fixture=(window as any).notificationFixture;fixture.pending={provider:'codex',sessionId:'step-session',cwd:'/fixture/project',title:'Synthetic task notification'};fixture.emit();});
+  await expect(page.getByRole('heading',{name:'Check documentation'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Open chat',exact:true})).toBeVisible();
+  await expect(page.locator('.desktop-rail .provider-picker-trigger')).toContainText('Claude');
 });

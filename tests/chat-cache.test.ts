@@ -15,6 +15,9 @@ test('chat snapshots survive reads, isolate providers/hosts and clear on forget'
 test('bounded cache retains recent chats and tolerates corrupted storage',()=>{
  for(let n=0;n<30;n++)writeChatCache('host','codex','chat:'+n,'hello');
  const raw=Object.values(data)[0];assert.ok(Object.keys(JSON.parse(raw)).length<=21);
+ data['pocket-code-chats-v1:legacy:claude']=JSON.stringify({sessions:{at:1,value:[{sessionId:'task'}]},'chat:task':{at:1,value:['saved']}});
+ assert.equal(readChatCache('legacy','claude','sessions'),null);
+ assert.deepEqual(readChatCache('legacy','claude','chat:task'),['saved']);
  data['pocket-code-chats-v1:broken:claude']='invalid';
  assert.equal(readChatCache('broken','claude','sessions'),null);
  writeChatCache('broken','claude','sessions',[]);assert.deepEqual(readChatCache('broken','claude','sessions'),[]);

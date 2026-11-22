@@ -199,6 +199,21 @@ export class MarkdownChains {
     this.timer.unref();
   }
   hasWork() { return [...this.records.values()].some(r => r.chain.status === 'running'); }
+  // A provider may announce its session between two scheduler observations.
+  chatMembership(runs: ReadonlyArray<Pick<JobView,'id'|'sessionId'|'provider'|'account'>>) {
+    const sessions=new Set<string>(), jobs=new Set<string>();
+    const key=(provider:string,account:string|undefined,id:string)=>JSON.stringify([provider,account||'',id]);
+    for(const record of this.records.values())for(const attempt of record.attempts??[]){
+      if(attempt.jobId)jobs.add(key(attempt.provider,attempt.account,attempt.jobId));
+      if(attempt.sessionId)sessions.add(key(attempt.provider,attempt.account,attempt.sessionId));
+    }
+    for(const run of runs){
+      const provider=run.provider||'claude';
+      if(run.sessionId&&jobs.has(key(provider,run.account,run.id)))sessions.add(key(provider,run.account,run.sessionId));
+    }
+    return (provider:string,chat:{sessionId?:string;id?:string;account?:string})=>
+      Boolean(chat.sessionId&&sessions.has(key(provider,chat.account,chat.sessionId))||chat.id&&jobs.has(key(provider,chat.account,chat.id)));
+  }
   observingJobs(){
     const ids=new Set<string>();
     for(const {chain} of this.records.values())if(chain.status==='running'){
@@ -209,6 +224,16 @@ export class MarkdownChains {
 
   private async detail(record: RecordV1) {
     const chain = structuredClone(record.chain);
+    const counts=new Map<number,number>();
+    for(const attempt of record.attempts??[]){
+      const step=chain.steps[attempt.step];
+      if(!step)continue;
+      const number=(counts.get(attempt.step)??0)+1;
+      counts.set(attempt.step,number);
+      if(!attempt.sessionId||attempt.sessionId===step.sessionId||attempt.jobId&&attempt.jobId===step.jobId)continue;
+      const {provider,account,cwd,sessionId}=attempt;
+      (step.previousChats??=[]).push({provider,account,cwd,sessionId,attempt:number});
+    }
     if (record.settings?.model) chain.model = record.settings.model;
     if (chain.account && !chain.accountName) {
       const name = await this.options.accountName?.(chain.account);
@@ -297,6 +322,18 @@ export class MarkdownChains {
       }
     }
     return [];
+  }
+  async notificationTarget(provider:ChainScope['provider'],cwd:string,match:{sessionId?:string;jobId?:string}){
+    await this.init();
+    let target:{id:string;owner:ChainScope}|null=null;
+    for(const {chain,attempts} of this.records.values()){
+      const found=attempts?.some(attempt=>attempt.provider===provider&&(attempt.cwd===cwd||chain.cwd===cwd)&&
+        (match.jobId&&match.jobId===attempt.jobId||match.sessionId&&match.sessionId===attempt.sessionId));
+      if(!found)continue;
+      if(target)return null;
+      target={id:chain.id,owner:{cwd:chain.cwd,provider:chain.provider,account:chain.account}};
+    }
+    return target;
   }
   private record(id: string, scope: ChainScope) {
     const record = this.records.get(id.toLowerCase());

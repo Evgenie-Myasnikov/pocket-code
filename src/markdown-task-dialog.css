@@ -25,6 +25,19 @@
 .markdown-edit-field>button { grid-column:2;grid-row:1;justify-self:end; }
 .markdown-edit-field>input,.markdown-edit-field>textarea { grid-column:1/-1; }
 .markdown-edit-field textarea { resize:vertical;min-height:4rem; }
+.simple-task-editor { gap:.65rem; }
+.simple-task-editor textarea { font-size:1rem; }
+.task-file-action { display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;min-width:0; }
+.task-file-action button { display:inline-flex;align-items:center;gap:.4rem; }
+.task-file-action small { color:var(--muted);overflow-wrap:anywhere; }
+.task-extra-options { margin-top:.3rem;border-top:1px solid var(--line);padding-top:.55rem; }
+.task-extra-options summary { display:flex;align-items:center;gap:.35rem;width:fit-content;min-height:2rem;color:var(--muted);font-size:.86rem; }
+.task-extra-options summary::-webkit-details-marker { display:none; }
+.task-extra-options[open]>summary svg { transform:rotate(90deg); }
+.task-extra-options>div { display:grid;gap:.7rem;padding-top:.5rem; }
+.task-extra-options>div>button { justify-self:start; }
+.simple-task-editor .chain-delegation { display:flex;align-items:center;gap:.5rem; }
+.simple-task-editor .chain-delegation input { width:auto; }
 .markdown-task-editor>button,.markdown-step-editor>button { justify-self:start; }
 .markdown-preview-steps li>div { display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap; }
 .markdown-preview-steps details { flex:1 1 12rem;min-width:0; }
@@ -32,4 +45,5 @@
   .confirm-modal.markdown-task-dialog { padding:16px; }
   .markdown-step-editor { padding:.5rem .6rem .8rem; }
   .markdown-task-dialog footer .primary { flex:1 1 100%; }
+  .markdown-task-dialog:has(.simple-task-editor) footer .primary { flex:0 1 auto; }
 }

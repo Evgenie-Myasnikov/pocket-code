@@ -28,8 +28,11 @@ test('chain API runs distinct chats with their settings and isolates saved conte
     },
     stop:(id:string)=>{const job=active.get(id);if(job)job.status='stopped';},
   });
+  const ordinaryId=randomUUID();
+  const listSessions=async()=>[ordinaryId,...Array.from(active.values(),run=>run.sessionId!)]
+    .map(sessionId=>({sessionId,summary:'Work on step',cwd:project,lastModified:1}));
   const {app,terminals,closeTaskServices}=await createApp({roots:[project,other],uploads,
-    hostName:'Synthetic PC',token,desktopSessionIndexes:[]},jobs);
+    hostName:'Synthetic PC',token,desktopSessionIndexes:[]},jobs,{listSessions,getSessionMessages:async()=>[]});
   const server=app.listen(0,'127.0.0.1');
   await new Promise<void>(resolve=>server.once('listening',resolve));
   t.after(async()=>{await closeTaskServices();terminals.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(root,{recursive:true,force:true});});
@@ -66,6 +69,16 @@ test('chain API runs distinct chats with their settings and isolates saved conte
   assert.equal(starts[0].mode,'plan');assert.equal(starts[0].maxBudgetUsd,2);assert.equal(starts[0].sessionId,undefined);
   assert.match(starts[0].text,/Shared example/);assert.doesNotMatch(starts[0].text,/Expect the sample/);
   const first=active.get(starts[0].id)!;
+  const library=async()=>await (await request('/../sessions?provider=claude')).json();
+  assert.deepEqual((await library()).map((s:{sessionId:string})=>s.sessionId),[ordinaryId]);
+  assert.equal((await request('/../sessions/'+first.sessionId+'/messages?provider=claude')).status,200);
+  assert.equal((await (await request('/../jobs?provider=claude')).json())[0].taskChat,true);
+  assert.equal((await (await request('/../activity')).json())[0].taskChat,true);
+  const folder=await (await request('/../chat-library/bulk-delete',{provider:'claude',folder:project,action:'preview'})).json();
+  assert.deepEqual(folder.ids,[ordinaryId]);assert.deepEqual(folder.running,[]);
+  const notice=await (await request(query+'&notification=1&jobId='+first.id)).json();
+  assert.deepEqual(notice,{id,owner:scope});
+  assert.equal(await (await request('?'+new URLSearchParams({...scope,cwd:other})+'&notification=1&jobId='+first.id)).json(),null);
   first.partial='Live example.';
   const live:MarkdownChainDetail=await (await request(detail)).json();
   assert.equal(live.steps[0].launchCwd,first.cwd);assert.ok(starts[0].text.includes('Selected project folder: '+JSON.stringify(project)));
@@ -99,6 +112,7 @@ test('chain API runs distinct chats with their settings and isolates saved conte
   assert.equal(summary.context,undefined);assert.equal(summary.steps,undefined);
   assert.equal((await request('/'+id+'/delete',{...scope,cwd:other})).status,404);
   assert.deepEqual(await (await request('/'+id+'/delete',scope)).json(),{ok:true});
+  assert.ok((await library()).some((s:{sessionId:string})=>s.sessionId===first.sessionId));
   assert.equal((await request(detail)).status,404);assert.deepEqual(await (await request(query)).json(),[]);
   assert.equal((await request('',plan)).status,409);
 });

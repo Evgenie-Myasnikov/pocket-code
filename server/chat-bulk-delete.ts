@@ -8,6 +8,7 @@ type Provider='claude'|'codex'|'copilot';
 type Chat={sessionId:string;cwd?:string;account?:string;readOnly?:boolean;source?:string};
 type Source={
   personal():boolean;
+  folderChatFilter?(provider:Provider):Promise<(chat:Chat)=>boolean>;
   sessions(provider:Provider,includeDeleted?:boolean):Promise<Chat[]>;
   originals?:{canRemove(provider:Provider):boolean;remove(provider:Provider,id:string,cwd:string):Promise<void>};
   verifyDesktopOriginal?(id:string,cwd:string):Promise<boolean>;
@@ -50,7 +51,8 @@ export function mountChatBulkDelete(app:Express,library:ChatLibrary,source:Sourc
       const resolved=provider==='claude'?await library.resolveAccounts(decorated,await source.accounts()):decorated;
       for(const chat of resolved)catalog.set(chat.sessionId,chat);
     }
-    const inScope=(s:Chat)=>s.account===account&&(folder===undefined||folderKey(s.cwd)===folderKey(folder))&&(!expected||expected.get(s.sessionId)?.includes(folderKey(s.cwd)));
+    const folderChat=folder!==undefined&&source.folderChatFilter?await source.folderChatFilter(provider):undefined;
+    const inScope=(s:Chat)=>(!folderChat||folderChat(s))&&s.account===account&&(folder===undefined||folderKey(s.cwd)===folderKey(folder))&&(!expected||expected.get(s.sessionId)?.includes(folderKey(s.cwd)));
     const candidates=ids?[...new Set(ids)]:[...catalog.values()].filter(inScope).map(s=>s.sessionId);
     const result={ids:[] as string[],running:[] as string[],unavailable:[] as string[],failed:[] as string[],unsupported:[] as string[],alreadyRemoved:[] as string[]};
     const active=()=>new Set(source.jobs(provider).filter(j=>j.status==='running').map(j=>j.sessionId));

@@ -26,6 +26,7 @@ export type MarkdownChainStep = {
   retryCount?: number;
   retryAt?: number;
   retryReport?: string;
+  previousChats?: (ChainDeleteChat & {cwd:string;attempt:number})[];
   jobId?: string;
   sessionId?: string;
   error?: string;

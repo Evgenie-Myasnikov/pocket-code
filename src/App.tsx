@@ -125,7 +125,7 @@ const budgetRangeMessage='Лимит стоимости запроса вне д
 const connectivityError=(error:unknown)=>{const problem=(error as {problem?:string}|null)?.problem;return problem==='unreachable'||problem==='tls'||problem==='cleartext'||hostDown(getReachability());};
 const uniqueMessages = (messages:ChatMessage[]) => [...new Map(messages.map(message=>[message.id,message])).values()];
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() || p;
-export type EmbeddedChat={tasksPage?:{initialId?:string;initialRoot?:string;project?:string};onTaskProject?(root:string):void;onOpenTasks?(initialId?:string,owner?:MarkdownChainScope):void;onTaskDraft?(root:string,prompt?:string):void;taskDraft?:{root:string;prompt:string};onTaskDraftUsed?():void;draftStore?:Map<string,Map<string,ChatDraft>>;onTaskProvider?(provider:WorkspaceProvider):void;activity?:ActivityFeed;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardSelection?:BoardSelection|null;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onRevealBoardSelection?(target:BoardRevealTarget):void;onCreated?(session:Session,job:JobView):void;onNewBoardChat?(target:BoardChat):void;onOpenChainChat?(session:Session,jobId?:string):void;onBack():void};
+export type EmbeddedChat={taskDrawer?:HTMLElement;tasksPage?:{initialId?:string;initialRoot?:string;project?:string};onTaskProject?(root:string):void;onOpenTasks?(initialId?:string,owner?:MarkdownChainScope):void;onTaskDraft?(root:string,prompt?:string):void;taskDraft?:{root:string;prompt:string};onTaskDraftUsed?():void;draftStore?:Map<string,Map<string,ChatDraft>>;onTaskProvider?(provider:WorkspaceProvider):void;activity?:ActivityFeed;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardSelection?:BoardSelection|null;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onRevealBoardSelection?(target:BoardRevealTarget):void;onCreated?(session:Session,job:JobView):void;onNewBoardChat?(target:BoardChat):void;onBack():void};
 function focusLatestMessage(transcript: HTMLElement) {
   const latest = transcript.querySelector<HTMLElement>('.conversation-inner > article.message:last-of-type');
   const target = latest ?? transcript.querySelector<HTMLElement>('.conversation-inner');
@@ -239,18 +239,18 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const composerPreferences=useComposerPreferences();
   const claudeCatalog=useClaudeModels(demo?null:connection,provider,cwd);
   // A custom provider runs this Claude agent with its own URL, key and model catalog.
-  const customAccount=useCustomAccount(),account=provider==='claude'&&!demo?customAccount:'',customModels=useCustomModels(demo?null:connection,account);
+  const selectedAccount=useCustomAccount(),customAccount=embedded?.taskDrawer?(embedded.session?.account||''):selectedAccount,account=provider==='claude'&&!demo?customAccount:'',customModels=useCustomModels(demo?null:connection,account);
   const claudeDefaultModel=claudeCatalog.models.find(item=>item.isDefault)?.id||'sonnet';
   const claudeEffort=useCodexEffort(provider==='claude'?claudeCatalog.models:undefined,model,'claude');
   const localActivity=useActivity(demo||embedded?.activity?null:connection);
   const activity=embedded?.activity||localActivity;
   const [activityTarget,setActivityTarget]=useState<{item:ActivityItem;connection:Connection}|null>(null);
   const [notificationTarget,setNotificationTarget]=useState<(WatchedChat & {account?:string})|null>(null);
-  useRunNotifications(demo||connection?.workspaceId?null:connection,locale().startsWith('ru')?'ru':'en');
+  useRunNotifications(demo||connection?.workspaceId?null:connection,locale().startsWith('ru')?'ru':'en',false,!!embedded?.taskDrawer);
   useChatNotifications(connection,demo?null:tab==='chats'?(mobileChat&&(selected||job)?{provider,sessionId:job?.sessionId||selected?.sessionId,jobId:job?.id,cwd,title:selected?.customTitle||selected?.summary||engineName}:null):undefined,locale().startsWith('ru')?'ru':'en',chat=>{
     if(chat.provider!=='claude'&&chat.provider!=='codex'&&chat.provider!=='copilot')return;
     setNotificationTarget(chat);setProvider(chat.provider);
-  });
+  },!!embedded?.taskDrawer,openTasks);
   useEffect(()=>{
     if(!notificationTarget||notificationTarget.provider!==provider||!connection)return;
     if(busy||uploading)return;
@@ -283,6 +283,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const rejectedDraft=rejectedDrafts[currentDraftKey()];
   const embeddedDraftReady=useRef(false);
   const rememberDraft=()=>{if(embedded&&!embeddedDraftReady.current)return;drafts.current!.set(currentDraftKey(),{text:draft,attachments});};
+  const drawerDraft=useRef(rememberDraft);
+  drawerDraft.current=rememberDraft;
+  useEffect(()=>()=>{if(embedded?.taskDrawer)drawerDraft.current();},[embedded?.taskDrawer]);
   const restoreDraft=(key:string)=>{const value=drafts.current!.get(key);setDraft(value?.text||'');setAttachments(value?.attachments||[]);};
   function openActivity(item:ActivityItem){
     if(!connection||busy||uploading)return;
@@ -303,7 +306,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const paging=useRefForWorkspace<symbol|null>(null);
   const historyExpanded=useRefForWorkspace(false);
   const scrollAnchor=useRefForWorkspace<{height:number;top:number;epoch:number;prepend:boolean;messageId?:string;offset?:number}|null>(null);
-  useEffect(()=>saveSelectedWorkspace(provider),[provider]);
+  useEffect(()=>{if(!embedded?.taskDrawer)saveSelectedWorkspace(provider);},[provider,embedded?.taskDrawer]);
   useEffect(()=>savePreferences(provider,{model:lastModel,mode:"default",budget,codexAccess}),[provider,lastModel,budget,codexAccess]);
   // Desktop settings change the device defaults while this chat stays mounted; follow them instead of saving stale values back.
   useEffect(()=>{const handle=(event:Event)=>{const change=(event as CustomEvent<PreferenceChange>).detail;if(!change||change.provider!==provider)return;if(change.budget!==undefined)setBudget(clampBudget(change.budget));if(change.codexAccess)setCodexAccess(change.codexAccess);};window.addEventListener('pocket-code-preferences',handle);return()=>window.removeEventListener('pocket-code-preferences',handle);},[provider,setBudget,setCodexAccess]);
@@ -314,7 +317,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       setProjectReady(true);
     } else if (!cwd) setCwd(preferredRoot(connection.url, health.roots, provider));
   },[connection,health,projects,projectReady,cwd,provider]);
-  useEffect(()=>{if(connection&&projectReady&&projects?.includes(cwd))savePreferredRoot(connection.url,cwd,provider);},[connection,cwd,projects,projectReady,provider]);
+  useEffect(()=>{if(!embedded?.taskDrawer&&connection&&projectReady&&projects?.includes(cwd))savePreferredRoot(connection.url,cwd,provider);},[connection,cwd,projects,projectReady,provider]);
   useEffect(()=>{if(tab!=='chats')setReadingMode(false);},[provider,tab]);
   const historyWindow = useRefForWorkspace(100);
   const [historyError, setHistoryError] = useStateForWorkspace('');
@@ -393,7 +396,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const keyActions=useRef({stop:()=>{}});keyActions.current={stop:()=>{if(runUnknown)retryNow();else void stopRun();}};
   useEffect(()=>{
     // Windows: Esc stops the run; Ctrl+Shift+M, I and E open the access, model and effort pickers of this chat; Ctrl+Shift+D opens Review.
-    if(!embedded)return;
+    if(!embedded||embedded.taskDrawer)return;
     const key=(event:KeyboardEvent)=>{
       const root=scroll.current?.closest<HTMLElement>('.app');if(!root||!root.getClientRects().length||event.defaultPrevented)return;
       if(document.querySelector('[aria-modal="true"],dialog[open],.access-menu,.model-custom,.chat-menu'))return;
@@ -578,7 +581,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     setDraft([draft,rejectedDraft.text].filter(Boolean).join('\n\n'));setAttachments(combined);
     setRejectedDrafts(old=>({...old,[currentDraftKey()]:{...rejectedDraft,restored:true}}));
   }
-  useEffect(()=>{if(!connection?.deviceId)return;const beat=()=>request(connection,'/devices/heartbeat',{}).then(()=>setLastContact(Date.now())).catch(()=>{});const stopBeat=startVisiblePoll(beat,15000,true,document,hostGate(connection.url));const revoked=(event:Event)=>{if((event as CustomEvent).detail===connection.deviceId)void disconnect('revoked');};window.addEventListener('pocket-device-revoked',revoked);return()=>{stopBeat();window.removeEventListener('pocket-device-revoked',revoked);};},[connection]);
+  useEffect(()=>{if(embedded?.taskDrawer||!connection?.deviceId)return;const beat=()=>request(connection,'/devices/heartbeat',{}).then(()=>setLastContact(Date.now())).catch(()=>{});const stopBeat=startVisiblePoll(beat,15000,true,document,hostGate(connection.url));const revoked=(event:Event)=>{if((event as CustomEvent).detail===connection.deviceId)void disconnect('revoked');};window.addEventListener('pocket-device-revoked',revoked);return()=>{stopBeat();window.removeEventListener('pocket-device-revoked',revoked);};},[connection]);
   // Another known route (Wi-Fi, Tailscale, tunnel) can replace an unreachable one without a new QR.
   async function reachableRoute(c:Connection){for(const url of c.routes||[]){if(url===c.url)continue;try{const next={...c,url:normalizeUrl(url)},{stale}=await freshHealth(next);if(!stale)return next;}catch{/* Try the next route. */}}return null;}
   function cancelConnect(){++connectEpoch.current;setConnecting(false);setRestoring(false);}
@@ -976,6 +979,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const taskCwd=tab==='tasks'?(pinnedRoot||taskProject||cwd||projectRoots[0]||''):cwd;
   const chainScope={cwd:taskCwd,provider,...(account?{account}:{})};
   const chainQuery=new URLSearchParams(chainScope).toString();
+  const drawerDrafts=useRef(new Map<string,Map<string,ChatDraft>>());
   const chainControls:MarkdownChainControls|undefined=connection&&!connection.workspaceId&&!demo&&taskCwd?{
     cwd:taskCwd,canStart:canRun,
     list:()=>api('/task-chains?'+chainQuery),
@@ -994,20 +998,15 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       return result;
     },
     stop:id=>api('/task-chains/'+encodeURIComponent(id)+'/stop',chainScope),
-    openChat:step=>{
+    renderChat:(step,close,actions)=>{
       if(!step.sessionId&&!step.jobId)return;
       const executor=step.executor??{provider,account};
       const target:Session={sessionId:step.sessionId||'pending-'+step.jobId,cwd:step.launchCwd||step.worktreeCwd||taskCwd,provider:executor.provider,summary:step.title,lastModified:Date.now(),account:executor.account||''};
       const live=step.sessionId&&jobs.find(run=>(run.provider||'claude')===executor.provider&&(run.account||'')===(executor.account||'')&&run.sessionId===step.sessionId&&run.status==='running');
       const active=live?live.id:(!step.sessionId||step.status==='running'||step.status==='waiting'?step.jobId:undefined);
-      if(embedded?.onOpenChainChat)embedded.onOpenChainChat(target,active);
-      else if(executor.provider!==provider || (executor.account||'')!==account){
-        rememberDraft();
-        if(executor.provider==='claude')setCustomAccount(executor.account||'');
-        setNotificationTarget({provider:executor.provider,account:executor.account||'',sessionId:step.sessionId,jobId:active,cwd:target.cwd!,title:step.title});
-        setProvider(executor.provider);
-      }
-      else void openSession(target,active?{id:active,sessionId:step.sessionId}:undefined);
+      return <WorkspaceApp key={JSON.stringify([executor.provider,target.account,target.sessionId])}
+        onDisconnect={close} embedded={{taskDrawer:actions,connection,provider:executor.provider,session:target,
+          jobId:active,cwd:target.cwd!,activity,draftStore:embedded?.draftStore||drawerDrafts.current,onOpenTasks:close,onBack:close}}/>;
     }
   }:undefined;
   const newTaskChat=taskCwd!==cwd||!!selected?.readOnly||boardMissing;
@@ -1189,7 +1188,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const inConversation=tab==='chats'&&chatSurface&&mobileChat;
   const tabBar=!embedded&&!(readingMode&&tab==='chats')&&!inConversation;
   // Chats that wait for the person come from every provider, so a waiting Codex chat is visible while Claude is selected.
-  const waiting=activity.items.filter(item=>item.status==='needs_input'||item.status==='error');
+  const waiting=activity.items.filter(item=>!item.taskChat&&(item.status==='needs_input'||item.status==='error'));
   const sessionStatus=(sessionId:string):RunStatus|undefined=>{const active=jobs.find(j=>j.sessionId===sessionId&&j.status==='running');if(active)return active.approvals?.length?'needs_input':'running';return activity.items.find(item=>item.provider===provider&&item.sessionId===sessionId)?.status;};
   const providerAttention=(id:WorkspaceProvider)=>waiting.filter(item=>item.provider===id).length;
   const providerChips=<ProviderPicker connection={connection||undefined} value={provider} onChange={setProvider} disabled={demo||busy||uploading} attention={providerAttention}/>;
@@ -1209,7 +1208,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       <div className="session-list">
         {waiting.length>0&&!search&&<section className="session-group session-group-waiting" aria-labelledby="waiting-chats"><h2 className="list-label" id="waiting-chats">{t('Ждут вас')}<span>{waiting.length}</span></h2>
           {waiting.map(item=><button className="session-row" key={item.provider+':'+item.id} disabled={busy||uploading||Boolean(activityTarget)} onClick={()=>openActivity(item)}><MessageSquare size={16}/><div><strong>{item.title||t('Новый разговор')}</strong><small>{providerName(item.provider)} · {basename(item.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={item.status}/></small></div></button>)}</section>}
-        {jobs.filter((j) => j.status === 'running' && (provider!=='claude'||(j.account||'')===account) && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><MessageSquare size={16}/><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={j.approvals?.length?'needs_input':'running'}/></small></div></button>)}
+        {jobs.filter((j) => !j.taskChat && j.status === 'running' && (provider!=='claude'||(j.account||'')===account) && !sessions.some((s) => s.sessionId === j.sessionId)).map((j) => <button className="session-row" key={j.id} onClick={() => void openSession({ sessionId: j.sessionId || `pending-${j.id}`, summary: t("Текущая задача"), cwd: j.cwd, lastModified: j.startedAt }, j)}><MessageSquare size={16}/><div><strong>{t("Текущая задача")}</strong><small>{basename(j.cwd)}<span aria-hidden="true">·</span><ChatRunStatus status={j.approvals?.length?'needs_input':'running'}/></small></div></button>)}
         {grouped.map(group=><section className="session-group" key={group.group} aria-label={dayGroupLabel(group.group)}><h2 className="list-label">{dayGroupLabel(group.group)}<span>{group.items.length}</span></h2>{group.items.map(sessionRow)}</section>)}
         {/* "No chats yet" only after the PC answered; before that a skeleton, or why the list cannot load. */}
         {!visible.length && connection && !search && !demo && !sessionsLoaded ? unreachable ? <div className="empty-list" role="status"><MessageSquare size={32} /><p>{t('Список чатов загрузится, когда ПК будет на связи.')}</p><button className="secondary" onClick={()=>retryNow()}>{t('Повторить')}</button></div> : <div className="loading-skeleton" role="status" aria-label={t('Загружаем чаты…')}><span/><span/><span/></div>
@@ -1227,7 +1226,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       {chatSurface&&<ChatEdgeGlass/>}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
-        <ChatHeader board={chatBoard?{title:chatBoard.title,disabled:!connection||demo,open:()=>void openChatBoard(chatBoard)}:undefined} hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} close={embedded&&boardChat?.context?{label:language==='ru'?'Закрыть чат доски':'Close board chat',open:()=>embedded.onBack()}:undefined} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
+        <ChatHeader actionsHost={embedded?.taskDrawer} board={chatBoard?{title:chatBoard.title,disabled:!connection||demo,open:()=>void openChatBoard(chatBoard)}:undefined} hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} close={embedded&&boardChat?.context?{label:language==='ru'?'Закрыть чат доски':'Close board chat',open:()=>embedded.onBack()}:undefined} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():boardChat?.context?setTab('workspace'):setMobileChat(false)}
           context={undefined}
           review={availableReview||taskRun?{disabled:!connection||demo||!!selected?.readOnly,open:()=>{setReviewPaths(undefined);setReviewOpen(true);},stats:availableReview&&availableReview.files!==undefined?{added:availableReview.added||0,removed:availableReview.removed||0,files:availableReview.files}:undefined}:undefined}

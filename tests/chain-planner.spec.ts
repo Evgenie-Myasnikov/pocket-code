@@ -22,6 +22,7 @@ async function openTasks(page:Page){
 }
 async function openPlanner(page:Page){
   await openTasks(page);
+  await page.getByRole('button',{name:'Create chain',exact:true}).click();
   await page.getByRole('button',{name:'Plan with AI',exact:true}).click();
   return page.getByRole('dialog');
 }
@@ -32,6 +33,7 @@ const sources=[
 
 test('import a prose plan once and choose AI or manual splitting with the same document',async({page})=>{
   await openTasks(page);
+  await page.getByRole('button',{name:'Create chain',exact:true}).click();
   await page.getByRole('button',{name:'Import Markdown',exact:true}).click();
   let dialog=page.getByRole('dialog');
   await dialog.getByLabel('Main context (.md)').setInputFiles(sources[0]);
@@ -58,6 +60,7 @@ test('import a prose plan once and choose AI or manual splitting with the same d
 
 test('an unresolved plan reference blocks AI and automatic execution while allowing explicit manual editing',async({page})=>{
   await openTasks(page);
+  await page.getByRole('button',{name:'Create chain',exact:true}).click();
   await page.getByRole('button',{name:'Import Markdown',exact:true}).click();
   const dialog=page.getByRole('dialog');
   await dialog.getByLabel('Main context (.md)').setInputFiles({name:'guide.md',mimeType:'text/markdown',buffer:Buffer.from('# Guide\n- [Review](review.md)')});
@@ -75,6 +78,7 @@ test('available planners stay usable while unavailable providers explain how to 
     catalog.warnings=['executors'];
     catalog.unavailable=[{provider:'codex',reason:'signed_out'}];
   });
+  await page.getByRole('button',{name:'Create chain',exact:true}).click();
   await page.getByRole('button',{name:'Plan with AI',exact:true}).click();
   const dialog=page.getByRole('dialog');
   await dialog.getByLabel('Source files').setInputFiles(sources);

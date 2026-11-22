@@ -13,6 +13,7 @@ test('Markdown import keeps selected project locations distinct from uploaded co
   });
   await desktop(page);
   await page.locator('.desktop-rail').getByRole('button',{name:'Tasks',exact:true}).click();
+  await page.getByRole('button',{name:'Create chain',exact:true}).click();
   await page.getByRole('button',{name:'Import Markdown',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Markdown tasks'});
   await dialog.getByRole('button',{name:'Context from project'}).click();

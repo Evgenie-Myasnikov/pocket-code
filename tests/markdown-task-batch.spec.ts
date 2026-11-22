@@ -8,6 +8,7 @@ function markdown(name:string,text:string){
 
 async function openTaskDialog(page:Page){
   await page.locator('.desktop-rail').getByRole('button',{name:'Tasks',exact:true}).click();
+  await page.getByRole('button',{name:'Create chain',exact:true}).click();
   await page.getByRole('button',{name:'Import Markdown',exact:true}).click();
   return page.getByRole('dialog',{name:'Markdown tasks'});
 }
@@ -121,6 +122,7 @@ test('linked chats show execution order, per-step context and project history',a
   await tasksNav.click();
   await page.getByRole('region',{name:'Задачи',exact:true}).getByRole('button',{name:'Claude',exact:true}).click();
   await page.getByRole('menuitemradio',{name:'Учебный API'}).click();
+  await page.getByRole('button',{name:'Создать цепочку',exact:true}).click();
   await page.getByRole('button',{name:'Импорт Markdown',exact:true}).click();
   const importer=page.getByRole('dialog',{name:'Задачи из Markdown'});
   await importer.getByLabel('Основной контекст (.md)').setInputFiles(markdown('Обновление каталога.md',[
@@ -181,7 +183,8 @@ test('linked chats show execution order, per-step context and project history',a
   const settings=steps.first().locator('.chain-run-settings');
   await expect(settings).toContainText('Claude · Учебный API');await expect(settings).toContainText('catalog-editor');
   await steps.first().getByRole('button',{name:'Открыть чат'}).click();
-  await expect(panel).toBeHidden();
+  await expect(panel).toBeVisible();
+  await expect(page.getByRole('complementary',{name:'Чат задачи'})).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>(window as any).desktopCalls.some((call:any)=>call.endpoint?.includes('/sessions/alpha/messages')))).toBe(true);
   await page.getByRole('button',{name:/Шаг 1 \/ 3/}).click();
   await expect(panel.getByRole('heading',{name:'Обновление каталога.md'})).toBeVisible();
