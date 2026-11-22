@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [0.28.53](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.52...v0.28.53) (2026-11-22)
 
-Preparing 0.28.53 (Android version code 140) from the integrated release branch.
+Published [0.28.53](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.53) from [bb22e43b2f3bb75d1972c19e3967cd9e8bbc4e6f](https://github.com/Evgenie-Myasnikov/pocket-code/commit/bb22e43b2f3bb75d1972c19e3967cd9e8bbc4e6f) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). All four public downloads matched the audited SHA-256 hashes, all 163 UI files matched across packages, and the APK signer matched 0.28.52. Android version code 140. Physical-device verification remains open.
 
 ### Bug Fixes
 - Markdown task chains (2026-11-22). A finished chat without its completion marker now schedules another attempt at the same step with the previous report. Delays increase to one minute. User stops and provider failures remain terminal. Eight scheduler tests and TypeScript passed.
