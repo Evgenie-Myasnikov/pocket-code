@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [0.28.56](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.55...v0.28.56) (2026-11-22)
 
-Built local 0.28.56 packages from release/0.28.1 at 8df6a1d139fb4d45919723331f669e94fc69e2bb. Verified all three package hashes, 163 shared web assets and Android signing continuity (version code 143). Physical installation remains untested.
+Published from [fe5c63c](https://github.com/Evgenie-Myasnikov/pocket-code/commit/fe5c63c4cd92208d111c9ec5b7043e0f8919f95d) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). Verified the tag, all four public download hashes, the packaged UI and Android signature continuity. Physical device installation remains untested.
 
 ### Bug Fixes
 - Chat delivery (2026-11-22). Show the submitted message immediately and clear the composer while the host acknowledges it. Retain subsequent typing and recover rejected submissions. Verified the production build and five browser scenarios, including delayed Claude and Codex acknowledgements.
