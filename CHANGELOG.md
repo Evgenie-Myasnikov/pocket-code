@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Preparing 0.28.52 (Android version code 139) from the integrated release branch.
+
 ### Features
 - Task chains (2026-11-22). Open Tasks on Windows or Android to create or import a Markdown plan. Follow each linked chat, its provider and requested model, current output, exact step context and result. Stopped and completed chains can be deleted while their chats stay available.
 - Task authoring (2026-11-22). Use Improve on a chat draft or individual task field with a supported local Claude, Codex or Copilot account or a configured API-key connection and model. Custom accounts generate an isolated text suggestion through the PC. Apply or edit the suggestion before running a task. A real local Codex 0.171.0 request and simulated OpenAI-compatible API requests were verified.
