@@ -99,10 +99,21 @@ test('only the final assistant reply may confirm completion', async t => {
   ];
   await chains.tick(); await chains.tick();
   const chain = await chains.get(input.id, input);
-  assert.equal(chain.status, 'failed');
-  assert.match(chain.steps[0].error!, /confirming/);
+  assert.equal(chain.status, 'running');
+  assert.equal(chain.steps[0].retryCount, 1);
+  assert.equal(chain.steps[0].retryReport, 'Waiting for your decision.');
   assert.equal(chain.steps[1].status, 'pending');
   assert.equal(jobs.size, 1);
+  t.mock.method(Date, 'now', () => chain.steps[0].retryAt! + 1);
+  await Promise.all([chains.tick(), chains.tick()]);
+  assert.equal(jobs.size, 2);
+  const retry = [...jobs.values()][1];
+  retry.status = 'done';
+  await chains.tick();
+  await chains.stop(input.id, input);
+  await chains.tick();
+  assert.equal((await chains.get(input.id, input)).status, 'stopped');
+  assert.equal(jobs.size, 2);
 });
 
 test('stop is scoped, idempotent and excludes subsequent launches', async t => {

@@ -4,6 +4,9 @@ export type MarkdownChainStep = {
   body: string;
   source: string;
   status: 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
+  retryCount?: number;
+  retryAt?: number;
+  retryReport?: string;
   jobId?: string;
   sessionId?: string;
   error?: string;
@@ -47,6 +50,9 @@ export function buildChainStepPrompt(chain: MarkdownChainDetail, index: number) 
   if (index > 0 && chain.steps[index - 1].handoff) {
     sections.push(`Previous step: ${chain.steps[index - 1].title}\n${chain.steps[index - 1].handoff}`);
   }
+  if (step.retryCount) sections.push(
+    `Continue the unfinished step. Inspect existing changes and rerun outstanding checks. Avoid repeating completed work. Previous attempt report:\n${step.retryReport || "(no report)"}`
+  );
   sections.push(
     `Current task (${step.source})\n${step.body}`,
     `After completing and verifying this step, summarize the result and checks for the next chat, then end your reply with this exact line:\n${chainCompletionMarker(chain.id, index)}\nIf blocked, describe what is needed and omit the completion line.`

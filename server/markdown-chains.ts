@@ -118,7 +118,10 @@ export class MarkdownChains {
       // replay it after restart, even if its session ID had not arrived yet.
       const hadLinks = record.chain.steps.some(s => s.jobId);
       for (const step of record.chain.steps) delete step.jobId;
-      if (record.chain.status === 'running') {
+      if (record.chain.status === 'running' && record.chain.steps.some(s => s.retryAt !== undefined)) {
+        await this.save(record);
+        this.schedule();
+      } else if (record.chain.status === 'running') {
         const step = record.chain.steps.find(activeStep) || record.chain.steps.find(s => s.status === 'pending');
         if (step) {
           step.status = 'failed'; step.error = 'Host restarted. Check the chat before repeating this task.';
@@ -246,6 +249,8 @@ export class MarkdownChains {
           if (job.status === 'running') await this.options.stop(step.jobId);
         } else delete step.jobId;
       }
+      const retry = record.chain.steps.find(s => s.retryAt !== undefined);
+      if (retry) { delete retry.retryAt; retry.status = 'stopped'; }
       if (step && activeStep(step)) step.status = 'stopped';
       if (record.chain.status === 'running') record.chain.status = 'stopped';
       await this.save(record);
@@ -270,7 +275,11 @@ export class MarkdownChains {
         if (chain.steps.every(s => s.status === 'done')) chain.status = 'done';
         return;
       }
-      step.error = 'The chat ended without confirming that the step was completed.';
+      step.retryCount = (step.retryCount ?? 0) + 1;
+      step.retryReport = step.output || step.retryReport;
+      step.retryAt = Date.now() + Math.min(60000, 1000 * 2 ** Math.min(step.retryCount, 6));
+      step.status = 'pending';
+      return;
     } else if (job.error) step.error = job.error;
     step.status = job.status === 'stopped' ? 'stopped' : 'failed';
     chain.status = step.status;
@@ -281,6 +290,14 @@ export class MarkdownChains {
     const index = chain.steps.findIndex(s => activeStep(s) || s.status === 'pending');
     const step = chain.steps[index];
     if (!step) return;
+    if (step.retryAt !== undefined) {
+      if (step.retryAt > Date.now()) return;
+      delete step.retryAt;
+      delete step.jobId;
+      delete step.sessionId;
+      delete step.output;
+      delete step.outputTruncated;
+    }
     if (step.jobId) {
       const job = await this.options.view(step.jobId);
       if (!job) {

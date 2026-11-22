@@ -131,7 +131,7 @@ export function MarkdownChainPanel({controls,initial,initialId}:{
           return <li key={i} data-status={step.status} aria-current={isActive?'step':undefined} ref={isActive?currentStep:undefined} tabIndex={isActive?-1:undefined}>
           <div className="chain-node" aria-hidden="true">{step.status==='done'?<Check size={15}/>:i+1}</div>
           <div className="chain-step">
-            <div className="chain-step-heading"><h3>{step.title}</h3><span className="chain-state">{statusLabel(step.status,ru)}</span></div>
+            <div className="chain-step-heading"><h3>{step.title}</h3><span className="chain-state">{step.retryAt ? (ru ? 'Ожидает повтора' : 'Retry scheduled') : statusLabel(step.status,ru)}{step.retryCount ? ` · ${ru ? 'Попытка' : 'Attempt'} ${step.retryCount + 1}` : ''}</span></div>
             {step.error&&<p className="chain-step-error">{step.error}</p>}
             {isActive&&<div className="task-live-response">
               <div className="task-phase"><strong>{executionProvider}</strong>
