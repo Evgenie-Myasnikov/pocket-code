@@ -1,4 +1,5 @@
 import {expect,test,type Page} from '@playwright/test';
+import packageJson from '../package.json' with {type:'json'};
 import {openChatList} from './chat-navigation';
 import {desktop} from './desktop-fixture';
 
@@ -7,13 +8,13 @@ async function phone(page:Page){
   await page.route('**/api/**',async route=>{
     const url=new URL(route.request().url()),path=url.pathname;
     let value:unknown=[];
-    if(path==='/api/health')value={name:'Demo',roots:['C:/Demo/Atlas'],protocol:1};
+    if(path==='/api/health')value={name:'Demo',roots:['C:/Demo/Atlas'],protocol:1,version:packageJson.version};
     else if(path==='/api/providers')value=[{id:'claude',name:'Claude',available:true,authenticated:true}];
     else if(path==='/api/sessions')value=[{sessionId:'alpha',summary:'Каталог',cwd:'C:/Demo/Atlas',lastModified:1}];
     else if(path==='/api/jobs')value=await page.evaluate(()=>(window as any).testRuns.map((run:any)=>({...run,messages:[],reasoningPreviews:undefined,writePreviews:undefined})));
     else if(path==='/api/jobs/concurrent-preview'){
       const run=await page.evaluate(()=>(window as any).testRuns[0]);
-      if(String(run.revision)===url.searchParams.get('revision'))value=null;
+      if(String(run.revision)===url.searchParams.get('revision'))return route.fulfill({status:204});
       else if(String(run.messagesRevision)===url.searchParams.get('messages'))value={...run,messages:[],messagesUnchanged:true};
       else value=run;
     }
@@ -83,7 +84,11 @@ for(const client of ['desktop','phone'])test(`${client} keeps reasoning and two 
   await expect(snippets).toHaveText([/currency: "RUB"/,/expect\(price\).toContain/]);
   await expect(context).toContainText('Пишу функцию формата цены и проверяю символ валюты.');
   expect(await reasoning.evaluate(node=>node===(window as any).reasoningNode)).toBe(true);
-  if(client==='phone')expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  if(client==='phone'){
+    await page.waitForResponse(response=>new URL(response.url()).pathname==='/api/jobs/concurrent-preview'&&response.status()===204);
+    await expect(page.getByText(/По этому адресу ответил другой сервис/)).toHaveCount(0);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  }
   const capture=client==='desktop'?process.env.POCKET_PARALLEL_TURN_CAPTURE:process.env.POCKET_PARALLEL_PHONE_CAPTURE;
   if(capture){
     const top=await reasoning.boundingBox(),bottom=await files.last().boundingBox();
