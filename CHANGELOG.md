@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [0.28.55](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.54...v0.28.55) (2026-11-22)
 
-Preparing 0.28.55 (Android version code 142). Web, Windows, PC host and Android packages built successfully. Publication requires the signing identity used by 0.28.54 and GitHub Releases write access.
+Published [0.28.55](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.55) from [d4ef337](https://github.com/Evgenie-Myasnikov/pocket-code/commit/d4ef33787a1447f1a78c4e2a0de1ed54e5dc6f70) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). SHA-256 verified for all four public downloads. All 163 web assets matched across packages. Android version code 142 uses the same signing certificate as 0.28.54. Physical Android installation remains untested.
 
 ### Features
 - Chat activity (2026-11-22). The default brief view folds successful shell commands from each user turn into one expandable history. Output stays available and running commands, failures and approval requests remain visible. Desktop and phone browser checks covered turn boundaries, the detailed view and retained command output.
