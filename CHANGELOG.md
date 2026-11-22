@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Preparing 0.28.54 (Android version code 141) from the integrated release branch.
+
 ### Features
 - File changes and token usage (2026-11-22). Chats display native partial writes, measured generation statistics and the last saved response metrics. A per-response result card opens the verified working and output folders and lists changed files and available diff counts. Validation covered actual adapter event handlers with synthetic events, five Edge scenarios for streaming and file results, and the production TypeScript/Vite build.
 - Chat history (2026-11-22). Reopening a chat restores its cached transcript immediately while the host refreshes it. Permanent erasure also clears connected clients’ retained copies on synchronization and closes an erased chat that is open on another device. Edge scenarios covered slow connections, switching chats, account isolation and reconnecting after erasure.
