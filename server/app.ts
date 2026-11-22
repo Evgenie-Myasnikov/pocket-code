@@ -53,7 +53,7 @@ import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 
-export type Config = { port?:number; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { port?:number; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages; forkSession?:typeof forkSession };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -181,7 +181,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(config.engineUpdates){const state=await config.engineUpdates.status();await config.engineUpdates.configure(body.enabled??state.enabled,body.provider==='copilot'?state.provider:body.provider);}
     res.json(await engineStatus());
   });
-  app.get('/api/runtime', (_req, res) => res.json({ applicationId: 'app.pocketcode.host', processId: process.pid, version: packageJson.version, desktopCheckRequestedAt:config.updater?.desktopCheckRequestedAt||0, busy: isBusy(), internet: config.runtime?.internet() ?? false }));
+  app.get('/api/runtime', (_req, res) => {
+    const internet = config.runtime?.internet() ?? false;
+    res.json({ applicationId: 'app.pocketcode.host', processId: process.pid, version: packageJson.version, desktopCheckRequestedAt:config.updater?.desktopCheckRequestedAt||0, busy: isBusy(), internet, phoneAccess: internet || (config.runtime?.lanAccess?.() ?? false) });
+  });
   app.post('/api/runtime/stop', (_req, res) => {
     if (!config.runtime) throw new HttpError(404, 'Runtime control is unavailable.');
     if (config.hostUpdater?.draining) throw new HttpError(409, 'The PC is handing off an update. Wait for it to finish.');

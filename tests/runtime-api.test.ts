@@ -6,10 +6,12 @@ import os from 'node:os';
 import type {AddressInfo} from 'node:net';
 import {createApp,type Config} from '../server/app.js';
 import {Jobs} from '../server/jobs.js';
+import {DeviceRegistry} from '../server/devices.js';
 
-async function fixture(extra:Partial<Config>={}){
+async function fixture(extra:Partial<Config>={},emptyRegistry=false){
   const root=await mkdtemp(path.join(os.tmpdir(),'pocket-runtime-api-')),token='synthetic-runtime-key-'.repeat(3);
-  const result=await createApp({roots:[root],token,hostName:'Synthetic computer',uploads:path.join(root,'uploads'),desktopSessionIndexes:[],...extra},new Jobs(),{listSessions:async()=>[],getSessionMessages:async()=>[]} as any);
+  const devices=emptyRegistry ? await new DeviceRegistry(path.join(root,'devices.json')).load() : undefined;
+  const result=await createApp({roots:[root],token,devices,hostName:'Synthetic computer',uploads:path.join(root,'uploads'),desktopSessionIndexes:[],...extra},new Jobs(),{listSessions:async()=>[],getSessionMessages:async()=>[]} as any);
   const server=result.app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
   const base=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
   return {...result,root,req:(url:string,body?:unknown,key=token)=>fetch(base+url,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)}),
@@ -21,9 +23,22 @@ test('runtime identity and stop require authentication and expose no local paths
     assert.equal((await f.req('/runtime',undefined,'wrong')).status,401);
     assert.equal((await f.req('/runtime/stop',{},'wrong')).status,401);assert.equal(stops,0);
     const pkg=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
-    assert.deepEqual(await(await f.req('/runtime')).json(),{applicationId:'app.pocketcode.host',processId:process.pid,version:pkg.version,desktopCheckRequestedAt:0,busy:false,internet:true});
+    assert.deepEqual(await(await f.req('/runtime')).json(),{applicationId:'app.pocketcode.host',processId:process.pid,version:pkg.version,desktopCheckRequestedAt:0,busy:false,internet:true,phoneAccess:true});
     assert.equal(f.isBusy(),false);
   }finally{await f.close();}
+});
+test('the local host stays available when phone access is off',async()=>{
+  let lan=false;
+  const f=await fixture({runtime:{internet:()=>false,lanAccess:()=>lan,stop(){}}},true);
+  try {
+    const state=async()=> (await f.req('/runtime')).json();
+    assert.equal((await state()).phoneAccess,false);
+    assert.equal((await f.req('/health')).status,200);
+    assert.deepEqual(await (await f.req('/devices')).json(),[]);
+    assert.deepEqual(await (await f.req('/sessions?provider=claude')).json(),[]);
+    lan=true;
+    assert.equal((await state()).phoneAccess,true);
+  } finally { await f.close(); }
 });
 test('runtime stop refuses active Claude, Codex or terminal work and an update handoff',async()=>{
   let stops=0,codexBusy=false;const hostUpdater:any={draining:false},codex:any={list:()=>codexBusy?[{status:'running'}]:[]};

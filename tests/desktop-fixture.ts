@@ -1,13 +1,14 @@
 import {test,expect,type Page} from '@playwright/test';
 
-export async function desktop(page:Page){
- await page.addInitScript(()=>{
+export async function desktop(page:Page, initialState: {online?:boolean;statusCode?:string;phoneAccess?:boolean;activePhoneAccess?:boolean} = {}){
+ await page.addInitScript((initialState)=>{
   const listeners:((event:{data:unknown})=>void)[]=[];
   const calls:{action:string;endpoint?:string}[]=[];(window as any).desktopCalls=calls;
   const canvas=document.createElement('canvas');canvas.width=480;canvas.height=220;const drawing=canvas.getContext('2d')!;drawing.fillStyle='#263a32';drawing.fillRect(0,0,480,220);drawing.fillStyle='#c3dda8';drawing.font='28px sans-serif';drawing.fillText('Workspace preview',30,65);drawing.fillStyle='#829b86';drawing.fillRect(30,95,110,95);drawing.fillStyle='#48665c';drawing.fillRect(156,95,294,95);const sampleImage=canvas.toDataURL('image/png').split(',')[1];
-  let state={online:true,busy:false,status:'Pocket Code · connected',startup:false,autoReconnect:true,internet:true,addresses:[],jira:true};
+  let state={online:true,busy:false,status:'Pocket Code · connected',startup:false,autoReconnect:true,internet:true,addresses:[],jira:true,...initialState};
   const reply=(id:number,value:unknown)=>queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,value:structuredClone(value)}})));
   (window as any).chrome={...((window as any).chrome||{}),webview:{addEventListener(_type:string,fn:(event:{data:unknown})=>void){listeners.push(fn);},postMessage(message:any){
+   if(message.action==='restart-host'){calls.push(message);state={...state,online:true,statusCode:'connected'};reply(message.id,state);return;}
    calls.push(message);const {id,action}=message;if(action==='state'||action==='pairing-role'){reply(id,state);return;}if(action==='settings'){state={...state,...message};reply(id,state);return;}if(action==='device-rename'){const d=(window as any).testDevices.find((d:any)=>d.id===message.deviceId);d.name=message.name;reply(id,{ok:true});return;}if(action==='device-disconnect'){(window as any).testDevices=(window as any).testDevices.filter((d:any)=>d.id!==message.deviceId);reply(id,{ok:true});return;}if(action==='provider-login'){reply(id,{state:'waiting'});return;}if(action==='provider-logout'){reply(id,{state:'idle'});return;}if(action==='check-update'){reply(id,{...state,updateState:'checking'});return;}if(action==='toggle'){state={...state,online:!state.online};reply(id,state);listeners.forEach(listener=>listener({data:{state}}));return;}
    const url=new URL('https://example.invalid'+message.endpoint),p=url.pathname,provider=url.searchParams.get('provider')||'claude';
    if(p.startsWith('/project-board')&&typeof (window as any).boardHostRequest==='function'){void (window as any).boardHostRequest(message.endpoint,message.data).then((result:any)=>{if(result.error)listeners.forEach(listener=>listener({data:{id,error:result.error,status:result.status}}));else reply(id,result.value);});return;}
@@ -56,9 +57,9 @@ export async function desktop(page:Page){
    if(p==='/review'){const file=url.searchParams.get('file');reply(id,{files:[{path:'src/layout.ts',added:2,removed:1,binary:false}],current:'main',base:'main',branches:['main'],repositoryRoot:url.searchParams.get('cwd'),patch:file?'@@ -1 +1,2 @@\n-old\n+adaptive\n+responsive':'',binary:false});return;}
    reply(id,{});
   }}};
- });
+ }, initialState);
  await page.goto((test.info().project.use.baseURL||'http://127.0.0.1:5173')+'/?desktop=1');
- await expect(page.getByRole('button',{name:/claude · Interface review/})).toBeVisible();
+ if(initialState.online!==false)await expect(page.getByRole('button',{name:/claude · Interface review/})).toBeVisible();
 }
 
 export async function desktopSection(page:Page,name:string){

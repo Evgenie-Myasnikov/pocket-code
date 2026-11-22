@@ -11,8 +11,8 @@ import type {DesktopState} from './desktop-bridge';
 export function hostStatusText(state:DesktopState){
   const code=state.statusCode;
   if(code==='connected')return state.status;
-  if(code==='ready'||!code&&state.status==='Ready to connect')return t('Готово к подключению');
-  if(code==='disconnected'||!code&&state.status==='Disconnected')return t('Отключено');
+  if(code==='ready'||!code&&state.status==='Ready to connect')return t('Ожидаем локальный сервер…');
+  if(code==='disconnected'||!code&&state.status==='Disconnected')return t('Локальный сервер остановлен.');
   if(code==='reconnecting'||!code&&state.status.startsWith('Host unavailable'))return t('Сервер ПК недоступен. Переподключаемся…');
   if(code==='starting'||!code&&state.status.startsWith('Starting the host'))return t('Запускаем сервер / восстанавливаем связь…');
   if(code==='preparing'||!code&&state.status.startsWith('Preparing the host'))return t('Готовим сервер. Первый запуск может занять несколько минут.');

@@ -9,6 +9,7 @@ import path from 'node:path';
 import { createApp } from './app.js';
 import { writePairingPage, pairingAddresses } from './pairing.js';
 import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { HostUpdater } from './host-update.js';
 import packageJson from '../package.json';
 import { startInternetTunnel } from './tunnel.js';
@@ -52,7 +53,7 @@ const copilot=new CopilotService(roots);
 let internetAddress: string | undefined;
 let runtimeReady = false;
 const hostUpdater = new HostUpdater(updater, { version: packageJson.version, directory: local, previousDir: process.cwd(), roots, port, host, isBusy: () => !runtimeReady || isBusy(), tunnel: () => ({ publicUrl: internetAddress, tunnelPid: tunnel?.pid, tunnelExecutable: tunnel?.executable }), shutdown: () => shutdown(true) });
-const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines, closeTaskServices } = await createApp({ port,runs,devices,routes:()=>[...pairingAddresses(host,port).map(item=>item.url),...(internetAddress?[internetAddress]:[])],refreshPairing:()=>writePairingPage(local,devices.pairingToken,host,port,internetAddress,jiraSetupKey,true).then(()=>{}),copilot,pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
+const { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines, closeTaskServices } = await createApp({ port,runs,devices,routes:()=>[...pairingAddresses(host,port).map(item=>item.url),...(internetAddress?[internetAddress]:[])],refreshPairing:()=>writePairingPage(local,devices.pairingToken,host,port,internetAddress,jiraSetupKey,true).then(()=>{}),copilot,pcJira:{key:jiraSetupKey,connection:jiraConnection,login:jiraLogin}, engineUpdates: new EngineUpdates(path.join(local, 'engine-updates.json')), runtime: { lanAccess: () => host !== 'localhost' && host !== '::1' && !host.startsWith('127.'), internet: () => Boolean(internetAddress && tunnel && !tunnel.isStopped()), stop: () => shutdown() }, hostUpdater, codex, updater, roots, token, hostName: hostname(), uploads: path.join(local, 'uploads'), webDir: path.resolve('dist'), jira:jiraConnection.service, jiraForProvider: () => jiraConnection.service });
 runtimeReady = true;updater.start();
 const engineTimer=setInterval(()=>void maintainEngines().catch(()=>{}),30000);engineTimer.unref();
 void maintainEngines().catch(()=>{});
@@ -81,6 +82,14 @@ async function showPairing() {
       execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$p=Get-CimInstance Win32_Process -Filter 'ProcessId=${inheritedPid}'; if($p.ExecutablePath -eq '${quoted}'){$p|Invoke-CimMethod -MethodName Terminate|Out-Null}`], { windowsHide: true, timeout: 5000 }, () => { inheritedStopped = true; resolve(); });
     }) };
   } else if (process.env.POCKET_INTERNET === '1') {
+    const installer = process.env.POCKET_DESKTOP_TUNNEL_INSTALLER;
+    if (installer) {
+      // The host is listening already. A failed download affects phone sharing only.
+      const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+      await promisify(execFile)(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', installer], { windowsHide: true });
+      if (closing) return;
+      process.env.POCKET_TUNNEL_EXE = path.resolve(path.dirname(installer), '../.tools/cloudflared/cloudflared.exe');
+    }
     if (!process.env.POCKET_TUNNEL_EXE) throw new Error('Запустите сервер через Start Pocket Code Internet.cmd');
     console.log('Открываем HTTPS-туннель. QR появится после подготовки интернет-адреса…');
     tunnel = await startInternetTunnel(process.env.POCKET_TUNNEL_EXE, port, local);

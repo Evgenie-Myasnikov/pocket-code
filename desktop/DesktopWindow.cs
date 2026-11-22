@@ -16,7 +16,8 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 public sealed class DesktopPreferences {
-    public bool Connect=true, Internet=true, AutoReconnect=true, AutoUpdate=true;
+    // Connect is the persisted phone-sharing preference, including on older installations.
+    public bool Connect=false, Internet=true, AutoReconnect=true, AutoUpdate=true;
     public string Source="";
     public bool RunAlerts=true;
     public bool KeepAwake=false;
@@ -135,7 +136,10 @@ public sealed class PocketDesktop:Form {
     readonly TaskCompletionSource<bool> initialized=new TaskCompletionSource<bool>();
     DesktopPreferences preferences;
     PocketCodeOwnedHost owner;
-    bool polling,online,changing,exiting,webReady,autoStartPending,hostBusy,tunnelOnline;
+    bool polling,online,changing,exiting,webReady,hostBusy,tunnelOnline,activePhoneAccess,legacyPhoneAccess;
+    bool autoStartPending=true;
+    int hostProcessId;
+    DateTime hostStartedUtc=DateTime.MaxValue;
     int failures;
     long updateSize,updateReceived;
     DateTime nextAttempt=DateTime.MinValue;
@@ -176,10 +180,10 @@ public sealed class PocketDesktop:Form {
         tray.Text="Pocket Code";tray.Icon=Icon;tray.ContextMenuStrip=menu;tray.Visible=!preview;tray.DoubleClick+=(_,e)=>RestoreWindow();
         tray.BalloonTipClicked+=(_,e)=>{OpenRunAlert();CompleteRunAlert();};tray.BalloonTipClosed+=(_,e)=>CompleteRunAlert();
         FormClosing+=(_,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}else{timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;}};
-        timer.Tick+=async(_,e)=>await Poll();if(!preview&&Array.IndexOf(args,"--updated")>=0)preferences.Connect=true;autoStartPending=preferences.Connect&&(preferences.AutoReconnect||Array.IndexOf(args,"--updated")>=0);
+        timer.Tick+=async(_,e)=>await Poll();
         Shown+=async(_,e)=>{try{if(Array.IndexOf(args,"--background")>=0&&!reopen)Hide();await InitializeWeb();}catch(Exception error){status=error.Message;initialized.TrySetException(error);MessageBox.Show(error.Message+"\nRun the desktop installer again. Microsoft Edge WebView2 Runtime must be installed.","Pocket Code",MessageBoxButtons.OK,MessageBoxIcon.Error);return;}
             if(preview)return;
-            // Host polling must not depend on this write; the next Toggle or settings change saves again.
+            // Host polling must not depend on this write; a later settings change saves again.
             try{Save();}catch(IOException){}catch(UnauthorizedAccessException){}
             timer.Start();await Poll();};
     }
@@ -282,8 +286,7 @@ public sealed class PocketDesktop:Form {
                     else if(action=="device-approve"||action=="device-reject"){result=await Send(reader,"/devices/"+parsed+(action=="device-approve"?"/approve":"/reject"),true);}
                     else{string deviceName=message.ContainsKey("name")?message["name"] as string:null;if(String.IsNullOrWhiteSpace(deviceName)||deviceName.Length>80)throw new InvalidOperationException("Invalid device name.");result=await Send(reader,"/devices/"+parsed+"/rename",true,json.Serialize(new{name=deviceName}));}
                 }
-                else if(action=="toggle")await Toggle();
-                else if(action=="restart-host"){if(!preview&&!online&&!changing){changing=true;Push();try{while(polling&&!exiting)await Task.Delay(50);if(!exiting&&!online){if(owner!=null){owner.Dispose();owner=null;}preferences.Connect=true;Save();nextAttempt=DateTime.MinValue;Launch();}}finally{changing=false;Push();}}}
+                else if(action=="restart-host"){if(!preview&&!online&&!changing){changing=true;Push();try{while(polling&&!exiting)await Task.Delay(50);if(!exiting&&!online&&(owner==null||owner.ActiveCount==0)){if(owner!=null){owner.Dispose();owner=null;}nextAttempt=DateTime.MinValue;Launch();}}finally{changing=false;Push();}}}
                 else if(action=="jira"){if(!preview&&jiraUrl!=null)OpenUrl(jiraUrl);}
                 else if(action=="check-update"){await Send(reader,"/updates/check",true);StartUpdate();}
                 else if(action=="settings"){
@@ -292,7 +295,8 @@ public sealed class PocketDesktop:Form {
                     if(message.ContainsKey("startup"))SetStartup((bool)message["startup"]);
                     if(message.ContainsKey("autoReconnect"))preferences.AutoReconnect=(bool)message["autoReconnect"];
                     if(message.ContainsKey("keepAwake")){preferences.KeepAwake=(bool)message["keepAwake"];UpdateKeepAwake();}
-                    if(message.ContainsKey("internet")){if(online||owner!=null)throw new InvalidOperationException("Disconnect before changing connection mode.");preferences.Internet=(bool)message["internet"];}
+                    if(message.ContainsKey("phoneAccess"))preferences.Connect=(bool)message["phoneAccess"];
+                    if(message.ContainsKey("internet"))preferences.Internet=(bool)message["internet"];
                     Save();
                 }else if(action!="state")throw new InvalidOperationException("Unknown desktop action.");result=Snapshot();
             }Reply(new{id=id,value=result});
@@ -332,7 +336,7 @@ public sealed class PocketDesktop:Form {
         foreach(string name in new[]{"provider","sessionId","jobId","cwd","title"})pendingChat[name]=Field(activeRunAlert,name);
         RestoreWindow();Reply(new{chatNotification=true});
     }
-    object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,statusCode=StatusCode(),updateSize=updateSize,updateReceived=updateReceived,failures=failures,nextRetryAt=!online&&nextAttempt>DateTime.UtcNow?(long)(nextAttempt-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds:0,keepAwake=preferences.KeepAwake,logs=failures>0,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
+    object Snapshot(){return new{autoUpdate=preferences.AutoUpdate,updateState=updateState,updateVersion=updateVersion,version=AppVersion(),online=online,busy=changing||owner!=null&&!online,hostBusy=online&&hostBusy,tunnelOnline=online&&tunnelOnline,status=status,statusCode=StatusCode(),updateSize=updateSize,updateReceived=updateReceived,failures=failures,nextRetryAt=!online&&nextAttempt>DateTime.UtcNow?(long)(nextAttempt-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds:0,keepAwake=preferences.KeepAwake,logs=failures>0,startup=!preview&&StartupEnabled(),autoReconnect=preferences.AutoReconnect,phoneAccess=preferences.Connect,activePhoneAccess=online&&activePhoneAccess,internet=preferences.Internet,addresses=addresses,jira=jiraUrl!=null};}
     // The window localizes host states by code; free text stays only as the detail of an unexpected failure.
     string StatusCode(){if(online)return "connected";if(status=="Ready to connect")return "ready";if(status=="Disconnected")return "disconnected";if(status.StartsWith("Host unavailable"))return "reconnecting";if(status.StartsWith("Starting the host"))return "starting";if(status.StartsWith("Preparing the host"))return "preparing";if(status=="Disconnect before changing connection mode.")return "mode-locked";return "failed";}
     public void RestoreWindow(){Show();WindowState=FormWindowState.Normal;Activate();web.Focus();}
@@ -347,7 +351,7 @@ public sealed class PocketDesktop:Form {
             request.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",token);if(post)request.Content=new StringContent(requestBody,Encoding.UTF8,"application/json");
             HttpResponseMessage sent;
             try{sent=await client.SendAsync(request);}
-            catch(HttpRequestException){if(!preferences.Connect&&owner==null)throw new DesktopBridgeFailure("host_stopped","The PC host is stopped.");throw new DesktopBridgeFailure("host_unreachable","The PC host is not answering.");}
+            catch(HttpRequestException){throw new DesktopBridgeFailure("host_unreachable","The PC host is not answering.");}
             catch(TaskCanceledException){throw new DesktopBridgeFailure("host_timeout","The PC host did not answer in time.");}
             using(var response=sent){
                 string body=await response.Content.ReadAsStringAsync();object parsed=null;try{parsed=json.DeserializeObject(body);}catch{}
@@ -356,34 +360,67 @@ public sealed class PocketDesktop:Form {
         }
     }
     Task<object> Request(string endpoint,bool post=false){return Send(http,"/"+endpoint,post);}
-    async Task<bool> Check(){try{var runtime=(Dictionary<string,object>)await Request("runtime");if(!runtime.ContainsKey("applicationId")||(string)runtime["applicationId"]!="app.pocketcode.host")return false;if(runtime.ContainsKey("desktopCheckRequestedAt")){long requested=Convert.ToInt64(runtime["desktopCheckRequestedAt"]);if(requested>lastRequestedUpdate){lastRequestedUpdate=requested;StartUpdate();}}hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;}catch{return false;}}
+    async Task<bool> Check(){try{
+        var runtime=(Dictionary<string,object>)await Request("runtime");
+        if(Field(runtime,"applicationId")!="app.pocketcode.host")return false;
+        if(runtime.ContainsKey("desktopCheckRequestedAt")){long requested=Convert.ToInt64(runtime["desktopCheckRequestedAt"]);if(requested>lastRequestedUpdate){lastRequestedUpdate=requested;StartUpdate();}}
+        hostBusy=runtime.ContainsKey("busy")&&Convert.ToBoolean(runtime["busy"]);
+        tunnelOnline=runtime.ContainsKey("internet")&&Convert.ToBoolean(runtime["internet"]);
+        legacyPhoneAccess=!runtime.ContainsKey("phoneAccess");
+        activePhoneAccess=legacyPhoneAccess?tunnelOnline:Convert.ToBoolean(runtime["phoneAccess"]);
+        int pid;
+        if(Int32.TryParse(Field(runtime,"processId"),out pid)&&pid!=hostProcessId){
+            hostProcessId=pid;hostStartedUtc=DateTime.MaxValue;
+            try{using(var process=Process.GetProcessById(pid))hostStartedUtc=process.StartTime.ToUniversalTime();}
+            catch(ArgumentException){}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}
+        }
+        status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;
+    }catch{return false;}}
     async Task Poll(){
         if(preview||polling||changing||exiting)return;polling=true;
-        try{online=await Check();if(exiting||changing)return;if(online){failures=0;autoStartPending=false;LoadPairing();await PollUpdate();await PollRunNotifications();await PollDevices();UpdateKeepAwake();tray.Text=preferences.RunLanguage=="ru"?"Pocket Code · подключено":"Pocket Code · connected";return;}
-            phoneOnline=false;UpdateKeepAwake();
+        try{
+            bool wasOnline=online;
+            online=await Check();if(exiting||changing)return;
+            if(online){
+                failures=0;autoStartPending=false;
+                if(!wasOnline)Push();
+                LoadPairing();await PollUpdate();await PollRunNotifications();
+                if(activePhoneAccess)await PollDevices();else phoneOnline=false;
+                UpdateKeepAwake();tray.Text=preferences.RunLanguage=="ru"?"Pocket Code · подключено":"Pocket Code · connected";return;
+            }
+            phoneOnline=false;activePhoneAccess=false;hostProcessId=0;hostStartedUtc=DateTime.MaxValue;UpdateKeepAwake();
             addresses=new object[0];jiraUrl=null;if(owner!=null&&owner.ActiveCount==0){owner.Dispose();owner=null;nextAttempt=DateTime.UtcNow.AddSeconds(Math.Min(60,5*Math.Pow(2,Math.Min(failures++,4))));}
             if(owner!=null){status="Starting the host / restoring connection…";return;}
-            status=preferences.Connect&&preferences.AutoReconnect?"Host unavailable. Reconnecting…":"Disconnected";tray.Text=preferences.RunLanguage=="ru"?"Pocket Code · нет подключения":"Pocket Code · disconnected";
-            if(preferences.Connect&&(autoStartPending||preferences.AutoReconnect)&&DateTime.UtcNow>=nextAttempt){autoStartPending=false;Launch();}
+            status=preferences.AutoReconnect?"Host unavailable. Reconnecting…":"Disconnected";tray.Text=preferences.RunLanguage=="ru"?"Pocket Code · нет подключения":"Pocket Code · disconnected";
+            if((autoStartPending||preferences.AutoReconnect)&&DateTime.UtcNow>=nextAttempt){autoStartPending=false;Launch();}
         }catch(Exception error){status=error.Message;nextAttempt=DateTime.UtcNow.AddSeconds(30);}finally{polling=false;Push();}
     }
     void Launch(){
         string script=Path.Combine(preferences.Source,"scripts","start.ps1");if(!File.Exists(script))throw new FileNotFoundException("Pocket Code source folder is missing. Run the installer from its new location.");
-        Directory.CreateDirectory(storage);string command="& '"+script.Replace("'","''")+"' -Desktop"+(preferences.Internet?" -Internet":"")+" *> '"+Path.Combine(storage,"desktop-launch.log").Replace("'","''")+"'";
+        string networkOptions=!preferences.Connect?" -BindAddress 127.0.0.1":preferences.Internet?" -Internet":"";
+        Directory.CreateDirectory(storage);string command="& '"+script.Replace("'","''")+"' -Desktop"+networkOptions+" *> '"+Path.Combine(storage,"desktop-launch.log").Replace("'","''")+"'";
         owner=PocketCodeOwnedHost.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe"),"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand "+Convert.ToBase64String(Encoding.Unicode.GetBytes(command)),preferences.Source,true);status="Preparing the host. First launch may take several minutes.";
     }
-    async Task Toggle(){if(preview||changing||exiting)return;changing=true;Push();try{
-        while(polling&&!exiting)await Task.Delay(50);if(exiting)return;
-        if(online||owner!=null){if(online)await Request("runtime/stop",true);preferences.Connect=false;Save();if(online)await Task.Delay(500);if(owner!=null){owner.Dispose();owner=null;}online=false;addresses=new object[0];jiraUrl=null;status="Disconnected";}
-        else{preferences.Connect=true;Save();nextAttempt=DateTime.MinValue;Launch();}
-    }catch(Exception error){status=error.Message;}finally{changing=false;Push();}await Poll();}
     async Task ExitApp(){if(exiting||changing)return;changing=true;try{
         if(owner==null&&online)await Request("runtime/stop",true);exiting=true;timer.Stop();if(owner!=null){owner.Dispose();owner=null;}tray.Visible=false;Close();
     }catch(Exception error){status=error.Message;RestoreWindow();Push();}finally{changing=false;}}
     void LoadPairing(){
-        string file=Path.Combine(storage,"pairing.html");if(!File.Exists(file))return;string html=File.ReadAllText(file);var items=new List<object>();
-        foreach(Match match in Regex.Matches(html,"src=\"(data:image/png;base64,[^\"]+)\"[^>]*>\\s*<code>([^<]+)</code>"))items.Add(new{image=match.Groups[1].Value,url=System.Net.WebUtility.HtmlDecode(match.Groups[2].Value)});
-        addresses=items.ToArray();var setup=Regex.Match(html,"href=\"(http://127\\.0\\.0\\.1:4318/setup/jira#[^\"]+)\"");jiraUrl=setup.Success?System.Net.WebUtility.HtmlDecode(setup.Groups[1].Value):null;
+        addresses=new object[0];jiraUrl=null;
+        string file=Path.Combine(storage,"pairing.html");
+        try{
+            // An independently launched host can share this storage with a previous host.
+            if(!File.Exists(file)||File.GetLastWriteTimeUtc(file)<hostStartedUtc)return;
+            string html=File.ReadAllText(file);var items=new List<object>();
+            if(legacyPhoneAccess||activePhoneAccess){
+                foreach(Match match in Regex.Matches(html,"src=\"(data:image/png;base64,[^\"]+)\"[^>]*>\\s*<code>([^<]+)</code>")){
+                    string url=System.Net.WebUtility.HtmlDecode(match.Groups[2].Value);
+                    if(url.StartsWith("https://",StringComparison.OrdinalIgnoreCase)&&!tunnelOnline)continue;
+                    items.Add(new{image=match.Groups[1].Value,url=url});
+                }
+                if(legacyPhoneAccess)activePhoneAccess=tunnelOnline||items.Count>0;
+            }
+            addresses=items.ToArray();var setup=Regex.Match(html,"href=\"(http://127\\.0\\.0\\.1:4318/setup/jira#[^\"]+)\"");jiraUrl=setup.Success?System.Net.WebUtility.HtmlDecode(setup.Groups[1].Value):null;
+        }catch(IOException){}catch(UnauthorizedAccessException){}
     }
     /** Sleep is blocked only on mains power while agents run or a phone is online; closing the lid still sleeps. */
     void UpdateKeepAwake(){bool awake=preferences.KeepAwake&&online&&(hostBusy||phoneOnline)&&SystemInformation.PowerStatus.PowerLineStatus==PowerLineStatus.Online;try{SetThreadExecutionState(awake?ContinuousState|SystemRequired:ContinuousState);}catch(EntryPointNotFoundException){}}

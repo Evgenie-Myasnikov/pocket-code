@@ -56,9 +56,12 @@ The Windows sidebar collapses to an icon rail and remembers that preference. New
 
 1. Run **Setup Pocket Code.cmd** on Windows. Setup reuses a supported Node.js installation or downloads a private LTS runtime and verifies its checksum. It installs development dependencies, builds the shared UI and desktop shell, and creates shortcuts. You do not need the Android SDK to install a released APK.
 2. Open desktop **Settings → AI providers**. Choose Claude, Codex or Copilot and inspect installation, server and sign-in states. If automatic detection fails, choose a supported manual sign-in method. Complete login in the provider's PC window or browser, then refresh. See [sign-in methods](PROVIDER-SIGN-IN.md).
-3. Open desktop **Settings → Connection**. Select one of the available addresses: local Wi-Fi/LAN, a configured Tailscale address, or HTTPS internet tunnel. These are different routes to the same host, not different AI accounts.
-4. Install the released APK on Android. Open **Settings → PC connection → Scan QR code**, point the camera at the selected PC QR and allow pairing. No manual address/key entry is required for the normal flow.
-5. Open **Chats**, choose a provider, then **New**. Choose the project for the new conversation. Existing chats keep their original folder.
+3. Open **Chats**, choose a provider, then **New**. Choose the project for the new conversation. Existing chats keep their original folder.
+
+### Optional Android setup
+
+1. Open **Settings → Connection** and enable phone access. Choose LAN or internet. On the next host launch, select the pairing address.
+2. Install the released APK on Android. Open **Settings → PC connection → Scan QR code**, point the camera at the selected PC QR and allow pairing. No manual address/key entry is required for the normal flow.
 
 Treat the QR as a password. The host gives each paired device its own credential. Windows Connection lists devices, status and disconnect controls. Revoking a phone requires pairing again. A changed temporary tunnel address may also require a fresh scan.
 

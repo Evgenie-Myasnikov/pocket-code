@@ -41,3 +41,7 @@
 .desktop-shortcuts-button{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:6px 12px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:.8rem;text-align:left}.desktop-shortcuts-button:hover{background:var(--surface);color:var(--text)}.desktop-shortcuts-button kbd{margin-left:auto}
 .desktop-shortcuts dl{display:grid;gap:8px;margin:8px 0 16px;width:100%;text-align:left}.desktop-shortcuts dl>div{display:flex;align-items:center;gap:16px}.desktop-shortcuts dt{flex:0 0 130px}.desktop-shortcuts dd{margin:0;color:var(--muted)}
 kbd{font-family:var(--font-mono);font-size:max(var(--type-min),.85em);padding:1px 6px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;background:var(--panel);color:var(--text)}
+.desktop-host-recovery{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px 12px;padding:12px;color:var(--muted)}
+.desktop-host-recovery p{margin:0}
+.desktop-chat-host:has(>.desktop-host-recovery){flex-direction:column}
+.desktop-chat-host>.desktop-host-recovery~.embedded-chat{flex:1}

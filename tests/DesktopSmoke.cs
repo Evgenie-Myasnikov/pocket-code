@@ -17,7 +17,7 @@ public static class DesktopSmoke {
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         PocketCodeOwnedHost owned=null;
         try{
-            using(var form=new PocketDesktop(new[]{"--preview"},true)){
+            if(Array.IndexOf(args,"--standalone-host")<0)using(var form=new PocketDesktop(new[]{"--preview"},true)){
                 form.Show();DateTime readyDeadline=DateTime.UtcNow.AddSeconds(20);while(!form.Ready.IsCompleted&&DateTime.UtcNow<readyDeadline){Application.DoEvents();Thread.Sleep(20);}Check(form.Ready.IsCompleted,"WebView loads");form.Ready.GetAwaiter().GetResult();Check(form.Visible,"Window opens");
                 var ui=(Microsoft.Web.WebView2.WinForms.WebView2)Field(form,"web");bool rendered=false;var renderDeadline=DateTime.UtcNow.AddSeconds(15);
                 while(!rendered&&DateTime.UtcNow<renderDeadline){var ready=ui.CoreWebView2.ExecuteScriptAsync("!!document.querySelector('.desktop-app')");while(!ready.IsCompleted){Application.DoEvents();Thread.Sleep(10);}rendered=ready.Result=="true";Application.DoEvents();Thread.Sleep(50);}Check(rendered,"Shared desktop interface renders");
@@ -46,8 +46,8 @@ public static class DesktopSmoke {
             Directory.CreateDirectory(Path.Combine(temp,"scripts"));
             try{
                 Environment.SetEnvironmentVariable("POCKET_DATA_DIR",temp);
-                File.WriteAllText(Path.Combine(temp,"scripts","start.ps1"),"param([switch]$Desktop,[switch]$Internet)\n[Reflection.Assembly]::LoadFrom('"+typeof(PocketCodeOwnedHost).Assembly.Location.Replace("'","''")+"') | Out-Null\n$nested=[PocketCodeOwnedHost]::Start((Join-Path $PSHOME 'powershell.exe'),'-NoProfile -NonInteractive -Command \"Start-Sleep -Seconds 90\"',$PWD.Path,$true)\nSet-Content -LiteralPath (Join-Path $env:POCKET_DATA_DIR 'nested.pid') -Value $nested.ProcessId\ntry{Start-Sleep -Seconds 90}finally{$nested.Dispose()}");
-                File.WriteAllText(Path.Combine(temp,"desktop.json"),"{\"Connect\":false,\"Internet\":false,\"AutoReconnect\":true}");
+                File.WriteAllText(Path.Combine(temp,"scripts","start.ps1"),"param([switch]$Desktop,[switch]$Internet,[string]$BindAddress)\nif (!$Desktop -or $Internet -or $BindAddress -ne '127.0.0.1') {throw 'Unexpected remote access'}\n[Reflection.Assembly]::LoadFrom('"+typeof(PocketCodeOwnedHost).Assembly.Location.Replace("'","''")+"') | Out-Null\n$nested=[PocketCodeOwnedHost]::Start((Join-Path $PSHOME 'powershell.exe'),'-NoProfile -NonInteractive -Command \"Start-Sleep -Seconds 90\"',$PWD.Path,$true)\nSet-Content -LiteralPath (Join-Path $env:POCKET_DATA_DIR 'nested.pid') -Value $nested.ProcessId\ntry{Start-Sleep -Seconds 90}finally{$nested.Dispose()}");
+                File.WriteAllText(Path.Combine(temp,"desktop.json"),"{\"Connect\":false,\"Internet\":true,\"AutoReconnect\":false}");
                 // A handle without delete sharing makes File.Replace fail, as seen right after an update handoff.
                 using(var locked=new FileStream(Path.Combine(temp,"desktop.json"),FileMode.Open,FileAccess.Read,FileShare.ReadWrite))
                 using(var form=new PocketDesktop(new[]{"--source",temp},false)){
@@ -66,36 +66,42 @@ public static class DesktopSmoke {
                         while(!timer.Enabled&&DateTime.UtcNow<deadline){Application.DoEvents();Thread.Sleep(20);}
                         Check(form.Visible==wasVisible,wasVisible?"Window reopens after an update when it was open":"Updated window stays in the tray when it was hidden");
                         Check(!File.Exists(marker),"Reopen marker is consumed");
+                        Check(!((DesktopPreferences)Field(form,"preferences")).Connect,"An update preserves local-only access");
                         uint browser=((Microsoft.Web.WebView2.WinForms.WebView2)Field(form,"web")).CoreWebView2.BrowserProcessId;
                         Call(form,"ExitApp");
                         try{using(var process=Process.GetProcessById((int)browser))process.WaitForExit(10000);}catch(ArgumentException){/* Already exited. */}
                     }
                 }
                 using(var form=new PocketDesktop(new[]{"--source",temp},false)){
+                    // Earlier update probes may already have launched and exited their own child.
+                    string nestedFile=Path.Combine(temp,"nested.pid");
+                    if(File.Exists(nestedFile))File.Delete(nestedFile);
                     using(var bitmap=new Bitmap(2,2))using(var image=new MemoryStream()){
                         bitmap.Save(image,System.Drawing.Imaging.ImageFormat.Png);
                         File.WriteAllText(Path.Combine(temp,"pairing.html"),"<img src=\"data:image/png;base64,"+Convert.ToBase64String(image.ToArray())+"\" alt=\"Synthetic\"><code>https://example.invalid</code><a href=\"http://127.0.0.1:4318/setup/jira#synthetic\">Jira</a>");
                     }
-                    typeof(PocketDesktop).GetMethod("LoadPairing",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(form,null);
+                    var loadPairing=typeof(PocketDesktop).GetMethod("LoadPairing",BindingFlags.NonPublic|BindingFlags.Instance);
+                    typeof(PocketDesktop).GetField("activePhoneAccess",BindingFlags.NonPublic|BindingFlags.Instance).SetValue(form,true);
+                    typeof(PocketDesktop).GetField("tunnelOnline",BindingFlags.NonPublic|BindingFlags.Instance).SetValue(form,true);
+                    loadPairing.Invoke(form,null);
+                    Check(((object[])Field(form,"addresses")).Length==0,"A previous host's QR is hidden");
+                    typeof(PocketDesktop).GetField("hostStartedUtc",BindingFlags.NonPublic|BindingFlags.Instance).SetValue(form,DateTime.UtcNow.AddMinutes(-1));
+                    loadPairing.Invoke(form,null);
                     Check(((object[])Field(form,"addresses")).Length==1,"Pairing image is available to shared UI");
                     Check(Field(form,"jiraUrl")!=null,"Local Jira setup is available");
-                    Call(form,"Poll");Check(Field(form,"owner")==null,"Explicitly disconnected setting does not auto-start");
-                    Call(form,"Toggle");Check(Field(form,"owner")!=null,"Manual connect launches hidden host");
-                    Check(File.ReadAllText(Path.Combine(temp,"desktop.json")).Contains("\"Connect\":true"),"Connect intent is saved");
-                    string nestedFile=Path.Combine(temp,"nested.pid");DateTime deadline=DateTime.UtcNow.AddSeconds(8);
+                    Call(form,"Poll");Check(Field(form,"owner")!=null,"Local host launches even with sharing and automatic retries disabled");
+                    DateTime deadline=DateTime.UtcNow.AddSeconds(8);
                     while(!File.Exists(nestedFile)&&DateTime.UtcNow<deadline){Application.DoEvents();Thread.Sleep(50);}
-                    Check(File.Exists(nestedFile),"Nested launcher job started");
+                    Check(File.Exists(nestedFile),"Loopback launcher started without a tunnel");
                     using(var nested=Process.GetProcessById(Int32.Parse(File.ReadAllText(nestedFile).Trim()))){
                         Check(((PocketCodeOwnedHost)Field(form,"owner")).Contains(nested.Id),"Nested host also belongs to desktop job");
-                        Call(form,"Toggle");Check(Field(form,"owner")==null,"Disconnect closes owned job");
-                        Check(nested.WaitForExit(5000),"Disconnect closes nested host too");
+                        Call(form,"ExitApp");Check(Field(form,"owner")==null,"Exiting closes the local host");
+                        Check(nested.WaitForExit(5000),"Exiting closes nested host too");
                     }
-                    Check(File.ReadAllText(Path.Combine(temp,"desktop.json")).Contains("\"Connect\":false"),"Disconnect intent is saved");
-                    Call(form,"Poll");Check(Field(form,"owner")==null,"Disconnected host stays stopped");
-                    Call(form,"Toggle");Call(form,"ExitApp");
+                    Check(File.ReadAllText(Path.Combine(temp,"desktop.json")).Contains("\"Connect\":false"),"Local startup preserves disabled phone access");
                 }
                 using(var restored=new PocketDesktop(new[]{"--source",temp},false)){
-                    Call(restored,"Poll");Check(Field(restored,"owner")!=null,"Last active connection resumes on next launch");Call(restored,"ExitApp");
+                    Call(restored,"Poll");Check(Field(restored,"owner")!=null,"Local chats start again when the window reopens");Call(restored,"ExitApp");
                 }
             }finally{
                 Environment.SetEnvironmentVariable("POCKET_DATA_DIR",previous);
@@ -110,7 +116,7 @@ public static class DesktopSmoke {
             foreach(string path in new[]{"/runtime/stop","/jobs/example/stop","/files/upload","/file/write","https://example.invalid","//example.invalid","/../runtime/stop","/sessions/x/messages#hidden","/jira/login"})Check(!DesktopReadPolicy.Allows(path),"Unsafe route denied");
             foreach(string path in new[]{"/project-board","/project-board/create","/project-board/delete","/project-board/miro","/jobs","/uploads","/jobs/11111111-1111-4111-8111-111111111111/messages","/workspaces","/workspaces/11111111-1111-4111-8111-111111111111/delete","/boards/11111111-1111-4111-8111-111111111111/delete","/boards/11111111-1111-4111-8111-111111111111","/boards/11111111-1111-4111-8111-111111111111/branch"})Check(DesktopReadPolicy.AllowsWrite(path),"Chat/board write allowed");
             foreach(string path in new[]{"/runtime/stop","/file/write","/provider-connections/claude/logout","https://example.invalid","/../jobs","/jobs#hidden"})Check(!DesktopReadPolicy.AllowsWrite(path),"Unapproved write denied");
-            Console.WriteLine("PASS: shared WebView UI, tray lifecycle, scoped read/write bridge policy, nested child cleanup and saved reconnect.");return 0;
+            Console.WriteLine("PASS: standalone host lifecycle, scoped bridge policy and nested child cleanup.");return 0;
         }catch(Exception error){Console.Error.WriteLine(error);return 1;}finally{if(owned!=null)owned.Dispose();}
     }
 }

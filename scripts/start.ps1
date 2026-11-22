@@ -20,21 +20,33 @@ if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyCon
 }
 . (Join-Path $PSScriptRoot 'bootstrap.ps1')
 Ensure-PocketDependencies $projectRoot
+if ($Desktop) {
+    # This is a fresh desktop launch. Only the update worker inherits a running tunnel.
+    $env:POCKET_EXISTING_TUNNEL_URL = $null
+    $env:POCKET_EXISTING_TUNNEL_PID = $null
+    $env:POCKET_TUNNEL_EXE = $null
+}
+$env:POCKET_DESKTOP_TUNNEL_INSTALLER = $null
 if ($Internet) {
     Write-Host 'Internet mode: traffic passes through Cloudflare over HTTPS. Access still requires your private key.'
-    . (Join-Path $PSScriptRoot 'install-tunnel.ps1')
+    if ($Desktop) {
+        # The local chat service starts before the optional phone helper is prepared.
+        $env:POCKET_DESKTOP_TUNNEL_INSTALLER = Join-Path $PSScriptRoot 'install-tunnel.ps1'
+    } else {
+        . (Join-Path $PSScriptRoot 'install-tunnel.ps1')
+    }
     $env:POCKET_INTERNET = '1'
     $BindAddress = '127.0.0.1'
 } else { $env:POCKET_INTERNET = '0' }
 if (-not $ProjectPath) {
-    # Keep the existing default project, and let the paired phone choose local folders.
+    # The desktop and paired clients can both choose from local project folders.
     $ProjectPath = @($projectRoot)
     foreach ($drive in [IO.DriveInfo]::GetDrives()) {
         if ($drive.IsReady -and $drive.DriveType -eq [IO.DriveType]::Fixed) {
             $ProjectPath += $drive.RootDirectory.FullName
         }
     }
-    Write-Host 'Choose your project in the phone app. Local Git projects are discovered automatically.'
+    Write-Host 'Choose a project in Pocket Code. Local Git projects are discovered automatically.'
 }
 $resolvedRoots = @($ProjectPath | ForEach-Object { (Resolve-Path -LiteralPath $_).Path })
 $env:POCKET_ROOTS = ConvertTo-Json -InputObject $resolvedRoots -Compress
@@ -55,14 +67,16 @@ if (-not (Test-Path -LiteralPath $keyPath)) {
 Protect-PocketStorage $storagePath | Out-Null
 Start-PocketCleanup $storagePath
 Write-Host ''
-Write-Host 'Pocket Code - private connection key (paste into the Android app):' -ForegroundColor Green
-if(-not $Desktop){Write-Host ([System.IO.File]::ReadAllText($keyPath)) -ForegroundColor Yellow}
+if(-not $Desktop){
+    Write-Host 'Pocket Code - private connection key (paste into the Android app):' -ForegroundColor Green
+    Write-Host ([System.IO.File]::ReadAllText($keyPath)) -ForegroundColor Yellow
+}
 Write-Host ''
 Write-Host ('Open on this PC: http://127.0.0.1:' + $Port)
 if ($Internet) { Write-Host 'Scan the new HTTPS QR code for mobile internet. Keep this window open.' }
-else { Write-Host 'For mobile internet, enable internet mode in the desktop connection settings or configure Tailscale on both devices.' }
+elseif (-not $Desktop) { Write-Host 'For mobile internet, enable internet mode in the desktop connection settings or configure Tailscale on both devices.' }
 Write-Host 'Close this window or press Ctrl+C to fully quit Pocket Code and its tunnel.'
-Write-Host 'A QR pairing page will open in your browser after the server starts.'
+if (-not $Desktop) { Write-Host 'A QR pairing page will open in your browser after the server starts.' }
 $managedPointer = Join-Path $storagePath 'host/current.json'
 if (Test-Path -LiteralPath $managedPointer) {
     try {

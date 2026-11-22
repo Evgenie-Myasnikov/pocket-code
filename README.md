@@ -9,8 +9,10 @@ Pocket Code connects **Claude Code**, **Codex** and **GitHub Copilot** to a shar
 ## Start in three steps
 
 1. On Windows, extract the repository and run **Setup Pocket Code.cmd**. It detects Node.js or installs a checksum-verified private runtime, installs dependencies, builds the desktop app and creates shortcuts. For later launches use **Start Pocket Code.cmd**.
-2. In desktop **Settings**, check the AI account and open **Connection**. Select the offered LAN, Tailscale or internet address. Keep the PC awake.
-3. Install the Android APK from Releases. Open **Settings → PC connection**, scan the PC QR, then open **Chats → New**. Select a project and provider and send the first message.
+2. In desktop **Settings → AI providers**, sign in to the provider you want to use.
+3. Open **Chats** on Windows, select a project and provider, and send the first message.
+
+To also use Android, enable phone access under **Settings → Connection** on Windows. After the next host launch, install the Android APK and scan the pairing QR in the phone's **Settings → PC connection**.
 
 QR codes are private connection credentials. Provider sign-in is separate. The PC application stays in the tray when its window closes; **tray → Exit** ends it. Windows autostart and reconnect are optional settings.
 

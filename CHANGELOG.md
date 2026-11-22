@@ -3,6 +3,8 @@
 ## 0.28.51 (unreleased)
 
 ### Fixes
+- Standalone Windows chats (2026-11-22). Desktop starts its local host even for previously disconnected profiles. Fresh installations use loopback. Chats can retry the local service directly, and changes to optional phone access take effect on the next host launch without interrupting an active conversation.
+  Validation included the production build, the standalone Windows WebView launch check, three browser chat scenarios with a simulated provider, and eleven bridge, runtime and device tests. Live provider accounts were not exercised.
 - Long replies and keyboard focus (2026-11-22). Jump to latest places keyboard focus on the last message, including after a history refresh. Code examples wrap individually and preserve indentation when copied. Clipboard errors explain how to copy manually. Retrying an attachment or inserting it as text returns keyboard focus to the draft. [Usability review](USABILITY.md)
   All 22 targeted Edge scenarios passed across runs. Four ran separately after two browser-test workers exited during startup. Nine unit checks and the TypeScript/Vite build passed. Physical Android and packaged-app checks remain open.
 - Reading and composing (2026-11-22). Table cells wrap on narrow screens, and wide tables retain keyboard focus and scroll position during streaming. IME confirmation preserves the draft. The attachment picker and compact file list restore focus, and failed uploads show the reason on touch screens. [Review and references](USABILITY.md)

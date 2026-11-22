@@ -51,9 +51,9 @@ test('desktop chat supports scoped select all, copy and paste',async({page,conte
  await page.keyboard.press('Control+c');await input.fill('');await page.locator('.conversation-inner').click({position:{x:10,y:10}});await page.keyboard.press('Control+v');await expect(input).toBeFocused();expect(await input.inputValue()).toContain('The responsive layout is ready.');
 });
 test('Connection is in Settings without retired workspace administration',async({page})=>{
- await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Connection',exact:true}).click();
+ await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Connection and startup',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Phone access',exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Connect your phone',exact:true})).toBeVisible();
- await expect(page.getByRole('heading',{name:'Ready to connect',exact:true})).toBeVisible();
  await expect(page.getByLabel('QR role')).toHaveCount(0);
  await expect(page.getByRole('button',{name:'WorkSpace',exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Create workspace',exact:true})).toHaveCount(0);
@@ -95,7 +95,7 @@ test('desktop keeps the current chat while switching sections and persists appea
  await desktop(page);await page.getByRole('button',{name:/claude · Interface review/}).click();await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:/^Appearance & language/}).click();await page.getByRole('button',{name:'Ocean',exact:true}).click();await expect(page.getByRole('button',{name:'All settings',exact:true})).toBeHidden();await page.getByRole('button',{name:/^Windows application/}).click();
  await page.getByLabel('Start with Windows').check();await page.getByRole('button',{name:/claude · Interface review/}).click();await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
- await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Connection',exact:true}).click();await expect(page.getByRole('heading',{name:'Connect your phone'})).toBeVisible();
+ await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Connection and startup',exact:true}).click();await expect(page.getByRole('heading',{name:'Phone access'})).toBeVisible();
  const calls=await page.evaluate(()=>(window as any).desktopCalls);expect(calls.some((call:any)=>call.action==='settings'&&call.startup===true)).toBeTruthy();
 });
 test('desktop request adapter sends mutations to the native write allowlist',async({page})=>{
@@ -138,7 +138,7 @@ test('desktop follows the newest run, streams partial text and shows question/er
 });
 test('PC shows device presence and confirms individual revocation',async({page})=>{
  await desktop(page);await page.evaluate(()=>{(window as any).testDevices=[{id:'11111111-1111-4111-8111-111111111111',name:'Synthetic phone',platform:'android',version:'1',lastSeen:Date.now(),pairedAt:Date.now(),status:'online'},{id:'22222222-2222-4222-8222-222222222222',name:'Synthetic tablet',platform:'android',version:'1',lastSeen:Date.now()-60000,pairedAt:1,status:'offline'}];});
- await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Connection',exact:true}).click();const devices=page.locator('.desktop-devices');await expect(devices).toContainText('Synthetic phone');await expect(devices).toContainText('Online');await expect(devices).toContainText('Offline');
+ await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Connection and startup',exact:true}).click();const devices=page.locator('.desktop-devices');await expect(devices).toContainText('Synthetic phone');await expect(devices).toContainText('Online');await expect(devices).toContainText('Offline');
  const phone=devices.getByRole('listitem').filter({hasText:'Synthetic phone'});await phone.getByRole('button',{name:'Rename',exact:true}).click();await phone.getByLabel('Device name').fill('Renamed phone');await phone.getByRole('button',{name:'Save',exact:true}).click();await expect(devices).toContainText('Renamed phone');
  const renamed=devices.getByRole('listitem').filter({hasText:'Renamed phone'});await renamed.getByRole('button',{name:'Disconnect',exact:true}).click();expect(await page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.action==='device-disconnect'))).toBeFalsy();await renamed.getByRole('button',{name:'Cancel',exact:true}).click();
  await renamed.getByRole('button',{name:'Disconnect',exact:true}).click();await renamed.getByRole('button',{name:'Disconnect device',exact:true}).click();await expect(devices.getByRole('listitem').filter({hasText:'Renamed phone'})).toHaveCount(0);await expect(devices.getByRole('listitem').filter({hasText:'Synthetic tablet'})).toContainText('Offline');

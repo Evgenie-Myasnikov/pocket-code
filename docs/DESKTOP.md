@@ -44,15 +44,15 @@ This synthetic capture shows an earlier interface revision; follow the current n
 
 | Action | Result |
 | --- | --- |
-| Close or minimize the window | Hide in the system tray; keep the host running |
+| Close the window | Hide in the system tray and keep the host running |
 | Double-click the tray icon / Open | Restore the window |
-| Disconnect | Stop an idle host and save disconnected state |
+| Change phone access | Save the sharing mode for the next host launch and continue the current chat |
 | Right-click tray icon → Exit | Exit the desktop app and terminate its owned process tree |
-| Launch again | Restore the last active connection when automatic reconnection is enabled |
+| Launch again | Start the local chat service or reuse the running host |
 
-Enable **Запускать с Windows** to start in the tray after Windows sign-in. Clear it to remove autostart. **Восстанавливать последнее подключение** controls reconnecting on launch and after an owned host exits unexpectedly. Explicit Disconnect prevents reconnection, including after Windows restarts. Exit ends the application for now, but preserves the connection preference for its next launch.
+Opening Desktop starts the chat service on the PC. Open **Chats**, choose your provider and project, and send a message. A new installation listens on loopback only. Enable phone access in **Settings → Connection** to share the host on the next launch.
 
-The application recognizes an existing authenticated Pocket Code host and does not start a duplicate. A host started by the legacy console launcher remains owned by that launcher; stop it while idle before switching fully to the desktop application. Disconnect can be refused while tasks or a host update are active. Explicit Exit terminates the desktop application's own running tasks, so finish work before exiting.
+Windows startup opens Desktop in the tray after sign-in. Automatic recovery retries a failed host. Desktop reuses an existing authenticated host, including one started from the console. To apply sharing changes to a console-owned host, finish active tasks and exit that host before reopening Desktop. Exiting Desktop from the tray terminates tasks in the host it owns.
 
 The PC must stay awake. A temporary internet tunnel can receive a different URL after restart; the phone then needs the new QR. This does not provide a permanent address or remote wake-up. Connection keys stay in the existing private host storage; the desktop settings file stores preferences, not a second copy of the key.
 
@@ -67,15 +67,15 @@ QR-код и список устройств находятся в **Настр�
 
 Для установки или обновления запустите **Setup Pocket Code.cmd**. Node.js определяется автоматически даже в старом окне PowerShell; если подходящей версии нет, загрузится проверенная локальная копия Node.js 24 LTS. Права администратора и winget не нужны. Зависимости, включая TypeScript, устанавливаются до сборки. Для запуска остаётся **Start Pocket Code.cmd** или ярлык **Pocket Code**. Интернет-режим и выход доступны в приложении. Папку исходников оставьте на месте; после её переноса повторите установку.
 
-- **Крестик и сворачивание** скрывают окно в трей, сервер продолжает работать.
+- **Крестик** скрывает окно в трей, сервер продолжает работать.
 - **Двойной щелчок по значку** возвращает окно приложения.
-- **Отключить** завершает соединение и запоминает отключённое состояние. При активных задачах сначала нужно дождаться их завершения.
+- **Чаты** доступны после запуска локального сервера, даже если телефон никогда не подключался.
 - **Правая кнопка по значку → Выход** завершает приложение и запущенные им процессы. Активная работа при этом прерывается.
 - **Запускать с Windows** включает запуск в трее после входа в Windows.
-- **Восстанавливать последнее подключение** повторяет подключение при запуске и после сбоя сервера. Явно отключённое соединение само не включится.
+- Автоматическое восстановление повторяет запуск локального сервера после сбоя.
 
-Интернет включается отдельной галочкой до подключения. Для домашней сети снимите её. После перезапуска временного интернет-туннеля адрес может поменяться — тогда отсканируйте новый QR на телефоне. ПК должен оставаться включённым и не спать.
+При новой установке сервер принимает подключения только с самого ПК. Для телефона включите доступ в **Настройки → Подключение** и выберите локальную сеть или интернет. Настройки вступят в силу при следующем запуске сервера. Чтобы применить их вручную, завершите активные задачи, выйдите из приложения через трей и откройте его снова. После перезапуска туннеля телефону может понадобиться новый QR-код.
 
-Если сервер уже запущен старым консольным способом, приложение покажет его без создания второго процесса. Для полного перехода завершите старый сервер, когда нет активных задач, и запустите соединение из нового окна.
+Если сервер запущен из консоли, Desktop использует его для чатов. Для перехода на сервер под управлением Desktop завершите активные задачи, закройте сервер в консоли и снова откройте приложение.
 
 С версии **0.21.0** приложение и сервер ПК обновляются автоматически (**Настройки → Обновления приложения**). После обновления окно открывается снова, если было открыто; иначе приложение остаётся в трее. Временный интернет-туннель может получить новый адрес — тогда отсканируйте новый QR. При запуске сервера фоновая очистка удаляет старые сборки приложения, устаревшие версии сервера, скачанные архивы обновлений и старые APK. Текущие, запущенные и недавно установленные версии сохраняются.
