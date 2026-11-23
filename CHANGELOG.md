@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased (0.28.58)
+## [0.28.58](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.57...v0.28.58) (2026-11-23)
+
+Published [0.28.58](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.58) from [99eb8b7](https://github.com/Evgenie-Myasnikov/pocket-code/commit/99eb8b7a49ca5a98e9134a54d72a9390b09af32e) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). The tag points to that commit and all four public downloads match the local SHA-256 hashes. 163 UI files matched across the APK and the Windows package; no private data was found in the unpacked packages. Android version code 145.
+
+**The APK is signed with a new key** (certificate SHA-256 beginning d0e5792c). The key of 0.28.49–0.28.57 (beginning d755576e) is no longer on the build PC, so Android cannot install 0.28.58 over an earlier version: uninstall the app, install this APK and pair the phone again. Physical Android installation and the Windows shell smoke test were not run.
 
 ### Bug Fixes
 
