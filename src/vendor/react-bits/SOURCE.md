@@ -22,6 +22,8 @@ Original TypeScript/CSS components are pinned to upstream commit `e12c22192ac7b4
 
 The adjacent MIT + Commons Clause license applies to every component. The original shader artwork is retained. Integration uses lazy imports, bounded render resolution, no global pointer effects and explicit pause handling. Preview images are actual local captures of the selected components.
 
+Local frame pacing: DarkVeil, the default background, draws about 30 frames a second instead of one per display refresh; the app also pauses every effect while its window is not focused.
+
 Local lifecycle fixes: defer forced context loss until a canvas is detached so React Strict Mode can replay effects; retain the DarkVeil immutable-texture resize fix. New effects stop scheduling frames while paused, and disabled pointer interactions cannot wake them. Topography has an explicit paused control. Shared integration adapts theme/custom color, speed, light mode where supported and paused state without introducing a new runtime dependency.
 
 The catalog contains 17 effects. Aurora, LiquidChrome and FloatingLines were removed; their saved IDs fall back to DarkVeil. Retained effects keep their existing IDs and previews.

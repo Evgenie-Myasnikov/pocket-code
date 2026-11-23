@@ -71,3 +71,24 @@ test('review never executes configured clean or process filters',async()=>{
     assert.equal(git('config','filter.probe.clean').toString().trim(),'node filter.cjs');
   }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('review pages large comparisons and scopes turn paths before counting files in nested checkouts',async t=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),'pocket-review-page-'));
+  t.after(async()=>{assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await rm(root,{recursive:true,force:true});});
+  const cwd=path.join(root,'nested'),git=(...args:string[])=>execFileSync('git',['-C',root,...args],{windowsHide:true,stdio:'pipe'});
+  await mkdir(cwd);git('init');
+  await writeFile(path.join(root,'outside.txt'),'outside');
+  for(let start=0;start<1002;start+=32)await Promise.all(Array.from({length:Math.min(32,1002-start)},(_,i)=>writeFile(path.join(cwd,'item-'+String(start+i).padStart(4,'0')+'.txt'),'line\n')));
+  const first=await review([cwd],cwd,'working');
+  assert.equal(first.totalFiles,1002);assert.equal(first.files.length,1000);
+  const page=await review([cwd],cwd,'working',undefined,undefined,{offset:1000});
+  assert.equal(page.totalFiles,1002);
+  assert.deepEqual(page.files.map(file=>file.path),['nested/item-1000.txt','nested/item-1001.txt']);
+  assert.ok(page.files.every(file=>file.added===1&&file.untracked));
+  await writeFile(path.join(cwd,'item-[1].txt'),'selected\n');
+  const paths=['item-[1].txt','item-1001.txt'];
+  const scoped=await review([cwd],cwd,'working',undefined,undefined,{paths});
+  assert.equal(scoped.totalFiles,2);assert.deepEqual(scoped.files.map(file=>file.path).sort(),paths.map(name=>'nested/'+name).sort());
+  assert.match((await review([cwd],cwd,'working',undefined,'nested/item-[1].txt',{paths})).patch,/selected/);
+  await assert.rejects(review([cwd],cwd,'working',undefined,undefined,{paths:['../outside.txt']}));
+});

@@ -132,8 +132,10 @@
 .composer-submit:has(.stop-button) .usage-percent{color:var(--text)}
 .composer-submit:has(.stop-primary) .usage-percent{color:var(--bg)}
 .composer-submit-usage .usage-indicator[data-flash] .usage-percent{opacity:1;transform:none}
-.composer-submit :is(.send-button,.stop-button)>svg{transition:opacity .35s ease,transform .35s ease}
-.composer-submit:has(.usage-indicator[data-flash]) :is(.send-button,.stop-button)>svg{opacity:0;transform:scale(.6)}
+/* The icon takes its faded state from its button. A tag after :has() joins the invalidation set of every :has() rule, so typing
+   in the composer made each icon in the window (one per message action) recalculate its style. */
+.composer-submit :is(.send-button,.stop-button)>svg{opacity:var(--submit-icon-opacity,1);scale:var(--submit-icon-scale,1);transition:opacity .35s ease,scale .35s ease}
+.composer-submit:has(.usage-indicator[data-flash]) :is(.send-button,.stop-button){--submit-icon-opacity:0;--submit-icon-scale:.6}
 
 @container(max-width:600px){
  .prompt-composer .composer-models{gap:0;flex-wrap:nowrap}

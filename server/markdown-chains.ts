@@ -1,5 +1,7 @@
 import {createHash, randomUUID} from 'node:crypto';
-import {mkdir, readFile, readdir, rename, stat, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, readdir, stat} from 'node:fs/promises';
+import {writeDurable} from './durable-file.js';
+import {replaceFile} from './fs-retry.js';
 import path from 'node:path';
 import {buildChainStepPrompt, chainCompletionMarker, type ChainExecutor, type ChainSourceInput, type MarkdownChainDetail, type MarkdownChainStep, type MarkdownChainSummary} from '../src/markdown-chain.js';
 import type {CodexAccess} from './codex-access.js';
@@ -134,16 +136,16 @@ export class MarkdownChains {
   private async writeRecord(id: string, record: RecordV1 | DeletedRecord) {
     const file = path.join(this.options.file, id + '.json');
     await mkdir(this.options.file, {recursive: true, mode: 0o700});
-    await writeFile(file + '.tmp', JSON.stringify(record), {mode: 0o600});
-    await rename(file + '.tmp', file);
+    await writeDurable(file, JSON.stringify(record));
   }
   private async save(record: RecordV1) {
     record.chain.steps.forEach((_,index)=>updateAttempt(record,index));
     await this.writeRecord(record.chain.id, record);
     this.records.set(record.chain.id.toLowerCase(), record);
   }
+  /** A failed restore is tried again by the next request instead of failing every chat list until the host restarts. */
   init() {
-    return this.restored ??= this.restore();
+    return this.restored ??= this.restore().catch(error => { this.restored = undefined; throw error; });
   }
   private async restore() {
     let names: string[];
@@ -153,14 +155,25 @@ export class MarkdownChains {
       names = [];
     }
     for (const name of names.filter(name => name.endsWith('.json') && uuid.test(name.slice(0, -5)))) {
-      const record: RecordV1 | DeletedRecord = JSON.parse(await readFile(path.join(this.options.file, name), 'utf8'));
-      if ('deletedScope' in record && record.version === 1 && /^[a-f\d]{64}$/.test(record.deletedScope)) {
+      const file = path.join(this.options.file, name);
+      let record: RecordV1 | DeletedRecord;
+      try {
+        record = JSON.parse(await readFile(file, 'utf8'));
+        if (!record || typeof record !== 'object') throw new SyntaxError('Cannot restore Markdown chain record.');
+        const removed = 'deletedScope' in record && record.version === 1 && /^[a-f\d]{64}$/.test(record.deletedScope);
+        if (!removed && (!('chain' in record) || record.version !== 1 || record.chain?.id + '.json' !== name || !Array.isArray(record.chain.steps)))
+          throw new SyntaxError('Cannot restore Markdown chain record.');
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        // One damaged record (an interrupted write) must not switch every chat list off: it is kept aside and the other tasks load.
+        await replaceFile(file, file + '.corrupt-' + Date.now()).catch(() => {});
+        console.error(new Date().toISOString(), 'A damaged task record was set aside; the other tasks stay available.');
+        continue;
+      }
+      if ('deletedScope' in record) {
         this.deleted.set(name.slice(0, -5).toLowerCase(), record);
         continue;
       }
-      if (!('chain' in record)) throw new Error('Cannot restore Markdown chain record.');
-      if (record.version !== 1 || record.chain?.id + '.json' !== name || !Array.isArray(record.chain.steps))
-        throw new Error('Cannot restore Markdown chain record.');
       // A durable launch intent might already have reached the provider. Never
       // replay it after restart, even if its session ID had not arrived yet.
       for(const tree of Object.values(record.trees??{})){

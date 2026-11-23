@@ -1,4 +1,4 @@
-import {openChatList} from './chat-navigation';
+import {openChatList,openReview,chatMenu} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 
@@ -39,10 +39,10 @@ async function host(page:Page,files?:File[]){
 const panel=(page:Page)=>page.getByRole('dialog',{name:'Review',exact:true});
 async function open(page:Page,init?:()=>void){
   if(init)await page.addInitScript(init);
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await page.getByRole('button',{name:/Garden review/}).click();
-  await page.getByRole('button',{name:'Review',exact:true}).click();
+  await openReview(page);
   await expect(panel(page).locator('.review-file')).not.toHaveCount(0);
 }
 const file=(page:Page,path:string)=>panel(page).locator(`.review-file[data-path="${path}"]`);
@@ -105,7 +105,7 @@ test('viewed marks collapse files, survive reopening and clear when the agent ed
   await expect(plants.locator('.review-file-toggle')).toHaveAttribute('aria-expanded','false');
   await expect(review.locator('.review-files-button')).toContainText('Viewed 1/5');
   await review.getByRole('button',{name:'Back to chat',exact:true}).click();
-  await page.getByRole('button',{name:'Review',exact:true}).click();
+  await openReview(page);
   await expect(file(page,'src/plants.ts').getByRole('checkbox',{name:'Viewed'})).toBeChecked();
   state.files=state.files.map(item=>item.path==='src/plants.ts'?{...item,fingerprint:'p2'}:item);state.fingerprint='bbbbbbbbbbbbbbbb';
   await panel(page).getByRole('button',{name:'Refresh',exact:true}).click();
@@ -140,8 +140,15 @@ test('a line number quotes the line into the chat draft while Review stays open'
 
 test('idle polling keeps patches, the summary counts filtered files and the header shows the change size',async({page})=>{
   await page.clock.install();
-  const state=await host(page);await page.setViewportSize({width:1280,height:800});await open(page);
-  await expect(page.getByRole('button',{name:'Review',exact:true}).locator('.review-button-stats')).toHaveCount(1);
+  const state=await host(page);await page.setViewportSize({width:1280,height:800});
+  // The change size is shown on the Review entry of the chat menu, before Review covers the header.
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
+  await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
+  await page.getByRole('button',{name:/Garden review/}).click();
+  await chatMenu(page).click();
+  const entry=page.getByRole('menuitem',{name:'Review',exact:true});
+  await expect(entry.locator('.review-button-stats')).toHaveCount(1);
+  await entry.click();await expect(panel(page).locator('.review-file')).not.toHaveCount(0);
   const review=panel(page);await expect(file(page,'src/plants.ts')).toContainText('formatRelativeDate');
   const reads=()=>state.calls.filter(url=>url.pathname==='/api/review'&&url.searchParams.get('file')==='src/plants.ts').length;
   const before=reads(),lists=state.calls.filter(url=>url.pathname==='/api/review'&&!url.searchParams.get('file')).length;
@@ -158,9 +165,9 @@ test('idle polling keeps patches, the summary counts filtered files and the head
 
 test('empty comparison explains itself and offers the branch comparison',async({page})=>{
   const state=await host(page,[]);await page.setViewportSize({width:390,height:844});
-  await page.goto('http://127.0.0.1:5173');await openChatList(page);
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
-  await page.getByRole('button',{name:/Garden review/}).click();await page.getByRole('button',{name:'Review',exact:true}).click();
+  await page.getByRole('button',{name:/Garden review/}).click();await openReview(page);
   const review=panel(page);await expect(review).toContainText('No uncommitted changes in garden-app');
   await review.getByRole('button',{name:'Compare with the main branch'}).click();
   await expect.poll(()=>state.calls.some(url=>url.pathname==='/api/review'&&url.searchParams.get('mode')==='branch')).toBe(true);
@@ -175,6 +182,7 @@ test('the turn result opens Review on the files of that turn, with all changes o
   await page.getByRole('button',{name:'View diff',exact:true}).click();
   const review=panel(page);await expect(review.locator('.review-file')).toHaveCount(1);
   await expect(review.locator('.review-filter-note')).toContainText('Only files from this turn');
+  expect(state.calls.some(url=>url.searchParams.getAll('path').includes('src/plants.ts'))).toBe(true);
   await review.locator('.review-filter-note').getByRole('button',{name:'Show all',exact:true}).click();
   await expect(review.locator('.review-file')).toHaveCount(5);
   await file(page,'src/plants.ts').getByRole('button',{name:'20 more context lines'}).click();
@@ -204,4 +212,36 @@ test('Viewed checkboxes are 48 px targets and Review keys do nothing while Revie
   await shell.evaluate(element=>{element.style.display='';});
   await expect(review.locator('.review-file.viewed')).toHaveCount(0);
   await page.keyboard.press('v');await expect(plants.getByRole('checkbox',{name:'Viewed'})).toBeChecked();
+});
+
+test('a failed first read has one recovery action and no empty file controls',async({page})=>{
+  await host(page);await page.setViewportSize({width:360,height:780});
+  await page.route('**/api/review?*',route=>route.fulfill({status:503,json:{error:'Host unavailable'}}));
+  await page.goto(test.info().project.use.baseURL||'http://127.0.0.1:5173');await openChatList(page);
+  await connectByQr(page);await openChatList(page);await page.getByRole('button',{name:/Garden review/}).click();
+  await openReview(page);
+  const review=panel(page);
+  await expect(review.getByRole('alert')).toContainText('Host unavailable');
+  await expect(review.getByRole('button',{name:'Retry'})).toBeVisible();
+  await expect(review.locator('.review-toolbar')).toBeHidden();
+  await expect(review.locator('.review-tree')).toHaveCount(0);
+  await expect(review).toHaveCSS('backdrop-filter','none');
+  await page.screenshot({path:'artifacts/screenshots/review-phone-error.png'});
+});
+test('large comparisons page by offset and retain the real total',async({page})=>{
+  await host(page);await page.setViewportSize({width:1280,height:800});
+  await page.route('**/api/review?*',route=>{
+    const url=new URL(route.request().url());
+    if(url.searchParams.has('file'))return route.fallback();
+    const offset=Number(url.searchParams.get('offset')||0);
+    const files=[{path:offset?'src/last.ts':'src/plants.ts',added:1,removed:0,status:'modified'}];
+    return route.fulfill({json:{current:'feature/beds',base:'main',branches:['main'],files,totalFiles:1001,fingerprint:'same-comparison'}});
+  });
+  await open(page);
+  const review=panel(page);
+  await review.getByRole('button',{name:'Next file page'}).click();
+  await expect(review.locator('.review-file-heading')).toContainText('last.ts');
+  await expect(review.getByRole('button',{name:'Next file page'})).toBeDisabled();
+  await review.getByRole('button',{name:'Previous file page'}).click();
+  await expect(review.locator('.review-file-heading')).toContainText('plants.ts');
 });

@@ -24,7 +24,7 @@ import express from 'express';
 import {TaskNotifications,jiraNotifications} from './task-notifications';
 import packageJson from '../package.json';
 import type { HostUpdater } from './host-update.js';
-import { review, reviewAvailability } from './review.js';
+import { review, reviewAvailability, reviewQuery } from './review.js';
 import { readClaudeUsage } from './claude-usage.js';
 import { documentProjects, projectDocuments, readProjectDocument } from './project-docs.js';
 import { projectArtifact } from './project-artifact.js';
@@ -63,7 +63,13 @@ import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 
-export type Config = { port?:number; customProviders?:CustomProviders; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService };
+export type Config = { port?:number; customProviders?:CustomProviders; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
+  /** How long a provider's chat listing answers without being read again, and how long it may answer while a new one loads. */
+  sessionListFreshMs?: number; sessionListStaleMs?: number;
+  /** How long a chat list waits for a provider that usually answers quickly before it answers from the saved listing. */
+  sessionListWaitMs?: number;
+  /** How long the provider list waits for one provider's sign-in and model check before reporting its last known state. */
+  providerStatusWaitMs?: number };
 type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSessionMessages; forkSession?:typeof forkSession; getSessionInfo?:typeof getSessionInfo; deleteSession?:typeof deleteSession };
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
@@ -396,12 +402,36 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     }
     return permitted.sort((a, b) => b.lastModified - a.lastModified);
   };
-  // Concurrent list/project/history requests share metadata only while loading.
-  // Every later request sees Desktop renames, project removal and provider loss.
+  // Concurrent list/project/history requests share one read of a provider's chats.
   const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
-  const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude',includeDeleted=false) => {
+  // Reading a provider's chats can take seconds (Codex scans its whole archive). The chat list, a chat's history and
+  // a new turn only need rows that rarely change, so they answer from the last listing while a new one loads in the
+  // background. Titles, deletions and access to the chat's folder are still checked on every request.
+  const sessionListFresh=config.sessionListFreshMs??2000,sessionListStale=config.sessionListStaleMs??60000,sessionListWait=config.sessionListWaitMs??1200;
+  const sessionLists=new Map<'claude' | 'codex' | 'copilot',{at:number;took:number;value:Awaited<ReturnType<typeof loadSessions>>}>();
+  const refreshSessions=(provider:'claude' | 'codex' | 'copilot')=>sessionReads(provider,async()=>{const started=Date.now(),value=await loadSessions(provider);sessionLists.set(provider,{at:Date.now(),took:Date.now()-started,value});return value;});
+  /**
+   * saved: answer from the saved listing without waiting (one chat is looked up: its history, a new turn).
+   * recent: a chat list; it waits a moment for a provider that answers quickly and otherwise uses the saved listing.
+   * current: always read the provider's chats now (a chat created a moment ago, deletion).
+   */
+  type ListingNeed='saved'|'recent'|'current';
+  const providerSessions=async(provider:'claude' | 'codex' | 'copilot',need:ListingNeed)=>{
+    const saved=sessionLists.get(provider),age=saved?Date.now()-saved.at:Infinity;
+    // A slow provider is asked again less often: its listing stays current for three times as long as it took to read (20 s at most).
+    if(saved&&need!=='current'&&sessionListFresh>0&&age<Math.max(sessionListFresh,Math.min(20000,saved.took*3)))return saved.value;
+    const loading=refreshSessions(provider);
+    if(need==='current'||!saved||age>=sessionListStale)return loading;
+    // The saved listing answers; a provider that stopped answering is reported once the listing is too old.
+    loading.catch(()=>{});
+    if(need==='saved'||saved.took>=sessionListWait)return saved.value;
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    try{return await Promise.race([loading.catch(()=>saved.value),new Promise<typeof saved.value>(resolve=>{timer=setTimeout(()=>resolve(saved.value),sessionListWait);})]);}
+    finally{clearTimeout(timer);}
+  };
+  const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude',includeDeleted=false,need:ListingNeed='recent') => {
     if(workspaceAccess.current())return [];
-    const listed=await chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await sessionReads(provider,()=>loadSessions(provider)),workspaceAccess.store.chatLinks(),includeDeleted);
+    const listed=await chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await providerSessions(provider,need),workspaceAccess.store.chatLinks(),includeDeleted);
     if(provider!=='claude')return listed;
     // A chat started with a custom provider keeps that account, so it is listed and resumed with the same provider.
     // Tasks record their account when the session ID appears; this fallback covers tasks listed before that write finished.
@@ -414,10 +444,15 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
   async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {
     if(provider==='copilot')z.string().min(1).max(4096).parse(id);else uuid.parse(id);
-    const found = (await sessions(provider)).find(s => s.sessionId === id);
+    type Row=Awaited<ReturnType<typeof sessions>>[number];
+    const permitted=async(found:Row)=>{if (found.cwd && (!found.readOnly||workspaceAccess.current())) await allowedPath(accessRoots(), found.cwd, true);return found;};
+    const saved = (await sessions(provider,false,'saved')).find(s => s.sessionId === id);
+    // The saved listing answers for a chat whose folder is still allowed. A chat created a moment ago, or one whose
+    // folder changed since, is decided from the provider's current chats.
+    if (saved) try { return await permitted(saved); } catch { /* Decided below from the current listing. */ }
+    const found = (await sessions(provider,false,'current')).find(s => s.sessionId === id);
     if (!found) throw new HttpError(404, 'Чат не найден в разрешённых папках');
-    if (found.cwd && (!found.readOnly||workspaceAccess.current())) await allowedPath(accessRoots(), found.cwd, true);
-    return found;
+    return permitted(found);
   }
   app.get('/api/sessions/:id/subagents', async (req, res) => {
     const provider = providerSchema.parse(req.query.provider), parent = await session(String(req.params.id), provider);
@@ -433,7 +468,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const messages = provider==='copilot'?[]:provider === 'codex' ? await codex().subagentMessages(parent.sessionId, agent) : await claudeSubagentMessages(parent.sessionId, agent, cwd);
     res.json({ messages });
   });
-  app.get('/api/review', async (req, res) => { const query = z.object({cwd:text,mode:z.enum(['working','staged','branch']).default('working'),base:z.string().max(300).optional(),file:z.string().max(4096).optional(),whitespace:z.enum(['0','1']).optional(),context:z.coerce.number().int().min(0).max(100000).optional()}).parse(req.query); res.json(await review(roots,query.cwd,query.mode,query.base,query.file,{whitespace:query.whitespace==='1',context:query.context})); });
+  app.get('/api/review', async (req, res) => { const query = reviewQuery.extend({cwd:text,mode:z.enum(['working','staged','branch']).default('working'),base:z.string().max(300).optional()}).parse(req.query); res.json(await review(roots,query.cwd,query.mode,query.base,query.file,{whitespace:query.whitespace==='1',context:query.context,paths:query.path,offset:query.offset})); });
   app.get('/api/review/availability', async (req, res) => { const { cwd } = z.object({ cwd: text }).parse(req.query); res.json(await reviewAvailability(roots, cwd)); });
   app.get('/api/codex/usage', async (_req, res) => res.json(await codex().usage()));
   app.get('/api/copilot/usage', async (_req, res) => res.json(await copilot().usage()));
@@ -452,9 +487,20 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const cwd = await allowedPath(accessRoots(), text.parse(req.query.cwd), true);
     res.json(await claudeCatalog.read(cwd));
   });
+  // Codex and Copilot check their sign-in and models over their own processes and the network. Both are asked at once,
+  // and one that does not answer in time is reported from its last known state, so it never holds back the other providers.
+  const providerStates=new Map<'codex'|'copilot',object>();
+  const providerState=async(id:'codex'|'copilot',read:()=>Promise<object>)=>{
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    const loading=read().then(value=>{providerStates.set(id,value);return value;});
+    const late=new Promise<object>(resolve=>{timer=setTimeout(()=>resolve(providerStates.get(id)??{available:false,authenticated:false,models:[],access:'checking',error:'Still checking this provider.'}),config.providerStatusWaitMs??4000);});
+    try{return await Promise.race([loading,late]);}finally{clearTimeout(timer);loading.catch(()=>{});}
+  };
   app.get('/api/providers', async (_req, res) => {
-    const state = config.codex ? await config.codex.status() : { available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' };
-    res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...state },{id:'copilot',name:'GitHub Copilot',...(config.copilot?await config.copilot.status():{available:false,authenticated:false,models:[]})}]);
+    const [codexState,copilotState]=await Promise.all([
+      config.codex?providerState('codex',()=>config.codex!.status()):{ available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' },
+      config.copilot?providerState('copilot',()=>config.copilot!.status()):{available:false,authenticated:false,models:[]}]);
+    res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...codexState },{id:'copilot',name:'GitHub Copilot',...copilotState}]);
   });
   mountCustomProviders(app,customProviders,guardCustomProviders);
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
@@ -496,7 +542,9 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     ];
   };
   const processChats=mountChatBulkDelete(app,chatLibrary,{
-    personal:()=>!workspaceAccess.current(),sessions,
+    personal:()=>!workspaceAccess.current(),
+    // Deleting works from the provider's current chats, never from a saved listing.
+    sessions:(provider,includeDeleted)=>sessions(provider,includeDeleted,'current'),
     folderChatFilter:async provider=>{
       await taskChains.init();
       const linked=taskChains.chatMembership(engineFor(provider).list());

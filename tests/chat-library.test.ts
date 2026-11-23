@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,readdir,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {ChatLibrary} from '../server/chat-library.js';
@@ -14,8 +14,18 @@ test('chat library serializes edits, persists names/removal and isolates provide
   assert.deepEqual(await reopened.decorate('codex',[{sessionId:'one'}]),[{sessionId:'one',customTitle:'Renamed'}]);
   assert.deepEqual(await reopened.decorate('claude',[{sessionId:'one'}]),[]);
   assert.deepEqual((await reopened.read()).projects,['synthetic-project']);
-  await writeFile(file,'broken');
-  await assert.rejects(reopened.edit(d=>{d.chats={};}));
+  // A damaged library (an interrupted write leaves zero bytes) must not switch chats off: the previous copy answers and the damaged file is kept.
+  await writeFile(file,'\0'.repeat(64));
+  assert.deepEqual(await reopened.decorate('codex',[{sessionId:'one'}]),[{sessionId:'one',customTitle:'Renamed'}]);
+  assert.deepEqual(await reopened.decorate('claude',[{sessionId:'one'}]),[]);
+  await reopened.edit(d=>{d.projects.push('after-recovery');});
+  assert.deepEqual((await new ChatLibrary(file).read()).projects,['after-recovery']);
+  assert.ok((await readdir(dir)).some(name=>name.startsWith('library.json.corrupt-')),'the damaged copy is kept beside the library');
+  // Without a backup the library starts empty instead of failing every chat request.
+  const lone=path.join(dir,'lone.json');await writeFile(lone,'broken');
+  assert.deepEqual(await new ChatLibrary(lone).read(),{chats:{},projects:[]});
+  await new ChatLibrary(lone).edit(d=>{d.chats['codex:two']={title:'Kept'};});
+  assert.equal((await new ChatLibrary(lone).read()).chats['codex:two'].title,'Kept');
  }finally{assert.equal(path.dirname(dir),os.tmpdir());await rm(dir,{recursive:true,force:true});}
 });
 

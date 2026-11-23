@@ -208,7 +208,7 @@ public sealed class PocketDesktop:Form {
     readonly JavaScriptSerializer json=new JavaScriptSerializer{MaxJsonLength=32*1024*1024};
     readonly HttpClient http=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false}){Timeout=TimeSpan.FromSeconds(3)};
     readonly HttpClient reader=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false}){Timeout=TimeSpan.FromSeconds(95)};
-    readonly SemaphoreSlim reads=new SemaphoreSlim(8);
+    readonly SemaphoreSlim reads=new SemaphoreSlim(16);
     readonly NotifyIcon tray=new NotifyIcon();
     readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer{Interval=4000};
     static readonly Color InitialBackground=Color.FromArgb(25,25,23);
@@ -222,6 +222,8 @@ public sealed class PocketDesktop:Form {
     int hostProcessId;
     DateTime hostStartedUtc=DateTime.MaxValue;
     int failures;
+    // Checks in a row that the host left unanswered in time, and whether the last failure was only a late answer.
+    int slowChecks;bool lateAnswer;
     long updateSize,updateReceived;
     DateTime nextAttempt=DateTime.MinValue;
     string status="Ready to connect",jiraUrl;
@@ -460,7 +462,7 @@ public sealed class PocketDesktop:Form {
         }
     }
     Task<object> Request(string endpoint,bool post=false){return Send(http,"/"+endpoint,post);}
-    async Task<bool> Check(){try{
+    async Task<bool> Check(){lateAnswer=false;try{
         var runtime=(Dictionary<string,object>)await Request("runtime");
         if(Field(runtime,"applicationId")!="app.pocketcode.host")return false;
         if(runtime.ContainsKey("desktopCheckRequestedAt")){long requested=Convert.ToInt64(runtime["desktopCheckRequestedAt"]);if(requested>lastRequestedUpdate){lastRequestedUpdate=requested;StartUpdate();}}
@@ -475,12 +477,17 @@ public sealed class PocketDesktop:Form {
             catch(ArgumentException){}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}
         }
         status="Pocket Code "+runtime["version"]+(owner==null?" · existing host":" · connected");return true;
-    }catch{return false;}}
+    }catch(DesktopBridgeFailure failure){lateAnswer=failure.Code=="host_timeout";return false;}catch{return false;}}
     async Task Poll(){
         if(preview||polling||changing||exiting)return;polling=true;
         try{
             bool wasOnline=online;
-            online=await Check();if(exiting||changing)return;
+            bool answered=await Check();if(exiting||changing)return;
+            // A busy host that answers late, or one whose own process is still alive (waking from sleep, replacing itself for an
+            // update), is still running: the window stays connected, and chats stay usable, until the third missed check in a row.
+            // A host started elsewhere that refuses the connection is gone and is reported at once.
+            if(answered)slowChecks=0;else if(wasOnline&&(lateAnswer||owner!=null&&owner.ActiveCount>0)&&++slowChecks<3)return;
+            online=answered;
             if(online){
                 failures=0;autoStartPending=false;
                 if(!wasOnline)Push();

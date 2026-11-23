@@ -1,5 +1,13 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Просмотр изменений': 'Review changes',
+  'Единый': 'Unified',
+  'Рядом': 'Split',
+  'Не удалось открыть изменения': 'Couldn’t load changes',
+  'Страницы файлов': 'File pages',
+  'Предыдущая страница файлов': 'Previous file page',
+  'Следующая страница файлов': 'Next file page',
+  '{0}–{1} из {2}': '{0}–{1} of {2}',
   'Задачи из Markdown':'Markdown tasks',
   'Выполни по порядку задачи из вложенного файла markdown-tasks.md.':'Run the tasks in the attached markdown-tasks.md file in order.',
   'Таблица с горизонтальной прокруткой':'Horizontally scrollable table',
@@ -923,6 +931,8 @@ export const english: Record<string, string> = {
   "К новым сообщениям: {0}": "Jump to latest messages: {0}",
   "К новым сообщениям": "Jump to latest messages",
   "Отправится, когда {0} закончит ход": "Will be sent when {0} finishes the turn",
+  "Отправится, как только чат откроется": "Will be sent as soon as the chat opens",
+  "Чат не открылся вовремя. Сообщение возвращено в поле ввода.": "The chat did not open in time. The message is back in the input field.",
   "После завершения ответа": "After the current response",
   "Не доставлено": "Not delivered",
   "Время ожидания истекло — агенту отправлен отказ": "Timed out — the agent received a denial",

@@ -1,3 +1,4 @@
+import {z} from 'zod';
 import {execFile} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -8,7 +9,24 @@ import {isolatedGitEnvironment} from './git-environment.js';
 const execute=promisify(execFile);
 /** status: added/deleted/modified come from Git; untracked files are new and not yet in Git. linesUnknown: an untracked file beyond the counting budget. */
 export type ReviewFile={path:string;added:number;removed:number;binary:boolean;untracked:boolean;status?:'added'|'deleted'|'modified'|'untracked';generated?:boolean;linesUnknown?:boolean;fingerprint?:string};
-export type ReviewOptions={whitespace?:boolean;context?:number};
+export type ReviewOptions={whitespace?:boolean;context?:number;paths?:string[];offset?:number};
+const queryPath=z.string().min(1).max(4096);
+export const reviewQuery=z.object({
+  file:queryPath.optional(),
+  path:z.union([queryPath,z.array(queryPath).min(1).max(100)]).transform(value=>typeof value==='string'?[value]:value).optional(),
+  offset:z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+  whitespace:z.enum(['0','1']).optional(),context:z.coerce.number().int().min(0).max(100000).optional(),
+});
+const pageSize=1000;
+function pathBatches(paths:string[]){
+  const batches:string[][]=[];
+  let size=0;
+  for(const name of paths){
+    if(!batches.length||size+name.length>12_000){batches.push([]);size=0;}
+    batches[batches.length-1].push(name);size+=name.length+3;
+  }
+  return batches;
+}
 const flags=['--no-ext-diff','--no-textconv','--no-renames'];
 const hash=(value:string)=>createHash('sha1').update(value).digest('hex').slice(0,16);
 // Lock files, minified bundles and source maps are noise in a review; .gitattributes linguist-generated adds project-specific ones.
@@ -53,15 +71,13 @@ async function comparisonMetadata(git:Awaited<ReturnType<typeof gitContext>>['gi
   const comparison=base||branches.find(b=>b==='origin/main')||branches.find(b=>b==='origin/master')||branches.find(b=>b==='main'&&b!==current)||branches.find(b=>b==='master'&&b!==current)||'HEAD';
   return {branches,current,comparison};
 }
-/** Size and modification time identify a working-tree file version without reading it. */
-async function fileStamp(location:string){try{const info=await lstat(location);return `${info.size}:${info.mtimeMs}`;}catch{return 'missing';}}
-/** Line counts for new, untracked text files, within a budget so a large untracked folder stays cheap. */
-async function untrackedLines(location:string,budget:{files:number;bytes:number}){
+/** Count new text files within the page's shared byte and file budget. */
+async function untrackedLines(location:string,info:Awaited<ReturnType<typeof lstat>>|undefined,budget:{files:number;bytes:number}){
+  if(!info)return {added:0,binary:false,linesUnknown:true};
+  if(!info.isFile()||info.isSymbolicLink()||info.size>1_000_000)return {added:0,binary:true};
+  if(info.size>256_000||budget.files<=0||budget.bytes<Number(info.size))return {added:0,binary:false,linesUnknown:true};
+  budget.files--;budget.bytes-=Number(info.size);
   try{
-    const info=await lstat(location);
-    if(!info.isFile()||info.isSymbolicLink()||info.size>1_000_000)return {binary:true,added:0};
-    if(info.size>256_000||budget.files<=0||budget.bytes<info.size)return {binary:false,added:0,linesUnknown:true};
-    budget.files--;budget.bytes-=info.size;
     const buffer=await readFile(location);if(buffer.includes(0))return {binary:true,added:0};
     const text=buffer.toString('utf8');return {binary:false,added:text?text.split('\n').length-(text.endsWith('\n')?1:0):0};
   }catch{return {binary:false,added:0,linesUnknown:true};}
@@ -82,38 +98,58 @@ export async function review(roots:string[],input:string,mode:'working'|'staged'
   if(mode==='task'&&(!base||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(base)||(await git(['rev-parse','--verify',base+'^{commit}'])).trim()!==base))throw new HttpError(400,'The task baseline commit is unavailable.');
   const range=mode==='task'?[base!]:mode==='staged'?['--cached']:mode==='branch'?[`${comparison}...HEAD`]:hasHead?['HEAD']:['--cached'];
   const whitespace=options.whitespace?['--ignore-all-space']:[];
-  const pathspec=single?file:scope,worktree=mode==='working'||mode==='task';
-  const [stats,raw,untracked]=await Promise.all([
-    git(['diff',...flags,...whitespace,'--numstat','-z',...range,'--',pathspec]),
-    git(['diff',...flags,'--raw','-z',...range,'--',pathspec]),
-    worktree?git(['ls-files','--others','--exclude-standard','-z','--',pathspec]):Promise.resolve(''),
-  ]);
-  // --raw -z: ":old-mode new-mode old-blob new-blob STATUS\0path\0"; the blobs identify index and commit versions.
-  const rawParts=raw.split('\0'),rawRows=new Map<string,string>();
-  for(let i=0;i+1<rawParts.length;i+=2)if(rawParts[i].startsWith(':'))rawRows.set(rawParts[i+1],rawParts[i]);
-  const statusOf=(name:string):ReviewFile['status']=>{const letter=rawRows.get(name)?.trim().split(/\s+/).at(-1)?.[0];return letter==='A'?'added':letter==='D'?'deleted':'modified';};
-  const files:ReviewFile[]=stats.split('\0').filter(Boolean).map(row=>{const [add,remove,...name]=row.split('\t');const file=name.join('\t');return {path:file,added:Number(add)||0,removed:Number(remove)||0,binary:add==='-',untracked:false,status:statusOf(file),fingerprint:row+'|'+(rawRows.get(file)||'')};}).filter(item=>within(cwd,path.resolve(root,item.path)));
-  // With whitespace ignored, numstat still lists files, so status-only changes stay visible.
-  for(const [name,row] of rawRows)if(!files.some(item=>item.path===name)&&within(cwd,path.resolve(root,name)))files.push({path:name,added:0,removed:0,binary:false,untracked:false,status:statusOf(name),fingerprint:row});
-  if(worktree){
-    const budget={files:200,bytes:2_000_000};
-    for(const name of untracked.split('\0').filter(Boolean))if(within(cwd,path.resolve(root,name))){
-      const counted=single?{binary:false,added:0}:await untrackedLines(path.resolve(root,name),budget);
-      files.push({path:name,added:counted.added,removed:0,binary:counted.binary,untracked:true,status:'untracked',...('linesUnknown' in counted&&counted.linesUnknown?{linesUnknown:true}:{}),fingerprint:'untracked'});
+  const selectedPaths=options.paths?.map(name=>{
+    const location=path.resolve(cwd,name);
+    if(!name||name.includes('\0')||path.isAbsolute(name)||/^(?:[A-Za-z]:|[\\/])/.test(name)||!within(cwd,location)||location===cwd){
+      throw new HttpError(400,'Select files inside the current project.');
     }
+    return path.relative(root,location).split(path.sep).join('/');
+  });
+  const requested=selectedPaths?new Set(selectedPaths):undefined;
+  if(requested&&!requested.size)throw new HttpError(400,'Select at least one file.');
+  if(single&&requested&&!requested.has(file))throw new HttpError(404,'This file is not in the current comparison.');
+  const pathspecs=single?[file]:requested?[...requested]:[scope],worktree=mode==='working'||mode==='task';
+  const rawRows=new Map<string,string>(),untrackedNames=new Set<string>();
+  const permitted=(name:string)=>within(cwd,path.resolve(root,name))&&(!requested||requested.has(name));
+  for(const batch of pathBatches(pathspecs)){
+    const [raw,untracked]=await Promise.all([
+      git(['diff',...flags,'--raw','-z',...range,'--',...batch]),
+      worktree?git(['ls-files','--others','--exclude-standard','-z','--',...batch]):Promise.resolve(''),
+    ]);
+    const parts=raw.split('\0');
+    for(let i=0;i+1<parts.length;i+=2)if(parts[i].startsWith(':')&&permitted(parts[i+1]))rawRows.set(parts[i+1],parts[i]);
+    for(const name of untracked.split('\0'))if(name&&permitted(name))untrackedNames.add(name);
   }
-  if(files.length>1000)throw new HttpError(400,'Too many changed files. Narrow the project folder.');
-  // Working-tree versions have no blob id in --raw; their size and time say whether the agent wrote the file again.
-  await Promise.all(files.map(async item=>{item.fingerprint=hash((item.fingerprint||'')+(worktree?'|'+await fileStamp(path.resolve(root,item.path)):'')+'|'+(options.whitespace?'w':''));if(generatedName.test(item.path))item.generated=true;}));
-  if(!single&&files.length&&files.some(item=>!item.generated)){
-    const output=await gitInput(['check-attr','-z','--stdin','linguist-generated'],files.map(item=>item.path).join('\0')+'\0');
-    const parts=output.split('\0');for(let i=0;i+2<parts.length;i+=3)if(parts[i+2]==='set'||parts[i+2]==='true'){const match=files.find(item=>item.path===parts[i]);if(match)match.generated=true;}
+  const names=[...rawRows.keys(),...untrackedNames],totalFiles=names.length;
+  const offset=single?0:options.offset??0;
+  const page=names.slice(offset,offset+pageSize),stats=new Map<string,string>();
+  for(const batch of pathBatches(page.filter(name=>rawRows.has(name)))){
+    const output=await git(['diff',...flags,...whitespace,'--numstat','-z',...range,'--',...batch]);
+    for(const row of output.split('\0'))if(row){const name=row.slice(row.indexOf('\t',row.indexOf('\t')+1)+1);stats.set(name,row);}
+  }
+  const files:ReviewFile[]=[],budget={files:200,bytes:2_000_000};
+  for(let start=0;start<page.length;start+=24){
+    const slice=page.slice(start,start+24);
+    const infos=await Promise.all(slice.map(name=>worktree?lstat(path.resolve(root,name)).catch(()=>undefined):undefined));
+    files.push(...await Promise.all(slice.map(async(name,index):Promise<ReviewFile>=>{
+      const row=stats.get(name)||'',raw=rawRows.get(name)||'',untracked=untrackedNames.has(name),info=infos[index];
+      const [add,remove]=row.split('\t'),letter=raw.trim().split(/\s+/).at(-1)?.[0];
+      const counts=untracked&&!single?await untrackedLines(path.resolve(root,name),info,budget):{added:Number(add)||0,binary:add==='-'};
+      const stamp=worktree?'|'+(info?info.size+':'+info.mtimeMs:'missing'):'';
+      return {path:name,untracked,removed:Number(remove)||0,...counts,status:untracked?'untracked':letter==='A'?'added':letter==='D'?'deleted':'modified',
+        fingerprint:hash((untracked?'untracked':row+'|'+raw)+stamp+'|'+(options.whitespace?'w':'')),...(generatedName.test(name)?{generated:true}:{})};
+    })));
+  }
+  if(!single&&files.some(item=>!item.generated)){
+    const byName=new Map(files.map(item=>[item.path,item]));
+    const output=await gitInput(['check-attr','-z','--stdin','linguist-generated'],page.join('\0')+'\0');
+    const parts=output.split('\0');for(let i=0;i+2<parts.length;i+=3)if(parts[i+2]==='set'||parts[i+2]==='true'){const match=byName.get(parts[i]);if(match)match.generated=true;}
   }
   // A cheap identity of the whole comparison: the client re-downloads patches only when this or a file's own fingerprint changes.
   const fingerprint=hash([mode,comparison,head,options.whitespace?'w':'',...files.map(item=>item.path+'\t'+item.fingerprint+'\t'+item.added+'\t'+item.removed)].join('\n'));
   // A chat may start in a subfolder or a linked worktree. Report the resolved
   // context without widening the comparison to sibling projects in its repo.
-  const result={files,current,base:comparison,branches,mode,scope,repositoryRoot:root,projectPath:cwd,patch:'',binary:false,fingerprint};
+  const result={files,totalFiles,current,base:comparison,branches,mode,scope,repositoryRoot:root,projectPath:cwd,patch:'',binary:false,fingerprint};
   if(!single)return result;
   const selected=files.find(item=>item.path===file);if(!selected)throw new HttpError(404,'This file is not in the current comparison.');
   if(selected.untracked){

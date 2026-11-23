@@ -89,7 +89,7 @@ test('shared projects include both providers while excluding out-of-scope and mi
     if (codexFails) throw new Error('Synthetic unavailable provider');
     return [{cwd:codexRoot}, {cwd:claudeRoot}, {cwd:outside}, {cwd:path.join(root, 'missing')}];
   }};
-  const runtime = await createApp({roots:[root], uploads:path.join(temporary, 'uploads'), token, hostName:'Fixture', desktopSessionIndexes:[], codex}, new Jobs(), {
+  const runtime = await createApp({roots:[root], uploads:path.join(temporary, 'uploads'), token, hostName:'Fixture', desktopSessionIndexes:[], codex, sessionListFreshMs:0, sessionListStaleMs:0}, new Jobs(), {
     listSessions: async () => {
       if (claudeFails) throw new Error('Synthetic unavailable provider');
       return [{sessionId:randomUUID(), cwd:claudeRoot, lastModified:1}, {sessionId:randomUUID(), cwd:outside, lastModified:1}];

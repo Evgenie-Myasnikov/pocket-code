@@ -1,4 +1,4 @@
-import {openChatList,newChat} from './chat-navigation';
+import {openChatList,newChat,openReview,chatMenu} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect,type Page} from '@playwright/test';
 
@@ -38,7 +38,7 @@ async function connect(page:Page,language='en',scale=100){
   await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await page.getByRole('button',{name:/Chat repository test/}).click();
-  await page.getByRole('button',{name:'Review',exact:true}).click();
+  await openReview(page);
   // Unified mode groups removals first; additions can be outside the virtual window.
   await expect(review(page).locator('.diff-content')).toContainText('src/first.ts old 0');
 }
@@ -63,7 +63,7 @@ test('Review reading mode preserves the diff position and draft, and Back restor
   await host(page);await page.setViewportSize({width:390,height:844});await connect(page);
   await review(page).getByRole('button',{name:'Back to chat',exact:true}).click();
   await page.getByLabel('Message Claude').fill('Keep my review draft');
-  await page.getByRole('button',{name:'Review',exact:true}).click();
+  await openReview(page);
   const panel=review(page),content=panel.locator('.diff-content');await expect(content).toContainText('src/first.ts old 0');
   await content.evaluate(element=>{element.scrollTop=480;});const before=await content.evaluate(element=>element.scrollTop);
   await panel.getByRole('button',{name:'Reading mode',exact:true}).click();
@@ -78,7 +78,7 @@ test('Review reading mode preserves the diff position and draft, and Back restor
   await panel.getByRole('button',{name:'Reading mode',exact:true}).click();await page.evaluate(()=>window.dispatchEvent(new Event('pocket-code-back')));
   await expect(panel.getByRole('button',{name:'Reading mode',exact:true})).toBeVisible();await expect(panel).toBeVisible();
   await panel.getByRole('button',{name:'Reading mode',exact:true}).click();await restore.click();await expect(panel.getByLabel('Changed files',{exact:true})).toBeVisible();
-  await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);await expect(page.getByRole('button',{name:'Review',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);await expect(chatMenu(page)).toBeFocused();
   await expect(page.getByLabel('Message Claude')).toHaveValue('Keep my review draft');
 });
 
@@ -114,7 +114,7 @@ test('Review refreshes changed content without losing scroll and keeps options o
   await expect(content).toContainText('updated old 0',{timeout:9000});
   expect(await content.evaluate(element=>element.scrollTop)).toBe(240);
   await panel.getByRole('button',{name:'Back to chat',exact:true}).click();
-  await page.getByRole('button',{name:'Review',exact:true}).click();
+  await openReview(page);
   await expect(review(page).locator('.diff-table')).toHaveCSS('font-size','18px');
 });
 

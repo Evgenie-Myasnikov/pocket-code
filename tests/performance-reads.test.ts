@@ -121,3 +121,77 @@ test('concurrent API reads share SDK work and the next read revalidates project 
   assert.equal((await get(`/sessions/${id}/messages?window=100`)).status, 404);
   assert.equal(histories, 1, 'shared metadata cannot authorize a redirected path');
 });
+
+test('chats answer from the saved listing while a slow provider is read again in the background', async t => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'pocket-perf-listing-')), root = path.join(temp, 'root');
+  await mkdir(root, { recursive: true });
+  const first = '00000000-0000-4000-8000-000000000001', second = '00000000-0000-4000-8000-000000000002', token = 'synthetic-listing-token-0000000000000000000';
+  let listings = 0, wait = 5, created = false;
+  const sdk: any = {
+    listSessions: async () => { listings++; await delay(wait); return [first, ...(created ? [second] : [])].map(sessionId => ({ sessionId, summary: 'Fixture', cwd: root, lastModified: 1 })); },
+    getSessionMessages: async () => [{ uuid: 'message', type: 'user', message: { content: 'Fixture' } }],
+  };
+  const jobs = new Jobs();
+  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', desktopSessionIndexes: [], sessionListFreshMs: 500, sessionListWaitMs: 150 }, jobs, sdk);
+  const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(async () => { jobs.close(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(temp, { recursive: true, force: true }); });
+  const get = (route: string) => fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api${route}`, { headers: { Authorization: `Bearer ${token}` } });
+  const ids = async () => ((await (await get('/sessions?provider=claude')).json()) as { sessionId: string }[]).map(chat => chat.sessionId);
+  assert.deepEqual(await ids(), [first]); assert.equal(listings, 1);
+  // The list, a chat's history and its previews reuse the listing instead of reading every chat of the provider again.
+  assert.ok((await Promise.all([get('/sessions?provider=claude'), get(`/sessions/${first}/messages?provider=claude&window=50`), get(`/sessions/${first}/messages?provider=claude&window=20`)])).every(response => response.ok));
+  assert.equal(listings, 1);
+  // Once the listing has aged, a provider that has become slow is read in the background: the list waits for it only briefly.
+  await delay(600); wait = 600; created = true;
+  const started = Date.now();
+  assert.deepEqual(await ids(), [first]);
+  assert.ok(Date.now() - started < 300, 'the chat list did not wait for the slow provider');
+  assert.equal(listings, 2);
+  // A chat created a moment ago is not in the saved listing: its history waits for the current one instead of failing.
+  assert.equal((await get(`/sessions/${second}/messages?provider=claude&window=50`)).status, 200);
+  assert.equal(listings, 2, 'the request joined the read that was already running');
+  assert.deepEqual(await ids(), [first, second]);
+  // A chat that does not exist is still reported from the provider's current chats.
+  assert.equal((await get('/sessions/00000000-0000-4000-8000-000000000009/messages?provider=claude&window=50')).status, 404);
+});
+
+test('a provider that does not answer its sign-in check never holds back the other providers', async t => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'pocket-perf-providers-')), root = path.join(temp, 'root');
+  await mkdir(root, { recursive: true });
+  const token = 'synthetic-provider-token-000000000000000000';
+  let answer: Promise<object> = new Promise(() => {});
+  const codex: any = { list: () => [], sessions: async () => [], status: () => answer };
+  const jobs = new Jobs();
+  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', desktopSessionIndexes: [], codex, providerStatusWaitMs: 40 }, jobs, { listSessions: async () => [], getSessionMessages: async () => [] } as any);
+  const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(async () => { jobs.close(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(temp, { recursive: true, force: true }); });
+  const providers = async () => { const list = await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/providers`, { headers: { Authorization: `Bearer ${token}` } })).json() as any[]; return Object.fromEntries(list.map(item => [item.id, item])); };
+  const waiting = await providers();
+  assert.equal(waiting.claude.available, true, 'Claude is reported while Codex is still being checked');
+  assert.deepEqual([waiting.codex.available, waiting.codex.access], [false, 'checking']);
+  answer = Promise.resolve({ available: true, authenticated: true, models: [{ id: 'synthetic-model', name: 'Synthetic' }] });
+  assert.deepEqual([(await providers()).codex.available, (await providers()).codex.authenticated], [true, true]);
+  // The check hangs again: the state the PC confirmed last is reported instead of "unavailable".
+  answer = new Promise(() => {});
+  const late = await providers();
+  assert.deepEqual([late.codex.available, late.codex.authenticated, late.codex.models.length], [true, true, 1]);
+});
+
+test('a chat list shows what a quick provider has now instead of an aged listing', async t => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'pocket-perf-quick-')), root = path.join(temp, 'root');
+  await mkdir(root, { recursive: true });
+  const first = '00000000-0000-4000-8000-000000000001', second = '00000000-0000-4000-8000-000000000002', token = 'synthetic-quick-listing-token-0000000000000';
+  let created = false;
+  const sdk: any = {
+    listSessions: async () => { await delay(5); return [first, ...(created ? [second] : [])].map(sessionId => ({ sessionId, summary: 'Fixture', cwd: root, lastModified: 1 })); },
+    getSessionMessages: async () => [],
+  };
+  const jobs = new Jobs();
+  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', desktopSessionIndexes: [], sessionListFreshMs: 40 }, jobs, sdk);
+  const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(async () => { jobs.close(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(temp, { recursive: true, force: true }); });
+  const ids = async () => ((await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions?provider=claude`, { headers: { Authorization: `Bearer ${token}` } })).json()) as { sessionId: string }[]).map(chat => chat.sessionId);
+  assert.deepEqual(await ids(), [first]);
+  await delay(200); created = true;
+  assert.deepEqual(await ids(), [first, second], 'the list waited for the quick provider instead of repeating the saved listing');
+});

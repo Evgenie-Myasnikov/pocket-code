@@ -1,4 +1,4 @@
-import {openChatList,newChat,openSection} from './chat-navigation';
+import {openChatList,newChat,openSection,openReview} from './chat-navigation';
 import {connectByQr} from './qr-connect';
 import {test,expect} from '@playwright/test';
 test('Review opens on the right and preserves the draft; smaller settings survive reload',async({page})=>{
@@ -7,7 +7,7 @@ test('Review opens on the right and preserves the draft; smaller settings surviv
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await openChatList(page);
   await connectByQr(page,'http://127.0.0.1:4319','test-only-'.repeat(5));await openChatList(page);
   await page.getByRole('button',{name:/Интеграционный тест/}).click();await page.getByLabel('Message Claude').fill('Keep this draft');
-  await page.getByRole('button',{name:'Review',exact:true}).click();await expect(page.getByRole('dialog',{name:'Review'})).toBeVisible();await expect(page.getByText(/^-?old value$/)).toBeVisible();await expect(page.getByText(/^\+?new value$/)).toBeVisible();
+  await openReview(page);await expect(page.getByRole('dialog',{name:'Review'})).toBeVisible();await expect(page.getByText(/^-?old value$/)).toBeVisible();await expect(page.getByText(/^\+?new value$/)).toBeVisible();
   await page.screenshot({path:'artifacts/screenshots/review-mobile.png',fullPage:true});
   await page.getByRole('button',{name:'Back to chat',exact:true}).click();await expect(page.getByLabel('Message Claude')).toHaveValue('Keep this draft');
   await page.getByLabel('Claude model').selectOption('sonnet');

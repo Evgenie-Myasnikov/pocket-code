@@ -223,6 +223,8 @@ void main() {
 
 const INTRO_SECONDS = 1.8;
 const MAX_FIELD_PIXELS = 900000;
+// Local: a little under two 60 Hz frames, so the next drawn frame is the second one (five frames at 144 Hz).
+const FRAME_INTERVAL_MS = 31;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -471,6 +473,11 @@ export const DarkVeil = ({
     const frame = (now: number) => {
       raf = 0;
       if (!visible || document.hidden) return;
+      // Local: the veil drifts slowly, so it is drawn about 30 times a second instead of at the display's refresh rate.
+      if (last && now - last < FRAME_INTERVAL_MS) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
       const s = settingsRef.current;
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;

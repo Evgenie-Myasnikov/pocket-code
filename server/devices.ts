@@ -1,5 +1,6 @@
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
-import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';
+import {mkdir} from 'node:fs/promises';
+import {readGuarded,writeDurable} from './durable-file.js';
 import path from 'node:path';
 import {HttpError,validToken} from './security.js';
 type Via='lan'|'tailscale'|'internet';
@@ -13,13 +14,15 @@ export class DeviceRegistry{
  private state:State={pairing:secret(),devices:[],hostId:randomUUID()};private pending=new Map<string,Pending>();private queue:Promise<unknown>=Promise.resolve();
  private requests=new Map<string,Set<()=>void>>();private persistedAt=0;
  constructor(private file:string,private now=Date.now){}
- async load(){try{const state=JSON.parse(await readFile(this.file,'utf8'));if(!state||typeof state.pairing!=='string'||!Array.isArray(state.devices)||state.devices.length>100||state.devices.some((d:any)=>!d||typeof d.id!=='string'||typeof d.hash!=='string'||typeof d.name!=='string'||!Number.isFinite(d.lastSeen)))throw Error('Invalid device registry');this.state={...state,devices:state.devices.filter((d:Device)=>!d.revokedAt)};if(typeof state.hostId!=='string'){this.state.hostId=randomUUID();await this.save(this.state);}}catch(error:any){if(error.code!=='ENOENT')throw error;await this.save(this.state);}return this;}
+ /** A damaged registry (an interrupted write) never stops the host from starting: it is kept aside and devices pair again.
+  * No backup is kept on purpose: an older copy could bring back a device that was disconnected since. */
+ async load(){const valid=(state:any)=>!!state&&typeof state.pairing==='string'&&Array.isArray(state.devices)&&state.devices.length<=100&&!state.devices.some((d:any)=>!d||typeof d.id!=='string'||typeof d.hash!=='string'||typeof d.name!=='string'||!Number.isFinite(d.lastSeen));const {value:state}=await readGuarded<State>(this.file,valid);if(!state){await this.save(this.state);return this;}this.state={...state,devices:state.devices.filter((d:Device)=>!d.revokedAt)};if(typeof state.hostId!=='string'){this.state.hostId=randomUUID();await this.save(this.state);}return this;}
  /** Stable across restarts and QR changes, so a phone can tell PCs apart. */
  get hostId(){return this.state.hostId!;}
  get pairingToken(){return this.state.pairing;}
  async rotatePairing(){return this.change(async()=>{const next={...this.state,pairing:secret()};await this.save(next);this.state=next;});}
  isPairing(token:string){return validToken(token,this.state.pairing);}
- private async save(state:State){await mkdir(path.dirname(this.file),{recursive:true});const temp=this.file+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(state),{mode:0o600});await rename(temp,this.file);}
+ private async save(state:State){await mkdir(path.dirname(this.file),{recursive:true});await writeDurable(this.file,JSON.stringify(state),{temp:this.file+'.'+randomUUID()+'.tmp'});}
  private change<T>(fn:()=>Promise<T>):Promise<T>{const next=this.queue.then(fn);this.queue=next.catch(()=>{});return next;}
  // The same installation scanning again replaces its entry and key instead of adding a duplicate.
  async pair(token:string,{installation,...input}:PairInput){return this.change(async()=>{if(!this.isPairing(token))throw new HttpError(401,'Pairing code expired. Scan the current QR on the PC.','pairing_expired');const install=installation?hash('installation:'+installation):undefined,previous=install?this.state.devices.find(d=>d.installation===install):undefined;if(!previous&&this.state.devices.length>=100)throw new HttpError(409,'Device limit reached. Disconnect an old device on the PC.','device_limit');const key=secret(),now=this.now(),device:Device=previous?{...previous,...input,name:previous.customName?previous.name:input.name,hash:hash(key),lastSeen:now}:{id:randomUUID(),...input,...(install?{installation:install}:{}),hash:hash(key),pairedAt:now,lastSeen:now};const next={...this.state,devices:previous?this.state.devices.map(d=>d.id===previous.id?device:d):[...this.state.devices,device]};await this.save(next);this.state=next;if(previous)this.abort(previous.id);return {deviceId:device.id,token:key,...(device.workspaceId?{workspaceId:device.workspaceId}:{})};});}

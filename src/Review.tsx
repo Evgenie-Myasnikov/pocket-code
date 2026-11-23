@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useLayoutEffect,useMemo,useState,useRef} from 'react';
-import {ArrowLeft,Eye,EyeOff,SlidersHorizontal,RefreshCw,GitBranch,X,ChevronDown,ChevronRight,ChevronsDownUp,ChevronsUpDown,FileDiff,ListTree,MessageSquarePlus,Copy,GitCompareArrows} from 'lucide-react';
+import {ArrowLeft,Eye,EyeOff,SlidersHorizontal,RefreshCw,GitBranch,X,ChevronDown,ChevronRight,ChevronLeft,ChevronsDownUp,ChevronsUpDown,FileDiff,ListTree,MessageSquarePlus,Copy,GitCompareArrows,FolderGit2,FileWarning} from 'lucide-react';
 import {useModal} from './navigation';
 import {request,type Connection} from './api';
 import {t,getLanguage,useLanguage} from './i18n';
@@ -11,19 +11,30 @@ import {ReviewFileDiff,FileStats,fileStatus,fileVersion} from './ReviewFileDiff'
 import {ReviewContext,createScrollBus,useCodeMetrics} from './review-context';
 import type {LineSelection,LineSide} from './DiffTable';
 import {readViewed,writeViewed} from './review-viewed';
+import {resultPath} from './project-path';
 const extension=(path:string)=>{const name=path.split(/[\\/]/).at(-1)||path;const dot=name.lastIndexOf('.');return dot>0?name.slice(dot).toLowerCase():'(none)';};
 const stored=(key:string)=>{try{return localStorage.getItem(key);}catch{return null;}};
 const store=(key:string,value:string|null)=>{try{if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}catch{/* Preferences are optional. */}};
 const AUTO_SPLIT=900,COMPACT=600,TREE=1000;
 const POLL=[5000,15000,30000];
-/** Turn edit paths can be absolute or relative to another folder; a Review path matches when one ends with the other. */
-const samePath=(file:string,edited:string)=>{const a=file.replaceAll('\\','/').toLowerCase(),b=edited.replaceAll('\\','/').replace(/^\.\//,'').toLowerCase();return a===b||b.endsWith('/'+a)||a.endsWith('/'+b);};
-
-type Data={files:ReviewFile[];current:string;base:string;branches:string[];patch:string;binary:boolean;repositoryRoot?:string;projectPath?:string;scope?:string;fingerprint?:string};
+const PAGE_SIZE=1000;
+type Data={files:ReviewFile[];current:string;base:string;branches:string[];patch:string;binary:boolean;repositoryRoot?:string;projectPath?:string;scope?:string;fingerprint?:string;totalFiles?:number};
+/** Limit the encoded URL as well as the number of paths a single page can contain. */
+function scopeQueries(query:URLSearchParams,paths:string[]){
+  const chunks:URLSearchParams[]=[];
+  let current=new URLSearchParams(query),length=current.toString().length,count=0;
+  for(const path of paths){
+    const size=new URLSearchParams({path}).toString().length+1;
+    if(count&&(count>=100||length+size>7000)){chunks.push(current);current=new URLSearchParams(query);length=current.toString().length;count=0;}
+    current.append('path',path);length+=size;count++;
+  }
+  if(count)chunks.push(current);
+  return chunks;
+}
 type Selection={path:string}&LineSelection&{text:string[]};
 export function Review({connection,cwd,onClose,initialMode='working',taskRunId,onQuote,onlyPaths}:{connection:Connection;cwd:string;onClose:()=>void;initialMode?:'working'|'branch';taskRunId?:string;onQuote?:(text:string)=>void;onlyPaths?:string[]}){
   useLanguage();
-  const panel=useRef<HTMLElement|null>(null),diff=useRef<HTMLElement|null>(null),probe=useRef<HTMLSpanElement|null>(null),eye=useRef<HTMLButtonElement|null>(null),restore=useRef<HTMLButtonElement|null>(null),optionsButton=useRef<HTMLButtonElement|null>(null),filesButton=useRef<HTMLButtonElement|null>(null);
+  const panel=useRef<HTMLElement|null>(null),diff=useRef<HTMLElement|null>(null),fileListElement=useRef<HTMLDivElement|null>(null),probe=useRef<HTMLSpanElement|null>(null),eye=useRef<HTMLButtonElement|null>(null),restore=useRef<HTMLButtonElement|null>(null),optionsButton=useRef<HTMLButtonElement|null>(null),filesButton=useRef<HTMLButtonElement|null>(null);
   const [reading,setReading]=useState(false),[options,setOptions]=useState(false),[navOpen,setNavOpen]=useState(false);
   const optionsPanel=useRef<HTMLDivElement|null>(null),navigatorPanel=useRef<HTMLDivElement|null>(null);
   // 4–8 px were unreadable on a phone; an old saved value falls back to the chat size.
@@ -46,11 +57,14 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
   const [layout,setLayout]=useState<'auto'|'split'|'unified'>(()=>{const saved=stored('pocket-code-diff-layout');return saved==='split'||saved==='unified'?saved:'auto';});
   const [hiddenExtensions,setHiddenExtensions]=useState<string[]>(()=>{try{const value=JSON.parse(stored('pocket-code-review-hidden-types')||'[]');return Array.isArray(value)?value.filter(item=>typeof item==='string'):[];}catch{return [];}});
   const [turnOnly,setTurnOnly]=useState(!!onlyPaths?.length);
+  const scoped=turnOnly&&!!onlyPaths?.length;
+  const paths=useMemo(()=>[...new Set((onlyPaths||[]).map(path=>resultPath(cwd,path)).filter((path):path is string=>!!path))],[cwd,onlyPaths]);
+  const [offset,setOffset]=useState(0);
   const [opened,setOpened]=useState<Record<string,boolean>>({});
   const metrics=useCodeMetrics(probe,fontSize);
   const bus=useMemo(()=>createScrollBus(diff),[]);
   useEffect(()=>bus.attach(),[bus]);
-  useEffect(()=>{const element=diff.current,outer=panel.current;if(!element||!outer)return;const measure=()=>{setWidth(element.clientWidth);setPanelWidth(outer.clientWidth);};const observer=new ResizeObserver(measure);observer.observe(element);observer.observe(outer);measure();return()=>observer.disconnect();},[]);
+  useEffect(()=>{const element=diff.current,outer=panel.current;if(!element||!outer)return;const measure=()=>{setWidth(fileListElement.current?.clientWidth||element.clientWidth);setPanelWidth(outer.clientWidth);};const observer=new ResizeObserver(measure);observer.observe(element);observer.observe(outer);if(fileListElement.current)observer.observe(fileListElement.current);measure();return()=>observer.disconnect();},[]);
   // Split needs about 40 columns per side; below that it is unavailable, and Auto chooses it only on a wide panel.
   const splitMinimum=Math.round(2*(40*metrics.unit+70)),splitPossible=width>=splitMinimum;
   const effectiveLayout=layout==='auto'?(panelWidth>=AUTO_SPLIT&&splitPossible?'split':'unified'):layout==='split'&&!splitPossible?'unified':layout;
@@ -64,12 +78,30 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
     const load=async(background=false)=>{
       if(inFlight||!active)return;inFlight=true;clearTimeout(timer);
       if(!background){setBusy(true);setError('');}
-      const query=new URLSearchParams({cwd,mode,...(base?{base}:{}),...(whitespace?{whitespace:'1'}:{})});
+      const endpoint=taskRunId?'/task-runs/'+taskRunId+'/review':'/review';
+      const query=new URLSearchParams({...(!taskRunId?{cwd,mode,...(base?{base}:{})}:{}),...(whitespace?{whitespace:'1'}:{}),...(offset&&!scoped?{offset:String(offset)}:{})});
       try{
-        const value=await request<Data>(connection,taskRunId?'/task-runs/'+taskRunId+'/review'+(whitespace?'?whitespace=1':''):'/review?'+query);
+        const queryList=scoped?scopeQueries(query,paths):[query];
+        const scopedFiles=new Map<string,ReviewFile>();
+        let value:Data={files:[],current:'',base:'',branches:[],patch:'',binary:false};
+        for(const params of queryList){
+          const search=params.toString();
+          value=await request<Data>(connection,endpoint+(search?'?'+search:''));
+          if(!active)return;
+          if(scoped){
+            // An older host may return the full list. Its paths include the repository-relative scope.
+            const legacy=value.totalFiles===undefined;
+            const names=params.getAll('path');
+            const key=(p:string)=>/^(?:[a-z]:|\\\\)/i.test(cwd)?p.toLowerCase():p;
+            const requested=new Set(names.map(p=>key(value.scope&&value.scope!=='.'?value.scope+'/'+p:p)));
+            for(const item of value.files)if(!legacy||requested.has(key(item.path)))scopedFiles.set(item.path,item);
+          }
+        }
+        if(scoped)value={...value,files:[...scopedFiles.values()],totalFiles:scopedFiles.size,fingerprint:undefined};
+        else if(offset&&value.totalFiles!==undefined&&offset>=value.totalFiles){setOffset(Math.max(0,Math.floor((value.totalFiles-1)/PAGE_SIZE)*PAGE_SIZE));return;}
         if(!active)return;
         const previous=latest.current;
-        const same=!!previous&&(value.fingerprint&&previous.fingerprint?value.fingerprint===previous.fingerprint:JSON.stringify(previous.files)===JSON.stringify(value.files))&&previous.current===value.current&&previous.base===value.base;
+        const same=!!previous&&previous.totalFiles===value.totalFiles&&(value.fingerprint&&previous.fingerprint?value.fingerprint===previous.fingerprint:JSON.stringify(previous.files)===JSON.stringify(value.files))&&previous.current===value.current&&previous.base===value.base;
         idle.current=same?idle.current+1:0;
         if(!same){latest.current=value;setData(value);}
         setError('');setUpdated(Date.now());
@@ -81,15 +113,14 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
     const resume=()=>{if(document.visibilityState==='visible'){idle.current=0;void load(true);}else clearTimeout(timer);};
     document.addEventListener('visibilitychange',resume);window.addEventListener('focus',resume);
     return()=>{active=false;clearTimeout(timer);document.removeEventListener('visibilitychange',resume);window.removeEventListener('focus',resume);};
-  },[connection,cwd,mode,base,refresh,taskRunId,whitespace]);
-  useEffect(()=>{if(diff.current){diff.current.scrollTop=0;diff.current.scrollLeft=0;}setSelection(null);},[mode,base]);
+  },[connection,cwd,mode,base,refresh,taskRunId,whitespace,offset,paths,scoped]);
+  useEffect(()=>{if(diff.current){diff.current.scrollTop=0;diff.current.scrollLeft=0;}setSelection(null);},[mode,base,offset,scoped]);
   const repository=data?.repositoryRoot||cwd,repoName=repository.split(/[\\/]/).filter(Boolean).at(-1)||repository;
   const subfolder=data?.scope&&data.scope!=='.'?data.scope:'';
   const files=data?.files||[];
   const extensions=[...new Set(files.map(item=>extension(item.path)))].sort();
   const activeHidden=hiddenExtensions.filter(ext=>extensions.includes(ext));
-  const turnFiles=turnOnly&&onlyPaths?.length?files.filter(item=>onlyPaths.some(path=>samePath(item.path,path))):null;
-  const visibleFiles=(turnFiles||files).filter(item=>!hiddenExtensions.includes(extension(item.path)));
+  const visibleFiles=files.filter(item=>!hiddenExtensions.includes(extension(item.path)));
   const setHidden=(next:string[])=>{setHiddenExtensions(next);store('pocket-code-review-hidden-types',next.length?JSON.stringify(next):null);};
   // Viewed marks belong to this PC, repository and comparison; a new fingerprint means the agent changed the file again.
   const viewedKey=[connection.url,repository,taskRunId||mode,taskRunId?'':base||data?.base||''].join('|');
@@ -150,7 +181,10 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
     document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);
   });
   const modeLabel=taskRunId?t('Изменения задачи'):t(mode==='branch'?'Изменения ветки':mode==='staged'?'Подготовленные изменения':'Все изменения');
-  const total=turnFiles?turnFiles.length:files.length;
+  const total=data?.totalFiles??files.length;
+  const paged=total>PAGE_SIZE&&!scoped;
+  function clearPage(){latest.current=null;setData(null);setError('');setOffset(0);}
+  function showAllFiles(){clearPage();setTurnOnly(false);}
   const count=!data&&error?'—':visibleFiles.length===total?plural(total,['{0} файл','{0} файла','{0} файлов']):t('{0} из {1}',visibleFiles.length,plural(total,['{0} файла','{0} файлов','{0} файлов']));
   const fileRow=(file:ReviewFile)=>{const status=fileStatus(file),slash=file.path.lastIndexOf('/');return <li key={file.path} className={currentName===file.path?'current':''}>
     <button type="button" onClick={()=>scrollToFile(file.path)} aria-current={currentName===file.path?'location':undefined}>{status&&<span className="review-file-status" data-status={status.key}>{status.label}</span>}<span className="review-nav-path"><span className="review-file-folder">{file.path.slice(0,slash+1)}</span>{file.path.slice(slash+1)}</span><FileStats file={file}/></button>
@@ -159,49 +193,58 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
     <div className="review-nav-actions"><span>{t('Просмотрено {0} из {1}',viewedCount,visibleFiles.length)}</span><button type="button" className="icon-button" aria-label={t('Свернуть всё')} title={t('Свернуть всё')} onClick={()=>setAll(false)}><ChevronsDownUp size={20}/></button><button type="button" className="icon-button" aria-label={t('Развернуть всё')} title={t('Развернуть всё')} onClick={()=>setAll(true)}><ChevronsUpDown size={20}/></button></div>
     <ul className="review-nav-list">{visibleFiles.map(fileRow)}</ul>
   </>;
-  const emptyChanges=data&&!files.length&&!busy&&!error;
+  const emptyChanges=data&&!files.length&&!error;
+  const hasFiles=!!files.length;
+  const showTree=tree&&treeOpen&&visibleFiles.length>0;
+  const startFailed=!!error&&!data;
   const comparisonBranch=data?.base&&data.base!=='HEAD'?data.base:'';
   return <ReviewContext.Provider value={{metrics,bus}}><aside ref={panel} className={'review-panel'+(reading?' review-reading':'')} role="dialog" aria-label="Review" aria-modal="true" onPointerDown={()=>poke.current()}>
     <span ref={probe} className="diff-probe" aria-hidden="true" style={{fontSize:fontSize?`${fontSize}px`:undefined}}>{'0'.repeat(100)}</span>
     <header className="review-header" hidden={reading}>
       <button className="icon-button" aria-label={t('Вернуться в чат')} title={t('Вернуться в чат')} onClick={onClose}><ArrowLeft size={20}/></button>
-      <div className="review-heading"><h2>Review</h2><span className="review-context" title={repository}><span className="review-repo">{repoName}{subfolder&&<span className="review-subfolder"> / {subfolder}</span>}</span>{data?.current&&<span className="review-branch"><GitBranch size={12}/>{data.current}</span>}<span className="review-mode">{modeLabel}</span></span></div>
-      <button ref={eye} className="icon-button" aria-label={t('Режим чтения')} title={t('Режим чтения')} aria-pressed={reading} onClick={()=>toggleReading(true)}><Eye size={20}/></button>
+      <div className="review-heading"><h2>{t('Просмотр изменений')}</h2><span className="review-context" title={repository}><span className="review-repo"><FolderGit2 size={14}/>{repoName}{subfolder&&<span className="review-subfolder"> / {subfolder}</span>}</span>{data?.current&&<span className="review-branch"><GitBranch size={12}/>{data.current}</span>}<span className="review-mode">{modeLabel}</span></span></div>
+      <button ref={eye} hidden={!visibleFiles.length} className="icon-button" aria-label={t('Режим чтения')} title={t('Режим чтения')} aria-pressed={reading} onClick={()=>toggleReading(true)}><Eye size={20}/></button>
       <button ref={optionsButton} className="icon-button" aria-label={t('Параметры ревью')} title={t('Параметры ревью')} aria-expanded={options} aria-controls="review-options" onClick={()=>setOptions(value=>!value)}><SlidersHorizontal size={20}/></button>
     </header>
     <div className="review-options-backdrop" hidden={!options||reading} onClick={()=>setOptions(false)}><div ref={optionsPanel} id="review-options" className="review-options" role="dialog" aria-modal="true" aria-label={t('Параметры ревью')} onClick={event=>event.stopPropagation()}>
       <div className="review-options-heading"><strong>{t('Параметры ревью')}</strong><button className="icon-button" aria-label={t('Закрыть параметры')} onClick={()=>setOptions(false)}><X size={20}/></button></div>
-      <div className="review-controls"><label hidden={!!taskRunId}>{t('Сравнение')}<select aria-label={t('Сравнение')} value={mode} onChange={e=>{setMode(e.target.value);setData(null);}}><option value="working">{t('Все изменения')}</option><option value="staged">{t('Подготовленные изменения')}</option><option value="branch">{t('Изменения ветки')}</option></select></label>
+      <div className="review-controls"><label hidden={!!taskRunId}>{t('Сравнение')}<select aria-label={t('Сравнение')} value={mode} onChange={e=>{clearPage();setMode(e.target.value);}}><option value="working">{t('Все изменения')}</option><option value="staged">{t('Подготовленные изменения')}</option><option value="branch">{t('Изменения ветки')}</option></select></label>
       <label className="review-font-size">{t('Размер кода')}<select aria-label={t('Размер кода')} value={fontSize??''} onChange={event=>{const value=event.target.value?Number(event.target.value):null;setFontSize(value);store('pocket-code-diff-font-size',value===null?null:String(value));}}><option value="">{t('Как в чате, не меньше 14 px')}</option>{[10,12,14,16,18,20,22,24].map(size=><option key={size} value={size}>{size} px</option>)}</select></label>
-      {!taskRunId&&mode==='branch'&&data&&<label className="review-base">{t('Базовая ветка')}<select aria-label={t('Базовая ветка')} value={base||data.base} onChange={e=>{setBase(e.target.value);}}>{[...new Set(['HEAD',...data.branches])].map(branch=><option key={branch}>{branch}</option>)}</select></label>}</div>
+      {!taskRunId&&mode==='branch'&&data&&<label className="review-base">{t('Базовая ветка')}<select aria-label={t('Базовая ветка')} value={base||data.base} onChange={e=>{clearPage();setBase(e.target.value);}}>{[...new Set(['HEAD',...data.branches])].map(branch=><option key={branch}>{branch}</option>)}</select></label>}</div>
       <label className="review-toggle"><span>{t('Переносить строки')}<small>{t('В двух колонках длинные строки переносятся всегда.')}</small></span><input type="checkbox" aria-label={t('Переносить строки')} checked={wrap} onChange={event=>{setWrap(event.target.checked);store('pocket-code-diff-wrap',String(event.target.checked));}}/></label>
       <label className="review-toggle review-fit-width"><span>{t('Fit diff to width')}<small>{t('Без переноса: уменьшает код, но не мельче 60%.')}</small></span><input type="checkbox" aria-label={t('Fit diff to width')} checked={fitWidth} disabled={wrap} onChange={event=>{setFitWidth(event.target.checked);store('pocket-code-diff-fit-width',String(event.target.checked));}}/></label>
       <label className="review-toggle"><span>{t('Игнорировать пробелы')}</span><input type="checkbox" checked={whitespace} onChange={event=>{setWhitespace(event.target.checked);store('pocket-code-diff-whitespace',event.target.checked?'true':null);}}/></label>
-      <fieldset className="review-extension-filters"><legend>{t('Показывать типы файлов')}</legend>{extensions.map(ext=><label key={ext} className="review-chip"><input type="checkbox" checked={!hiddenExtensions.includes(ext)} onChange={event=>setHidden(event.target.checked?hiddenExtensions.filter(value=>value!==ext):[...hiddenExtensions,ext])}/>{ext==='(none)'?t('Без расширения'):ext}</label>)}</fieldset>
+      <fieldset className="review-extension-filters" hidden={!extensions.length}><legend>{t('Показывать типы файлов')}</legend>{extensions.map(ext=><label key={ext} className="review-chip"><input type="checkbox" checked={!hiddenExtensions.includes(ext)} onChange={event=>setHidden(event.target.checked?hiddenExtensions.filter(value=>value!==ext):[...hiddenExtensions,ext])}/>{ext==='(none)'?t('Без расширения'):ext}</label>)}</fieldset>
       <p className="review-scope" title={data?.projectPath||cwd}>{repoName}{subfolder&&<> / {subfolder}</>}</p><p className="muted review-note">{taskRunId?t('Изменения рабочей копии задачи относительно исходного коммита.'):t('Изменения Git в папке проекта, включая правки вне этого чата.')}</p>
     </div></div>
-    <div className="review-toolbar" hidden={reading}>
+    <div className="review-toolbar" hidden={reading||!hasFiles}>
       <button ref={filesButton} type="button" className="review-files-button" aria-expanded={tree?treeOpen:navOpen} onClick={()=>{if(tree){const value=!treeOpen;setTreeOpen(value);store('pocket-code-review-tree',value?null:'closed');}else setNavOpen(true);}}><ListTree size={16}/><span><strong>{count}</strong>{visibleFiles.length>1&&<small>{t('Просмотрено {0}/{1}',viewedCount,visibleFiles.length)}</small>}</span>{!tree&&<ChevronDown size={16}/>}</button>
       <div className="review-layout-switch" role="group" aria-label={t('Вид сравнения')}>
-        {(['auto','unified','split'] as const).map(value=><button key={value} aria-pressed={layout===value} disabled={value==='split'&&!splitPossible} title={value==='split'&&!splitPossible?t('Для двух колонок нужен экран шире'):value==='auto'?t('Две колонки на широкой панели, одна на узкой'):undefined} aria-label={value==='auto'?t('Авто'):value==='unified'?t('В одну колонку'):t('В две колонки')} onClick={()=>chooseLayout(value)}>{value==='auto'?t('Авто'):value==='unified'?'1':'2'}</button>)}
+        {(['auto','unified','split'] as const).map(value=><button key={value} aria-pressed={layout===value} disabled={value==='split'&&!splitPossible} title={value==='split'&&!splitPossible?t('Для двух колонок нужен экран шире'):value==='auto'?t('Две колонки на широкой панели, одна на узкой'):undefined} aria-label={value==='auto'?t('Авто'):value==='unified'?t('В одну колонку'):t('В две колонки')} onClick={()=>chooseLayout(value)}>{value==='auto'?t('Авто'):value==='unified'?t('Единый'):t('Рядом')}</button>)}
       </div>
       <button className="icon-button" disabled={busy} aria-label={t('Обновить')} title={updated?t('Обновлено в {0}',new Date(updated).toLocaleTimeString(getLanguage()==='ru'?'ru-RU':'en-US')):t('Обновить')} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={20}/></button>
       {busy&&data&&<span className="review-progress" aria-hidden="true"/>}
     </div>
-    {(activeHidden.length>0||turnFiles)&&!reading&&<div className="review-filter-note">{turnFiles&&<span>{t('Только файлы этого хода')}<button type="button" className="text-button" onClick={()=>setTurnOnly(false)}>{t('Показать все')}</button></span>}{activeHidden.length>0&&<span>{t('Скрыто типов: {0}',activeHidden.length)}<button type="button" className="text-button" onClick={()=>setHidden([])}>{t('Показать все типы')}</button></span>}</div>}
+    {(activeHidden.length>0||scoped)&&hasFiles&&!reading&&<div className="review-filter-note">{scoped&&<span>{t('Только файлы этого хода')}<button type="button" className="text-button" onClick={showAllFiles}>{t('Показать все')}</button></span>}{activeHidden.length>0&&<span>{t('Скрыто типов: {0}',activeHidden.length)}<button type="button" className="text-button" onClick={()=>setHidden([])}>{t('Показать все типы')}</button></span>}</div>}
     {reading&&<button type="button" className="review-reading-band" onClick={()=>{toggleReading(false);setNavOpen(true);}}><FileDiff size={14}/><span>{currentName||repoName}</span></button>}
     {reading&&<button ref={restore} className="icon-button review-restore" aria-label={t('Показать управление ревью')} title={t('Показать управление ревью')} onClick={()=>toggleReading(false)}><EyeOff size={20}/></button>}
     <p className="visually-hidden" role="status">{busy&&!data?t('Загружаем изменения…'):data&&!error?count:''}</p>
-    {error&&<p className="error-banner review-error" role="alert"><span>{t(error)}</span><button type="button" className="text-button" onClick={()=>setRefresh(n=>n+1)}>{t('Повторить')}</button></p>}
+    {error&&!startFailed&&<p className="error-banner review-error" role="alert"><span>{t(error)}</span><button type="button" className="text-button" onClick={()=>setRefresh(n=>n+1)}>{t('Повторить')}</button></p>}
     {busy&&!data&&!error&&<div className="review-loading" aria-hidden="true"><span/><span/><span/></div>}
-    <div className={'review-body'+(tree&&treeOpen?' with-tree':'')}>
-      {tree&&treeOpen&&<nav className="review-tree" aria-label={t('Изменённые файлы')}>{fileList}</nav>}
+    <div className={'review-body'+(showTree?' with-tree':'')}>
+      {showTree&&<nav className="review-tree" aria-label={t('Изменённые файлы')}>{fileList}</nav>}
       <section ref={diff} className="diff-content" aria-label={t('Изменённые файлы')} tabIndex={0}>
-        {emptyChanges&&<div className="review-empty"><GitCompareArrows size={32}/><h3>{mode==='branch'&&comparisonBranch?t('Нет изменений относительно {0}',comparisonBranch):t('Нет незакоммиченных изменений в {0}',repoName)}</h3>{data?.current&&<p><GitBranch size={14}/>{data.current}</p>}<div>{!taskRunId&&mode!=='branch'&&<button type="button" className="secondary" onClick={()=>{setMode('branch');setData(null);}}>{t('Сравнить с основной веткой')}</button>}<button type="button" className="secondary" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={16}/>{t('Обновить')}</button></div></div>}
-        {!!files.length&&!visibleFiles.length&&<div className="review-empty"><p>{turnFiles&&!turnFiles.length?t('Файлы этого хода больше не отличаются в этом сравнении.'):t('Все файлы скрыты фильтром.')}</p><button type="button" className="secondary" onClick={()=>{setHidden([]);setTurnOnly(false);}}>{turnFiles&&!turnFiles.length?t('Показать все'):t('Показать все типы')}</button></div>}
-        <div className="review-file-list">{visibleFiles.map(item=><ReviewFileDiff key={[cwd,mode,base,item.path].join('|')} file={item} taskRunId={taskRunId} connection={connection} cwd={cwd} mode={mode} base={base} layout={effectiveLayout} fontSize={fontSize} fitWidth={fitWidth} wrap={wrap} compact={width<COMPACT} width={width} whitespace={whitespace} viewport={diff} open={isOpen(item)} onToggle={toggle} viewed={isViewed(item)} changedSinceViewed={!!viewed[item.path]&&!isViewed(item)} onViewed={markViewed} selection={selection?.path===item.path?selection:null} onSelectLine={selectLine}/>)}</div>
+        {startFailed&&<div className="review-empty review-unavailable" role="alert"><FileWarning size={28}/><h3>{t('Не удалось открыть изменения')}</h3><p>{t(error)}</p><button type="button" className="secondary" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={15}/>{t('Повторить')}</button></div>}
+        {emptyChanges&&<div className="review-empty"><GitCompareArrows size={28}/><h3>{scoped?t('Файлы этого хода больше не отличаются в этом сравнении.'):mode==='branch'&&comparisonBranch?t('Нет изменений относительно {0}',comparisonBranch):t('Нет незакоммиченных изменений в {0}',repoName)}</h3><div>{scoped?<button type="button" className="secondary" onClick={showAllFiles}>{t('Показать все')}</button>:!taskRunId&&mode!=='branch'&&<button type="button" className="secondary" onClick={()=>{clearPage();setMode('branch');}}>{t('Сравнить с основной веткой')}</button>}<button type="button" className="secondary" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={15}/>{t('Обновить')}</button></div></div>}
+        {hasFiles&&!visibleFiles.length&&<div className="review-empty"><p>{t('Все файлы скрыты фильтром.')}</p><button type="button" className="secondary" onClick={()=>setHidden([])}>{t('Показать все типы')}</button></div>}
+        <div ref={fileListElement} className="review-file-list">{visibleFiles.map(item=><ReviewFileDiff key={[cwd,mode,base,item.path].join('|')} file={item} taskRunId={taskRunId} connection={connection} cwd={cwd} mode={mode} base={base} layout={effectiveLayout} fontSize={fontSize} fitWidth={fitWidth} wrap={wrap} compact={width<COMPACT} width={width} whitespace={whitespace} viewport={diff} open={isOpen(item)} onToggle={toggle} viewed={isViewed(item)} changedSinceViewed={!!viewed[item.path]&&!isViewed(item)} onViewed={markViewed} selection={selection?.path===item.path?selection:null} onSelectLine={selectLine}/>)}</div>
       </section>
     </div>
+    {paged&&!reading&&<nav className="review-pages" aria-label={t('Страницы файлов')}>
+      <button className="icon-button" aria-label={t('Предыдущая страница файлов')} disabled={offset===0} onClick={()=>{clearPage();setOffset(offset-PAGE_SIZE);}}><ChevronLeft size={18}/></button>
+      <span>{t('{0}–{1} из {2}',offset+1,offset+files.length,total)}</span>
+      <button className="icon-button" aria-label={t('Следующая страница файлов')} disabled={offset+files.length>=total} onClick={()=>{clearPage();setOffset(offset+PAGE_SIZE);}}><ChevronRight size={18}/></button>
+    </nav>}
     {selection&&<div className="review-selection" role="region" aria-label={t('Выбранные строки')}><span>{selection.path.split('/').at(-1)}:L{selection.start}{selection.end>selection.start&&`-L${selection.end}`}</span>
       {onQuote&&<button type="button" className="primary" onClick={()=>{onQuote(quote(selection));setSelection(null);flash(t('Добавлено в сообщение'));}}><MessageSquarePlus size={16}/>{t('Спросить агента')}</button>}
       <button type="button" className="secondary" onClick={()=>{void copyText(quote(selection)).then(ok=>flash(ok?t('Скопировано'):t('Не удалось скопировать')));setSelection(null);}}><Copy size={16}/>{t('Копировать')}</button>

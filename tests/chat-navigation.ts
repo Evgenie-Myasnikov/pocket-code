@@ -32,3 +32,9 @@ export async function chooseProjectFolder(page:Page,label:string,path:string){
   await dialog.getByRole('searchbox').fill(path);
   await dialog.getByRole('button',{name:path,exact:true}).click();
 }
+/** Review is an entry of the conversation's "More actions" menu. */
+export const chatMenu=(page:Page)=>page.locator('.chat-header-conversation:visible .chat-menu-button').first();
+export async function openReview(page:Page){
+  await chatMenu(page).click();
+  await page.getByRole('menuitem',{name:'Review',exact:true}).click();
+}

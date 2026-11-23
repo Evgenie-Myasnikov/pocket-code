@@ -114,12 +114,19 @@ function setRevoked(name:string|null){try{if(name===null)localStorage.removeItem
 async function freshHealth(c:Connection){let stale=false;const mark=()=>{stale=true;};window.addEventListener('pocket-offline-read',mark);try{return {health:await request<Health>(c,'/health'),stale};}finally{window.removeEventListener('pocket-offline-read',mark);}}
 // Switching from a new desktop chat remounts the workspace for the same native host.
 const desktopHealth=new WeakMap<Connection,Health>();
+// The cache scope of that host is a digest; computing it once lets a reopened chat start with its connection in place.
+const desktopScope=new WeakMap<Connection,string>();
 type ProviderInfo = {id: WorkspaceProvider;name: string;available: boolean;authenticated?: boolean;models?: EffortModel[];error?: string;};
+/** The provider list a PC reported last: a chat opened later can be written to at once instead of waiting for the next check. */
+const knownProviders=new Map<string,ProviderInfo[]>();
+const defaultProviders=():ProviderInfo[]=>[{id:'claude',name:'Claude',available:true}];
 type Attachment = DraftAttachment;
 export type ChatDraft = {text: string;attachments: Attachment[];};
 type RejectedDraft = ChatDraft & {restored: boolean;};
 /** A message the host refused because the turn was ending; it is sent as it was written, never the current draft. */
-type PendingSend = {jobId: string;key: string;text: string;attachments: Attachment[];boardSelection?:BoardSelection|null;};
+type PendingSend = {jobId: string;key: string;text: string;attachments: Attachment[];boardSelection?:BoardSelection|null;
+  /** Written while the chat was still opening; it leaves as soon as the chat is ready, as a follow-up when a turn is running. */
+  opening?:boolean;};
 const codexBusyMessage = 'This chat is open in Codex on the PC. Its history is available here, but Codex must release the chat before you can send a message. Finish the task and close Codex on the PC, then try again.';
 const budgetRangeMessage='Лимит стоимости запроса вне диапазона $0.10–$100. Измените его в настройках доступа Claude.';
 /** A failure that only says the PC cannot be reached; the connection status line already tells it, so screens do not repeat it. */
@@ -143,11 +150,13 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const language=useLanguage();
   const appearanceSettings = useAppearance(!embedded);
   const [provider, setProvider] = useState<WorkspaceProvider>(()=>embedded?.provider||selectedWorkspace());
-  const [providers, setProviders] = useState<ProviderInfo[]>([{id:'claude',name:'Claude',available:true}]);
+  // A chat reopened in the PC window starts from what its host already answered: connection, cache scope, health and providers.
+  const warm=embedded&&desktopHealth.has(embedded.connection)&&desktopScope.has(embedded.connection)?embedded.connection:null;
+  const [providers, setProviders] = useState<ProviderInfo[]>(()=>embedded&&knownProviders.get(embedded.connection.url)||defaultProviders());
   const providerInfo = providers.find(item => item.id === provider);
   const engineName = provider==='copilot'?'Copilot':provider === 'codex' ? 'Codex' : 'Claude';
 
-  const [cacheScope,setCacheScope]=useState('');
+  const [cacheScope,setCacheScope]=useState(()=>warm?desktopScope.get(warm)!:'');
   const connectEpoch=useRef(0);
   const useStateForWorkspace = <T,>(initial:T | ((provider:WorkspaceProvider)=>T)) => useWorkspaceState(provider, initial, cacheScope);
   const useRefForWorkspace = <T,>(initial:T) => useWorkspaceRef(provider, initial, cacheScope);
@@ -160,9 +169,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [showScrollActions, setShowScrollActions] = useStateForWorkspace(false);
   const [fromStart, setFromStart] = useStateForWorkspace(false);
   const lastScrollTop = useRefForWorkspace(0);
-  const [connection, setConnection] = useState<Connection | null>(null),[saved, setSaved] = useState<Connection | null>(null);
+  const [connection, setConnection] = useState<Connection | null>(warm),[saved, setSaved] = useState<Connection | null>(null);
   const [connecting,setConnecting]=useState(false),[connectionError,setConnectionError]=useState(''),[connectionProblem,setConnectionProblem]=useState<ConnectionProblem|undefined>();
-  const [connected,setConnected]=useState(false),[paired,setPaired]=useState(false),[restoring,setRestoring]=useState(!embedded),[lastContact,setLastContact]=useState(0),[revokedFrom,setRevokedFrom]=useState(readRevoked);
+  const [connected,setConnected]=useState(Boolean(warm)),[paired,setPaired]=useState(false),[restoring,setRestoring]=useState(!embedded),[lastContact,setLastContact]=useState(0),[revokedFrom,setRevokedFrom]=useState(readRevoked);
   const disconnecting=useRef(false),pcName=useRef('');
   useChatErasures(!embedded?connection:null);
   const [workspaceConnection,setWorkspaceConnection]=useState<Connection|null>(null),[workspaceScanner,setWorkspaceScanner]=useState(false);
@@ -345,6 +354,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [offlineQueue,setOfflineQueue] = useStateForWorkspace<(PendingSend&{id:string;at:number})[]>([]);
   // Only a chat this phone already continues can wait for the PC; a new chat or a takeover needs the PC to answer first.
   const canQueue = unreachable && !demo && !!connection && !selected?.readOnly && (running&&!!job || takeover && !!(job?.sessionId||selected?.sessionId));
+  // The PC answers, but this chat is still being confirmed (its first answers after opening): a message can already be sent.
+  // It waits beside the composer and leaves by itself; a provider that needs sign-in or a PC that is away is not "warming".
+  const warming = !canRun && !unreachable && !demo && !connectionError && !connection?.workspaceId && (embedded ? !connection||!connected||!providerInfo : !!connection&&(connecting||!providerInfo));
   useEffect(()=>{if(!running)setStopping(false);},[running,job?.id]);
   /** Put a message back into a chat's draft, after anything already typed there. */
   function mergeDraft(key:string,text:string,files:Attachment[],stored=false){
@@ -385,7 +397,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     try{const next=await api<JobView>(`/jobs/${job.id}/messages/${id}/cancel`,{});setJob(next);return next;}catch(e){setError((e as Error).message);return null;}
   }
   const outbox:OutboxItem[]=[
-    ...(pendingSend&&pendingSend.key===currentDraftKey()?[{id:'pending',text:pendingSend.text,attachments:pendingSend.attachments.length,caption:t('Отправится, когда {0} закончит ход',engineName),onEdit:()=>releasePending(),onRemove:()=>setPendingSend(null),removeLabel:t('Не отправлять')}]:[]),
+    ...(pendingSend&&pendingSend.key===currentDraftKey()?[{id:'pending',text:pendingSend.text,attachments:pendingSend.attachments.length,caption:pendingSend.opening?t('Отправится, как только чат откроется'):t('Отправится, когда {0} закончит ход',engineName),onEdit:()=>releasePending(),onRemove:()=>setPendingSend(null),removeLabel:t('Не отправлять')}]:[]),
     ...(job?.queued||[]).map(item=>({id:item.id,text:item.text,attachments:item.attachments,caption:running?t('После завершения ответа'):t('Не доставлено'),
       // The files of a queued message live only in the screen that sent it; never withdraw it without them.
       onEdit:async()=>{const files=sentFollowups.current!.get(item.id);if(item.attachments&&!files){setError(t('Файлы этого сообщения остались на устройстве, с которого оно отправлено. Оно уйдёт после ответа как есть.'));return;}if(await withdrawQueued(item.id))mergeDraft(currentDraftKey(),item.text,files||[]);},
@@ -415,17 +427,27 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   },[embedded,running,reviewOpen,agentPanel,outputsOpen,taskPanel]);
   useEffect(()=>{
     const pending=pendingSend;
-    if(!pending||!canRun||busy||running||uploading||loading||pending.key!==currentDraftKey()||job&&job.id!==pending.jobId)return;
+    if(!pending||!canRun||busy||uploading||loading||pending.key!==currentDraftKey())return;
+    // A message written while the chat was opening leaves as soon as it is ready, as a follow-up when a turn is running.
+    if(!pending.opening&&(running||job&&job.id!==pending.jobId))return;
     setPendingSend(null);
-    void send({text:pending.text,attachments:pending.attachments});
-  },[canRun,busy,running,uploading,loading,job?.id,job?.status,pendingSend]);
+    void send({text:pending.text,attachments:pending.attachments,boardSelection:pending.opening?pending.boardSelection:undefined,restore:true});
+  },[canRun,busy,running,uploading,loading,job?.id,job?.status,selected?.sessionId,pendingSend]);
+  const releaseWaiting=useRef(releasePending);releaseWaiting.current=releasePending;
+  useEffect(()=>{
+    if(!pendingSend?.opening)return;
+    // The chat finished opening but cannot take messages (sign-in needed, the PC went away): the text returns to the field.
+    if(!loading&&!warming&&!canRun&&!busy){releaseWaiting.current();return;}
+    const timer=setTimeout(()=>{releaseWaiting.current();setError(t('Чат не открылся вовремя. Сообщение возвращено в поле ввода.'));},30000);
+    return()=>clearTimeout(timer);
+  },[pendingSend,loading,warming,canRun,busy]);
   useEffect(()=>{
     // When the PC answers again, waiting follow-ups of this chat leave one at a time; older than a day they return to the draft instead.
     const next=offlineQueue.find(item=>item.key===currentDraftKey());
     if(!next||!canRun||busy||uploading||loading||pendingSend||sending.current)return;
     setOfflineQueue(old=>old.filter(item=>item.id!==next.id));
     if(Date.now()-next.at>86400000){mergeDraft(next.key,next.text,next.attachments);return;}
-    void send({text:next.text,attachments:next.attachments,boardSelection:next.boardSelection});
+    void send({text:next.text,attachments:next.attachments,boardSelection:next.boardSelection,restore:true});
   },[canRun,busy,uploading,loading,offlineQueue,pendingSend,job?.id,selected?.sessionId]);
   function acknowledgeVisibleActivity(){
     const element=scroll.current;
@@ -592,7 +614,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   function cancelConnect(){++connectEpoch.current;setConnecting(false);setRestoring(false);}
   async function connect(c: Connection,restored=false) {
     const epoch=++connectEpoch.current;
-    setConnecting(true);setConnectionError('');setConnectionProblem(undefined);setConnected(false);
+    // A host that already answered this window stays usable while it is checked again.
+    const known=Boolean(embedded&&desktopHealth.has(embedded.connection));
+    setConnecting(true);setConnectionError('');setConnectionProblem(undefined);if(!known)setConnected(false);
     if(!restored&&(c.pairing||c.url!==saved?.url||c.token!==saved?.token))setPaired(false);
     try {
       if(c.workspaceOnly||c.workspaceInvite)throw Error(t('Для личных чатов ПК используйте QR подключения. Приглашение WorkSpace открывает только общие доски.'));
@@ -601,7 +625,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       const stored={...c,...(access?{workspaceAccess:access}:{}),workspaceAccesses:accesses};
       if(!embedded)await saveConnection(stored);
       if(epoch!==connectEpoch.current)return;
-      if(scope!==cacheScope){rememberPosition();rememberDraft();setProjects(null);setProviders([]);setBoardChat(null);setBoardLaunch(null);setActivityTarget(null);}
+      if(scope!==cacheScope){rememberPosition();rememberDraft();setProjects(null);setProviders(knownProviders.get(c.url)||defaultProviders());setBoardChat(null);setBoardLaunch(null);setActivityTarget(null);}
+      if(embedded)desktopScope.set(embedded.connection,scope);
       setCacheScope(scope);setSaved(c);setConnection(c);setDemo(false);
       if(!embedded){const host=c;setPrimaryHost(host.url,()=>request(host,'/health'));}
       const {health:h,stale}=await freshHealth(c);if(epoch!==connectEpoch.current)return;if(h.protocol!==1){if(embedded){desktopHealth.delete(embedded.connection);setHealth(null);}throw Object.assign(Error(t('Обновите приложение и сервер до одной версии')),{problem:'incompatible'});}setHealth(h);
@@ -610,7 +635,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       setConnected(true);setPaired(true);setLastContact(Date.now());setRevoked(null);setRevokedFrom(null);
       // The PC name, identity and other routes are kept so the next start can name the PC and fall back to another route.
       if(!embedded&&(h.name!==c.name||h.hostId!==c.hostId||h.routes&&JSON.stringify(h.routes)!==JSON.stringify(c.routes))){const next={...stored,name:h.name,...(h.hostId?{hostId:h.hostId}:{}),...(h.routes?{routes:h.routes}:{})};await saveConnection(next);if(epoch===connectEpoch.current)setSaved(next);}
-    }catch(e){if(epoch===connectEpoch.current){const problem=classifyProblem(e);if(problem==='unreachable'&&!c.pairing){const alternate=await reachableRoute(c);if(alternate&&epoch===connectEpoch.current){void connect(alternate,true);return;}}if(epoch===connectEpoch.current){setConnectionError((e as Error).message);setConnectionProblem(problem);if(problem==='unreachable')setOffline(true);}}}finally{if(epoch===connectEpoch.current){setConnecting(false);if(restored)setRestoring(false);}}
+    }catch(e){if(epoch===connectEpoch.current){const problem=classifyProblem(e);if(problem==='unreachable'&&!c.pairing){const alternate=await reachableRoute(c);if(alternate&&epoch===connectEpoch.current){void connect(alternate,true);return;}}if(epoch===connectEpoch.current){setConnected(false);setConnectionError((e as Error).message);setConnectionProblem(problem);if(problem==='unreachable')setOffline(true);}}}finally{if(epoch===connectEpoch.current){setConnecting(false);if(restored)setRestoring(false);}}
   }
   // The PC answered again: one pass re-reads /health and clears every connection-class error; gated polls refresh on the same event.
   const recover=useRef(()=>{});recover.current=()=>{
@@ -657,15 +682,24 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   useEffect(() => {
     setProvidersLoaded(false);
     if (!connection || demo) return;
-    let cancelled = false;
+    let cancelled = false,recheck:ReturnType<typeof setTimeout>|undefined;
     async function refreshProviders() {
       try {
         const list = await request<ProviderInfo[]>(connection!, '/providers');
-        if (!cancelled && Array.isArray(list)) {setProviders(old=>shareSnapshot(old,list.filter(item => item.id === 'claude' || item.id === 'codex'||item.id==='copilot')));setProvidersLoaded(true);}
+        if (!cancelled && Array.isArray(list)) {
+          const known=list.filter(item => item.id === 'claude' || item.id === 'codex'||item.id==='copilot');
+          // A provider whose check has not finished yet is asked again shortly; it never replaces a state the PC already confirmed.
+          const checking=known.some(item=>(item as {access?:string}).access==='checking');
+          const previous=knownProviders.get(connection!.url);
+          const merged=checking&&previous?known.map(item=>(item as {access?:string}).access==='checking'?previous.find(old=>old.id===item.id)||item:item):known;
+          knownProviders.set(connection!.url,merged);
+          setProviders(old=>shareSnapshot(old,merged));setProvidersLoaded(true);
+          if(checking){clearTimeout(recheck);recheck=setTimeout(()=>void refreshProviders(),3000);}
+        }
       } catch { /* Older bridge versions support the existing Claude workspace. */ }
     }
     const stop=startVisiblePoll(refreshProviders,30000,true,document,hostGate(connection.url));window.addEventListener('pocket-code-providers',refreshProviders);
-    return () => {cancelled=true;stop();window.removeEventListener('pocket-code-providers',refreshProviders);};
+    return () => {cancelled=true;clearTimeout(recheck);stop();window.removeEventListener('pocket-code-providers',refreshProviders);};
   },[connection,demo]);
   useEffect(() => {
     if (!connection || !health || demo) return;
@@ -933,7 +967,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       if(full){const liveIds=new Set(full.messages.map(message=>message.id));setHistory(old=>old.filter(message=>!liveIds.has(message.id)));}
       setJob(full);setTakeover(Boolean(full));
       const resolved=full?.sessionId?{...s,sessionId:full.sessionId,cwd:full.cwd}:s;
-      if(resolved.sessionId!==s.sessionId)setSelected(resolved);
+      if(resolved.sessionId!==s.sessionId){setSelected(resolved);setPendingSend(old=>old?.opening&&old.key===s.sessionId?{...old,key:resolved.sessionId}:old);}
       if (!resolved.sessionId.startsWith('pending-')) await loadHistory(resolved, full, epoch, false, savedPosition?.fromStart||false,Boolean(warm));
     } catch (e) {if (epoch === navigation.current) {clearDeniedHistory(e,s.sessionId,Boolean(full));if(context?.conversation&&(e as {status?:number}).status===404)setBoardMissing(true);if(connectivityError(e))setHistoryError((e as Error).message);else setError((e as Error).message);}} finally {if (epoch === navigation.current) setLoading(false);}
   }
@@ -1051,7 +1085,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     if(embedded)embedded.onTaskDraftUsed?.();else setLocalTaskDraft(undefined);
   },[pendingTaskDraft,connection,cwd,selected,job,busy,uploading,embeddedTarget,readyChatTarget]);
   /** Sends the draft, or a waiting message exactly as it was written. Typing during the request is kept. */
-  async function send(payload?: {text:string;attachments:Attachment[];boardSelection?:BoardSelection|null;branch?:{sessionId:string|null;history:ChatMessage[]}}) {
+  /** restore: a queued message that could not be delivered returns to the draft instead of being lost. */
+  async function send(payload?: {text:string;attachments:Attachment[];boardSelection?:BoardSelection|null;branch?:{sessionId:string|null;history:ChatMessage[]};restore?:boolean}) {
     if(boardMissing)return;
     const text=payload?payload.text:draft,files=[...(payload?payload.attachments:attachments)],ids=files.map(item=>item.id);
     const selection=matchingBoardSelection(payload?payload.boardSelection:embedded?embedded.boardSelection:boardSelection,connection,cwd,payload?payload.boardSelection?.boardId:boardChat?.boardId);
@@ -1065,17 +1100,21 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const consume=()=>{if(payload)return;setDraft(current=>current===text?'':current.startsWith(text)?current.slice(text.length).trimStart():current);setAttachments(old=>old.filter(item=>!ids.includes(item.id)));drafts.current!.delete(key);};
     // Without the PC a follow-up to a chat this phone already continues waits in "Waiting to send"; nothing else asks for a takeover first.
     if (!payload && unreachable && canQueue && !sending.current && !uploading && (text.trim() || files.length) && files.every(attachmentReady)) {setOfflineQueue(old=>[...old,{id:crypto.randomUUID(),at:Date.now(),jobId:job?.id||'',key,text,attachments:files,boardSelection:selection}]);consume();return;}
+    // A chat that is still opening (its history is loading, the PC's first answers are on their way) takes the message at once:
+    // it waits beside the composer and leaves by itself when the chat is ready.
+    if (!payload && (loading || warming) && !pendingSend && !sending.current && !uploading && !demo && !selected?.readOnly && (text.trim() || files.length) && files.every(attachmentReady)) {setPendingSend({jobId:job?.id||'',key,text,attachments:files,boardSelection:selection,opening:true});consume();setError('');return;}
     if (sending.current || loading || uploading || demo || !canRun || selected?.readOnly || !text.trim() && !files.length || !files.every(attachmentReady)) return;
     const submittedFiles=[...files], store=drafts.current!;
     let accepted=false;
-    if(!payload){
+    const visible=!payload||Boolean(payload.restore);
+    if(visible){
       consume();
       nearBottom.current=true;
       setOutgoing({key,text,files:submittedFiles});
       requestAnimationFrame(()=>bottom.current?.scrollIntoView({block:'end'}));
     }
     function finishSubmission(){
-      if(payload)return;
+      if(!visible)return;
       setOutgoing(null);
       if(accepted)return;
       const restoreText=(current:string)=>[text,current].filter(Boolean).join('\n\n');
@@ -1334,7 +1373,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             placeholder={demo?t("Подключите ПК, чтобы отправлять сообщения"):t("Что нужно сделать?")}
             disabled={demo||selected?.readOnly||boardMissing||Boolean(embedded&&readyChatTarget!==embeddedTarget)} uploading={uploading} busy={busy} stopping={stopping}
             mode={canQueue?'later':running?provider==='codex'?'steer':'queue':'send'} blockedReason={unreachable&&!canQueue&&!demo&&connection?t('Нет связи с ПК · черновик сохранится'):undefined} enterSends={enterSendsPreference(composerPreferences,Boolean(embedded))} keyHint={Boolean(embedded)}
-            canSend={!(demo||boardMissing||!(canRun||canQueue)||selected?.readOnly||busy||loading||uploading||!attachments.every(attachmentReady)||!draft.trim()&&!attachments.length)}
+            canSend={!(demo||boardMissing||!(canRun||canQueue||warming)||selected?.readOnly||busy||(loading||warming)&&Boolean(pendingSend)||uploading||!attachments.every(attachmentReady)||!draft.trim()&&!attachments.length)}
             onBoardImage={connection&&boardChat?.context?data=>{const image=takeBoardImageDrag(data,connection,cwd);if(image)uploadBoardImages([image]);else setError(t('Это изображение относится к другой доске или подключению.'));}:undefined}
             attachments={attachments} onRemove={id=>{boardImageLoads.current.delete(id);setAttachments(old=>old.filter(a=>a.id!==id));}} onFiles={(files,options)=>upload(files,options)} onRetry={retryUpload} onInsertText={id=>void insertPastedText(id)} onRecall={recallLast} onSend={()=>void send()}
             stopLabel={runUnknown?t("Повторить связь"):t("Остановить {0}",engineName)} stopRetry={runUnknown} onStop={running?runUnknown?()=>retryNow():()=>void stopRun():undefined}

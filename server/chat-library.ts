@@ -1,6 +1,7 @@
-import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';
+import {mkdir,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {HttpError} from './security.js';
+import {fileBusy,readGuarded,writeDurable} from './durable-file.js';
 /** The board a chat was started from. Host-private: repository boards never store chat associations. */
 export type BoardLink={id:string;root:string;title:string;noteId?:string;kind?:'discussion'|'note'|'task'};
 type OriginalRemoval={cwd:string;account?:string;status:'pending'|'erased'|'done'};
@@ -63,16 +64,32 @@ export class ChatLibrary {
    return 'ids' as const;
   }finally{this.deleting.delete(key);}
  }
+ /** The library as last written. Every caller gets its own copy, so nothing a caller does to it reaches the next reader. */
  async read():Promise<Library>{
   // Windows briefly locks the file while edit() replaces it; retry instead of failing the chat list.
-  for(let attempt=0;;attempt++){try{return await this.readOnce();}catch(error){const code=(error as NodeJS.ErrnoException).code;if(attempt<4&&(code==='EPERM'||code==='EBUSY'||code==='EACCES'))await new Promise(resolve=>setTimeout(resolve,25*(attempt+1)));else throw error;}}
+  for(let attempt=0;;attempt++){try{return await this.readOnce();}catch(error){if(attempt<4&&fileBusy(error))await new Promise(resolve=>setTimeout(resolve,25*(attempt+1)));else throw error;}}
  }
+ private cache?:{stamp:string;data:Library};
+ /** Changes when the file is replaced, so polls reuse the parsed library instead of reading it again. */
+ private async stamp(){try{const info=await stat(this.file);return info.mtimeMs+':'+info.size;}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return 'none';throw error;}}
  private async readOnce():Promise<Library>{
-  try{const data=JSON.parse(await readFile(this.file,'utf8'));if(!data.chats||typeof data.chats!=='object'||!Array.isArray(data.projects))throw Error('Invalid chat library');return data;}
-  catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return {chats:{},projects:[]};throw error;}
+  const stamp=await this.stamp();
+  if(this.cache?.stamp===stamp)return structuredClone(this.cache.data);
+  // A damaged library (an interrupted write, a zero-filled file after a power loss) must not switch every chat off:
+  // the host continues from the backup or from an empty library and keeps the damaged copy beside it.
+  const {value,recovered}=await readGuarded<Library>(this.file,data=>!!data&&typeof data==='object'&&!!(data as Library).chats&&typeof (data as Library).chats==='object'&&!Array.isArray((data as Library).chats)&&Array.isArray((data as Library).projects));
+  const data=value??{chats:{},projects:[]};
+  this.cache={stamp:recovered?await this.stamp():stamp,data};
+  return structuredClone(data);
  }
  async edit(change:(data:Library)=>void){
-  const write=this.pending.catch(()=>{}).then(async()=>{const data=await this.read();change(data);await mkdir(path.dirname(this.file),{recursive:true});await writeFile(this.file+'.tmp',JSON.stringify(data));for(let attempt=0;;attempt++){try{await rename(this.file+'.tmp',this.file);break;}catch(error){const code=(error as NodeJS.ErrnoException).code;if(attempt<4&&(code==='EPERM'||code==='EBUSY'||code==='EACCES'))await new Promise(resolve=>setTimeout(resolve,25*(attempt+1)));else throw error;}}});this.pending=write.then(()=>{this.revision++;});await this.pending;
+  const write=this.pending.catch(()=>{}).then(async()=>{
+   const data=await this.read();change(data);
+   await mkdir(path.dirname(this.file),{recursive:true});
+   await writeDurable(this.file,JSON.stringify(data),{backup:true});
+   this.cache={stamp:await this.stamp(),data:structuredClone(data)};
+  });
+  this.pending=write.then(()=>{this.revision++;});await this.pending;
  }
  /** Record the custom provider account of a Claude chat; only writes when it changes. */
  async tagAccount(sessionId:string,account:string,accountName?:string){const key='claude:'+sessionId,entry=(await this.read()).chats[key];if(entry?.account===account&&(!accountName||entry.accountName===accountName))return;await this.edit(data=>{data.chats[key]={...data.chats[key],account,...(accountName?{accountName}:{})};});}
