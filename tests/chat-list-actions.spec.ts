@@ -17,7 +17,7 @@ test('a muted conversation stays identifiable when reopening the library',async(
  await list.locator('.desktop-sessions>button').nth(1).hover();await bells.nth(1).click();await expect(bells.nth(1)).toHaveAttribute('aria-pressed','false');
  await page.reload();await expect(bells.nth(1)).toHaveAttribute('aria-pressed','false');await expect(bells.first()).toHaveAttribute('aria-pressed','true');
  await list.locator('.desktop-sessions>button').nth(1).hover();await list.getByRole('button',{name:'Действия чата',exact:true}).nth(1).click();
- const menu=page.getByRole('menu',{name:'Действия чата'});await expect(menu.getByRole('menuitem',{name:'Включить уведомления'})).toBeVisible();
+ const menu=page.getByRole('menu',{name:'Действия чата'});await expect(menu.getByRole('menuitem')).toHaveText(['Переименовать','Закрепить','В архив','Удалить']);
  if(process.env.POCKET_CHAT_NOTIFICATION_PREVIEW){
    await page.evaluate(()=>document.fonts.ready.then(()=>true));
    const a=(await page.locator('.desktop-library>.desktop-list-caption').boundingBox())!,b=(await menu.boundingBox())!;
@@ -27,6 +27,8 @@ test('a muted conversation stays identifiable when reopening the library',async(
 });
 
 test('a peer erasure closes the Windows chat and retains other conversation drafts',async({page})=>{
+ // The list shows every provider; this scenario is about Claude chats only.
+ await page.addInitScript(()=>{(window as any).testChatRowsBy={codex:[],copilot:[]};});
  await page.setViewportSize({width:1440,height:900});await desktop(page);
  const rows=page.locator('.desktop-sessions>button'),composer=page.getByRole('textbox',{name:'Message Claude',exact:true});
  await rows.nth(1).click();await composer.fill('Keep this desktop draft');
@@ -60,7 +62,7 @@ test('desktop chat actions are discoverable and do not switch the conversation o
  await page.getByRole('textbox',{name:'Chat name'}).fill('Synthetic reference notes');await page.getByRole('button',{name:'Rename',exact:true}).click();
  await expect(rows.nth(1)).toContainText('Synthetic reference notes');await expect(input).toHaveValue('Synthetic draft to retain');
  await expect(rows.first()).toHaveAttribute('aria-pressed','true');
- await actions.nth(1).click();await page.getByRole('menuitem',{name:'Erase chat…'}).click();
+ await actions.nth(1).click();await page.getByRole('menuitem',{name:'Delete',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'Erase chat'})).toContainText('Synthetic reference notes');
  await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(rows).toHaveCount(2);
  await page.emulateMedia({reducedMotion:'reduce'});await expect(actions.first()).toHaveCSS('transition-duration','0s');
@@ -74,9 +76,11 @@ test('running chat action keeps deletion unavailable and keyboard focus visible'
  const bell=page.getByRole('button',{name:'Chat notifications',exact:true}).first();
  await row.focus();await page.keyboard.press('Tab');await expect(bell).toBeFocused();await page.keyboard.press('Space');await expect(bell).toHaveAttribute('aria-pressed','false');
  await expect(row).toHaveAttribute('data-running','true');await page.keyboard.press('Tab');await expect(action).toBeFocused();await expect(action).toHaveCSS('opacity','1');
- await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Erase chat…'})).toBeDisabled();
+ await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Delete',exact:true})).toBeDisabled();
  await expect(page.getByRole('menuitem',{name:'Rename',exact:true})).toBeEnabled();
- await page.getByRole('menuitem',{name:'Unmute notifications'}).click();await expect(bell).toHaveAttribute('aria-pressed','true');await expect(action).toBeFocused();
+ // Muting lives on the bell of the row; the menu is Rename, Pin, Archive, Delete.
+ await expect(page.getByRole('menuitem',{name:/notifications/})).toHaveCount(0);await page.keyboard.press('Escape');
+ await bell.click();await expect(bell).toHaveAttribute('aria-pressed','true');
 });
 
 for(const pending of [false,true])test(`phone exposes a separate touch action without opening the chat (approval=${pending})`,async({page})=>{

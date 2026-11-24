@@ -16,7 +16,7 @@ test('every Russian t() key in the UI has an English translation',()=>{
   assert.deepEqual([...new Set(missing)],[]);
 });
 test('settings screens do not branch on the language for their own text',()=>{
-  const files=['SettingsPanel.tsx','DesktopSettings.tsx','ClaudeAccessSettings.tsx','CodexAccessSettings.tsx','ProviderConnections.tsx','EngineUpdates.tsx','DesktopUpdates.tsx','MiroSettings.tsx','MiroAISettings.tsx','Updates.tsx','UsageIndicator.tsx','CodexUsage.tsx','BudgetSettings.tsx','Appearance.tsx','StreamSpeedSettings.tsx','EdgeFadeSettings.tsx','BoardGridSettings.tsx','LimitAlert.tsx'];
+  const files=['SettingsPanel.tsx','DesktopSettings.tsx','ClaudeAccessSettings.tsx','CodexAccessSettings.tsx','ProviderConnections.tsx','EngineUpdates.tsx','DesktopUpdates.tsx','MiroSettings.tsx','MiroAISettings.tsx','Updates.tsx','UsageIndicator.tsx','CodexUsage.tsx','BudgetSettings.tsx','Appearance.tsx','BoardGridSettings.tsx','LocalModels.tsx','LimitAlert.tsx'];
   for(const file of files){const source=readFileSync('src/'+file,'utf8');assert.doesNotMatch(source,/\bru\?\s*['"`]|\bl\(\s*'|=\s*\(en:string/,file);}
 });
 test('settings strings render in English without Cyrillic',()=>{

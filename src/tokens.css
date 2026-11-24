@@ -1,8 +1,8 @@
 /* Design tokens: the one place for raw colours, type, spacing, radii, elevation, layers and motion.
    Component CSS uses roles from here (and --bg/--panel/--surface/--line/--muted/--text/--accent from the palette files); tests/design-tokens.test.ts blocks new hex literals elsewhere. */
 
-/* Match the initial Graphite window until the saved appearance is applied. */
-:root{--bg:#191917;--panel:#21211e;--surface:#2b2b27;--line:#41403a;--muted:#bcb8ae;--text:#f1eee7;--accent:#efb864;--accent-dark:#211b12}
+/* Match the default Carbon theme until the saved appearance is applied. */
+:root{--bg:#0c0c0c;--panel:#121212;--surface:#1c1c1c;--line:#2b2b2b;--muted:#a6a6a6;--text:#f3f3f3;--accent:#e8e8e8;--accent-dark:#111111}
 
 /* Semantic families. Each has -fg (text and icons, at least 4.5:1 on --bg and on its own -bg), -bg (a tinted pill or banner surface) and -border (at least 3:1 on --bg).
    Status is never colour alone: components pair it with a glyph and a word (run-status.tsx). */

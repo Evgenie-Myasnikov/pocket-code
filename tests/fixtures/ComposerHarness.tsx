@@ -2,7 +2,6 @@ import {useEffect,useState} from 'react';
 import {ChatComposer} from '../../src/ChatComposer';
 import {Markdown,RichBlock} from '../../src/RichBlocks';
 import {ModelPicker} from '../../src/ModelPicker';
-import {StreamSpeedSettings} from '../../src/StreamSpeedSettings';
 export function ComposerHarness(){
  const [fresh,setFresh]=useState('');
  useEffect(()=>{(window as any).setFreshStream=setFresh;return()=>{delete (window as any).setFreshStream;};},[]);
@@ -14,6 +13,6 @@ export function ComposerHarness(){
   <ChatComposer text={draft} onText={setDraft} label="Synthetic prompt" placeholder="What would you like to create?" uploading={false} canSend={!!draft.trim()} attachments={[]}
     controls={<><ModelPicker provider="claude" name="Claude" models={[{id:'sonnet',name:'Sonnet · current version',isDefault:true},{id:'opus',name:'Opus'}]} value={model} onChange={setModel}/><select className="effort-picker" aria-label="Effort"><option>High</option><option>Medium</option></select></>}
     onRemove={()=>{}} onFiles={()=>{}} onSend={()=>{setSent(count=>count+1);setDraft('');}} stopLabel="Stop synthetic" onStop={stopped?undefined:()=>setStopped(true)}/>
-  <output aria-label="Sent">{sent}</output><StreamSpeedSettings/>
+  <output aria-label="Sent">{sent}</output>
  </main>;
 }

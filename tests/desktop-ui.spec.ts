@@ -316,12 +316,3 @@ test('desktop bell shares process state with chats and is available outside chat
  await expect(page.locator('.activity-entry,.activity-drawer')).toHaveCount(0);
 });
 
-test('desktop edge fade preference persists and applies to shared chat',async({page})=>{
- await desktop(page);await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();
- await page.getByRole('button',{name:/Appearance & language/}).click();await page.locator('.appearance-advanced summary').click();
- const slider=page.getByRole('slider',{name:'Chat edge fade',exact:true});await expect(slider).toHaveValue('100');await slider.fill('0');
- await expect(page.locator('html')).toHaveAttribute('data-chat-edge-fade','off');
- await page.reload();await page.locator('.desktop-rail').getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:/Appearance & language/}).click();await expect(slider).toHaveValue('0');
- await page.locator('.desktop-sessions').getByRole('button',{name:'New chat',exact:true}).click();
- await expect(page.locator('.conversation')).toBeVisible();expect(await page.locator('.conversation').evaluate(el=>getComputedStyle(el).maskImage)).toBe('none');
-});

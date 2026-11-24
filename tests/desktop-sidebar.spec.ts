@@ -19,7 +19,7 @@ test('New chat stays in the icon rail and recent conversations reopen with the l
   const start=nav.getByRole('button',{name:'Новый чат',exact:true});
   await expect(start).toBeVisible();
   await expect(start).toHaveAttribute('aria-keyshortcuts','Control+N');
-  await expect(rail.locator('.rail-chat-folder>summary').first()).toContainText('Atlas');
+  await expect(rail.locator('.rail-chat-folder')).toHaveCount(0);await expect(rail.locator('.desktop-sessions>button').first()).toBeVisible();
   await nav.getByRole('button',{name:'Задачи',exact:true}).click();
   await expect(start).toBeVisible();
   await nav.getByRole('button',{name:'Свернуть панель',exact:true}).click();

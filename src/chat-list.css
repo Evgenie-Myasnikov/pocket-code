@@ -1,0 +1,34 @@
+/* The flat chat list of the PC sidebar: title, time on the right, one page of rows at a time. */
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions{margin-inline-start:0;padding-inline-start:0;border-inline-start:0;overflow:visible}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button{content-visibility:auto;contain-intrinsic-size:auto 36px;animation:chat-row-in var(--dur-short,.16s) var(--ease-standard,ease-out) both}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button{position:relative}
+/* The time sits where the row actions appear on hover, so the title never moves. */
+.desktop-app>.desktop-rail .desktop-chat-list .chat-row-time{position:absolute;inset-inline-end:10px;top:50%;transform:translateY(-50%);transition:opacity var(--dur-short,.16s);color:var(--muted);font-size:calc(11px * var(--ui-scale,1));font-variant-numeric:tabular-nums}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button:is(:hover,:focus-visible,[aria-pressed=true]) .chat-row-time{opacity:0}
+.desktop-app>.desktop-rail .desktop-more-chats{justify-content:center;margin-block:6px 10px;color:var(--muted);border:1px solid var(--line);transition:background-color var(--dur-short,.16s),color var(--dur-short,.16s),border-color var(--dur-short,.16s)}
+.desktop-app>.desktop-rail .desktop-more-chats:hover{color:var(--text);border-color:var(--muted)}
+.desktop-app>.desktop-rail .desktop-rail-content{scroll-behavior:smooth}
+@keyframes chat-row-in{from{opacity:0;transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){
+ .desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button{animation:none}
+ .desktop-app>.desktop-rail .desktop-rail-content{scroll-behavior:auto}
+}
+/* The icon strip: the open section is a quiet filled square, without an accent edge or outline. */
+:root[data-theme] .desktop-app>.desktop-rail>nav>button.active,
+:root[data-theme] .desktop-app>.desktop-rail>nav>button.desktop-new-chat{background:var(--surface);box-shadow:none;border:0;outline:0}
+:root[data-theme] .desktop-app>.desktop-rail>nav>button.desktop-new-chat:not(.active){background:transparent}
+:root[data-theme] .desktop-app>.desktop-rail>nav>button:focus-visible{outline:2px solid var(--muted);outline-offset:-2px}
+/* The time gives way to the row buttons while the row or a button is hovered, focused or has its menu open. */
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button:has(+.chat-list-action-slot:is(:hover,:focus-within)) .chat-row-time,
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button:has(+.chat-list-action-slot [aria-expanded=true]) .chat-row-time{opacity:0}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-chat-pin{display:inline-block;flex-shrink:0;margin-inline-end:5px;vertical-align:-1px;color:var(--muted)}
+.desktop-app>.desktop-rail .desktop-archived-chats{margin-block:4px 10px;color:var(--muted)}
+.desktop-app>.desktop-rail .desktop-archived-chats:hover,.desktop-app>.desktop-rail .desktop-archived-chats[aria-pressed=true]{color:var(--text)}
+/* Menus: a compact opaque panel with a thin border, like the rest of the window. */
+:root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu){padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 8px 24px var(--shadow-soft)}
+:root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu) button{min-height:calc(32px * var(--ui-scale,1));padding:6px 10px;border-radius:8px;font-size:calc(13px * var(--ui-scale,1));font-weight:var(--fw-medium,500)}
+:root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu) button:hover{background:var(--surface)}
+@media(pointer:coarse){:root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu) button{min-height:44px}}
+/* Menu items follow one another without a rule before the destructive one; it is marked by colour. */
+:root[data-theme][data-theme] .card-action-menu hr{display:none}
+:root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu) button:hover{background:color-mix(in srgb,var(--text) 8%,transparent)}

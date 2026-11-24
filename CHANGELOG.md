@@ -4,6 +4,14 @@
 
 ### Features
 
+- Simpler PC window (2026-11-24). The sidebar is one list of chats.
+  - The app name, the provider picker, the project filter and the folder groups are gone from the sidebar. Chats of Claude, Codex and Copilot are in one list, newest first, with the time on the right. The first 30 are drawn; "Show more chats" adds the next 30.
+  - A row's "…" menu is Rename, Pin, Archive, Delete. Pinned chats lead the list and archived ones move to an "Archived" section at its end. Pins and the archive are kept in this PC window only: the PC server and phones do not know about them. Muting stays on the row's bell.
+  - The provider is chosen inside a new chat, next to the message field. A chat of another provider opens straight from the list.
+  - Themes: Carbon (new default: neutral near-black panels, grey borders, a light accent), Emerald, Graphite, Slate and Ink. The ten colour palettes are removed; a saved removed palette becomes Carbon. Menus and cards are opaque with a thin border.
+  - Removed from the chat: the animated background with its 17 styles and settings, glass panels with blur, the fade at the chat edges, and the paced "reveal" of streamed text with its speed setting. Text appears as it arrives.
+  - The transcript follows a streamed answer through the assistant-ui viewport instead of the app's own animated follower. Scrolling back stops the following; "Jump to latest messages" resumes it.
+  - Settings: the section list is plain rows; Appearance is theme, mode, size and colour-blind colours; all providers are on one page.
 - Local model (2026-11-24). Settings → Providers on the PC can start and stop a local [Strata](https://github.com/Niko1221/Strata) model without the Strata window, which on the test PC used about 1 GB of RAM (its embedded browser, Node and PowerShell helpers) while the model server itself is the same. Choose an installed model, the context (32K–256K) and the drafting mode; the panel shows the state and the server address.
   - The PC server calls Strata's own command line (`strata launch --no-tui`, `--status`, `--stop`, `models list`, JSON output) through its bundled `python.exe`, without `cmd.exe` or a shell. A start is refused while the Strata app already runs a model on the GPU, while another Strata model runs, or when the model would first download files.
   - The server listens on 127.0.0.1 only and requires an API key generated once by the PC server, stored encrypted like other provider keys and handed to Strata through an environment variable, never on the command line. The running server is saved as one custom provider, `Strata · <model>`, updated in place on later starts, so it serves chats and, through Strata's Anthropic-compatible API, Claude Code tasks.
@@ -12,7 +20,11 @@
 
 ### Validation
 
-- Server tests from PowerShell: 602 tests, 598 passed, 1 skipped, 3 failed: the same three that fail before this change (compatibility trigger stub, host packager fixture, three older board cards without a CHANGELOG reference). TypeScript and the documentation link check passed; the privacy guard passed on the changed files.
+- Simpler PC window: server and unit tests from PowerShell, 596 passed, 1 skipped and 3 failed of 600 (the same three as before this change). TypeScript and the documentation link check passed.
+  - New browser scenarios on Edge, all passed: 6 for the chat list, the provider in a new chat, Appearance, the providers page and the row menu with pin and archive; 2 for following a streamed answer and reading back.
+  - Existing scenarios: 6 for opening history and paging passed after one was changed to open the Codex chat from the list; 6 for chat row actions passed after their menu expectations were updated. In the main PC window file 21 scenarios fail, none new: they fail on the previous commit too, where 22 fail (the 22nd tested the removed edge fade). One message-actions scenario also fails on the previous commit.
+  - Removed with their features: the browser tests of backgrounds, glass, edge fade, the old palettes and the old follower, and the unit test of the text reveal. The phone layout, the installed application and long real chats were not tested.
+- Local model, server tests from PowerShell before the window changes: 602 tests, 598 passed, 1 skipped, 3 failed: the same three that fail before this change (compatibility trigger stub, host packager fixture, three older board cards without a CHANGELOG reference). TypeScript and the documentation link check passed; the privacy guard passed on the changed files.
 - Unit and API tests: 7 new tests with a synthetic Strata command line (JSON parsing, start with the key only in the environment, one provider updated in place, refusals for a busy GPU, a download and a second model, launch failure, missing Strata, runtime discovery that rejects a folder outside the control directory, host-only routes).
 - Browser tests on Edge: 3 new desktop scenarios (start, starting, running with its address, stop and the remembered choice after reload; the Strata window holding the GPU; no Strata) and 3 settings navigation scenarios passed. The panel was checked on screenshots.
 - Real Strata 0.1.65 (engine 0.1.66) on a 16 GB NVIDIA GPU: the server module started IQ3_S (ready in about 51 s) and Coder IQ1_M (about 24 s) at a 128K context; `/v1/models` answered 200 with the key and 401 without it, a chat completion answered, the Anthropic Messages probe returned 400 (supported), and the stop left no engine running. The installed Pocket Code application and a phone were not tested.

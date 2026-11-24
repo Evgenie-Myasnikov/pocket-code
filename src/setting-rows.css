@@ -1,0 +1,51 @@
+/* Flat settings rows: a title with a short note on the left, one control on the right, a thin line between rows. */
+.setting-rows{display:grid}
+.setting-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px 28px;margin:0;padding:18px 0;border-bottom:1px solid var(--line);font:inherit;color:var(--text)}
+.setting-row:last-of-type{border-bottom:0}
+.setting-row>div:first-child{display:grid;gap:4px;min-width:0}
+.setting-row strong{font-weight:var(--fw-semibold,600)}
+.setting-row small{color:var(--muted);font-size:max(var(--type-min,12px),.86em);line-height:1.45}
+.setting-row>:last-child{justify-self:end;max-width:100%}
+.setting-row>input[role=switch]{width:44px;height:24px;margin:0;cursor:pointer;accent-color:var(--accent)}
+.setting-row select{min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:var(--ui-radius-control,10px);background:var(--panel);color:var(--text);font:inherit}
+.setting-row .segmented-options{min-width:min(100%,320px)}
+@media(max-width:640px){.setting-row{grid-template-columns:minmax(0,1fr)}.setting-row>:last-child{justify-self:stretch}.setting-row>input[role=switch]{justify-self:start}}
+/* The theme cards need the full width: the row stacks its title above them. */
+.setting-row:has(>.theme-presets){grid-template-columns:minmax(0,1fr)}
+.setting-row>.theme-presets{justify-self:stretch;grid-template-columns:repeat(auto-fill,minmax(6.5rem,1fr));max-width:none}
+.setting-row .segmented-options{min-width:min(100%,330px)}
+.setting-row .segmented-options span{white-space:nowrap;overflow-wrap:normal;min-height:40px}
+/* A switch drawn from the checkbox itself: a track and a knob that slides. */
+.setting-row>input[role=switch]{appearance:none;-webkit-appearance:none;position:relative;border-radius:999px;border:1px solid var(--line);background:var(--surface);transition:background-color var(--dur-short,.16s),border-color var(--dur-short,.16s)}
+.setting-row>input[role=switch]::after{content:"";position:absolute;top:2px;inset-inline-start:2px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:transform var(--dur-short,.16s),background-color var(--dur-short,.16s)}
+.setting-row>input[role=switch]:checked{background:var(--accent);border-color:var(--accent)}
+.setting-row>input[role=switch]:checked::after{transform:translateX(20px);background:var(--accent-dark)}
+.setting-row>input[role=switch]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(forced-colors:active){.setting-row>input[role=switch]{appearance:auto;-webkit-appearance:auto}.setting-row>input[role=switch]::after{display:none}}
+/* Providers on one page: one section per provider, separated by a thin line. */
+.provider-sections{display:grid;gap:0}
+.provider-section{padding:22px 0;border-bottom:1px solid var(--line)}
+.provider-section:first-child{padding-top:4px}
+.provider-section>h3{margin:0 0 10px;font-size:1.05rem}
+.provider-section .provider-connections{margin-block:0 12px}
+/* The provider card carries the visible name; the section heading stays for assistive technology. */
+.provider-section>h3:has(+.provider-connections){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* The settings section list: plain rows like the chat list, small quiet group labels, a soft fill for the open section. */
+:root[data-theme][data-theme] .desktop-settings>.settings-index>.settings-group{gap:2px}
+:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-group-title{margin:14px 10px 6px;font-size:calc(11px * var(--ui-scale,1));font-weight:var(--fw-medium,500);letter-spacing:.04em;text-transform:none;color:var(--muted)}
+:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-category{min-height:38px;padding:8px 10px;border:0;border-radius:var(--ui-radius-control,10px);background:transparent;box-shadow:none;transition:background-color var(--dur-short,.16s),color var(--dur-short,.16s)}
+:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-category::before,:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-category::after{display:none}
+:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-category:hover{background:var(--surface)}
+:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-category.current{background:var(--surface);box-shadow:none}
+:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-category strong{font-weight:var(--fw-medium,500);font-size:calc(13.5px * var(--ui-scale,1))}
+:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-category>svg{color:var(--muted)}
+:root[data-theme][data-theme] .desktop-settings>.settings-index .settings-category.current>svg{color:var(--text)}
+/* Cards sit one step above the page: a panel fill, a thin border and compact padding. */
+:root[data-theme][data-theme] .settings-detail :is(.provider-card,.access-mode-options,.update-panel){background:var(--panel);border:1px solid var(--line);border-radius:var(--ui-radius-card,14px);box-shadow:none}
+:root[data-theme][data-theme] .settings-detail .provider-card{margin-block:0 14px;padding:18px 20px}
+:root[data-theme][data-theme] .settings-detail .provider-card>header{margin-bottom:4px}
+:root[data-theme][data-theme] .settings-detail .provider-card h3{font-size:1.05rem}
+:root[data-theme][data-theme] .settings-detail .provider-card dl{margin-block:10px 12px}
+:root[data-theme][data-theme] .settings-detail .provider-card dt{color:var(--muted)}
+.provider-section{padding:14px 0 18px}
+.settings-detail>h2{font-size:1.25rem}

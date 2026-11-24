@@ -66,13 +66,14 @@ test('opening an active chat retains cached earlier replies during base-history 
 });
 
 for(const beginning of [false,true])test(`Codex keeps expanded ${beginning?'beginning':'tail'} pages while reading and refreshes on Latest`,async({page})=>{
+ // The chat list shows every provider: the Codex chat is opened from it directly.
+ await page.addInitScript(()=>{(window as any).testChatRowsBy={claude:[{sessionId:'claude-only',summary:'claude · Interface review',cwd:'C:\Demo\Atlas',lastModified:1}],codex:[{sessionId:'alpha',summary:'codex · Interface review',cwd:'C:\Demo\Atlas',lastModified:2}],copilot:[]};});
  await page.setViewportSize({width:1440,height:400});await desktop(page);
  await page.evaluate(()=>{(window as any).testHistoryPage=(url:URL)=>{
   const start=url.searchParams.get('from')==='start',older=url.searchParams.has('end'),first=start||older?0:30;
   return {messages:Array.from({length:30},(_,i)=>({id:'paged-'+(i+first),role:'assistant',blocks:[{type:'text',text:'Paged reply '+(i+first)+'\n\nSynthetic page content with enough text to read.'}]})),previous:first===0?null:30,next:start?30:null};
  };});
- await page.locator('.desktop-rail .provider-picker-trigger').click();await page.getByRole('menuitemradio',{name:'Codex',exact:true}).click();
- await page.locator('.desktop-sessions button').filter({hasText:'Interface review'}).click();
+ await page.locator('.desktop-sessions button').filter({hasText:'codex · Interface review'}).click();
  await expect(page.getByText('Paged reply 59',{exact:true})).toHaveCount(1);
  const scroll=page.locator('.conversation');
  await expect.poll(()=>scroll.evaluate(el=>el.scrollTop)).toBeGreaterThan(40);

@@ -2,7 +2,7 @@
 button.project-folder-trigger{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;min-height:38px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;text-align:left}
 .project-folder-trigger>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .project-folder-trigger>svg,.project-folder-dialog button>svg{flex-shrink:0}
-.modal-backdrop.project-folder-backdrop{backdrop-filter:blur(2px);background:color-mix(in srgb,var(--scrim) 78%,transparent)}
+.modal-backdrop.project-folder-backdrop{background:color-mix(in srgb,var(--scrim) 78%,transparent)}
 .project-folder-dialog{box-sizing:border-box;display:flex;flex-direction:column;gap:12px;width:min(34rem,calc(100vw - 24px));height:min(34rem,82dvh);padding:clamp(16px,3vw,24px);border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--text);overflow:hidden;text-align:start;box-shadow:0 14px 48px var(--shadow-soft)}
 .project-folder-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .project-folder-dialog h2{margin:0;font-size:1.14rem}

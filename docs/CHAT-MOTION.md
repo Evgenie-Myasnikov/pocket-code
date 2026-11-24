@@ -1,5 +1,7 @@
 # Chat interaction motion
 
+> Unreleased change: the animated backgrounds, glass panels, the chat edge fade, the paced text reveal and the app's own animated transcript follower described below were removed. The transcript now follows new output through the assistant-ui viewport. The sections below are kept as the record of earlier releases.
+
 The implementation was compared with 48 chat/message files in
 [AionUi at 11cd2a9](https://github.com/iOfficeAI/AionUi/tree/11cd2a9a20d1e033157636efc570b41384c66d85/packages/desktop/src/renderer).
 These are independently implemented interaction patterns using Pocket Code tokens;
@@ -53,7 +55,7 @@ text, not tool logs or image binaries. Editing old turns, regeneration, branches
 feedback submission and voice input are not provided by this adapter.
 
 The lazy-loaded React Bits Dark Veil source is pinned and attributed in
-[src/vendor/react-bits/SOURCE.md](../src/vendor/react-bits/SOURCE.md). Bundles include
+`src/vendor/react-bits/SOURCE.md` (removed together with the backgrounds, see the note at the top). Bundles include
 [third-party notices](../public/third-party-notices.txt). The theme-colored background
 uses quarter-resolution shader fields and DPR 1. Existing conversations pause it;
 hidden chats unmount it. Reduced motion and forced colors suppress WebGL decoration.
@@ -112,7 +114,7 @@ The background catalog has 17 original React Bits effects: DarkVeil, Iridescence
 SoftAurora, Grainient, LightPillar, Galaxy, Plasma, Prism, LightRays, GradientWaves,
 SideRays, RippleGrid, PixelSnow, Topography, Dither, Orb and Beams.
 Source attribution and lifecycle adaptations are in
-[the vendor source record](../src/vendor/react-bits/SOURCE.md). Removed effects
+the vendor source record (removed together with the backgrounds). Removed effects
 and their posters are no longer shipped by this catalog, including Aurora,
 LiquidChrome and FloatingLines. Stored removed IDs
 fall back to DarkVeil. Active shaders receive the actual theme/custom color;

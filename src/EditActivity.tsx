@@ -3,8 +3,6 @@ import {ChevronRight,FileCode2} from 'lucide-react';
 import {useLanguage} from './i18n';
 import type {ToolView} from './tool-registry';
 import {editFiles,type EditFile} from './edit-diff';
-import {usePacedText} from './usePacedText';
-import {useStreamSpeed} from './stream-speed';
 import './edit-activity.css';
 
 const signs={add:'+',del:'-',context:' ',meta:''};
@@ -14,9 +12,8 @@ function diffText(file:EditFile){return file.content??file.lines.map(row=>signs[
 
 function LiveWriteSnippet({text,totalLines}:{text:string;totalLines:number|undefined}){
   const viewport=useRef<HTMLSpanElement>(null);
-  const speed=useStreamSpeed();
   const excerpt=text.slice(-4000);
-  const visible=usePacedText(excerpt,false,speed);
+  const visible=excerpt;
   const lines=visible.split(/\r?\n/);
   if(lines.at(-1)==='')lines.pop();
   const tail=lines.slice(-4);

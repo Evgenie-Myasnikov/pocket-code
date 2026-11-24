@@ -1,5 +1,5 @@
 import {Fragment,useEffect,useRef,useState,type KeyboardEvent,type MouseEvent} from 'react';
-import {Check,ChevronRight,Folder,LayoutDashboard,MoreHorizontal,RefreshCw,Trash2,X} from 'lucide-react';
+import {Archive,Check,ChevronDown,Folder,LayoutDashboard,Pin,Trash2,X} from 'lucide-react';
 import {CardActionMenu} from './CardActionMenu';
 import {ChatListActions} from './ChatListActions';
 import type {ChatActionTarget} from './ChatActions';
@@ -9,6 +9,7 @@ import {request,type Connection} from './api';
 import {useLanguage} from './i18n';
 import {useModal} from './navigation';
 import './chat-delete-options.css';
+import './chat-list.css';
 import type {Session} from './session';
 import type {JobView} from '../server/types';
 
@@ -75,22 +76,40 @@ function DeleteChatsDialog({target,connection,provider,account,onClose,onDeleted
   </section></div>;
 }
 
-type Props=Scope&{
-  groups:Map<string,Session[]>;jobs:Map<string,JobView>;focusId?:string;actionId?:string;projectFilter:string;
-  loading:boolean;online:boolean;onRefresh():void;onOpen(s:Session):void;onMenu(target:ChatActionTarget):void;onCloseMenu():void;onDeleted(ids:string[]):void;
+export const CHAT_PAGE=30;
+/** Pinned and archived chats are a choice of this PC window, kept in its local storage. */
+function readIds(key:string){try{const value=JSON.parse(localStorage.getItem(key)||'[]');return new Set<string>(Array.isArray(value)?value.filter(item=>typeof item==='string').slice(0,2000):[]);}catch{return new Set<string>();}}
+function writeIds(key:string,ids:Set<string>){try{localStorage.setItem(key,JSON.stringify([...ids]));}catch{/* The choice still holds until the window closes. */}}
+const PINNED='pocket-desktop-pinned-chats',ARCHIVED='pocket-desktop-archived-chats';
+const providerNames:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'Copilot'};
+type Props={
+  /** Chats of every provider, newest first; each carries its provider. */
+  sessions:Session[];jobs:Map<string,JobView>;focusId?:string;actionId?:string;connection:Connection;provider:Provider;
+  loading:boolean;online:boolean;onOpen(s:Session):void;onMenu(target:ChatActionTarget):void;onCloseMenu():void;onDeleted(ids:string[],provider:Provider):void;
 };
-export function DesktopChatFolders({groups,jobs,focusId,actionId,projectFilter,loading,online,onRefresh,onOpen,onMenu,onCloseMenu,onDeleted,...scope}:Props){
+/** One flat list of chats. Only the first page is rendered; "Show more" adds the next one, so a long history costs nothing until asked for. */
+export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,loading,online,onOpen,onMenu,onCloseMenu,onDeleted,connection,provider}:Props){
   const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
   const tree=useRef<HTMLDivElement>(null),anchor=useRef<string|undefined>(undefined);
   const single=useRef<string|undefined>(undefined);
-  const [marked,setMarked]=useState(new Set<string>()),[target,setTarget]=useState<Target>();
-  const [menu,setMenu]=useState<{x:number;y:number;folder?:string}>();
-  const rows=()=>Array.from(tree.current?.querySelectorAll<HTMLButtonElement>('details[open] .desktop-sessions > button[data-chat-id]')||[]);
+  const [marked,setMarked]=useState(new Set<string>()),[queue,setQueue]=useState<(Target&Scope)[]>([]);
+  const [menu,setMenu]=useState<{x:number;y:number}>();
+  const [limit,setLimit]=useState(CHAT_PAGE);
+  const [pinned,setPinned]=useState(()=>readIds(PINNED)),[archived,setArchived]=useState(()=>readIds(ARCHIVED)),[showArchived,setShowArchived]=useState(false);
+  const flip=(key:string,set:(update:(old:Set<string>)=>Set<string>)=>void,id:string)=>set(old=>{const next=new Set(old);if(next.has(id))next.delete(id);else next.add(id);writeIds(key,next);return next;});
+  const archivedCount=allSessions.filter(s=>archived.has(s.sessionId)).length;
+  // Archived chats leave the list; pinned ones lead it. The incoming order (running, then newest) is kept inside each part.
+  const sessions=showArchived&&archivedCount?allSessions.filter(s=>archived.has(s.sessionId)):[...allSessions.filter(s=>!archived.has(s.sessionId)&&pinned.has(s.sessionId)),...allSessions.filter(s=>!archived.has(s.sessionId)&&!pinned.has(s.sessionId))];
+  // The open chat is always rendered, even when it is older than the first page.
+  const focusIndex=focusId?sessions.findIndex(s=>s.sessionId===focusId):-1;
+  const shown=sessions.slice(0,Math.max(limit,focusIndex+1)),hidden=sessions.length-shown.length;
+  const laneOf=(s:Session):Provider=>s.provider==='codex'||s.provider==='copilot'||s.provider==='claude'?s.provider:provider;
+  const rows=()=>Array.from(tree.current?.querySelectorAll<HTMLButtonElement>('.desktop-sessions > button[data-chat-id]')||[]);
   useEffect(()=>{
     if(!marked.size)return;
-    const known=new Set([...groups.values()].flatMap(list=>list.map(s=>s.sessionId)));
+    const known=new Set(sessions.map(s=>s.sessionId));
     if([...marked].some(id=>!known.has(id)))setMarked(new Set([...marked].filter(id=>known.has(id))));
-  },[groups,marked]);
+  },[sessions,marked]);
   function clear(){setMarked(new Set());anchor.current=undefined;single.current=undefined;}
   function toggle(id:string){
     const base=single.current;single.current=undefined;
@@ -111,10 +130,19 @@ export function DesktopChatFolders({groups,jobs,focusId,actionId,projectFilter,l
     if(event.ctrlKey||event.metaKey){toggle(s.sessionId);return;}
     clear();anchor.current=s.sessionId;single.current=s.sessionId;onOpen(s);
   }
-  function selectTarget(ids:string[]){setTarget({ids,...(projectFilter?{folder:projectFilter}:{})});}
+  /** A selection may mix providers and accounts; each group is confirmed and deleted on its own. */
+  function selectTarget(ids:string[]){
+    const groups=new Map<string,Target&Scope>();
+    for(const s of sessions){
+      if(!ids.includes(s.sessionId))continue;
+      const lane=laneOf(s),account=lane==='claude'?s.account||'':'',group=groups.get(lane+'|'+account);
+      if(group)group.ids!.push(s.sessionId);else groups.set(lane+'|'+account,{ids:[s.sessionId],connection,provider:lane,account});
+    }
+    setQueue([...groups.values()]);
+  }
   function openMenu(t:ChatActionTarget){
     if(marked.has(t.session.sessionId)){onCloseMenu();setMenu({x:t.x,y:t.y});}
-    else{clear();onMenu({...t,select:()=>{anchor.current=t.session.sessionId;setMarked(new Set([t.session.sessionId]));}});}
+    else{clear();const id=t.session.sessionId;onMenu({...t,select:()=>{anchor.current=id;setMarked(new Set([id]));},pin:{on:pinned.has(id),toggle:()=>flip(PINNED,setPinned,id)},archive:{on:archived.has(id),toggle:()=>flip(ARCHIVED,setArchived,id)}});}
   }
   function key(event:KeyboardEvent<HTMLButtonElement>,s:Session,running:boolean){
     const id=s.sessionId,ctrl=event.ctrlKey||event.metaKey;
@@ -130,33 +158,31 @@ export function DesktopChatFolders({groups,jobs,focusId,actionId,projectFilter,l
     else if(event.key==='Escape'){event.preventDefault();clear();}
     else if(event.key==='Delete'&&online){event.preventDefault();selectTarget(marked.has(id)?[...marked]:[id]);}
   }
-  function folderMenu(folder:string,x:number,y:number){onCloseMenu();setMenu({folder,x,y});}
+  const target=queue[0];
   return <>
-    <div className="desktop-list-caption"><span>{marked.size?l('Selected','Выбрано')+' · '+marked.size:l('Workspace chats','Чаты по папкам')}</span>
-      {marked.size>0?<span className="bulk-toolbar"><button className="icon-button" aria-label={l('Delete selected chats','Удалить выбранные чаты')} disabled={!online} onClick={()=>selectTarget([...marked])}><Trash2 size={16}/></button><button className="icon-button" aria-label={l('Clear selection','Снять выделение')} onClick={clear}><X size={16}/></button></span>:<button className="icon-button" aria-label={l('Refresh','Обновить')} onClick={onRefresh}><RefreshCw size={16}/></button>}
-    </div>
-    <div ref={tree} className="desktop-session-groups">{loading&&!groups.size?<p role="status">{l('Loading chats…','Загружаем чаты…')}</p>:
-      Array.from(groups,([folder,items])=><details key={folder} className="rail-chat-folder" open>
-        <summary title={folder} onContextMenu={e=>{e.preventDefault();folderMenu(folder,e.clientX,e.clientY);}}><ChevronRight size={13} aria-hidden="true"/><Folder size={15} aria-hidden="true"/><span>{folder?basename(folder):l('No project','Без проекта')}</span>
-          <button type="button" className="folder-chat-actions" aria-label={l('Folder actions','Действия папки')+' · '+(folder||l('No project','Без проекта'))} aria-haspopup="menu" onClick={e=>{e.preventDefault();e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();folderMenu(folder,r.left,r.bottom);}}><MoreHorizontal size={15}/></button>
-        </summary>
-        <div className="desktop-sessions">{items.map((s,index)=>{
-          const job=jobs.get(s.sessionId),running=job?.status==='running',status=running&&job?.approvals?.length?'needs_input':job?.status;
+    {marked.size>0&&<div className="desktop-list-caption"><span>{l('Selected','Выбрано')+' · '+marked.size}</span>
+      <span className="bulk-toolbar"><button className="icon-button" aria-label={l('Delete selected chats','Удалить выбранные чаты')} disabled={!online} onClick={()=>selectTarget([...marked])}><Trash2 size={16}/></button><button className="icon-button" aria-label={l('Clear selection','Снять выделение')} onClick={clear}><X size={16}/></button></span>
+    </div>}
+    <div ref={tree} className="desktop-session-groups desktop-chat-list">{loading&&!sessions.length?<p role="status">{l('Loading chats…','Загружаем чаты…')}</p>:
+      <div className="desktop-sessions">{shown.map((s,index)=>{
+          const job=jobs.get(s.sessionId),running=job?.status==='running',status=running&&job?.approvals?.length?'needs_input':job?.status,lane=laneOf(s);
           const title=s.customTitle||chatTitle(s.summary,l('Untitled chat','Без названия')),isMarked=marked.has(s.sessionId);
-          return <Fragment key={s.sessionId}><button style={{gridRow:index+1}} data-chat-id={s.sessionId} data-running={running||undefined} data-marked={isMarked||undefined}
+          return <Fragment key={s.sessionId}><button style={{gridRow:index+1}} data-chat-id={s.sessionId} data-provider={lane} data-running={running||undefined} data-marked={isMarked||undefined}
             aria-description={running?l('Working','Работает'):undefined} onContextMenu={e=>{e.preventDefault();openMenu({session:s,x:e.clientX,y:e.clientY,running});}} onKeyDown={e=>key(e,s,running)}
-            title={[s.customTitle||s.summary,s.board?(s.board.kind==='discussion'?l('Board discussion: ','Обсуждение доски: '):s.board.kind==='task'?l('Board task: ','Задача доски: '):l('Board: ','Доска: '))+s.board.title:'',s.cwd?basename(s.cwd):'',fullTime(s.lastModified)].filter(Boolean).join(' · ')}
+            title={[s.customTitle||s.summary,providerNames[lane],s.board?(s.board.kind==='discussion'?l('Board discussion: ','Обсуждение доски: '):s.board.kind==='task'?l('Board task: ','Задача доски: '):l('Board: ','Доска: '))+s.board.title:'',s.cwd||'',fullTime(s.lastModified)].filter(Boolean).join(' · ')}
             aria-pressed={marked.size?isMarked:focusId===s.sessionId} onClick={e=>click(e,s)}>
             {isMarked?<Check size={14} className="marked-chat-check" aria-hidden="true"/>:status&&status!=='running'?<RunStatusDot status={status} className="desktop-chat-dot" labelled={false}/>:<span className="desktop-chat-dot" data-status="idle"/>}
-            <span><strong>{s.board&&<LayoutDashboard className="desktop-chat-board" size={13} aria-label={l('Board chat: ','Чат доски: ')+s.board.title}/>}{title}</strong>
-              <small>{s.cwd?basename(s.cwd):l('No project','Без проекта')}{!status&&<> · <time title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time></>}</small>
-              {status&&status!=='running'&&<small className="desktop-run-label"><ChatRunStatus status={status}/></small>}</span><ChevronRight size={14}/>
-          </button><ChatListActions session={s} provider={scope.provider} connection={scope.connection} jobId={job?.id} row={index+1} running={running} open={actionId===s.sessionId} onOpen={openMenu} onClose={onCloseMenu}/></Fragment>;
-        })}</div></details>)}
-      {!loading&&!groups.size&&<p className="muted">{online?l('No matching chats','Нет подходящих чатов'):l('Chats will load when the local server is available.','Чаты загрузятся, когда локальный сервер будет доступен.')}</p>}
+            <span><strong>{pinned.has(s.sessionId)&&!showArchived&&<Pin className="desktop-chat-pin" size={12} aria-label={l('Pinned','Закреплён')}/>}{s.board&&<LayoutDashboard className="desktop-chat-board" size={13} aria-label={l('Board chat: ','Чат доски: ')+s.board.title}/>}{title}</strong>
+              <small>{providerNames[lane]}{s.cwd?' · '+basename(s.cwd):''}{!status&&<> · <time title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time></>}</small>
+              {status&&status!=='running'&&<small className="desktop-run-label"><ChatRunStatus status={status}/></small>}</span>{!status&&<time className="chat-row-time" title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}
+          </button><ChatListActions session={s} provider={lane} connection={connection} jobId={job?.id} row={index+1} running={running} open={actionId===s.sessionId} onOpen={openMenu} onClose={onCloseMenu}/></Fragment>;
+        })}</div>}
+      {hidden>0&&<button type="button" className="rail-action desktop-more-chats" onClick={()=>setLimit(shown.length+CHAT_PAGE)}><ChevronDown size={16} aria-hidden="true"/><span>{l('Show more chats','Показать ещё чаты')} · {hidden}</span></button>}
+      {archivedCount>0&&<button type="button" className="rail-action desktop-archived-chats" aria-pressed={showArchived} onClick={()=>{setShowArchived(value=>!value);setLimit(CHAT_PAGE);}}><Archive size={15} aria-hidden="true"/><span>{showArchived?l('Back to chats','Назад к чатам'):l('Archived','Архив')+' · '+archivedCount}</span></button>}
+      {!loading&&!sessions.length&&<p className="muted">{online?l('No chats yet','Чатов пока нет'):l('Chats will load when the local server is available.','Чаты загрузятся, когда локальный сервер будет доступен.')}</p>}
     </div>
-    {menu&&<CardActionMenu point={menu} label={menu.folder===undefined?l('Selected chat actions','Действия выбранных чатов'):l('Folder actions','Действия папки')} onClose={()=>setMenu(undefined)}
-      items={[{label:menu.folder===undefined?l('Delete selected chats','Удалить выбранные чаты'):l('Delete all chats in this folder','Удалить все чаты в папке'),Icon:Trash2,danger:true,disabled:!online,onSelect:()=>menu.folder===undefined?selectTarget([...marked]):setTarget({folder:menu.folder})}]}/>}
-    {target&&<DeleteChatsDialog {...scope} target={target} onClose={()=>setTarget(undefined)} onDeleted={ids=>{onDeleted(ids);setMarked(old=>{const next=new Set(old);for(const id of ids)next.delete(id);return next;});}}/>}
+    {menu&&<CardActionMenu point={menu} label={l('Selected chat actions','Действия выбранных чатов')} onClose={()=>setMenu(undefined)}
+      items={[{label:l('Delete selected chats','Удалить выбранные чаты'),Icon:Trash2,danger:true,disabled:!online,onSelect:()=>selectTarget([...marked])}]}/>}
+    {target&&<DeleteChatsDialog key={target.provider+'|'+target.account} connection={target.connection} provider={target.provider} account={target.account} target={{ids:target.ids}} onClose={()=>setQueue(old=>old.slice(1))} onDeleted={ids=>{onDeleted(ids,target.provider);setMarked(old=>{const next=new Set(old);for(const id of ids)next.delete(id);return next;});}}/>}
   </>;
 }

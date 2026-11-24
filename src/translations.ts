@@ -1,5 +1,11 @@
 // UI-only translations. Conversation, issue and file content must remain unchanged.
 export const english: Record<string, string> = {
+  'Режим': 'Mode',
+  'Тёмный, светлый или как в системе.': 'Dark, light or the same as the system.',
+  'Размер текста и элементов интерфейса.': 'The size of text and controls.',
+  'Цвета окна. Изменения видны сразу и сохраняются на этом устройстве.': 'Window colours. Changes apply at once and are saved on this device.',
+  'Изумруд': 'Emerald',
+  'Карбон': 'Carbon',
   'Авто (рекомендуется)': 'Auto (recommended)',
   'Выключен': 'Off',
   'Проверяем локальные модели…': 'Checking local models…',

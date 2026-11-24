@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {Bell,BellOff,ListChecks,Pencil,Trash2} from 'lucide-react';
+import {Archive,ArchiveRestore,Bell,BellOff,ListChecks,Pencil,Pin,PinOff,Trash2} from 'lucide-react';
 import {CardActionMenu} from './CardActionMenu';
 import {request,type Connection} from './api';
 import type {Session} from './session';
@@ -7,7 +7,9 @@ import {useLanguage} from './i18n';
 import {useModal} from './navigation';
 import {useChatMute} from './chat-mute';
 import {forgetChatTranscripts} from './chat-cache';
-export type ChatActionTarget={session:Session;x:number;y:number;running?:boolean;select?():void};
+export type ChatActionTarget={session:Session;x:number;y:number;running?:boolean;select?():void;
+ /** The PC chat list: pin to the top and archive out of the list. With these the menu is Rename, Pin, Archive, Delete. */
+ pin?:{on:boolean;toggle():void};archive?:{on:boolean;toggle():void}};
 export function ChatActions({target,connection,provider,jobId,managementDisabled,onClose,onChanged}:{target:ChatActionTarget;connection:Connection;provider:string;jobId?:string;managementDisabled?:boolean;onClose():void;onChanged(session:Session,deleted:boolean):void}){
  const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
  const {muted,toggle}=useChatMute(connection,target.session.provider||provider,target.session.sessionId,jobId);
@@ -33,9 +35,9 @@ export function ChatActions({target,connection,provider,jobId,managementDisabled
  }
  if(phase==='menu')return <CardActionMenu label={l('Chat actions','Действия чата')} point={target} onClose={closeMenu} items={[
   {label:l('Rename','Переименовать'),Icon:Pencil,disabled:managementDisabled,onSelect:()=>choose('rename')},
-  ...(target.select?[{label:l('Select chat','Выбрать чат'),Icon:ListChecks,onSelect:target.select}]:[]),
-  {label:muted?l('Unmute notifications','Включить уведомления'):l('Mute notifications','Отключить уведомления'),Icon:muted?Bell:BellOff,onSelect:toggle},
-  {label:l('Erase chat…','Стереть чат…'),Icon:Trash2,danger:true,disabled:managementDisabled||target.running,onSelect:()=>choose('delete')},
+  ...(target.pin&&target.archive?[{label:target.pin.on?l('Unpin','Открепить'):l('Pin','Закрепить'),Icon:target.pin.on?PinOff:Pin,onSelect:()=>{target.pin!.toggle();onClose();}},{label:target.archive.on?l('Unarchive','Вернуть из архива'):l('Archive','В архив'),Icon:target.archive.on?ArchiveRestore:Archive,onSelect:()=>{target.archive!.toggle();onClose();}}]
+   :[...(target.select?[{label:l('Select chat','Выбрать чат'),Icon:ListChecks,onSelect:target.select}]:[]),{label:muted?l('Unmute notifications','Включить уведомления'):l('Mute notifications','Отключить уведомления'),Icon:muted?Bell:BellOff,onSelect:toggle}]),
+  {label:target.pin?l('Delete','Удалить'):l('Erase chat…','Стереть чат…'),Icon:Trash2,danger:true,disabled:managementDisabled||target.running,onSelect:()=>choose('delete')},
  ]}/>;
  const heading=phase==='rename'?l('Rename chat','Переименовать чат'):l('Erase chat','Стереть чат');
  const submit=phase==='rename'?l('Rename','Переименовать'):eraseOriginals?l('Erase permanently','Стереть безвозвратно'):l('Remove from list','Убрать из списка');

@@ -3,9 +3,8 @@ import {setCustomAccount,useCustomAccount} from './custom-account';
 import {chatTitle} from './chat-title';
 import {RailButton} from './RailButton';
 import {RunStatusIcon,runStatusLabel} from './run-status';
-import {ChatAtmosphere} from './ChatAtmosphere';
 import {ChatActions,type ChatActionTarget} from './ChatActions';
-import {DesktopChatFolders} from './DesktopChatFolders';
+import {DesktopChatList} from './DesktopChatList';
 import {PanelResizeHandle} from './PanelResizeHandle';
 import './desktop-sidebar.css';
 import type {BoardSelection} from './board-selection-context';
@@ -13,8 +12,6 @@ import {prepareBoardConversation,adoptBoardConversation,readBoardConversation} f
 import {boardConversationHost} from './board-conversation-host';
 import './board-chat-compact.css';
 import './compact-ui.css';
-import {ProjectFolderPicker} from './ProjectFolderPicker';
-import {ProviderPicker} from './ProviderPicker';
 import {useActivity} from './useActivity';
 import {useDesktopRunNotifications,type WatchedChat} from './chat-notifications';
 import type {BoardNoticeTarget} from './BoardNotifications';
@@ -63,6 +60,7 @@ import {useBackNavigation,useModal} from './navigation';
 import type {JobView} from '../server/types';
 import type {BoardLink,Session} from './session';
 type Provider='claude'|'codex'|'copilot';
+const chatLanes:Provider[]=['claude','codex','copilot'];
 const connection:Connection={url:'http://127.0.0.1:4318',token:'',desktop:true};
 const initial:DesktopState={online:false,busy:false,status:'',startup:false,autoReconnect:true,internet:true,addresses:[],jira:false};
 const name=(path:string)=>path.split(/[\\/]/).filter(Boolean).at(-1)||path;
@@ -131,7 +129,9 @@ export function DesktopApp(){
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&!event.altKey&&event.key===','){event.preventDefault();setSettingsNonce(value=>value+1);setPage('settings');}};document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[]);
   const [provider,setProvider]=useState<Provider>(()=>{const value=saved('provider','claude');return value==='codex'||value==='copilot'?value:'claude';});
   const [chatAction,setChatAction]=useState<ChatActionTarget|null>(null),[attachedProjects,setAttachedProjects]=useState<string[]>([]);
-  const [projectFilter,setProjectFilter]=useState('');
+  const [otherSessions,setOtherSessions]=useState<Session[]>([]),[otherJobs,setOtherJobs]=useState<JobView[]>([]);
+  // Set right before a provider switch that must keep the chat on screen: a chat of another provider opened from the list, or the provider chosen inside a new chat.
+  const keepChat=useRef(false);
   const [project,setProject]=useState(''),[sessions,setSessions]=useState<Session[]>([]),[projects,setProjects]=useState<string[]>([]),[jobs,setJobs]=useState<JobView[]>([]);
   const projectSpaces=useProjectWorkspaces(state.online?connection:null);
   const [noticeTarget,setNoticeTarget]=useState<BoardNoticeTarget|null>(null);
@@ -172,8 +172,9 @@ export function DesktopApp(){
     persist('provider',provider);setSessions(readChatCache<Session[]>('desktop-local',provider,'sessions')||[]);setJobs([]);
     const boardTarget=boardChat&&(boardChat.taskRun?.provider||boardChat.note.chat?.provider||(boardChat.conversation?readBoardConversation(boardChat.conversation.key)?.provider:undefined))===provider?boardChat:null;
     const alertTarget=notificationChat?.provider===provider?notificationChat:null;
-    if(!boardTarget&&!alertTarget){setSelected(null);setCreating(false);}
-    setProject('');setProjectFilter('');
+    const keep=keepChat.current;keepChat.current=false;
+    if(!boardTarget&&!alertTarget&&!keep){setSelected(null);setCreating(false);}
+    if(!keep)setProject('');
     // A board chat open beside the board switches to this provider's chat of the same board.
     if(!boardTarget&&boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));
   },[provider]);
@@ -182,19 +183,29 @@ export function DesktopApp(){
   },[state.online,provider,revision]);
   useEffect(()=>{if(!state.online)return;let active=true;const stop=startVisiblePoll(async()=>{try{const folders=await request<string[]>(connection,'/projects');if(active)setProjects(old=>shareSnapshot(old,folders));}catch{/* Session project folders remain available. */}},60000);return()=>{active=false;stop();};},[state.online,revision]);
   useEffect(()=>{if(!state.online)return;let active=true;const stop=startVisiblePoll(async()=>{const epoch=libraryEpoch.current;try{const runs=await request<JobView[]>(connection,`/jobs?provider=${provider}`);if(active&&epoch===libraryEpoch.current)setJobs(old=>shareSnapshot(old,runs));}catch{/* Keep the last known run state during a transient disconnect. */}},1000);return()=>{active=false;stop();};},[state.online,provider,revision]);
+  // The list shows every provider's chats. The open provider is read by the polls above; the others are read here, less often.
+  useEffect(()=>{
+    const others=chatLanes.filter(lane=>lane!==provider),cached=(lane:Provider)=>(readChatCache<Session[]>('desktop-local',lane,'sessions')||[]).map(item=>({...item,provider:lane}));
+    setOtherSessions(others.flatMap(cached));setOtherJobs([]);
+    if(!state.online)return;let active=true;
+    const stopSessions=startVisiblePoll(async()=>{const lists=await Promise.all(others.map(async lane=>{try{const list=await request<Session[]>(connection,`/sessions?provider=${lane}`);writeChatCache('desktop-local',lane,'sessions',list);return list.map(item=>({...item,provider:lane}));}catch{return cached(lane);}}));if(active)setOtherSessions(old=>shareSnapshot(old,lists.flat()));},15000);
+    const stopJobs=startVisiblePoll(async()=>{const runs=await Promise.all(others.map(lane=>request<JobView[]>(connection,`/jobs?provider=${lane}`).catch(()=>[] as JobView[])));if(active)setOtherJobs(old=>shareSnapshot(old,runs.flat()));},5000);
+    return()=>{active=false;stopSessions();stopJobs();};
+  },[state.online,provider,revision]);
   // Custom providers share the Claude workspace; each lists only its own chats, the PC's Claude sign-in lists the rest.
   const customAccount=useCustomAccount(),account=provider==='claude'?customAccount:'';
   const currentLane=useRef(provider);
-  useEffect(()=>setChatAction(null),[provider,account,projectFilter]);
+  useEffect(()=>setChatAction(null),[provider,account]);
   currentLane.current=provider;
-  function removeChats(ids:string[],forgetTranscripts=true){
+  function removeChats(ids:string[],forgetTranscripts=true,lane:Provider=provider){
     if(!ids.length)return;
     libraryEpoch.current++;
-    if(forgetTranscripts)void forgetChatTranscripts(connection,provider,ids);
+    if(forgetTranscripts)void forgetChatTranscripts(connection,lane,ids);
     const removed=new Set(ids);
-    const cached=readChatCache<Session[]>('desktop-local',provider,'sessions');
-    if(cached)writeChatCache('desktop-local',provider,'sessions',cached.filter(s=>!removed.has(s.sessionId)));
-    if(currentLane.current===provider){
+    const cached=readChatCache<Session[]>('desktop-local',lane,'sessions');
+    if(cached)writeChatCache('desktop-local',lane,'sessions',cached.filter(s=>!removed.has(s.sessionId)));
+    if(currentLane.current!==lane){setOtherSessions(old=>old.filter(s=>!removed.has(s.sessionId)));setOtherJobs(old=>old.filter(j=>!j.sessionId||!removed.has(j.sessionId)));setSelected(old=>old&&removed.has(old.sessionId)?null:old);}
+    else{
       setSessions(old=>old.filter(s=>!removed.has(s.sessionId)));
       setJobs(old=>old.filter(j=>!j.sessionId||!removed.has(j.sessionId)));
       setSelected(old=>old&&removed.has(old.sessionId)?null:old);
@@ -214,21 +225,20 @@ export function DesktopApp(){
     window.addEventListener('pocket-chat-transcripts-removed',removed);
     return()=>{live=false;window.removeEventListener('pocket-chat-transcripts-removed',removed);};
   },[provider]);
-  const previousAccount=useRef(account);useEffect(()=>{if(previousAccount.current===account)return;previousAccount.current=account;if(!selected?.account&&!account||selected?.account===account)return;setSelected(null);setCreating(false);if(boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));},[account]);
+  const previousAccount=useRef(account);useEffect(()=>{if(previousAccount.current===account)return;previousAccount.current=account;if(!selected?.account&&!account||selected?.account===account)return;if(creating&&!selected)return;setSelected(null);setCreating(false);if(boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));},[account]);
   const latestJobs=useMemo(()=>{const map=new Map<string,JobView>();for(const job of [...jobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[jobs]);
-  const chatSessions=useMemo(()=>{const map=new Map(sessions.map(item=>[item.sessionId,item]));for(const job of latestJobs.values())if(!job.taskChat&&job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,{sessionId:job.sessionId,cwd:job.cwd,summary:name(job.cwd),lastModified:job.startedAt,...(job.account?{account:job.account}:{})});return [...map.values()].filter(item=>provider!=='claude'||(item.account||'')===account).sort((a,b)=>Number(latestJobs.get(b.sessionId)?.status==='running')-Number(latestJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[sessions,latestJobs,provider,account]);
+  const chatSessionsAll=useMemo(()=>{const map=new Map(sessions.map(item=>[item.sessionId,item]));for(const job of latestJobs.values())if(!job.taskChat&&job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,{sessionId:job.sessionId,cwd:job.cwd,summary:name(job.cwd),lastModified:job.startedAt,...(job.account?{account:job.account}:{})});return [...map.values()].sort((a,b)=>Number(latestJobs.get(b.sessionId)?.status==='running')-Number(latestJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[sessions,latestJobs]);
   const allFolders=useMemo(()=>Array.from(new Set([...projects,...sessions.map(item=>item.cwd||'').filter(Boolean)])).sort(),[projects,sessions]);
   const folders=attachedProjects;
   useEffect(()=>{if(!state.online)return;let alive=true;const load=async()=>{await request<string[]>(connection,'/chat-library/projects').then(data=>{if(alive)setAttachedProjects(data);}).catch(()=>{});};const stop=startVisiblePoll(load,60000);window.addEventListener('pocket-chat-project-added',load);return()=>{alive=false;stop();window.removeEventListener('pocket-chat-project-added',load);};},[state.online,revision]);
   // The Project page follows the chat filter, then the open chat, so both views stay on one folder.
   const projectRoot=project||selected?.cwd||allFolders[0]||'';
-  const visible=chatSessions.filter(item=>!projectFilter||item.cwd===projectFilter);
-  const sessionsByFolder=new Map<string,Session[]>();
-  for(const session of visible){
-    const root=session.cwd||'';
-    const group=sessionsByFolder.get(root);
-    if(group)group.push(session);else sessionsByFolder.set(root,[session]);
-  }
+  const laneOf=(session:Session):Provider=>session.provider==='codex'||session.provider==='copilot'||session.provider==='claude'?session.provider:provider;
+  const listJobs=useMemo(()=>{const map=new Map(latestJobs);for(const job of [...otherJobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[latestJobs,otherJobs]);
+  // Every provider's chats in one list, running ones first, then the most recent.
+  const visible=useMemo(()=>{const own=new Map(chatSessionsAll.map(item=>[item.sessionId,{...item,provider} as Session]));
+    const seen=new Set(own.keys());
+    return [...own.values(),...otherSessions.filter(item=>!seen.has(item.sessionId)&&!!seen.add(item.sessionId))].sort((a,b)=>Number(listJobs.get(b.sessionId)?.status==='running')-Number(listJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[chatSessionsAll,otherSessions,listJobs,provider]);
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
   const laneTarget=(target:BoardChat):BoardChat=>({...target,conversation:undefined,resumeJobId:undefined,note:{...target.note,chat:undefined}});
   async function openBoardChat(target:BoardChat,prepared=false){
@@ -236,7 +246,14 @@ export function DesktopApp(){
   }
   function startChat(){if(!state.online||!projectRoot)return;setProject(projectRoot);setDocDraft('');setNotificationChat(null);setBoardChat(undefined);setCreating(true);setSelected(null);setPage('chats');}
   function openChat(session:Session){if(session.board?.kind==='discussion'&&state.online){void openDiscussion(session,session.board);return;}openPlainChat(session);}
-  function openPlainChat(session:Session){setNotificationChat(null);setBoardChat(undefined);setSelected(session);setPage('chats');}
+  function openPlainChat(session:Session){
+    const lane=laneOf(session);setNotificationChat(null);setBoardChat(undefined);
+    if(lane==='claude')setCustomAccount(session.account||'');
+    if(lane!==provider){keepChat.current=true;setProject('');setProvider(lane);}
+    setSelected(session);setPage('chats');
+  }
+  // The provider chosen inside a new chat: the new chat and its project folder stay.
+  function chooseProvider(value:Provider){if(value===provider)return;keepChat.current=true;setProject(projectRoot);setProvider(value);}
   // A board discussion opened from the chat list returns to its board with the chat beside it; if the board is gone it stays a plain chat.
   async function openDiscussion(session:Session,link:BoardLink){
     try{
@@ -272,7 +289,7 @@ export function DesktopApp(){
     {state.logs&&<button className="text-button" onClick={()=>void action('open-logs')}>{label('Open logs folder','Открыть папку логов')}</button>}
   </div>;
   const connectionPanel=<DesktopConnection state={state} action={action} onState={setState} label={label}/>;
-  return <div className="desktop-app" style={{['--desktop-rail-width' as string]:railCollapsed?'52px':railWidth===null?'clamp(280px,calc(310px * var(--ui-scale,1)),380px)':railWidth+'px'}}><ChatAtmosphere active={page==='chats'} empty={false} surface="desktop"/>
+  return <div className="desktop-app" style={{['--desktop-rail-width' as string]:railCollapsed?'52px':railWidth===null?'clamp(280px,calc(310px * var(--ui-scale,1)),380px)':railWidth+'px'}}>
     {page==='workspace'&&<WorkspaceIdentity connection={state.online?connection:null} value={projectSpaces}/>}
     <aside className={'desktop-rail'+(railCollapsed?' rail-collapsed':'')} aria-label={label('Sidebar','Боковая панель')}>
       {!railCollapsed&&<RailResizer width={railWidth} onChange={setRailWidth}/>}
@@ -296,25 +313,21 @@ export function DesktopApp(){
        <RailButton className={page==='settings'?'active':''} aria-label={label('Settings','Настройки')} title={label('Settings','Настройки')} aria-current={page==='settings'?'page':undefined} onClick={()=>navigateRail('settings')}><Settings size={18}/><span>{label('Settings','Настройки')}</span></RailButton>
       </nav>
       <div className="desktop-rail-content">
-      <div className="desktop-rail-heading"><strong hidden={railCollapsed}>Pocket Code</strong></div>
-
-      <div className="desktop-library" hidden={railCollapsed}><ProviderPicker connection={connection||undefined} value={provider} onChange={setProvider} attention={id=>activity.items.filter(item=>!item.taskChat&&item.provider===id&&(item.status==='needs_input'||item.status==='error')).length}/>
-      {folders.length>0&&<div className="desktop-project-links"><div className="desktop-list-caption">{label('Projects','Проекты')}</div>{folders.length>1?<ProjectFolderPicker label={label('Filter projects','Фильтр проектов')} paths={folders}
-        value={projectFilter} allowClear placeholder={label('All projects','Все проекты')} onChange={folder=>{setProjectFilter(folder);if(folder)setProject(folder);}}/>:folders.map(folder=><button key={folder} className="rail-action" title={folder} aria-pressed={projectFilter===folder} onClick={()=>{setProjectFilter(projectFilter===folder?'':folder);setProject(folder);}}><Folder size={16}/><span>{name(folder)}</span></button>)}</div>}
-      <DesktopChatFolders key={[provider,account,projectFilter].join('|')} groups={sessionsByFolder} jobs={latestJobs} focusId={page==='chats'?selected?.sessionId:undefined}
-        actionId={chatAction?.session.sessionId} projectFilter={projectFilter} loading={loading} online={state.online} connection={connection} provider={provider} account={account}
-        onOpen={openChat} onMenu={setChatAction} onCloseMenu={()=>setChatAction(null)} onRefresh={()=>setRevision(value=>value+1)} onDeleted={removeChats}/></div>
+      <div className="desktop-library" hidden={railCollapsed}>
+      <DesktopChatList sessions={visible} jobs={listJobs} focusId={page==='chats'?selected?.sessionId:undefined}
+        actionId={chatAction?.session.sessionId} loading={loading} online={state.online} connection={connection} provider={provider}
+        onOpen={openChat} onMenu={setChatAction} onCloseMenu={()=>setChatAction(null)} onDeleted={(ids,lane)=>removeChats(ids,true,lane)}/></div>
       </div>
     </aside>
     <main className={'desktop-main'+(page==='work'&&boardChat?.context&&(selected||creating)?' desktop-board-chat':'')}>{state.online&&<ConnectionStatus/>}{error&&<div className="desktop-error" role="alert">{error}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setError('')}><X size={16}/></button></div>}
-    {(selected||creating||page==='tasks')&&<div className="desktop-chat-host" hidden={page!=='tasks'&&page!=='chats'&&!(page==='work'&&boardChat?.context)}>{localHostRecovery}<SharedChat key={provider+':'+account+(selected?'saved':'new')+(boardChat?':'+boardChat.boardId+':'+boardChat.note.id:'')+(boardChat?.conversation?':'+boardChat.conversation.generation:'')+(docDraft?':draft':'')} embedded={{tasksPage:page==='tasks'?{initialId:taskChainId,initialRoot:linkedRoot,project:taskProject}:undefined,onTaskProject:setTaskProject,onOpenTasks:openTasks,draftStore:chatDrafts.current,taskDraft,onTaskDraftUsed:()=>setTaskDraft(undefined),onTaskProvider:value=>{setTaskChainId(undefined);setProvider(value);},onTaskDraft:(root,prompt)=>{if(prompt!==undefined){setTaskDraft({root,prompt});setDocDraft('');setNotificationChat(null);setBoardChat(undefined);setProject(root);setSelected(null);setCreating(true);setPage('chats');}else{if(!selected)setCreating(true);setPage(boardChat?.context?'work':'chats');}},draft:docDraft||undefined,activity,visible:page==='chats'||(page==='work'&&!!boardChat?.context),connection,provider,session:selected||undefined,cwd:selected?.cwd||projectRoot,boardSelection,boardChat,jobId:boardChat?.resumeJobId||(selected?(notificationChat?.provider===provider&&selected.sessionId===(notificationChat.sessionId||`pending-${notificationChat.jobId}`)?notificationChat.jobId:latestJobs.get(selected.sessionId)?.id):undefined),onRevealBoardSelection:target=>{setBoardReveal(target);setPage('work');},onNewBoardChat:target=>void openBoardChat(target,true),onBoard:target=>{setNoticeTarget(target);setPage('work');},onCreated:(session,run)=>{setProvider(run.provider||provider);setDocDraft('');setJobs(old=>[run,...old.filter(j=>j.id!==run.id)]);setSelected(session);setCreating(false);},onBack:()=>{setDocDraft('');setSelected(null);setCreating(false);setBoardChat(undefined);}}}/></div>}
+    {(selected||creating||page==='tasks')&&<div className="desktop-chat-host" hidden={page!=='tasks'&&page!=='chats'&&!(page==='work'&&boardChat?.context)}>{localHostRecovery}<SharedChat key={provider+':'+account+(selected?'saved':'new')+(boardChat?':'+boardChat.boardId+':'+boardChat.note.id:'')+(boardChat?.conversation?':'+boardChat.conversation.generation:'')+(docDraft?':draft':'')} embedded={{tasksPage:page==='tasks'?{initialId:taskChainId,initialRoot:linkedRoot,project:taskProject}:undefined,onTaskProject:setTaskProject,onOpenTasks:openTasks,draftStore:chatDrafts.current,taskDraft,onTaskDraftUsed:()=>setTaskDraft(undefined),onProvider:chooseProvider,onTaskProvider:value=>{setTaskChainId(undefined);setProvider(value);},onTaskDraft:(root,prompt)=>{if(prompt!==undefined){setTaskDraft({root,prompt});setDocDraft('');setNotificationChat(null);setBoardChat(undefined);setProject(root);setSelected(null);setCreating(true);setPage('chats');}else{if(!selected)setCreating(true);setPage(boardChat?.context?'work':'chats');}},draft:docDraft||undefined,activity,visible:page==='chats'||(page==='work'&&!!boardChat?.context),connection,provider,session:selected||undefined,cwd:selected?.cwd||projectRoot,boardSelection,boardChat,jobId:boardChat?.resumeJobId||(selected?(notificationChat?.provider===provider&&selected.sessionId===(notificationChat.sessionId||`pending-${notificationChat.jobId}`)?notificationChat.jobId:latestJobs.get(selected.sessionId)?.id):undefined),onRevealBoardSelection:target=>{setBoardReveal(target);setPage('work');},onNewBoardChat:target=>void openBoardChat(target,true),onBoard:target=>{setNoticeTarget(target);setPage('work');},onCreated:(session,run)=>{setProvider(run.provider||provider);setDocDraft('');setJobs(old=>[run,...old.filter(j=>j.id!==run.id)]);setSelected(session);setCreating(false);},onBack:()=>{setDocDraft('');setSelected(null);setCreating(false);setBoardChat(undefined);}}}/></div>}
     {page==='tasks'?null:page==='workspace'?<DesktopWorkspaces connection={connection} value={projectSpaces} roots={allFolders} addresses={state.addresses} onBoard={()=>{setLocalBoards(false);setPage('work');}}/>:page==='work'?<div className="desktop-board-section">{boardChat?.context&&(selected||creating)&&<BoardChatDivider/>}<WorkBoards revealTarget={boardReveal} onSelection={setBoardSelection} focusTarget={noticeTarget} local connection={connection} roots={allFolders} workspaces={projectSpaces} onChat={target=>void openBoardChat(target)}/></div>:page==='chats'?(selected||creating?null:<div className="desktop-empty"><MessageSquare size={36}/><h1>{label('Chats','Чаты')}</h1>
       {state.online&&(projectRoot?<button className="primary" onClick={startChat}>{label('Start a conversation','Начать разговор')}</button>:<p>{label('Add a project folder on the PC to start a chat.','Добавьте папку проекта на ПК, чтобы начать чат.')}</p>)}
       {localHostRecovery}
       {recent&&<button className="secondary" aria-label={label('Resume latest chat','Продолжить последний чат')} onClick={()=>openChat(recent)}>{label('Resume latest chat','Продолжить последний чат')} · {recent.customTitle||chatTitle(recent.summary,label('Untitled chat','Без названия'))}</button>}
     </div>):(page==='rules'||page==='changelog')?<div className="desktop-project"><DocumentLibrary connection={connection} kind={docTab} showHeading onKind={kind=>{setDocTab(kind);if(kind!=='files')setPage(kind);}} onChat={state.online?(root,prompt)=>{setNotificationChat(null);setBoardChat(undefined);setProject(root);setDocDraft(prompt);setSelected(null);setCreating(true);setPage('chats');}:undefined}/></div>:<DesktopSettings onShortcuts={()=>setShortcutsOpen(true)} roots={allFolders} key={page+':'+settingsNonce} connectionPanel={connectionPanel} state={state} connection={connection} appearance={appearance} action={action}/>}
     </main>
-    {chatAction&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={provider} jobId={latestJobs.get(chatAction.session.sessionId)?.id} managementDisabled={!state.online} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{if(deleted){removeChats([session.sessionId],false);return;}setSessions(old=>{const next=old.map(s=>s.sessionId===session.sessionId?session:s);writeChatCache('desktop-local',provider,'sessions',next);return next;});if(selected?.sessionId===session.sessionId)setSelected(session);setRevision(value=>value+1);}}/>}
+    {chatAction&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={laneOf(chatAction.session)} jobId={listJobs.get(chatAction.session.sessionId)?.id} managementDisabled={!state.online} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{const lane=laneOf(chatAction.session);if(deleted){removeChats([session.sessionId],false,lane);return;}if(lane!==provider){setOtherSessions(old=>{const next=old.map(s=>s.sessionId===session.sessionId?{...session,provider:lane}:s);writeChatCache('desktop-local',lane,'sessions',next.filter(s=>s.provider===lane).map(({provider:_lane,...rest})=>rest as Session));return next;});if(selected?.sessionId===session.sessionId)setSelected({...session,provider:lane});setRevision(value=>value+1);return;}setSessions(old=>{const next=old.map(s=>s.sessionId===session.sessionId?session:s);writeChatCache('desktop-local',provider,'sessions',next);return next;});if(selected?.sessionId===session.sessionId)setSelected(session);setRevision(value=>value+1);}}/>}
     {shortcutsOpen&&<div className="modal-backdrop" onClick={event=>{if(event.target===event.currentTarget)setShortcutsOpen(false);}}><section ref={shortcutsSheet} className="confirm-modal desktop-shortcuts" role="dialog" aria-modal="true" aria-label={label('Keyboard shortcuts','Сочетания клавиш')}><Keyboard size={32}/><h2>{label('Keyboard shortcuts','Сочетания клавиш')}</h2><dl>{shortcuts.map(([keys,text])=><div key={keys+text}><dt><kbd>{keys}</kbd></dt><dd>{text}</dd></div>)}</dl><button className="secondary" onClick={()=>setShortcutsOpen(false)}>{label('Close','Закрыть')}</button></section></div>}
   </div>;
 }

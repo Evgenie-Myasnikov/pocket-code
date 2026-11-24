@@ -3,11 +3,6 @@ import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
 import {ChevronDown,Ellipsis,Lightbulb,WrapText,X} from 'lucide-react';
-import {useStreamingReveal} from './useStreamingReveal';
-import {usePacedText} from './usePacedText';
-import {useStreamSpeed} from './stream-speed';
-import {rehypeStreamingReveal,type RevealOptions} from './streaming-reveal';
-import './streaming-reveal.css';
 import './transcript.css';
 import type { Block, SubagentView } from '../server/types';
 import { t, useLanguage } from './i18n';
@@ -155,16 +150,10 @@ const markdownElements:NonNullable<ComponentProps<typeof Streamdown>['components
   },
 };
 
-const MarkdownBody=memo(function MarkdownBody({text,reveal,streaming=false}:{text:string;reveal?:RevealOptions;streaming?:boolean}) {
+/** Markdown is rendered as it arrives; there is no pacing or per-glyph reveal. */
+export const Markdown=memo(function Markdown({text,streaming=false}:{text:string;streaming?:boolean;animateInitial?:boolean}) {
   useLanguage();
-  // Streamdown's memo comparison includes data attributes. Expire glyph spans without
-  // remounting the table a reader has focused or scrolled while a reply is streaming.
-  return <div className="markdown"><Streamdown data-revealing={reveal?true:undefined} mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={false} remarkPlugins={[remarkGfm]} rehypePlugins={reveal?[[rehypeStreamingReveal,reveal]]:[]} components={markdownElements}>{text}</Streamdown></div>;
-});
-function StreamingMarkdown({text,animateInitial,streaming}:{text:string;animateInitial:boolean;streaming:boolean}){const speed=useStreamSpeed(),visible=usePacedText(text,animateInitial,speed,streaming);return <MarkdownBody text={visible} streaming={streaming||visible!==text} reveal={useStreamingReveal(visible,speed!==0,animateInitial)}/>;}
-export const Markdown=memo(function Markdown({text,streaming=false,animateInitial=false}:{text:string;streaming?:boolean;animateInitial?:boolean}){
-  const wasStreaming=useRef(streaming);if(streaming)wasStreaming.current=true;
-  return wasStreaming.current?<StreamingMarkdown text={text} animateInitial={animateInitial} streaming={streaming}/>:<MarkdownBody text={text}/>;
+  return <div className="markdown"><Streamdown mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={false} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.
@@ -182,9 +171,7 @@ function Document({block}:{block:Block}) {
 }
 function ReasoningBody({paragraphs,live,label}:{paragraphs:string[];live:boolean;label:string}){
   const body=useRef<HTMLDivElement>(null),follow=useRef(true);
-  const speed=useStreamSpeed();
-  const text=paragraphs.join('\n\n');
-  const visible=usePacedText(text,false,live?speed:0,live);
+  const visible=paragraphs.join('\n\n');
   useLayoutEffect(()=>{
     if(live&&follow.current&&body.current)body.current.scrollTop=body.current.scrollHeight;
   },[visible,live]);

@@ -9,10 +9,8 @@ import {userAttachmentBlocks} from './user-attachments';
 import {ChatActions,type ChatActionTarget} from './ChatActions';
 import {ChatListActions} from './ChatListActions';
 import {AssistantChatProvider} from './AssistantChat';
-import {ChatAtmosphere} from './ChatAtmosphere';
-import {ChatEdgeGlass} from './ChatEdgeGlass';
 import {ChatHistorySkeleton} from './ChatHistorySkeleton';
-import {scrollChatToLatest} from './chat-scroll-motion';
+import {ThreadPrimitive} from '@assistant-ui/react';
 import {matchingBoardSelection,type BoardSelection} from './board-selection-context';
 import {boardImageMime,boardImageFile,takeBoardImageDrag,takeQueuedBoardImages,type BoardImage} from './board-image-drag';
 import {prepareBoardConversation,attachBoardConversation,currentBoardConversation,boardChatLane} from './board-conversation';
@@ -25,7 +23,6 @@ import {MobileNavigation} from './MobileNavigation';
 import {watchWindowTheme} from './window-theme';
 import {ChatRunStatus,RunStatusDot,relativeTime,fullTime,dayGroup,dayGroupLabel,runStatusLabel,type RunStatus} from './run-status';
 import {providerName} from './ActivityList';
-import {useTranscriptFollow,transcriptFollowing} from './use-transcript-follow';
 import {useClaudeAccess} from './claude-access';
 import {RunningAction,elapsed} from './RunningAction';
 import {useDetailMode,setDetailMode} from './detail-mode';
@@ -132,7 +129,7 @@ const budgetRangeMessage='Лимит стоимости запроса вне д
 /** A failure that only says the PC cannot be reached; the connection status line already tells it, so screens do not repeat it. */
 const connectivityError=(error:unknown)=>{const problem=(error as {problem?:string}|null)?.problem;return problem==='unreachable'||problem==='tls'||problem==='cleartext'||hostDown(getReachability());};
 const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() || p;
-export type EmbeddedChat={taskDrawer?:HTMLElement;tasksPage?:{initialId?:string;initialRoot?:string;project?:string};onTaskProject?(root:string):void;onOpenTasks?(initialId?:string,owner?:MarkdownChainScope):void;onTaskDraft?(root:string,prompt?:string):void;taskDraft?:{root:string;prompt:string};onTaskDraftUsed?():void;draftStore?:Map<string,Map<string,ChatDraft>>;onTaskProvider?(provider:WorkspaceProvider):void;activity?:ActivityFeed;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardSelection?:BoardSelection|null;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onRevealBoardSelection?(target:BoardRevealTarget):void;onCreated?(session:Session,job:JobView):void;onNewBoardChat?(target:BoardChat):void;onBack():void};
+export type EmbeddedChat={taskDrawer?:HTMLElement;tasksPage?:{initialId?:string;initialRoot?:string;project?:string};onTaskProject?(root:string):void;/** Shown as a provider picker inside a new chat; the host switches provider and keeps the new chat. */onProvider?(value:WorkspaceProvider):void;onOpenTasks?(initialId?:string,owner?:MarkdownChainScope):void;onTaskDraft?(root:string,prompt?:string):void;taskDraft?:{root:string;prompt:string};onTaskDraftUsed?():void;draftStore?:Map<string,Map<string,ChatDraft>>;onTaskProvider?(provider:WorkspaceProvider):void;activity?:ActivityFeed;visible?:boolean;connection:Connection;provider:WorkspaceProvider;session?:Session;cwd:string;jobId?:string;boardSelection?:BoardSelection|null;boardChat?:BoardChat;draft?:string;onBoard?(target:BoardNoticeTarget):void;onRevealBoardSelection?(target:BoardRevealTarget):void;onCreated?(session:Session,job:JobView):void;onNewBoardChat?(target:BoardChat):void;onBack():void};
 function focusLatestMessage(transcript: HTMLElement) {
   const latest = transcript.querySelector<HTMLElement>('.conversation-inner > article.message:last-of-type');
   const target = latest ?? transcript.querySelector<HTMLElement>('.conversation-inner');
@@ -856,7 +853,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     return cancel;
   },[history,provider,readingMode]);
   useLayoutEffect(() => {if (!loading && nearBottom.current && !readingMode) bottom.current?.scrollIntoView({ behavior: 'auto' });}, [loading, selected?.sessionId, provider]);
-  useTranscriptFollow(scroll,nearBottom,(!loading||outputMessages.length>0||Boolean(job?.partial))&&!readingMode&&tab==='chats'&&(embedded?embedded.visible!==false:mobileChat),provider+':'+(selected?.sessionId||'new'));
+  // The transcript follows new output through the assistant-ui viewport while the reader is at the latest message.
+  const followLatest=(!loading||outputMessages.length>0||Boolean(job?.partial))&&!readingMode&&tab==='chats'&&(embedded?embedded.visible!==false:mobileChat);
   function captureScrollAnchor(prepend:boolean) {
     const el=scroll.current;if(!el)return;
     const top=el.getBoundingClientRect().top,elements=[...el.querySelectorAll<HTMLElement>('.conversation-inner > .message')];
@@ -1284,7 +1282,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       </div></aside>
     {boardPane&&<div className="mobile-board-stage" hidden={tab!=='workspace'&&!boardSheet}><WorkBoards key={JSON.stringify([connection!.url,connection!.token,Boolean(connection!.desktop),connection!.workspaceId||'',personalBoards.selected])} active={tab==='workspace'||boardSheet} revealTarget={boardReveal} onSelection={setBoardSelection} focusTarget={noticeTarget} compactContext local connection={connection!} roots={projectRoots} workspaces={personalBoards} onChat={target=>void launchBoardChat(target)}/></div>}
     <main hidden={boardPane&&tab==='workspace'} data-run-unknown={runUnknown||undefined} className={`workspace ${chatSurface?'chat-canvas':''}`} onDragOver={event=>{if(boardChat?.context&&event.dataTransfer.types.includes(boardImageMime)){event.preventDefault();event.dataTransfer.dropEffect='copy';}}} onDrop={event=>{if(!connection||!boardChat?.context||!event.dataTransfer.types.includes(boardImageMime))return;event.preventDefault();const image=takeBoardImageDrag(event.dataTransfer,connection,cwd);if(image&&!selected?.readOnly&&!boardMissing)uploadBoardImages([image]);}}>
-      {chatSurface&&<ChatAtmosphere active={tab==='chats'&&(!embedded||embedded.visible!==false)} empty={!outputMessages.length&&!job}/> }
       {boardSheet&&<BoardChatSheetGrip/>}
       {/* Review must escape the board chat's stacking context and phone sheet clipping.
           Keep it inside the desktop shell to inherit its resizable sidebar width. */}
@@ -1292,7 +1289,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {taskPanel&&taskRun&&connection&&<TaskRunPanel key={taskRun.id} connection={connection} initial={taskRun} onClose={()=>setTaskPanel(false)} onChat={(_run,followUp)=>{setTaskPanel(false);if(followUp)appendDraft(followUp);}} onBoard={target=>{if(embedded?.onBoard)embedded.onBoard(target);else{setNoticeTarget(target);setLocalBoards(true);setTab('workspace');}}}/>}
       {agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
-      {chatSurface&&<ChatEdgeGlass/>}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
         <ChatHeader actionsHost={embedded?.taskDrawer} board={chatBoard?{title:chatBoard.title,disabled:!connection||demo,open:()=>void openChatBoard(chatBoard)}:undefined} hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} close={embedded&&boardChat?.context?{label:language==='ru'?'Закрыть чат доски':'Close board chat',open:()=>embedded.onBack()}:undefined} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}
           status={!embedded&&otherStatus?{value:otherStatus,label:t('Другие чаты: {0}',runStatusLabel(otherStatus))}:undefined} onBack={()=>embedded?embedded.onBack():boardChat?.context?setTab('workspace'):setMobileChat(false)}
@@ -1330,7 +1326,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             }}/>
           </div>
         </div>}/> : contentTab === 'connection' ? connectView() : onboardingVisible ? connectView(true) : contentTab === 'workspace' ? (boardPane?null:<div className="center-message">{t('Подключитесь к ПК в настройках')}</div>) : (contentTab === 'files'||contentTab==='changelog') ? (connection||workspaceConnection) ? <DocumentLibrary connection={(connection||workspaceConnection)!} kind={docView} onKind={setDocView} onChat={connection?(root,prompt)=>{if(busy||uploading)return;newChat(root);setDraft(prompt);}:undefined} onFolderChat={connection?path=>newChat(path):undefined}/> : <div className="center-message">{t("Файлы доступны после подключения к ПК.")}</div> : contentTab === 'settings' ? <SettingsPanel connectionPanel={connectView()} online={!!pcStatus?.online} workspaceSelector={workspacePicker('settings')} page={settingsPage} onPage={page=>{setSettingsSubpage(null);setSettingsPage(page);}} subpageRequest={settingsSubpage} provider={provider} connection={connection} computerName={health.name} networkError={networkError} roots={projectRoots} cwd={cwd} onProject={root=>{newChat(root);setTab('settings');setSettingsPage('workspace');}} appearance={appearanceSettings} codexAccess={codexAccess} onCodexAccess={setCodexAccess} budget={budget} onBudget={setBudget}/> : <>
-        <div className="conversation" ref={scroll} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = transcriptFollowing(el,previous,nearBottom.current);setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;markScrolling();rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
+        <ThreadPrimitive.Viewport className="conversation" ref={scroll} autoScroll={followLatest} scrollToBottomOnInitialize={false} scrollToBottomOnThreadSwitch={false} style={{overflowAnchor:'none'}} onScroll={() => {const el = scroll.current!;if(!el.getClientRects().length||tab!=='chats')return;const previous=lastScrollTop.current;nearBottom.current = el.scrollHeight-el.scrollTop-el.clientHeight<80;setShowScrollActions(fromStart||!nearBottom.current);lastScrollTop.current = el.scrollTop;markScrolling();rememberPosition();acknowledgeVisibleActivity();if(fromStart?el.scrollTop>previous&&nearBottom.current:el.scrollTop<previous&&el.scrollTop<=40)void extendHistory();}}>
           <div className="conversation-inner" tabIndex={-1}>{selected&&!demo&&unreachable&&history.length>0&&<p className="muted history-meta" role="status">{t("Офлайн · сохранённая копия")}</p>}{selected?.readOnly && <p className="info-card">{t("Только просмотр. Чтобы продолжить чат и работать с файлами, запустите сервер с папкой этого проекта: ")}{cwd}</p>}{demo&&<div className="conversation-date"><span />{t("ПРИМЕР РАЗГОВОРА")}<span /></div>}
             {loading && (!history.length?<ChatHistorySkeleton/>:<p className="history-page-status muted" role="status">{t("Загружаем историю с ПК…")}</p>)}
             {!loading && !visibleOutgoing && !history.length && !job && !selected && taskRun && <section className="task-chat-card" aria-label={t('Задача')}><button type="button" className={'task-chat-stage task-stage-text task-stage-'+taskDisplayStage(taskRun)} onClick={()=>setTaskPanel(true)}>{taskRunStageLabel(taskRun)}</button><h2>{taskRun.title}</h2>{taskRun.worktree&&<p className="task-chat-branch"><code>{taskRun.worktree.branch}</code></p>}{(taskRun.noteSnapshot?.description||'').trim()&&<p className="task-chat-criteria">{(taskRun.noteSnapshot?.description||'').trim().split('\n').slice(0,4).join('\n')}</p>}<p className="muted">{t('Проверьте подготовленный запрос и отправьте его, чтобы агент начал. Сам он не отправляется.')}</p></section>}
@@ -1349,13 +1345,13 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             </div></article>}
             <div ref={bottom} />
           </div>
-        </div>
+        </ThreadPrimitive.Viewport>
         {(showScrollActions||fromStart)&&!readingMode&&<button className="scroll-latest" data-scrolling={scrolling||undefined} aria-label={unseen?t('К новым сообщениям: {0}',unseen):t('К новым сообщениям')} title={t('К новым сообщениям')} disabled={loading || busy} onClick={event=>{
           const transcript=scroll.current;
           const keyboardTrigger=event.detail===0?event.currentTarget:undefined;
           if(fromStart||historyExpanded.current||!transcript){void jumpHistory(false,keyboardTrigger);return;}
           nearBottom.current=true;
-          scrollChatToLatest(transcript);
+          transcript.scrollTo({top:transcript.scrollHeight,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
           lastScrollTop.current=transcript.scrollTop;
           if(keyboardTrigger)focusLatestMessage(transcript);
           setShowScrollActions(false);
@@ -1381,7 +1377,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
               label:language==='ru'?'Добавить папку проекта':'Add project folder',value:cwd,paths:projects||health.roots,disabled:busy||uploading||demo,
               onChange:root=>{void api('/chat-library/projects',{cwd:root}).then(()=>{projectChosen.current=true;setCwd(root);window.dispatchEvent(new Event('pocket-chat-project-added'));}).catch(e=>setError(e.message));}
             }:undefined}
-            controls={<>{(provider==='claude'||provider==='codex')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}{account?<ModelPicker provider="custom" name={engineName} models={customModels.models} value={customModels.model} onChange={customModels.setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>:<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>}{(provider==='codex'||provider==='claude'&&!account)&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
+            controls={<>{embedded?.onProvider&&!selected&&!job&&!taskRun&&!boardChat?.context&&<ProviderPicker connection={connection||undefined} value={provider} onChange={embedded.onProvider} disabled={busy||uploading}/>}{(provider==='claude'||provider==='codex')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}{account?<ModelPicker provider="custom" name={engineName} models={customModels.models} value={customModels.model} onChange={customModels.setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>:<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>}{(provider==='codex'||provider==='claude'&&!account)&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
             usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||claudeDefaultModel)).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']}/>}/>
         </div></ChatOverlay>
       </>}

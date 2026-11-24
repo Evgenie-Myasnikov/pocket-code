@@ -70,7 +70,7 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
      (window as any).chatChanges={...(window as any).chatChanges,[key]:erase?{action:'delete'}:message.data};
      reply(id,erase?{deleted:true,originalRemoved:true}:{ok:true});return;
    }
-   if(p==='/sessions'){reply(id,((window as any).testChatRows||[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}]).filter((s:any)=>(window as any).chatChanges?.[provider+':'+s.sessionId]?.action!=='delete').map((s:any)=>({...s,customTitle:(window as any).chatChanges?.[provider+':'+s.sessionId]?.title})));return;}
+   if(p==='/sessions'){reply(id,((window as any).testChatRowsBy?.[provider]||(window as any).testChatRows||[{sessionId:'alpha',summary:provider+' · Interface review',cwd:'C:\\Demo\\Atlas',lastModified:2},{sessionId:'beta',summary:provider+' · Documentation',cwd:'C:\\Demo\\Garden',lastModified:1}]).filter((s:any)=>(window as any).chatChanges?.[provider+':'+s.sessionId]?.action!=='delete').map((s:any)=>({...s,customTitle:(window as any).chatChanges?.[provider+':'+s.sessionId]?.title})));return;}
    if(p==='/provider-connections'){reply(id,{providers:['claude','codex','copilot'].map(id=>({id,installed:true,version:'1.0.0',server:id==='claude'?'on-demand':'ready',authenticated:id==='claude',busy:false,login:{state:'idle'},methods:id==='claude'?['browser','console','sso']:['browser','device']}))});return;}
    if(p==='/devices'){reply(id,(window as any).testDevices||[]);return;}
    if(p==='/document-projects'){reply(id,[{root:'C:\\Demo\\Atlas',name:'Atlas',documents:[]}]);return;}

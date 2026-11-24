@@ -24,13 +24,9 @@
 @media(max-width:600px){.project-board-index.board-index{padding:16px 20px}.project-board-index .board-index-actions{gap:8px}.board-gallery-search{flex-basis:100%}.project-board-grid.project-board-grid{gap:20px}}
 @media(prefers-reduced-motion:reduce){.project-board-grid .board-index-item.board-index-item{transition:none}}
 /* Board tiles use the shared glass material: frosted fill, light edge and the sheen of floating surfaces. */
-@supports(backdrop-filter:blur(1px)){
- :root[data-theme][data-theme] .project-board-grid .board-index-item.board-index-item{background:var(--ui-material-sheen),var(--ui-material-fill);border:1px solid var(--ui-material-edge);border-radius:var(--ui-radius-card,18px);box-shadow:var(--ui-material-shadow);-webkit-backdrop-filter:blur(14px) saturate(110%);backdrop-filter:blur(14px) saturate(110%);transition:border-color .16s,box-shadow .16s}
- :root[data-theme][data-theme] .project-board-grid .board-index-item.board-index-item:hover{border:1px solid color-mix(in srgb,var(--accent) 45%,var(--ui-material-edge));background:var(--ui-material-sheen),var(--ui-material-fill);box-shadow:var(--ui-material-shadow),0 6px 22px var(--shadow-soft)}
- :root[data-theme][data-theme] .project-board-grid .board-preview-stage{background:color-mix(in srgb,var(--bg) 35%,transparent);margin:6px 6px 0;width:calc(100% - 12px);box-sizing:border-box}
-}
-@media(prefers-reduced-transparency:reduce){:root[data-theme][data-theme] .project-board-grid .board-index-item.board-index-item{background:var(--panel);-webkit-backdrop-filter:none;backdrop-filter:none}}
-@media(forced-colors:active){:root[data-theme][data-theme] .project-board-grid .board-index-item.board-index-item{background:Canvas;border-color:CanvasText;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}}
+
+@media(prefers-reduced-transparency:reduce){:root[data-theme][data-theme] .project-board-grid .board-index-item.board-index-item{background:var(--panel);}}
+@media(forced-colors:active){:root[data-theme][data-theme] .project-board-grid .board-index-item.board-index-item{background:Canvas;border-color:CanvasText;box-shadow:none;}}
 /* Square previews with the title below; the person picks the tile width with the size slider. */
 .project-board-index .project-board-grid.project-board-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--board-tile,220px)),var(--board-tile,220px)));justify-content:start}
 .project-board-grid .board-index-item.board-index-item{height:auto;min-height:0}

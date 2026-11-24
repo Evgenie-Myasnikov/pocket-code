@@ -18,6 +18,6 @@ export function ChatListActions({session,connection,provider,jobId,running,disab
  const BellIcon=muted?BellOff:Bell;
  return <span className="chat-list-action-slot" style={row?{gridRow:row}:undefined}>
   <button ref={bell} type="button" className="chat-mute-action" aria-label={ru?'Уведомления чата':'Chat notifications'} aria-pressed={!muted} aria-description={title} title={action+' · '+title} disabled={!connection} onClick={toggle}><BellIcon size={16} aria-hidden="true"/></button>
-  <button ref={button} type="button" className="chat-list-action" aria-label={label} aria-description={title} title={label+' · '+title} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onPointerDown={event=>{if(open)event.stopPropagation();}} onClick={event=>{event.currentTarget.focus({preventScroll:true});if(open){onClose();return;}const rect=event.currentTarget.getBoundingClientRect();onOpen({session,running,x:rect.right-240,y:rect.bottom+4});}}><MoreHorizontal size={18} aria-hidden="true"/></button>
+  <button ref={button} type="button" className="chat-list-action" aria-label={label} aria-description={title} title={label+' · '+title} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onPointerDown={event=>{if(open)event.stopPropagation();}} onClick={event=>{event.currentTarget.focus({preventScroll:true});if(open){onClose();return;}const rect=event.currentTarget.getBoundingClientRect();onOpen({session,running,x:rect.right+6,y:rect.top});}}><MoreHorizontal size={18} aria-hidden="true"/></button>
  </span>;
 }
