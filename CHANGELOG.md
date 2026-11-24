@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.28.63 (2026-11-24)
+
+### Validation
+
+- Browser scenarios on Edge: 31 passed across the new chat placeholder, side panel and its drag speed, transcript rhythm, font, motion, token line, board and board selection, flat chat list, follow-up composer, board point chats and the Tasks provider menu.
+- Still failing, also on 0.28.62 without these changes: "codex saved chats reopen from cache without another health gate or stale navigation", "Codex keeps expanded beginning pages while reading and refreshes on Latest" and "a provider whose sign-in is still being checked takes the message and starts the turn once it is confirmed" time out.
+- Not checked: the installed Windows application, a phone, the full browser suite.
+
+### Features
+
+- Motion after Strata (2026-11-24). A streamed answer fades in word by word as it arrives (Streamdown's own fadeIn, 240 ms, ease-out, never ahead of the text); saved text appears at once. New transcript blocks rise in over 240 ms by 6 px with Strata's ease-out curve, and the turn result card, the model menu, the folder chip and the side panel (sliding in from the right) enter the same way. Reduced motion turns all of it off.
+  - Validation: 2 browser scenarios on Edge (word animation and its timing during a running turn; none with reduced motion) passed with the transcript, side panel, turn result, code highlighting and chat list scenarios.
+- Token line while a turn runs (2026-11-24). Until the provider reports the current turn, the line keeps the chat's total tokens and the last reply's speed from the saved record of the last turn, labelled "last reply"; the provider's numbers for the current turn replace them as they arrive. A speed is never estimated from text length. For API connections the saved record no longer brings back Claude Code's guessed context window.
+  - Validation: the token line browser spec was updated to the 0.28.61 wording (it still expected the old one) and a new scenario for a running turn passed.
+- Chat frame (2026-11-24). The chat and the docked side panel are framed cards with a 1 px outline and rounded corners on the window background, as in Strata. Dragging the side panel's edge measures the width from the panel's own right side, so it no longer creeps by the frame's margin on each click.
+  - Validation: the side panel browser scenario now checks the frame instead of the old background difference and passed with the drag speed scenario.
+
+### Bug Fixes
+
+- New chat without the history placeholder (2026-11-24). Sending the first message of a new chat no longer flashes the history skeleton or moves the message bubble: the chat view stays mounted while the new chat gets its saved id, and the placeholder shows only for a saved chat with nothing yet to show.
+  - Validation: a new browser scenario watches the whole open for the placeholder and passed.
+- Carbon swatch (2026-11-24). The Carbon theme swatch in Appearance shows the theme's own Strata colours.
+- Board selection (2026-11-24). Selecting the whole board (Ctrl+A or a selection frame) outlines every object but shows resize handles only when one object is selected, so a large board no longer turns into a grid of handles.
+  - Validation: a new board browser scenario passed with the board and selection scenarios.
+
 ## [0.28.62](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.61...v0.28.62) (2026-11-24)
 
 Published [0.28.62](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.62) from [72f4f26](https://github.com/Evgenie-Myasnikov/pocket-code/commit/72f4f26a00d43f1f8c4ec7ef823a4e352b49acd4) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows application, update manifest) match the local SHA-256 hashes. The privacy guard passed on the commit, and the unpacked assets were searched for the local home path, account name, employer name, author e-mail, keys and tokens without findings (the public repository owner appears only in release links). The APK is signed with the same key as 0.28.61 (certificate SHA-256 beginning d0e5792c). Built from a separate clean checkout of the same commit. Physical Android installation, the installed Windows application and the full browser suite were not run.

@@ -726,7 +726,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const account='account' in chat && typeof chat.account==='string'?chat.account:undefined;
     const matches=engineFor(provider).list().filter(job=>job.sessionId===chat.sessionId&&job.account===account)
       .sort((a,b)=>b.startedAt-a.startedAt);
-    res.json({generation:matches.length?matches[0].generation:await generationStore.get(provider,chat.sessionId,account)});
+    const generation=matches.length?matches[0].generation:await generationStore.get(provider,chat.sessionId,account);
+    // A chat through an API connection only states a window this host knows (records saved before held Claude Code's guess).
+    if(account&&generation){const window=jobs.contextWindowFor?.(account);const {contextWindow:_guess,...rest}=generation;res.json({generation:window?{...rest,contextWindow:window}:rest});return;}
+    res.json({generation});
   });
   const chatPageSync=new ChatPageSync();
   app.get('/api/sessions/:id/messages', async (req, res) => {

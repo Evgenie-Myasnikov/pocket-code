@@ -79,3 +79,16 @@ test('a board of 500 cards and 974 connections renders only what is on screen an
   console.log(JSON.stringify({shown,panMs:Date.now()-started,cardMetadataRenders:renders}));
   expect(renders).toBeLessThan(200);
 });
+
+test('selecting the whole board outlines every object but shows resize handles only for a single selected object',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});await page.goto(url);
+  await expect(page.locator('.whiteboard-item')).toHaveCount(5);
+  await page.locator('.whiteboard-viewport').click({position:{x:20,y:20}});
+  await page.keyboard.press('Control+a');
+  await expect(page.locator('.wb-selected')).toHaveCount(5);
+  await expect(page.locator('.wb-resize-handle')).toHaveCount(0);
+  await page.keyboard.press('Escape');await expect(page.locator('.wb-selected')).toHaveCount(0);
+  await node(page,4).locator('.whiteboard-text').click();
+  await expect(page.locator('.wb-selected')).toHaveCount(1);
+  await expect(node(page,4).locator('.wb-resize-handle')).toHaveCount(4);
+});

@@ -31,8 +31,9 @@ test('a file from the turn result opens as a tab of the side panel and the chat 
  // the foreground is a step lighter than the chat, and the chat list sits between the icon strip and the chat (after Strata)
  const bg=(selector:string)=>page.locator(selector).first().evaluate(e=>getComputedStyle(e).backgroundColor);
  const transparent=(value:string)=>value==='rgba(0, 0, 0, 0)';
- expect(await bg('.chat-side-panel')).not.toBe(await bg('.desktop-app'));expect(transparent(await bg('.file-reader-docked'))).toBe(true);
- expect(await bg('.desktop-rail')).not.toBe(await bg('.desktop-app'));expect(await bg('.desktop-chat-host header.chat-header')).toBe(await bg('.desktop-rail'));
+ // the chat and the panel are framed cards on the app background: the chat is a step darker, both have a 1px outline
+ expect(await bg('.desktop-main')).not.toBe(await bg('.desktop-app'));expect(transparent(await bg('.file-reader-docked'))).toBe(true);
+ for(const selector of ['.desktop-main','.chat-side-panel'])expect(await page.locator(selector).first().evaluate(e=>getComputedStyle(e).borderTopWidth)).toBe('1px');expect(await bg('.desktop-chat-host header.chat-header')).toBe(await bg('.desktop-rail'));
  // the left edge drags like a splitter; the width is remembered and double-click returns to half the chat area
  const edge=panel.getByRole('separator',{name:'Panel width'}),before=(await panel.boundingBox())!;
  const grip=(await edge.boundingBox())!;await page.mouse.move(grip.x+grip.width/2,grip.y+300);await page.mouse.down();await page.mouse.move(grip.x-80,grip.y+300,{steps:6});await page.mouse.up();

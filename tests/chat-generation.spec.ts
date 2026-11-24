@@ -20,10 +20,10 @@ test('switching chats ignores a late metrics read and shows only provider-report
   await alpha.click();await expect.poll(()=>page.evaluate(()=>!!(window as any).releaseMetrics)).toBe(true);
   await beta.click();await page.evaluate(()=>(window as any).releaseMetrics());
   const footer=page.getByRole('group',{name:'Token usage'});
-  await expect(footer).toHaveText('Total tokens 15K');await expect(footer).not.toContainText('Generated');
+  await expect(footer).toHaveText('15Ktotal tokens');await expect(footer).not.toContainText('Generated');
   await alpha.click();
-  await expect(footer).toContainText('55 tokens/s· last response');await expect(footer).toContainText('Generated 421');
-  await expect(footer).toContainText('Total tokens 16.2M');await expect(footer).toContainText('68% context');
+  await expect(footer).toContainText('55tok/s · last reply');
+  await expect(footer).toContainText('16.2Mtotal tokens');await expect(footer).toContainText('68% of context');
   if(process.env.POCKET_TOKEN_FOOTER_PREVIEW)await footer.screenshot({path:process.env.POCKET_TOKEN_FOOTER_PREVIEW});
 });
 
@@ -50,4 +50,18 @@ test('the phone wraps generation statistics and an older unmetered chat omits th
   if(process.env.POCKET_TOKEN_PHONE_PREVIEW)await footer.screenshot({path:process.env.POCKET_TOKEN_PHONE_PREVIEW});
   await page.getByRole('button',{name:/К списку чатов|Назад к чатам/}).click();await page.locator('.sidebar .session-row').filter({hasText:'Legacy sample'}).click();
   await expect(footer).toHaveCount(0);
+});
+
+test('while a turn runs and the provider has reported only the context, the chat total and the last reply speed stay',async({page})=>{
+  await page.addInitScript(()=>{
+    const w=window as any;
+    w.testSessionGeneration=()=>({generation:{outputTokensPerSecond:4.1,totalTokens:17700,contextTokens:17700,contextWindow:32768}});
+    w.testRuns=[{id:'run-alpha',provider:'claude',sessionId:'alpha',cwd:'C:\Demo\Atlas',status:'running',messages:[],partial:'',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0,generation:{contextTokens:4600}}];
+  });
+  await desktop(page);
+  await page.locator('.desktop-sessions > button[data-chat-id="alpha"]').click();
+  const footer=page.getByRole('group',{name:'Token usage'});
+  await expect(footer).toContainText('4.1tok/s · last reply');await expect(footer).toContainText('17.7Ktotal tokens');
+  // the live count has no known window, so no share of the context is borrowed from the last turn
+  await expect(footer).not.toContainText('% of context');
 });

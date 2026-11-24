@@ -53,3 +53,10 @@
 /* Chat list rows as dense as Strata's, also on PCs with a touch screen (the touch rule made every row 48 px tall). */
 :root[data-theme][data-theme][data-theme] .desktop-app>.desktop-rail .desktop-sessions>button{min-height:34px;padding-block:6px}
 :root[data-theme][data-theme][data-theme] .desktop-app>.desktop-rail .chat-list-action-slot :is(.chat-list-action,.chat-mute-action){width:28px;min-width:28px;height:28px;min-height:28px}
+/* The chat is a framed field, as in Strata: inset from the window edge with rounded corners and a thin border;
+   the side panel beside it is framed the same way. */
+:root[data-theme][data-theme] .desktop-app{background:var(--panel)}
+:root[data-theme][data-theme][data-theme] .desktop-app>.desktop-main{margin:6px 6px 6px 0;border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden}
+:root[data-theme][data-theme][data-theme] .chat-side-panel:not([data-expanded]){inset:6px 6px 6px auto;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+:root[data-theme][data-theme][data-theme] .chat-side-panel[data-expanded]{inset:6px 6px 6px var(--desktop-rail-width,290px);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+:root[data-theme][data-theme][data-theme][data-chat-side-panel=docked] .desktop-app>.desktop-main{margin-inline-end:calc(var(--chat-side-width) + 12px);padding-inline-end:0}

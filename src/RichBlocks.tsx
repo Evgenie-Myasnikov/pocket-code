@@ -5,6 +5,7 @@ import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
 import {ChevronDown,Ellipsis,Lightbulb,WrapText,X} from 'lucide-react';
 import './transcript.css';
+import 'streamdown/styles.css';
 import './activity-quiet.css';
 import './strata-shell.css';
 import type { Block, SubagentView } from '../server/types';
@@ -154,10 +155,13 @@ const markdownElements:NonNullable<ComponentProps<typeof Streamdown>['components
   },
 };
 
-/** Markdown is rendered as it arrives; there is no pacing or per-glyph reveal. */
+/** As in Strata: words of a streamed answer fade in as they arrive (240 ms, ease-out), never ahead of the text; saved text is static. */
+const streamAnimation={animation:'fadeIn' as const,duration:240,easing:'cubic-bezier(0,0,.2,1)',sep:'word' as const,maxBacklogMs:320};
+const reducedMotion=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const Markdown=memo(function Markdown({text,streaming=false}:{text:string;streaming?:boolean;animateInitial?:boolean}) {
   useLanguage();
-  return <div className="markdown"><Streamdown mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={false} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
+  const animate=streaming&&!reducedMotion();
+  return <div className="markdown"><Streamdown mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={animate?streamAnimation:false} isAnimating={animate} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.

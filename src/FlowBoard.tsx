@@ -36,7 +36,7 @@ type NodeData={item:Item;flags:string;mark?:NodeMark};
 type BoardNode=Node<NodeData,'board'>;
 type Draft={text:string;description?:string};
 /** What every object on the canvas needs from the board; it changes rarely, so typing in one editor does not render the others. */
-type Shared={ru:boolean;disabled:boolean;editingId:string|null;renderCard?(id:string):ReactNode;taskText?:{connection:Connection;cwd:string};
+type Shared={ru:boolean;disabled:boolean;single:boolean;editingId:string|null;renderCard?(id:string):ReactNode;taskText?:{connection:Connection;cwd:string};
   edit(id:string|null):void;finish(id:string,draft:Draft):void;resize(id:string,box:{x:number;y:number;width:number;height:number}):void;interact(active:boolean):void};
 const BoardContext=createContext<Shared>(null!);
 const DESCRIPTION_LIMIT=20000;
@@ -63,7 +63,7 @@ const BoardObject=memo(function BoardObject({id,data,selected}:NodeProps<BoardNo
   const metadata=useMemo(()=>item.kind==='card'?shared.renderCard?.(id):null,[shared.renderCard,id,item.kind]);
   const editing=shared.editingId===id&&item.kind!=='chart';
   return <article data-canvas-id={id} data-note-id={item.kind==='card'?id:undefined} className={`whiteboard-item wb-${item.kind} wb-${item.color}${flags}${selected?' wb-selected':''}${mark?' wb-issue-'+mark.level:''}`}>
-    {selected&&!shared.disabled&&<NodeResizer minWidth={120} minHeight={80} maxWidth={6000} maxHeight={6000} handleClassName="wb-resize-handle" lineClassName="wb-resize-line"
+    {selected&&shared.single&&!shared.disabled&&<NodeResizer minWidth={120} minHeight={80} maxWidth={6000} maxHeight={6000} handleClassName="wb-resize-handle" lineClassName="wb-resize-line"
       onResizeStart={()=>shared.interact(true)} onResizeEnd={(_,box)=>{shared.interact(false);shared.resize(id,box);}}/>}
     {mark&&<span className="wb-issue-badge" role="img" aria-label={mark.title} title={mark.title}>!</span>}
     {editing?<NodeEditor item={item}/>
@@ -251,12 +251,12 @@ function Board({value,editable,busy,onSave,onChatAt,overlay,toolbarHost,renderCa
     void change({...board,links:board.links.map(link=>link.id===edge.id?{...link,from,to,fromSide:(connection.sourceHandle||undefined) as PortSide|undefined,toSide:(connection.targetHandle||undefined) as PortSide|undefined}:link)});
   }
 
-  const shared=useMemo<Shared>(()=>({ru,disabled:!editable||busy,editingId,renderCard,taskText:taskTextConnection&&taskTextRoot?{connection:taskTextConnection,cwd:taskTextRoot}:undefined,
+  const shared=useMemo<Shared>(()=>({ru,disabled:!editable||busy,single:selected.length===1,editingId,renderCard,taskText:taskTextConnection&&taskTextRoot?{connection:taskTextConnection,cwd:taskTextRoot}:undefined,
     edit:setEditingId,interact:setInteracting,
     finish:(id,draft)=>{const now=boardRef.current,item=now.items.find(i=>i.id===id);if(!item||item.text===draft.text&&(item.description||'')===(draft.description||'')){setEditingId(null);return;}
       void change({...now,items:now.items.map(i=>i.id===id?{...i,text:draft.text,...(i.kind==='card'?{description:draft.description}:{})}:i)}).then(ok=>{if(ok)setEditingId(null);});},
     resize:(id,box)=>{const now=boardRef.current;void change({...now,items:now.items.map(i=>i.id===id?{...i,x:clamp(box.x,100000),y:clamp(box.y,100000),width:Math.max(120,Math.min(6000,Math.round(box.width))),height:Math.max(80,Math.min(6000,Math.round(box.height)))}:i)});},
-  }),[ru,editable,busy,editingId,renderCard,taskTextConnection,taskTextRoot]);
+  }),[ru,editable,busy,selected.length===1,editingId,renderCard,taskTextConnection,taskTextRoot]);
 
   const selectedCard=selected.length===1&&itemsById.get(selected[0])?.kind==='card'?selected[0]:null;
   const selectedActions=selectedCard&&!editingId?(cardActions?.(selectedCard)||[]):[];
