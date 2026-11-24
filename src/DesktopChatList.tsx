@@ -221,7 +221,7 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
       })()}</div>}
       {hidden>0&&<button type="button" className="rail-action desktop-more-chats" onClick={()=>setLimit(shown.length+CHAT_PAGE)}><ChevronDown size={16} aria-hidden="true"/><span>{l('Show more chats','Показать ещё чаты')} · {hidden}</span></button>}
       {archivedCount>0&&<button type="button" className="rail-action desktop-archived-chats" aria-pressed={showArchived} onClick={()=>{setShowArchived(value=>!value);setLimit(CHAT_PAGE);}}><Archive size={15} aria-hidden="true"/><span>{showArchived?l('Back to chats','Назад к чатам'):l('Archived','Архив')+' · '+archivedCount}</span></button>}
-      {!loading&&!ordered.length&&<p className="muted">{online?l('No chats yet','Чатов пока нет'):l('Chats will load when the local server is available.','Чаты загрузятся, когда локальный сервер будет доступен.')}</p>}
+      {!loading&&!ordered.length&&!online&&<p className="muted">{l('Chats will load when the local server is available.','Чаты загрузятся, когда локальный сервер будет доступен.')}</p>}
     </div>
     {folderMenu&&<CardActionMenu point={folderMenu} label={l('Folder actions','Действия папки')} onClose={()=>setFolderMenu(undefined)} items={[
       {label:l('Rename','Переименовать'),Icon:Pencil,onSelect:()=>{setRenaming(folderMenu.id);setFolderMenu(undefined);}},

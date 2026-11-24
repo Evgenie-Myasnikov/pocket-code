@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.28.62 (2026-11-24)
+
+### Validation
+
+- Server and unit tests from PowerShell: 615 tests, 611 passed, 1 skipped, 3 failed, the same three as on earlier releases.
+- Browser scenarios on Edge: 32 passed across the chat list and folders, settings rows (including the updated providers page scenario), the local model, font, transcript rhythm, side panel drag speed, side panel, turn result, code highlighting, action lines, the step editor and the Tasks provider menu.
+- Tasks also chooses the provider and model with the chat header menu, and an empty chat list no longer says "No chats yet" (1 new scenario).
+- Removed with their entry points (Create chain, Import Markdown and Plan with AI left the Tasks page in 0.28.60): the browser specs of the chain planner, the Markdown task batch and the Markdown task editor, and the Markdown import scenario of the step navigation spec. The step editor scenario now starts from Create Task.
+- Still failing, also on 0.28.59: the step navigation scenario "a step opens in its assigned provider and links back to the original chain" does not find the link back to the chain after opening the step chat.
+- Not checked: the installed Windows application, a phone, the full browser suite.
+
+### Bug Fixes
+
+- Context share of a local model (2026-11-24). A chat through an API connection showed Claude Code's guess of a 1,000,000-token context window for a model name it does not know, so the share of the context under the message field was wrong. The window now comes from what Pocket Code knows: the context the local Strata model was started with; for other API connections, and after a host restart, no window and no share are shown.
+  - Validation: 1 test of the real Jobs view (a known 32K window replaces the guess; an unknown one removes it) passed.
+- Real local model check (2026-11-24). On this PC, through the running Pocket Code 0.28.61 server (the requests the PC window sends; the window itself passes them from this version on): Strata 0.1.65 found both downloaded models; Coder IQ1_M started at a 32K context in about 30 s on port 18600 without the Strata window; Pocket Code saved the connection "Strata · coder-iq1_m" with its model; a chat turn through it answered "pong" in 9 s (about 4 tokens/s); the model stopped and freed the GPU. The run exposed the context window guess fixed above. Starting from the button in the installed window was not checked.
+
+### Features
+
+- Chat names (2026-11-24). After the first turn of a chat started in Pocket Code, the chat's own provider (with its model, or the API connection and its first model) names it in 2 to 6 words from the first message, through the same isolated, tool-less runtime as the task editor. A name the person gave is kept; a busy, failing or too long answer leaves the provider's own summary. This costs one short request to that provider per new chat.
+  - Validation: 2 unit tests (the title is cleaned of quotes, a final period and extra lines; an API connection uses its own model; a busy, failing, unavailable or over-long answer gives no title) passed. A real provider naming a chat was not run.
+- Font (2026-11-24). Appearance has a Font row for the interface and the chat: VS Code's fonts (the default), Golos Text, Manrope, the system font, or any installed font by its family name (only letters, digits, spaces, dots and hyphens are kept).
+  - Validation: 1 browser scenario on Edge (the default is Segoe UI, Manrope applies at once, an installed font name survives a reload and loses CSS punctuation) passed.
+- Chat list rows are 34 px high in the PC window, also on PCs with a touch screen, where a touch rule made them 48 px.
+
+### Performance
+
+- Side panel resize (2026-11-24). Dragging the side panel edge sets the width once per frame, and transcript blocks and lines of the open file outside the view are not laid out until they scroll in. On a synthetic chat of 120 command and answer pairs with a 300-section changelog open, the worst frame while dragging went from 83 ms (8 frames over 50 ms) to 35–49 ms (none over 50 ms) in headless Edge; a new browser scenario keeps the worst frame under 90 ms. The installed window was not measured.
+
+### Bug Fixes
+
+- Windows window (2026-11-24). The installed PC window refused the requests added in 0.28.60 and 0.28.61 with "This desktop request is not allowed": the local model panel and the header's local models, Import chats and the file sizes of a turn result. The Windows shell passes only listed endpoints to the PC server; `/local-models` (read) and `/local-models/start`, `/local-models/stop`, `/chat-library/import`, `/file-sizes` (write) are now listed. The browser tests replace that bridge and allow every endpoint, so they could not catch it.
+  - Validation: a small program compiled with the shell's C# 5 compiler against `desktop/DesktopWindow.cs` confirmed the five endpoints are allowed, local model actions are writes only, an extra path segment and an unrelated write stay blocked, and an existing read is still allowed. The same checks were added to `tests/DesktopSmoke.cs`; on this PC that smoke test stops earlier at its window minimise check, before any endpoint check. The installed application was not checked.
+
+### Changes
+
+- Settings → Providers (2026-11-24). Usage limits and Custom providers are plain rows like the rest of Settings: one card, rows separated by thin lines, no inner rounded boxes, no glassy background and no accent bar on the selected row.
+  - Usage limits: one row per provider with its tightest window, the reset time and when it was checked, the remaining share on the right and a refresh button. The separate "Claude usage limits" block under the rows is gone. Values come only from each provider's usage API; a failed or missing read shows "No data", never a percentage.
+  - Custom providers: each provider and "Add custom provider" is a row with a chevron that opens its page.
+  - Validation: `tests/settings-rows.spec.ts`, 5 browser scenarios on Edge, passed, including a new one that finds no inner frame, background image or inset shadow in both cards and reads a synthetic usage value with its check time. The 4 local-model scenarios passed, and the chat-list-flat scenario "all providers are on one settings page", failing since 0.28.60 on the old `.provider-section` count, now checks the cards and passes. TypeScript and the design token, translation and palette contrast checks passed. Not checked in the installed Windows application.
+
+- Appearance (2026-11-24). The colour-blind colours switch is removed at the product owner's request; a saved choice no longer applies.
+
 ## [0.28.61](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.60...v0.28.61) (2026-11-24)
 
 Published [0.28.61](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.61) from [91603ca](https://github.com/Evgenie-Myasnikov/pocket-code/commit/91603cabef2f2b4682ee0ad6e04396bef9e5deda) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows application, update manifest) match the local SHA-256 hashes. The privacy guard passed on the commit, and the unpacked assets were searched for the local home path, account name, employer name, author e-mail, keys and tokens without findings (the public repository owner appears only in release links). The APK is signed with the same key as 0.28.60 (certificate SHA-256 beginning d0e5792c). Built from a separate clean checkout of the same commit. Physical Android installation, the installed Windows application and the full browser suite were not run.

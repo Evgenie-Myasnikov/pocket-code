@@ -67,3 +67,20 @@ test('Chat settings have a Chat list card whose Import chats row brings provider
  await expect(list.getByRole('button',{name:'Import',exact:true})).toBeEnabled();
  expect(await page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.endpoint==='/chat-library/import'))).toBeFalsy();
 });
+
+test('usage limits and custom providers are plain rows: no inner boxes, gradients or accent bars, no second usage block',async({page})=>{
+ await page.addInitScript(()=>{localStorage.setItem('pocket-code-language-v1','en');(window as any).testTaskTextAccounts=[{id:'5b7c0d3e-0000-4000-8000-00000000b001',name:'Synthetic local',url:'http://127.0.0.1:47000/v1'}];(window as any).testUsage={claude:{ordinaryUsageAllowed:true,buckets:[{id:'session',name:'Session',windows:[{id:'primary',usedPercent:38,remainingPercent:62,windowDurationMins:300,resetsAt:Math.floor(Date.now()/1000)+3600}]}]}};});
+ await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();await open(page,'Providers');
+ const usage=page.getByRole('region',{name:'Usage limits',exact:true}),custom=page.getByRole('region',{name:'Custom providers',exact:true});
+ await expect(usage.locator('.settings-row')).toHaveCount(3);
+ await expect(usage.locator('.codex-usage,.usage-overview')).toHaveCount(0);
+ await expect(usage.getByRole('button',{name:'Refresh limits · Claude'})).toBeVisible();
+ const claudeRow=usage.locator('.settings-row').filter({hasText:'Claude'}).first();await expect(claudeRow).toContainText('62% remaining');await expect(claudeRow).toContainText('Checked:');
+ await expect(usage.locator('.settings-row').filter({hasText:'Codex'})).toContainText('No data');
+ await expect(custom.getByRole('button',{name:'Synthetic local'})).toBeVisible();
+ await expect(custom.getByRole('button',{name:/Add custom provider/})).toBeVisible();
+ // Inside both cards nothing draws its own frame: no rounded inner border, no background image, no inset bar.
+ const framed=await page.evaluate(()=>[...document.querySelectorAll<HTMLElement>('.settings-usage .settings-card *, .settings-block:has(.settings-row-link) .settings-card *')].filter(el=>{if(el.matches('button.icon-button,button.icon-button *'))return false;const c=getComputedStyle(el);return c.backgroundImage!=='none'||c.boxShadow!=='none'||(parseFloat(c.borderTopLeftRadius)>0&&parseFloat(c.borderLeftWidth)>0);}).map(el=>el.className));
+ expect(framed).toEqual([]);
+ await page.setViewportSize({width:1400,height:2400});await page.locator('.settings-detail').screenshot({path:'artifacts/screenshots/settings-rows-providers-usage.png'});
+});

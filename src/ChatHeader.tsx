@@ -44,7 +44,7 @@ export function ChatHeader({panel,model,docs=[],actionsHost,close,board,hideCont
   if(panel&&!actionsHost&&!contextMenuOnly){
     const hasPanel=panel.available;
     return <header className="chat-header chat-header-conversation chat-header-assistant chat-header-panel" data-section="chats">
-      <div className="chat-header-main"><div className="header-title"><h1 title={title}>{title}</h1>{model}
+      <div className="chat-header-main"><div className="header-title"><h1 title={title}>{title}</h1>{model}{context}
         {board&&<button className="chat-board-link" disabled={board.disabled} title={t('Открыть доску')} aria-label={t('Чат доски: {0}',board.title)+'. '+t('Открыть доску')} onClick={board.open}><LayoutDashboard size={14} aria-hidden="true"/><span>{board.title}</span></button>}
       </div></div>
       <div className="chat-header-actions" role="group" aria-label={t('Действия чата')}>

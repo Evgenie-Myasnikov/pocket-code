@@ -38,6 +38,8 @@ export class Jobs {
   private boardMcp:BoardMcpConfiguration=()=>({});
   setBoardMcpConfiguration(config:BoardMcpConfiguration){this.boardMcp=config;}
   recordGeneration?:(job:JobView)=>void;
+  /** The real context window of an API connection's model; Claude Code reports a guess for model names it does not know. */
+  contextWindowFor?:(account:string)=>number|undefined;
   private jobs = new Map<string, Job>();
   private sessionListeners: ((job: { sessionId: string; account?: string }) => void)[] = [];
   /** Called once a task learns its session ID, so a custom provider account is recorded before any list request. */
@@ -139,6 +141,7 @@ export class Jobs {
         // neither replace the parent identity nor be appended to its transcript.
         if ('parent_tool_use_id' in event && event.parent_tool_use_id) { job.revision++; continue; }
         generation.observe(job,event);
+        if(job.account&&job.generation&&(job.generation.contextWindow!==undefined||job.generation.contextTokens!==undefined)){const window=this.contextWindowFor?.(job.account);if(window)job.generation.contextWindow=window;else delete job.generation.contextWindow;}
         if (event.type==='stream_event' && !job.stopRequested && !job.controller.signal.aborted) {
           const part=event.event;
           if (part.type==='message_start'){

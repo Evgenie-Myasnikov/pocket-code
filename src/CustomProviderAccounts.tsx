@@ -33,9 +33,13 @@ function useCustomProfiles(connection:Connection|null,online:boolean){
 }
 
 /** Rows for custom providers in the AI accounts list, after the built-in providers. */
-export function CustomProviderList({connection,online=true,onOpen}:{connection:Connection|null;online?:boolean;onOpen(id:string|'new'):void}){
+/** rows: plain rows for a card of the PC window (a name and one line on the left, a chevron on the right). */
+export function CustomProviderList({connection,online=true,onOpen,rows=false}:{connection:Connection|null;online?:boolean;onOpen(id:string|'new'):void;rows?:boolean}){
   const {profiles,error}=useCustomProfiles(connection,online);
   if(!connection||!online)return null;
+  if(rows)return <>{(Array.isArray(profiles)?profiles:[]).map(p=><button type="button" className="settings-row settings-row-link" key={p.id} aria-labelledby={'custom-provider-'+p.id} aria-describedby={'custom-provider-'+p.id+'-summary'} onClick={()=>onOpen(p.id)}><span className="settings-row-text"><strong id={'custom-provider-'+p.id}>{p.name}</strong><small id={'custom-provider-'+p.id+'-summary'}>{customStatusLabel(p)} · {host(p.url)}</small></span><span className="settings-row-control"><ChevronRight size={18} aria-hidden="true"/></span></button>)}
+    <button type="button" className="settings-row settings-row-link" onClick={()=>onOpen('new')}><span className="settings-row-text"><strong><Plus size={16} aria-hidden="true"/> {t('Добавить свой провайдер')}</strong><small>{t('OpenAI-совместимый API: URL и API-ключ')}</small></span><span className="settings-row-control"><ChevronRight size={18} aria-hidden="true"/></span></button>
+    {error&&<div className="settings-row settings-line"><Notice tone="error">{error}</Notice></div>}</>;
   return <>{(Array.isArray(profiles)?profiles:[]).map(p=><button className="settings-category" key={p.id} aria-labelledby={'custom-provider-'+p.id} aria-describedby={'custom-provider-'+p.id+'-summary'} onClick={()=>onOpen(p.id)}>
       <span><strong id={'custom-provider-'+p.id}>{p.name}</strong><small id={'custom-provider-'+p.id+'-summary'}>{customStatusLabel(p)} · {host(p.url)}</small></span><ChevronRight size={20} aria-hidden="true"/></button>)}
     <button className="settings-category" onClick={()=>onOpen('new')}><span><strong><Plus size={16} aria-hidden="true"/> {t('Добавить свой провайдер')}</strong><small>{t('OpenAI-совместимый API: URL и API-ключ')}</small></span><ChevronRight size={20} aria-hidden="true"/></button>

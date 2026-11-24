@@ -16,7 +16,7 @@ import {AppearanceSettings,appearanceSummary,type useAppearance} from './Appeara
 import {LanguageSelector} from './Language';
 import {ProviderConnections} from './ProviderConnections';
 import {DesktopUpdates} from './DesktopUpdates';
-import {UsageLimits} from './UsageOverview';
+import {UsageRows} from './UsageRows';
 import {BudgetSettings} from './BudgetSettings';
 import {RunAlertsToggle,SettingsCategoryButton,usageSummary} from './SettingsPanel';
 import {DesktopConnectionSettings} from './DesktopConnectionSettings';
@@ -81,8 +81,8 @@ export function DesktopSettings({state,connection,appearance,action,initialPage=
         {id==='codex'&&<CodexAccessSettings row value={device.codexAccess} onChange={device.setCodexAccess}/>}
         {id==='copilot'&&<SettingRow title={t('Доступ агента')} note={t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}/>}
       </ProviderConnections>)}
-      {host&&<SettingsBlock title={t('Лимиты использования')} className="settings-usage"><UsageLimits connection={host} provider="claude"/></SettingsBlock>}
-      {state.online&&<SettingsBlock title={t('Свои провайдеры')}><nav className="settings-index" aria-label={t('Свои провайдеры')}><CustomProviderList connection={connection} online={state.online} onOpen={setCustom}/></nav></SettingsBlock>}
+      {host&&<SettingsBlock title={t('Лимиты использования')} className="settings-usage"><UsageRows connection={host}/></SettingsBlock>}
+      {state.online&&<SettingsBlock title={t('Свои провайдеры')}><CustomProviderList connection={connection} online={state.online} onOpen={setCustom} rows/></SettingsBlock>}
       <LocalModelSettings connection={connection} online={state.online}/>
     </>)}
     {current==='chat'&&<><SettingsBlock title={t('Сообщения')}><ComposerSettings desktop rows/>{onShortcuts&&<SettingRow title={t('Сочетания клавиш')} note={t('Список и настройка горячих клавиш')}><button className="secondary settings-shortcuts" aria-label={t('Сочетания клавиш')} onClick={onShortcuts}><Keyboard size={16}/>{t('Изменить')}<kbd>Ctrl+/</kbd></button></SettingRow>}</SettingsBlock><SettingsBlock title={t('Список чатов')}><ChatImport connection={host}/></SettingsBlock><SpeechSettingsPanel connection={host} rows/></>}

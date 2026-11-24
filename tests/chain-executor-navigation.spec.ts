@@ -1,37 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {desktop} from './desktop-fixture';
 
-test('Markdown import keeps selected project locations distinct from uploaded copies',async({page})=>{
-  await page.setViewportSize({width:1280,height:960});
-  await page.addInitScript(()=>{
-    (window as any).withSourceFolder=true;
-    (window as any).testChainRequest=(_p:string,data:any)=>{
-      if(!data)return {value:[]};
-      (window as any).acceptedSources=data.sourceFiles;
-      return {value:{...data,status:'running',steps:data.tasks.map((step:any)=>({...step,status:'pending'}))}};
-    };
-  });
-  await desktop(page);
-  await page.locator('.desktop-rail').getByRole('button',{name:'Tasks',exact:true}).click();
-  await page.getByRole('button',{name:'Create chain',exact:true}).click();
-  await page.getByRole('button',{name:'Import Markdown',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Markdown tasks'});
-  await dialog.getByRole('button',{name:'Context from project'}).click();
-  await dialog.getByRole('button',{name:'README.md',exact:true}).click();
-  await dialog.getByRole('button',{name:'Task files from project'}).click();
-  await dialog.getByRole('button',{name:'docs',exact:true}).click();
-  await dialog.getByRole('button',{name:'README.md',exact:true}).click();
-  await dialog.getByLabel('Task files (.md)',{exact:true}).setInputFiles({
-    name:'summary.md',mimeType:'text/markdown',buffer:Buffer.from('# Summarize\nPrepare an index.')
-  });
-  await dialog.getByRole('button',{name:'Start linked chats'}).click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).acceptedSources)).toEqual([
-    {name:'README.md',projectPath:'README.md'},
-    {name:'docs/README.md',projectPath:'docs/README.md'},
-    {name:'summary.md',text:'# Summarize\nPrepare an index.'}
-  ]);
-});
-
 test('a step opens in its assigned provider and links back to the original chain',async({page})=>{
   await page.setViewportSize({width:1280,height:960});
   await page.addInitScript(()=>{

@@ -12,8 +12,8 @@ test('a chain is built from steps and can loop back with a condition and a lap l
   });
   await desktop(page);
   await desktopSection(page,'Tasks');
-  await page.getByRole('button',{name:'Create chain',exact:true}).click();
-  await page.getByRole('button',{name:'Build step by step',exact:true}).click();
+  // Create Task is the only way to make a task: it opens the step-by-step editor.
+  await page.getByRole('button',{name:'Create Task',exact:true}).click();
   const form=page.getByRole('dialog',{name:'Chain of steps'});
   const start=form.getByRole('button',{name:'Start chain',exact:true});
   await expect(start).toBeDisabled();

@@ -18,8 +18,8 @@ export const palettes: Palette[] = [
 { id: 'ink', name: 'Тушь', hue: 327, hslHue: 301, preferredTheme: 'light', swatch: { dark: ['#201d23', '#d6acd8'], light: ['#f8f5ef', '#713f70'] } }];
 
 type Contrast = 'auto' | 'normal' | 'more';
-type Appearance = {chatFont:'vscode'|'golos'|'manrope'|'system';chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;/** Space between transcript blocks (an action line, a paragraph, a result), px. */blockGap: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
-const defaults: Appearance = { chatFont:'vscode',chatAlign:'center', palette: 'carbon', theme: 'dark', textSize: 14, scale: 100, spacing: 1.6, blockGap: 4, compact: false, contrast: 'auto', colorblind: false };
+type Appearance = {chatFont:'vscode'|'golos'|'manrope'|'system'|'installed';/** The family name of an installed font, for chatFont 'installed'. */customFont:string;/** Set once the person picks a font; Golos saved before that was the old default and becomes VS Code's fonts. */fontChosen?:boolean;chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;/** Space between transcript blocks (an action line, a paragraph, a result), px. */blockGap: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
+const defaults: Appearance = { chatFont:'vscode',customFont:'',chatAlign:'center', palette: 'carbon', theme: 'dark', textSize: 14, scale: 100, spacing: 1.6, blockGap: 4, compact: false, contrast: 'auto', colorblind: false };
 const storageKey = 'pocket-code-appearance-v1';
 const bounded = (value: unknown, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 function load(): Appearance {
@@ -29,11 +29,11 @@ function load(): Appearance {
     const data = JSON.parse(saved);
     // A palette that no longer exists (the removed colour palettes) becomes the default theme.
     const palette = palettes.some((p) => p.id === data.palette) ? data.palette : defaults.palette;
-    return { chatFont:['manrope','system'].includes(data.chatFont)?data.chatFont:'vscode',chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette,
+    return { chatFont:['golos','manrope','system','installed'].includes(data.chatFont)&&!(data.chatFont==='golos'&&!data.fontChosen)?data.chatFont:'vscode',customFont:typeof data.customFont==='string'?fontName(data.customFont):'',...(data.fontChosen===true?{fontChosen:true}:{}),chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette,
       theme: ['dark', 'light', 'system'].includes(data.theme) ? data.theme : defaults.theme,
       textSize: bounded(data.textSize, 8, 22, 14), scale: bounded(data.scale, 60, 130, 100),
       spacing: data.spacing === 1.85 ? 1.6 : bounded(data.spacing, 1.1, 2.2, 1.6), blockGap: [0, 4, 10].includes(data.blockGap) ? data.blockGap : 4, compact: data.compact === true,
-      contrast: ['auto', 'normal', 'more'].includes(data.contrast) ? data.contrast : defaults.contrast, colorblind: data.colorblind === true };
+      contrast: ['auto', 'normal', 'more'].includes(data.contrast) ? data.contrast : defaults.contrast, colorblind: false /* The setting was removed; a saved choice no longer applies. */ };
   } catch {return defaults;}
 }
 /** Second line of the settings index: what is set now, not what the page is about. */
@@ -51,7 +51,10 @@ export function useAppearance(ownsDocument = true) {
     const applyTheme = () => {root.dataset.theme = appearance.theme === 'system' ? system.matches ? 'light' : 'dark' : appearance.theme;};
     applyTheme();system.addEventListener('change', applyTheme);
     root.dataset.chatAlign = appearance.chatAlign;
-    root.style.setProperty('--font-chat',appearance.chatFont==='manrope'?"'Manrope','Golos Text',sans-serif":appearance.chatFont==='system'?"system-ui,'Golos Text',sans-serif":'var(--font-sans)');
+    // One font for the interface and the conversation, as in Strata; VS Code's system fonts unless the person picks another.
+    const family=fontFamily(appearance);
+    if(family){root.style.setProperty('--font-sans',family);root.style.setProperty('--font-display',family);}else{root.style.removeProperty('--font-sans');root.style.removeProperty('--font-display');}
+    root.style.setProperty('--font-chat','var(--font-sans)');
     root.dataset.compact = String(appearance.compact);
     root.dataset.palette = appearance.palette;
     const palette = palettes.find((p) => p.id === appearance.palette)!;
@@ -68,6 +71,15 @@ export function useAppearance(ownsDocument = true) {
     return () => system.removeEventListener('change', applyTheme);
   }, [appearance, ownsDocument]);
   return { appearance, setAppearance, saveError };
+}
+/** A family name typed by the person: letters, digits, spaces, dots and hyphens only, so it cannot break out of CSS. */
+function fontName(value:string){return value.replace(/[^\p{L}\p{N} .-]/gu,'').trim().slice(0,60);}
+function fontFamily(value:Appearance){
+  if(value.chatFont==='golos')return "'Golos Text',system-ui,sans-serif";
+  if(value.chatFont==='manrope')return "'Manrope','Golos Text',sans-serif";
+  if(value.chatFont==='system')return 'system-ui,sans-serif';
+  if(value.chatFont==='installed'&&value.customFont)return `"${value.customFont}",-apple-system,"Segoe UI",system-ui,sans-serif`;
+  return '';
 }
 type Sizing = Pick<Appearance, 'textSize' | 'scale' | 'spacing' | 'compact'>;
 /** Three sizes cover most needs; the exact sliders (including the 8–22 px and 60–130 % extremes) stay under "More". */
@@ -97,10 +109,12 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
       <div className="segmented-options">{([['dark', 'Тёмная'], ['light', 'Светлая'], ['system', 'Системная']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-theme" value={id} checked={appearance.theme === id} onChange={() => setAppearance((p) => ({ ...p, theme: id }))} /><span>{t(title)}</span></label>)}</div></div>
     <div className="setting-row" role="radiogroup" aria-labelledby="appearance-size-title"><div><strong id="appearance-size-title">{t("Размер")}</strong><small>{t("Размер текста и элементов интерфейса.")}</small></div>
       <div className="segmented-options">{sizePresets.map((item) => <label key={item.id}><input type="radio" name="appearance-size" checked={preset?.id === item.id} onChange={() => setAppearance((p) => ({ ...p, ...item.value }))} /><span>{t(item.title)}</span></label>)}</div></div>
+    <div className="setting-row"><div><strong id="appearance-font-title">{t("Шрифт")}</strong><small>{t("Шрифт интерфейса и чата.")}</small></div>
+      <div className="appearance-font"><select aria-labelledby="appearance-font-title" value={appearance.chatFont} onChange={(e) => setAppearance((p) => ({ ...p, chatFont: e.target.value as Appearance['chatFont'], fontChosen: true }))}>
+        <option value="vscode">{t("Как в VS Code (Segoe UI)")}</option><option value="golos">Golos Text</option><option value="manrope">Manrope</option><option value="system">{t("Системный")}</option><option value="installed">{t("Другой установленный…")}</option></select>
+        {appearance.chatFont==='installed'&&<input aria-label={t("Название установленного шрифта")} placeholder="Inter" defaultValue={appearance.customFont} maxLength={60} onBlur={(e) => setAppearance((p) => ({ ...p, customFont: fontName(e.target.value) }))} onKeyDown={(e) => {if(e.key==='Enter')(e.target as HTMLInputElement).blur();}} />}</div></div>
     <div className="setting-row" role="radiogroup" aria-labelledby="appearance-gap-title"><div><strong id="appearance-gap-title">{t("Расстояние между блоками")}</strong><small>{t("Между строками действий, абзацами ответа и результатами в чате.")}</small></div>
       <div className="segmented-options">{([[0, 'Плотно'], [4, 'Обычно'], [10, 'Свободно']] as const).map(([value, title]) => <label key={value}><input type="radio" name="appearance-gap" checked={appearance.blockGap === value} onChange={() => setAppearance((p) => ({ ...p, blockGap: value }))} /><span>{t(title)}</span></label>)}</div></div>
-    <label className="setting-row"><div><strong>{t("Цвета для дальтоников")}</strong><small>{t("Синий и оранжевый вместо зелёного и красного в статусах и Review")}</small></div>
-      <input type="checkbox" role="switch" checked={appearance.colorblind} onChange={(e) => setAppearance((p) => ({ ...p, colorblind: e.target.checked }))} /></label>
     {undo ? <Notice tone="info" action={<button type="button" className="secondary" onClick={() => { setAppearance({ ...undo }); setUndo(null); }}>{t("Отменить")}</button>}>{t("Оформление сброшено.")}</Notice>
       : <button type="button" className="text-button appearance-reset" disabled={!changed} onClick={() => { setUndo({ ...appearance }); setAppearance({ ...defaults }); }}><RotateCcw size={16} aria-hidden="true" />{t("Сбросить оформление")}</button>}
     {saveError && <p role="alert" className="error-banner">{t(saveError)}</p>}

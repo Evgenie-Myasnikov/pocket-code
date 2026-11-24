@@ -68,7 +68,8 @@ test('all providers are on one settings page',async({page})=>{
  await manyChats(page);await desktop(page);
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.locator('.settings-category').filter({hasText:'Providers'}).click();
  for(const name of ['Claude','Codex','GitHub Copilot'])await expect(page.getByRole('region',{name,exact:true})).toBeVisible();
- await expect(page.locator('.provider-section')).toHaveCount(4);
+ // One card of rows per provider, then the usage limits and custom providers cards on the same page.
+ for(const name of ['Claude','Codex','GitHub Copilot','Usage limits','Custom providers'])await expect(page.getByRole('region',{name,exact:true}).locator('.settings-card')).toHaveCount(1);
  await page.screenshot({path:'.local/settings-providers.png',fullPage:false});
 });
 

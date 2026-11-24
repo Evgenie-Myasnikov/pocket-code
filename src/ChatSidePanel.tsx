@@ -13,6 +13,9 @@ const WIDTH='pocket-chat-side-width';
 const railWidth=()=>document.querySelector('.desktop-rail')?.getBoundingClientRect().width||52;
 /** The remembered width, kept between a narrow chat (360 px) and a narrow panel (320 px). Empty means half of the chat area. */
 function readWidth(){try{const value=Number(localStorage.getItem(WIDTH));return Number.isFinite(value)&&value>=320?value:0;}catch{return 0;}}
+/** A drag sets the width at most once per frame: the chat and the open file are laid out once, not per mouse event. */
+let pendingWidth:number|null=null;
+function applyWidthSoon(width:number){if(pendingWidth===null)requestAnimationFrame(()=>{if(pendingWidth!==null)applyWidth(pendingWidth);pendingWidth=null;});pendingWidth=width;}
 function applyWidth(width:number){const root=document.documentElement;if(width)root.style.setProperty('--chat-side-width',width+'px');else root.style.removeProperty('--chat-side-width');}
 export type SidePanelTab={id:string;kind:'file'|'review'|'outputs'|'agents';label:string;title?:string;detail?:ReactNode};
 const icons={file:FileText,review:GitCompareArrows,outputs:PanelsTopLeft,agents:Users};
@@ -31,13 +34,13 @@ export function ChatSidePanel({tabs,active,expanded,onSelect,onCloseTab,onRefres
   useEffect(()=>{applyWidth(readWidth());return()=>applyWidth(0);},[]);
   const edge=()=>document.querySelector('.chat-side-panel')?.getBoundingClientRect().left??window.innerWidth/2;
   const limits=()=>({min:railWidth()+360,max:window.innerWidth-320});
-  const save=(x:number)=>{const width=Math.round(window.innerWidth-x);applyWidth(width);try{localStorage.setItem(WIDTH,String(width));}catch{/* The width holds until the window closes. */}};
+  const save=(x:number)=>{const width=Math.round(window.innerWidth-x);pendingWidth=null;applyWidth(width);try{localStorage.setItem(WIDTH,String(width));}catch{/* The width holds until the window closes. */}};
   useEffect(()=>{strip.current?.querySelector<HTMLElement>('[aria-selected=true]')?.scrollIntoView({block:'nearest',inline:'nearest'});},[active]);
   const scroll=(direction:number)=>strip.current?.scrollBy({left:direction*240,behavior:'smooth'});
   return createPortal(<section className="chat-side-panel" data-expanded={expanded||undefined} aria-label={t('Панель чата')}
     onKeyDown={event=>{if(event.key==='Escape'&&!event.defaultPrevented&&expanded){event.preventDefault();onExpand();}}}>
     {!expanded&&<PanelResizeHandle axis="x" className="chat-side-panel-resizer" label={t('Ширина панели')} hint={t('Перетащите, чтобы изменить ширину. Двойной щелчок — половина окна.')}
-      current={edge} limits={limits} onChange={x=>applyWidth(Math.round(window.innerWidth-x))} onCommit={save} onReset={()=>{applyWidth(0);try{localStorage.removeItem(WIDTH);}catch{/* Nothing to forget. */}}}/>}
+      current={edge} limits={limits} onChange={x=>applyWidthSoon(Math.round(window.innerWidth-x))} onCommit={save} onReset={()=>{applyWidth(0);try{localStorage.removeItem(WIDTH);}catch{/* Nothing to forget. */}}}/>}
     <header className="chat-side-panel-bar">
       <button type="button" className="icon-button chat-side-panel-scroll" aria-label={t('Предыдущие вкладки')} onClick={()=>scroll(-1)}><ChevronLeft size={16}/></button>
       <div ref={strip} className="chat-side-panel-tabs" role="tablist" aria-label={t('Панель чата')}>{tabs.map(tab=>{const Icon=icons[tab.kind];return <span key={tab.id} className="chat-side-panel-tab" data-selected={tab.id===active||undefined}>

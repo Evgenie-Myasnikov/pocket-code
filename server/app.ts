@@ -41,7 +41,7 @@ import { allowedPath, HttpError, safeFilename, validToken, within } from './secu
 import { Jobs } from './jobs.js';
 import {ClaudeModelCatalog} from './claude-models.js';
 import {claudeFallbackModels, modelIdPattern} from './provider-model.js';
-import { normalize } from './types.js';
+import { normalize, type JobView } from './types.js';
 import { Terminals } from './terminals.js';
 import { desktopIndexes, readDesktopSessions } from './desktop-sessions.js';
 import { JiraQueue } from './jira-queue.js';
@@ -190,6 +190,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const customProviders=config.customProviders??new CustomProviders(new WindowsJiraStore(path.join(config.uploads,'..','custom-providers.dat')));
   const guardCustomProviders=()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can use custom providers');};
   const localModels=config.localModels??new LocalModels({runtime:()=>discoverStrata(),engines:countStrataEngines,store:new WindowsJiraStore(path.join(config.uploads,'..','local-models.dat')),providers:customProviders});
+  // A chat on the local model shows its share of the context it was started with, not Claude Code's guess for an unknown model.
+  jobs.contextWindowFor=account=>(localModels as {contextFor?(id:string):number|undefined}).contextFor?.(account);
   const guardLocalModels=()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can manage local models');};
   type ConnectionStatus={id:string;installed:boolean;authenticated:boolean|null;server:string;version?:string};
   function localExecutors(status:ConnectionStatus[]){
@@ -388,7 +390,28 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   jobs.onSession(job=>{const account=job.account;if(account)void customProviders.name(account).catch(()=>undefined).then(name=>chatLibrary.tagAccount(job.sessionId,account,name)).catch(()=>{});});
   const generationStore=new SessionGeneration(path.join(config.uploads,'.tasks','chat-generation'));
   for(const engine of [jobs,config.codex,config.copilot]){
-    if(engine)engine.recordGeneration=job=>{void generationStore.record(job).catch(()=>{});if(job.sessionId)void chatLibrary.markOrigins(job.provider||'claude',[job.sessionId],'pocket').catch(()=>{});};
+    if(engine)engine.recordGeneration=job=>{void generationStore.record(job).catch(()=>{});if(job.sessionId)void chatLibrary.markOrigins(job.provider||'claude',[job.sessionId],'pocket').then(()=>autoTitle(job)).catch(()=>{});};
+  }
+  /** After the first turn of a chat started in Pocket Code, its own provider names it in a few words; a name the person gave is kept. */
+  const titling=new Set<string>();
+  async function autoTitle(job:JobView){
+    const provider=job.provider||'claude',id=job.sessionId;
+    if(!id||job.status!=='done'||job.baseMessageCount!==0||job.taskChat||titling.has(provider+':'+id))return;
+    const key=provider+':'+id;
+    if((await chatLibrary.read()).chats[key]?.title)return;
+    const first=job.messages.find(message=>message.role==='user')?.blocks.filter(block=>block.type==='text').map(block=>block.text||'').join('\n').trim();
+    if(!first)return;
+    titling.add(key);
+    try{
+      let selection:{provider:'claude'|'codex'|'copilot'|'custom';cwd:string;account?:string;model?:string}={provider,cwd:job.cwd};
+      if(provider==='claude'&&job.account){
+        const executor=(await customProviders.taskExecutors().catch(()=>[])).find(item=>item.account===job.account);
+        if(!executor?.model)return;
+        selection={provider:'custom',cwd:job.cwd,account:job.account,model:executor.model};
+      }
+      const title=await closeText.chatTitle(selection as never,first);
+      if(title)await chatLibrary.edit(data=>{const entry=data.chats[key];if(!entry?.title)data.chats[key]={...entry,title};});
+    }finally{titling.delete(key);}
   }
   const loadSessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if (provider === 'copilot') return copilot().sessions();

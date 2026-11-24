@@ -116,6 +116,9 @@ public static class DesktopSmoke {
             foreach(string path in new[]{"/runtime/stop","/jobs/example/stop","/files/upload","/file/write","https://example.invalid","//example.invalid","/../runtime/stop","/sessions/x/messages#hidden","/jira/login"})Check(!DesktopReadPolicy.Allows(path),"Unsafe route denied");
             foreach(string path in new[]{"/project-board","/project-board/create","/project-board/delete","/project-board/miro","/jobs","/uploads","/jobs/11111111-1111-4111-8111-111111111111/messages","/workspaces","/workspaces/11111111-1111-4111-8111-111111111111/delete","/boards/11111111-1111-4111-8111-111111111111/delete","/boards/11111111-1111-4111-8111-111111111111","/boards/11111111-1111-4111-8111-111111111111/branch"})Check(DesktopReadPolicy.AllowsWrite(path),"Chat/board write allowed");
             foreach(string path in new[]{"/runtime/stop","/file/write","/provider-connections/claude/logout","https://example.invalid","/../jobs","/jobs#hidden"})Check(!DesktopReadPolicy.AllowsWrite(path),"Unapproved write denied");
+            // 0.28.60+ endpoints the window calls: local model, Import chats, turn result sizes.
+            Check(DesktopReadPolicy.Allows("/local-models"),"Local model status allowed");foreach(string path in new[]{"/local-models/start","/local-models/stop","/chat-library/import","/file-sizes"})Check(DesktopReadPolicy.AllowsWrite(path),"Write allowed: "+path);
+            Check(!DesktopReadPolicy.AllowsWrite("/local-models/start/x")&&!DesktopReadPolicy.Allows("/local-models/start"),"Local model actions are writes only");
             Console.WriteLine("PASS: standalone host lifecycle, scoped bridge policy and nested child cleanup.");return 0;
         }catch(Exception error){Console.Error.WriteLine(error);return 1;}finally{if(owned!=null)owned.Dispose();}
     }

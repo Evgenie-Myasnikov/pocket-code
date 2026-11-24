@@ -142,5 +142,32 @@ export function mountTaskText(app:Express,options:{
       return readPlan(await generate(system,prompt),input.files,executors);
     });
   });
-  return ()=>{closing=true;for(const controller of active)controller.abort();};
+  /**
+   * A short name for a new chat, drafted by the chat's own provider (and model or API connection) from its first message,
+   * through the same isolated, tool-less runtime as the task editor. A busy provider or any failure leaves the chat
+   * with the provider's own summary; nothing is retried.
+   */
+  async function chatTitle(selection:Selection,firstMessage:string):Promise<string|undefined>{
+    const busyKey=selection.provider==='custom'?'custom:'+selection.account:selection.provider;
+    if(closing||options.busy.has(busyKey))return undefined;
+    try{await options.allowProject(selection.cwd);}catch{return undefined;}
+    options.busy.add(busyKey);
+    const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),options.timeoutMs??80000);
+    active.add(abort);
+    try{
+      const system='Pocket Code chat title, template v1. Return only a short title for the conversation that starts with the message below: 2 to 6 words, at most 48 characters, naming its topic. Use the language of the message. No quotation marks, no final period, no Markdown, a single line.';
+      let raw='';
+      if(selection.provider==='custom')raw=await options.custom(selection.account!,selection.model!,system,firstMessage.slice(0,2000),abort.signal);
+      else{
+        const local=options.generate[selection.provider];
+        if(!local||!(await section(options.providers))?.providers.includes(selection.provider))return undefined;
+        const directory=await mkdtemp(path.join(tmpdir(),'pocket-chat-title-'));
+        try{raw=await local(system,firstMessage.slice(0,2000),directory,abort);}finally{await rm(directory,{recursive:true,force:true,maxRetries:2});}
+      }
+      const title=raw.split(/\r?\n/).map(line=>line.trim()).find(Boolean)?.replace(/^[#>*\-\s]+/,'').replace(/^["'«“]+|["'»”]+$/g,'').replace(/[.。]$/,'').trim();
+      return title&&title.length<=60?title:undefined;
+    }catch{return undefined;}
+    finally{clearTimeout(timer);active.delete(abort);options.busy.delete(busyKey);}
+  }
+  return Object.assign(()=>{closing=true;for(const controller of active)controller.abort();},{chatTitle});
 }

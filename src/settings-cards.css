@@ -104,14 +104,20 @@
 .settings-appearance .setting-row{padding:14px 0;min-height:64px}
 .settings-appearance .appearance-reset{justify-self:start;margin:6px 0 14px}
 .settings-appearance .appearance-settings>.notice{margin:6px 0 14px}
-/* Usage: provider rows as lines of the card, the selected provider's windows below. */
-.settings-usage .settings-card{padding-block:6px}
-.settings-usage .usage-overview{gap:0;margin:0}
-.settings-usage .usage-overview>h3{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.settings-usage .usage-overview-row{min-height:56px;padding:10px 0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}
-.settings-usage .usage-overview-row:first-of-type{border-top:0}
-.settings-usage .usage-overview-row[aria-pressed=true]{box-shadow:inset 3px 0 0 var(--accent);padding-inline-start:12px}
-.settings-usage .codex-usage{margin:0;padding:12px 0 14px;border-top:1px solid var(--line)}
+/* Usage: one plain row per provider; the tone colours only the remaining value. */
+.usage-row .settings-row-control{gap:6px}
+.usage-row-value{display:inline-flex;align-items:center;gap:6px;color:var(--text)}
+.usage-row.usage-tone-warning .usage-row-value{color:var(--status-attention)}
+.usage-row.usage-tone-danger .usage-row-value{color:var(--danger-fg)}
+.usage-row .icon-button{width:32px;height:32px;min-width:32px;min-height:32px}
+/* A row that opens a page (custom providers): the whole row is the button, drawn like any other row. */
+:root[data-theme][data-theme] .settings-card>button.settings-row-link{width:100%;margin:0;padding:14px 0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;background-image:none;box-shadow:none;color:var(--text);font:inherit;text-align:start;cursor:pointer}
+:root[data-theme][data-theme] .settings-card>button.settings-row-link:first-child{border-top:0}
+:root[data-theme][data-theme] .settings-card>button.settings-row-link::before,:root[data-theme][data-theme] .settings-card>button.settings-row-link::after{display:none}
+:root[data-theme][data-theme] .settings-card>button.settings-row-link:hover strong{text-decoration:underline;text-underline-offset:3px}
+:root[data-theme][data-theme] .settings-card>button.settings-row-link:focus-visible{outline:2px solid var(--ring,var(--accent));outline-offset:-2px}
+.settings-row-link .settings-row-text>strong{display:inline-flex;align-items:center;gap:6px;font-weight:var(--fw-semibold,600);font-size:calc(14px * var(--ui-scale,1))}
+.settings-row-link .settings-row-control{color:var(--muted)}
 /* Local model and speech forms: rows only, no form spacing. */
 .settings-card>form{display:grid;min-width:0}
 /* Group headings: small, near their card (the shared heading scale is for page sections). */

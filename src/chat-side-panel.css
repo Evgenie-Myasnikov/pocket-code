@@ -52,3 +52,8 @@
 .chat-side-panel-resizer::after{content:'';position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background-color var(--dur-short,.16s)}
 .chat-side-panel-resizer:is(:hover,:focus-visible)::after,body.desktop-resizing .chat-side-panel-resizer::after{background:var(--muted)}
 .chat-side-panel-resizer:focus-visible{outline:0}
+/* Long chats and long files: blocks outside the view are not laid out until they scroll in, so resizing the panel
+   (and the window) only lays out what is on screen. The remembered size keeps the scrollbar steady. */
+.conversation-inner>article.message:not(:last-of-type){content-visibility:auto;contain-intrinsic-size:auto 48px}
+.chat-side-panel-body .file-markdown>*{content-visibility:auto;contain-intrinsic-size:auto 32px}
+.chat-side-panel-body .file-preview-body>pre .code-line{content-visibility:auto;contain-intrinsic-size:auto 1.4em}

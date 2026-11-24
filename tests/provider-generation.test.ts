@@ -75,3 +75,21 @@ test('Copilot preserves request and session scope, native timing and context cou
   put({...usage,id:'last',data:{...usage.data,providerCallId:'last'}});
   assert.equal(job.generation!.outputTokens,21);
 });
+
+test("an API connection's chat shows the context it was started with, never Claude Code's guess for an unknown model",async()=>{
+  for(const [known,expected] of [[32768,32768],[undefined,undefined]] as const){
+    const pipe=new PassThrough({objectMode:true}),jobs=new Jobs((()=>pipe) as any);
+    let final:JobView|undefined;jobs.recordGeneration=j=>{final=j;};
+    jobs.contextWindowFor=account=>account==='5b7c0d3e-0000-4000-8000-00000000a001'?known:undefined;
+    try{
+      jobs.start({id:'local',cwd:process.cwd(),mode:'default',text:'Sample',maxBudgetUsd:1,account:'5b7c0d3e-0000-4000-8000-00000000a001'} as any);
+      pipe.write({type:'system',session_id:'synthetic-local'});
+      pipe.write({type:'assistant',uuid:'sample',message:{id:'m',model:'local-coder',content:[{type:'text',text:'pong'}],usage:{input_tokens:17000,output_tokens:4}}});
+      // Claude Code reports a 1,000,000-token window for a model name it does not know.
+      pipe.end({type:'result',is_error:false,usage:{output_tokens:4},modelUsage:{'local-coder':{inputTokens:17000,outputTokens:4,cacheReadInputTokens:0,cacheCreationInputTokens:0,contextWindow:1000000}}});
+      await waitFor(()=>!!final);
+      assert.equal(final!.generation?.contextWindow,expected);
+      assert.equal(final!.generation?.contextTokens,17004);
+    }finally{pipe.end();jobs.close();}
+  }
+});

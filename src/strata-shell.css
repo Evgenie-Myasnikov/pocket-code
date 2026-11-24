@@ -50,3 +50,6 @@
 :root[data-theme][data-theme][data-theme] .conversation-inner>article.message.assistant{display:flow-root}
 :root[data-theme][data-theme][data-theme] .conversation-inner>article.message.assistant .markdown>:first-child{margin-top:0}
 :root[data-theme][data-theme][data-theme] .conversation-inner>article.message.tool-result>*{margin-top:0;margin-bottom:0}
+/* Chat list rows as dense as Strata's, also on PCs with a touch screen (the touch rule made every row 48 px tall). */
+:root[data-theme][data-theme][data-theme] .desktop-app>.desktop-rail .desktop-sessions>button{min-height:34px;padding-block:6px}
+:root[data-theme][data-theme][data-theme] .desktop-app>.desktop-rail .chat-list-action-slot :is(.chat-list-action,.chat-mute-action){width:28px;min-width:28px;height:28px;min-height:28px}

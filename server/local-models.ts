@@ -110,18 +110,24 @@ export class LocalModels{
    this.work=this.call(launch,30*60000,{[KEY_ENV]:key}).then(async answer=>{
     launched.parse(answer);
     const url='http://127.0.0.1:'+LOCAL_MODEL_PORT+'/v1';
-    await this.saveProvider(url,key,data.model);
+    const providerId=await this.saveProvider(url,key,data.model);
+    this.served={providerId,context:data.context};
     this.job={state:'ready',model:data.model,url,port:LOCAL_MODEL_PORT,since:this.now()};
    }).catch(error=>{this.job={state:'error',model:data.model,error:(error as Error).message.slice(0,300),since:this.now()};});
    return this.job;
   });
  }
 
- private async saveProvider(url:string,key:string,model:string){
+ /** The API connection this PC's running model serves and the context it was started with; unknown after a host restart. */
+ private served?:{providerId:string;context:number};
+ /** The real context window of a chat through this connection, when this host started the model. */
+ contextFor(providerId:string){return this.job.state==='ready'&&this.served?.providerId===providerId?this.served.context:undefined;}
+ private async saveProvider(url:string,key:string,model:string):Promise<string>{
   const secret=await this.secrets(),name=('Strata · '+model).slice(0,80);
-  if(secret.providerId){try{await this.deps.providers.save({id:secret.providerId,name,url,key});return;}catch(error){if((error as HttpError).status!==404)throw error;}}
+  if(secret.providerId){try{await this.deps.providers.save({id:secret.providerId,name,url,key});return secret.providerId;}catch(error){if((error as HttpError).status!==404)throw error;}}
   const {id}=await this.deps.providers.save({name,url,key});
   await this.deps.store.save({...secret,key,providerId:id});
+  return id;
  }
 
  async stop(){

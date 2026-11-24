@@ -133,6 +133,8 @@ public static class DesktopReadPolicy {
         string path=endpoint.Split('?')[0];
         if(path=="/speech/install"||path=="/speech/synthesize")return true;
         if(path=="/task-text/improve"||path=="/task-text/plan")return true;
+        // Local model start and stop, Import chats and the file sizes of a turn result (0.28.60+).
+        if(path=="/local-models/start"||path=="/local-models/stop"||path=="/chat-library/import"||path=="/file-sizes")return true;
         const string uuid=@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
         if(Regex.IsMatch(path,@"^/jobs/"+uuid+"/messages/"+uuid+"/cancel$"))return true;
         if(Regex.IsMatch(path,@"^/task-chains(?:/[a-f0-9-]+/(?:stop|delete|delete-chats))?$"))return true;
@@ -144,6 +146,7 @@ public static class DesktopReadPolicy {
         if(String.IsNullOrEmpty(endpoint)||endpoint.Length>16384||endpoint.IndexOfAny(new[]{'\\','#','\r','\n'})>=0)return false;
         string path=endpoint.Split('?')[0];
         if(path=="/chat-library/projects"||path=="/chat-library/erasures"||path=="/speech/status")return true;
+        if(path=="/local-models")return true;
         if(path=="/task-text/providers"||path=="/task-text/plan/providers")return true;
         if(Regex.IsMatch(path,@"^/task-chains(?:/[a-f0-9-]+)?$"))return true;
         if(Regex.IsMatch(path,@"^/(activity/events|task-runs(?:/[a-f0-9-]+(?:/(checks|result|board|review))?)?|miro/(status|items))$"))return true;

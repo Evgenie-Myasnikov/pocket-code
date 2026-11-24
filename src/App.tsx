@@ -1343,7 +1343,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         onPrepareDraft={connection&&!busy&&!uploading?prepareTaskDraft:undefined} maxDraftLength={taskFileRoom?1024*1024:taskTextRoom}
         unavailable={!connection||demo||connection.workspaceId?t('Подключитесь к ПК в настройках'):undefined}
         scopePicker={connection&&!demo&&!connection.workspaceId&&<div className="tasks-scope">
-          <ProviderPicker connection={connection} value={provider} onChange={value=>{rememberDraft();setTaskProject(taskCwd);setTaskChainId(undefined);(embedded?.onTaskProvider||setProvider)(value);}} disabled={busy||uploading}/>
+          {/* The PC window chooses the provider and model here with the same menu as the chat header. */}
+          {docked?<HeaderModelMenu connection={connection} provider={provider} onProvider={value=>{rememberDraft();setTaskProject(taskCwd);setTaskChainId(undefined);(embedded?.onTaskProvider||setProvider)(value);}} models={(account?customModels.models:provider==='claude'?claudeCatalog.models:providerInfo?.models)||[]} model={account?customModels.model:model} onModel={account?customModels.setModel:setModel} onManage={()=>embedded?.onOpenSettings?.('providers')} disabled={busy||uploading}/>
+          :<ProviderPicker connection={connection} value={provider} onChange={value=>{rememberDraft();setTaskProject(taskCwd);setTaskChainId(undefined);(embedded?.onTaskProvider||setProvider)(value);}} disabled={busy||uploading}/>}
           {/* Any folder the AI works in, not only a Git project. */}
           <div className="project-folder-field"><span>{t('Рабочая папка')}</span>
             <ProjectFolderPicker label={t('Рабочая папка')} value={taskCwd} paths={[...new Set([...projectRoots,...(taskCwd?[taskCwd]:[]),...(cwd?[cwd]:[])])]} onChange={root=>{
