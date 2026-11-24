@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.28.61 (2026-11-24)
+## [0.28.61](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.60...v0.28.61) (2026-11-24)
+
+Published [0.28.61](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.61) from [91603ca](https://github.com/Evgenie-Myasnikov/pocket-code/commit/91603cabef2f2b4682ee0ad6e04396bef9e5deda) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows application, update manifest) match the local SHA-256 hashes. The privacy guard passed on the commit, and the unpacked assets were searched for the local home path, account name, employer name, author e-mail, keys and tokens without findings (the public repository owner appears only in release links). The APK is signed with the same key as 0.28.60 (certificate SHA-256 beginning d0e5792c). Built from a separate clean checkout of the same commit. Physical Android installation, the installed Windows application and the full browser suite were not run.
 
 ### Features
 
