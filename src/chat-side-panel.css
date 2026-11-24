@@ -30,8 +30,8 @@
 .chat-header-agents:hover{background:var(--surface)}
 @media(max-width:900px){.chat-side-panel{inset:0 0 0 var(--desktop-rail-width,52px);width:auto}:root[data-chat-side-panel=docked] .desktop-app .desktop-main{padding-inline-end:0}}
 /* A file tab: the reader fills the panel without its dialog frame. */
-.chat-side-panel-body>.file-reader-docked{position:static;display:flex;flex-direction:column;flex:1;width:auto;max-width:none;height:auto;max-height:none;min-height:0;margin:0;border:0;border-radius:0;box-shadow:none;background:transparent}
-.chat-side-panel-body>.file-reader-docked .file-preview-body{flex:1;min-height:0;overflow:auto}
+:is(.chat-side-panel-body,.file-with-changes)>.file-reader-docked{position:static;display:flex;flex-direction:column;flex:1;width:auto;max-width:none;height:auto;max-height:none;min-height:0;margin:0;border:0;border-radius:0;box-shadow:none;background:transparent}
+:is(.chat-side-panel-body,.file-with-changes)>.file-reader-docked .file-preview-body{flex:1;min-height:0;overflow:auto}
 .docked-image{position:relative;display:flex;flex:1;min-height:0;min-width:0}
 .docked-image-view{flex:1;overflow:auto;display:grid;place-items:center;padding:16px}
 .docked-image[data-fit] .docked-image-view img{max-width:100%;max-height:100%;object-fit:contain}
@@ -41,8 +41,8 @@
 .chat-header-panel .chat-header-actions :is(.icon-button,.chat-menu-button){width:32px;height:32px;min-width:32px;min-height:32px;padding:0;border:0;border-radius:8px;background:transparent;box-shadow:none;color:var(--muted)}
 .chat-header-panel .chat-header-actions :is(.icon-button,.chat-menu-button):hover{background:var(--surface);color:var(--text)}
 /* The tab already names the file. */
-.chat-side-panel-body>.file-reader-docked .file-reader-header>:is(svg:first-child,strong){display:none}
-.chat-side-panel-body>.file-reader-docked .file-reader-header{justify-content:flex-end;min-height:0;padding-block:6px}
+:is(.chat-side-panel-body,.file-with-changes)>.file-reader-docked .file-reader-header>:is(svg:first-child,strong){display:none}
+:is(.chat-side-panel-body,.file-with-changes)>.file-reader-docked .file-reader-header{justify-content:flex-end;min-height:0;padding-block:6px}
 /* The PC chat header as in Strata: the chat's name, then its model, then the actions on the right. */
 .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title{display:flex!important;flex-direction:row;align-items:center;gap:12px;min-width:0;padding:0 4px;background:transparent;border:0;box-shadow:none}
 .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title>h1{flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;font-size:calc(15px * var(--ui-scale,1));font-weight:var(--fw-bold,700)}

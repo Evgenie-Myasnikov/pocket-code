@@ -63,6 +63,7 @@ import {mountRunNotifications} from './run-notifications.js';
 import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
+import {ScheduledTasks} from './scheduled-tasks.js';
 
 export type Config = { port?:number; customProviders?:CustomProviders; localModels?:LocalModels;claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
   /** How long a provider's chat listing answers without being read again, and how long it may answer while a new one loads. */
@@ -949,6 +950,57 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const body=z.object({eraseOriginals:z.literal(true),chats:z.array(z.object({provider:z.enum(['claude','codex','copilot']),account:uuid.optional(),sessionId:z.string().min(1).max(4096)}).strict())}).parse(req.body);
     res.json(await taskChains.remove(uuid.parse(req.params.id),await chainScope(req.body),body));
   });
+  // Scheduled chats: the host starts a new chat with the task's prompt at every scheduled time (personal PC chats only).
+  const scheduleSchema=z.discriminatedUnion('kind',[
+    z.object({kind:z.literal('daily'),time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)}).strict(),
+    z.object({kind:z.literal('weekdays'),time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)}).strict(),
+    z.object({kind:z.literal('interval'),hours:z.number().int().min(1).max(24)}).strict(),
+  ]);
+  const scheduledInput=z.object({name:z.string().trim().min(1).max(120),prompt:z.string().trim().min(1).max(20000),provider:z.enum(['claude','codex','copilot']),
+    account:z.union([z.literal(''),uuid]).optional(),model:z.union([z.literal(''),z.string().regex(modelIdPattern)]),cwd:text,schedule:scheduleSchema}).strict();
+  // No defaults in the shared shape: a partial change (pause) must not reset the fields it leaves out.
+  const scheduledCreate=scheduledInput.extend({model:scheduledInput.shape.model.default('')}).strict();
+  const scheduledSettings=(task:{provider:'claude'|'codex'|'copilot';account?:string;model:string;cwd:string})=>{
+    const settings=jobSettings.parse({provider:task.provider,cwd:task.cwd,model:task.model,...(task.account?{account:task.account}:{})});
+    engineFor(settings.provider);validateJobSettings(settings);return settings;
+  };
+  const personalSchedules=()=>{if(workspaceAccess.current())throw new HttpError(403,'Scheduled chats belong to the connected PC');};
+  const scheduledJob=(id:string)=>{try{return jobView(id);}catch{return undefined;}};
+  const scheduled=new ScheduledTasks({
+    file:path.join(config.uploads,'.tasks','scheduled-tasks.json'),
+    ready:()=>!runtimeStopping&&!config.hostUpdater?.draining&&!providerConnections.isSigningIn(),
+    session:id=>scheduledJob(id)?.sessionId,
+    adopt:async(task,sessionId)=>{await chatLibrary.markOrigins(task.provider,[sessionId],'pocket');},
+    start:async(task,id)=>{
+      const settings=scheduledSettings(task);
+      const cwd=await allowedPath(accessRoots(),settings.cwd,true);
+      return launchJob(settings,{id,cwd,text:task.prompt,displayText:task.prompt,attachmentPaths:[],baseMessageCount:0});
+    },
+  });
+  scheduled.start();
+  const scheduledBody=async(input:unknown,partial:boolean)=>{
+    const body=(partial?scheduledInput.partial().extend({paused:z.boolean().optional()}).strict():scheduledCreate).parse(input) as z.infer<typeof scheduledInput>&{paused?:boolean};
+    if(body.cwd!==undefined)body.cwd=await allowedPath(accessRoots(),body.cwd,true);
+    return body;
+  };
+  app.get('/api/scheduled-tasks',async(_req,res)=>{personalSchedules();res.json(await scheduled.list());});
+  app.post('/api/scheduled-tasks',async(req,res)=>{
+    personalSchedules();const body=await scheduledBody(req.body,false);scheduledSettings(body);
+    res.json(await scheduled.create({...body,account:body.account||undefined}));
+  });
+  app.post('/api/scheduled-tasks/:id',async(req,res)=>{
+    personalSchedules();const id=uuid.parse(req.params.id),body=await scheduledBody(req.body,true);
+    const current=(await scheduled.list()).find(task=>task.id===id);if(!current)throw new HttpError(404,'This scheduled task was deleted.');
+    scheduledSettings({...current,...body,account:'account' in body?body.account||undefined:current.account});
+    res.json(await scheduled.update(id,{...body,...('account' in body?{account:body.account||undefined}:{})}));
+  });
+  app.post('/api/scheduled-tasks/:id/run',async(req,res)=>{
+    personalSchedules();
+    if(runtimeStopping||config.hostUpdater?.draining||providerConnections.isSigningIn())throw new HttpError(409,'The host is unavailable to start this run.');
+    res.json(await scheduled.runNow(uuid.parse(req.params.id)));
+  });
+  app.post('/api/scheduled-tasks/:id/read',async(req,res)=>{personalSchedules();res.json(await scheduled.read(uuid.parse(req.params.id)));});
+  app.post('/api/scheduled-tasks/:id/delete',async(req,res)=>{personalSchedules();res.json(await scheduled.remove(uuid.parse(req.params.id)));});
   app.post('/api/jobs', async (req, res) => {
     const body = jobSettings.extend({id:uuid,sessionId:uuid.optional(),text:z.string().max(100000),attachments:z.array(uuid).max(10).default([]),
       taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed:z.boolean().default(false)}).parse(req.body);
@@ -1108,7 +1160,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       engine.start({id,cwd:sourceRoot,text:prompt,displayText:'Check Pocket Code compatibility after an AI runtime update.',mode:'default',codexAccess:'full',maxBudgetUsd:5});
     });
   }
-  const closeTaskServices=async()=>{closeText();await generationStore.flush();await taskChains.close();await disposeNotifications();await taskRuntime!.close();};
+  const closeTaskServices=async()=>{closeText();await scheduled.close();await generationStore.flush();await taskChains.close();await disposeNotifications();await taskRuntime!.close();};
   app.locals.closeTaskServices=closeTaskServices;
   return { app, jobs, terminals, queue, codexQueue, copilotQueue, workflow, isBusy, maintainEngines, closeTaskServices, taskRuntime };
 }

@@ -46,3 +46,5 @@
 .turn-result .turn-result-type{width:52px;font-size:.92em}
 .turn-result .turn-result-name{max-width:48%;font-weight:var(--fw-medium,500)}
 .turn-result-location>span strong{margin-left:.35em;color:var(--text);font-weight:var(--fw-bold,700)}
+.turn-result .turn-result-file-counts{flex:none;display:inline-flex;gap:.35em;padding-inline-start:12px;font-size:.92em;font-variant-numeric:tabular-nums}
+.turn-result .turn-result-file-counts>b:first-child{color:var(--diff-add-fg)}.turn-result .turn-result-file-counts>b:last-child{color:var(--diff-del-fg)}

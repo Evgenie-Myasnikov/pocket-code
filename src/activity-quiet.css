@@ -40,3 +40,9 @@
 :root[data-theme][data-theme] .conversation-inner .message :is(.activity-row,.edit-activity)>summary>span{margin-inline-start:0}
 /* An older rule gives every span in a tool line a 4 px left margin; inside the transcript the flex gap spaces them. */
 :root[data-theme][data-theme] .conversation-inner .message :is(.activity-row,.edit-activity)>summary span{margin-left:0}
+
+/* A read file inside an action line: its path as one muted line and its text as an ordinary code block of the chat. */
+.message .tool-card .tool-file-path{margin:.2em 0 .5em;color:var(--muted);font-size:.92em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.message .tool-card .tool-file-preview{display:grid;gap:.35em;margin:0;padding:0;border:0}
+.message .tool-card .tool-file-preview pre{margin:0}
+.message .tool-card .tool-file-preview .tool-output-more{justify-self:start}

@@ -1,0 +1,30 @@
+/* Scheduled chats in the PC chat list: a clock, the name, and a dot while a run is unread (as in Claude's sidebar). */
+.desktop-app>.desktop-rail .scheduled-tasks{display:flex;flex-direction:column;gap:1px;padding:2px 0 6px;margin-block-end:4px;border-block-end:1px solid var(--line)}
+.desktop-app>.desktop-rail .scheduled-tasks-caption{margin:2px 8px 2px;color:var(--muted);font-size:calc(11px * var(--ui-scale,1));font-weight:var(--fw-semibold,600)}
+.desktop-app>.desktop-rail .scheduled-task{position:relative;display:flex;align-items:center;min-width:0}
+.desktop-app>.desktop-rail .scheduled-task-open{flex:1;display:flex;align-items:center;gap:8px;min-width:0;min-height:35px;margin:0;padding:6px 40px 6px 8px;border:0;border-radius:7px;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.desktop-app>.desktop-rail .scheduled-task-open:hover,.desktop-app>.desktop-rail .scheduled-task-open[aria-pressed=true]{background:var(--surface)}
+.desktop-app>.desktop-rail .scheduled-task-open>span:last-child{display:flex;flex-direction:column;min-width:0}
+.desktop-app>.desktop-rail .scheduled-task-open strong{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:calc(13px * var(--ui-scale,1));font-weight:var(--fw-medium);line-height:1.4}
+.desktop-app>.desktop-rail .scheduled-task-open small{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted);font-size:calc(11px * var(--ui-scale,1))}
+.desktop-app>.desktop-rail .scheduled-task[data-paused] .scheduled-task-open strong{color:var(--muted)}
+.scheduled-task-icon{position:relative;display:inline-flex;flex:none;color:var(--muted)}
+.scheduled-task[data-unread] .scheduled-task-icon{color:var(--text)}
+.scheduled-task-dot{position:absolute;top:-2px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--panel)}
+.desktop-app>.desktop-rail .scheduled-task-actions{position:absolute;right:4px;top:50%;translate:0 -50%;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-width:28px;min-height:28px;margin:0;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted);opacity:0}
+.desktop-app>.desktop-rail .scheduled-task:is(:hover,:focus-within) .scheduled-task-actions,.desktop-app>.desktop-rail .scheduled-task-actions[aria-expanded=true]{opacity:1}
+.desktop-app>.desktop-rail .scheduled-task-actions:hover{color:var(--text);background:var(--panel)}
+.scheduled-tasks-error{margin:4px 8px;color:var(--danger,var(--text));font-size:calc(12px * var(--ui-scale,1))}
+.confirm-modal.scheduled-task-dialog{width:min(520px,100%);max-width:520px;color:var(--text)}
+.scheduled-task-dialog form{display:flex;flex-direction:column;gap:12px}
+.scheduled-task-dialog h2{margin:0 0 4px}
+.scheduled-task-dialog label,.scheduled-task-field{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:calc(12px * var(--ui-scale,1))}
+.scheduled-task-dialog :is(input,textarea,select){width:100%;min-height:36px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit;font-size:calc(13px * var(--ui-scale,1))}
+.scheduled-task-dialog textarea{resize:vertical;min-height:96px;line-height:1.5}
+.confirm-modal.scheduled-task-dialog .scheduled-task-field .header-model-chip{width:auto;margin:0;align-self:flex-start}
+.scheduled-task-schedule{display:flex;align-items:flex-end;gap:10px;margin:0;padding:0;border:0;min-width:0}
+.scheduled-task-schedule legend{margin-block-end:6px;padding:0;color:var(--muted);font-size:calc(12px * var(--ui-scale,1))}
+.scheduled-task-schedule>select{flex:1}
+.scheduled-task-schedule>label{flex:0 0 130px}
+.scheduled-task-dialog p{margin:0}
+@media (max-width:520px){.scheduled-task-schedule{flex-direction:column;align-items:stretch}.scheduled-task-schedule>label{flex:none}}

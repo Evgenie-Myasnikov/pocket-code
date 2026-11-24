@@ -1730,4 +1730,8 @@ export const english: Record<string, string> = {
   'Заменит текущий аккаунт CLI на этом ПК': 'Replaces the current CLI account on this PC',
   'Приходят, даже когда окно свёрнуто в трей': 'Arrive even when the window is in the tray',
   'Список чатов': 'Chat list',
+  'Ответ': 'Answer',
+  'без ответа': 'no answer',
+  'Вопрос отклонён': 'Question declined',
+  'Пустой файл': 'Empty file',
 };

@@ -1,4 +1,4 @@
-import {Fragment,useEffect,useRef,useState,type KeyboardEvent,type MouseEvent} from 'react';
+import {Fragment,useEffect,useRef,useState,type KeyboardEvent,type MouseEvent,type ReactNode} from 'react';
 import {Archive,Check,ChevronDown,ChevronRight,Folder,FolderPlus,LayoutDashboard,MoreHorizontal,Pencil,Pin,Trash2,X} from 'lucide-react';
 import {CardActionMenu} from './CardActionMenu';
 import {ChatListActions} from './ChatListActions';
@@ -82,10 +82,11 @@ function readIds(key:string){try{const value=JSON.parse(localStorage.getItem(key
 function writeIds(key:string,ids:Set<string>){try{localStorage.setItem(key,JSON.stringify([...ids]));}catch{/* The choice still holds until the window closes. */}}
 const PINNED='pocket-desktop-pinned-chats',ARCHIVED='pocket-desktop-archived-chats',FOLDERS='pocket-desktop-chat-folders';
 /** Folders are made and named by the person; like pins they belong to this PC window. A chat is in at most one folder. */
-export type ChatFolder={id:string;name:string;collapsed:boolean;chats:string[]};
+/** `at` is the folder's place among the chats outside folders: how many of them are above it (none: at the top). */
+export type ChatFolder={id:string;name:string;collapsed:boolean;chats:string[];at?:number};
 function readFolders():ChatFolder[]{
   try{const value=JSON.parse(localStorage.getItem(FOLDERS)||'[]');
-    return Array.isArray(value)?value.filter(f=>f&&typeof f.id==='string'&&typeof f.name==='string'&&Array.isArray(f.chats)).slice(0,200).map(f=>({id:f.id,name:f.name.slice(0,120),collapsed:f.collapsed===true,chats:f.chats.filter((c:unknown)=>typeof c==='string').slice(0,2000)})):[];}
+    return Array.isArray(value)?value.filter(f=>f&&typeof f.id==='string'&&typeof f.name==='string'&&Array.isArray(f.chats)).slice(0,200).map(f=>({id:f.id,name:f.name.slice(0,120),collapsed:f.collapsed===true,chats:f.chats.filter((c:unknown)=>typeof c==='string').slice(0,2000),...(Number.isInteger(f.at)&&f.at>0?{at:Math.min(f.at,100000)}:{})})):[];}
   catch{return [];}
 }
 function writeFolders(folders:ChatFolder[]){try{localStorage.setItem(FOLDERS,JSON.stringify(folders));}catch{/* The folders still hold until the window closes. */}}
@@ -95,9 +96,11 @@ type Props={
   /** Chats of every provider, newest first; each carries its provider. */
   sessions:Session[];jobs:Map<string,JobView>;focusId?:string;actionId?:string;connection:Connection;provider:Provider;
   loading:boolean;online:boolean;onOpen(s:Session):void;onMenu(target:ChatActionTarget):void;onCloseMenu():void;onDeleted(ids:string[],provider:Provider):void;
+  /** More buttons beside New folder, and a block shown above the chats (scheduled tasks). */
+  barActions?:ReactNode;beforeChats?:ReactNode;
 };
 /** One flat list of chats. Only the first page is rendered; "Show more" adds the next one, so a long history costs nothing until asked for. */
-export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,loading,online,onOpen,onMenu,onCloseMenu,onDeleted,connection,provider}:Props){
+export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,loading,online,onOpen,onMenu,onCloseMenu,onDeleted,connection,provider,barActions,beforeChats}:Props){
   const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
   const tree=useRef<HTMLDivElement>(null),anchor=useRef<string|undefined>(undefined);
   const single=useRef<string|undefined>(undefined);
@@ -109,7 +112,14 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
   const changeFolders=(change:(old:ChatFolder[])=>ChatFolder[])=>setFolders(old=>{const next=change(old);writeFolders(next);return next;});
   /** Moves a chat out of every folder and, unless folder is null, into that one. */
   const moveChat=(id:string,folder:string|null)=>changeFolders(old=>old.map(f=>({...f,chats:f.id===folder?[...f.chats.filter(c=>c!==id),id]:f.chats.filter(c=>c!==id)})));
-  const createFolder=(chat?:string)=>{const id=crypto.randomUUID();changeFolders(old=>[...old.map(f=>chat?{...f,chats:f.chats.filter(c=>c!==chat)}:f),{id,name:l('New folder','Новая папка'),collapsed:false,chats:chat?[chat]:[]}]);setRenaming(id);};
+  const createFolder=(chat?:string,at?:number)=>{const id=crypto.randomUUID();changeFolders(old=>[...old.map(f=>chat?{...f,chats:f.chats.filter(c=>c!==chat)}:f),{id,name:l('New folder','Новая папка'),collapsed:false,chats:chat?[chat]:[],...(at?{at}:{})}]);setRenaming(id);};
+  /** A right click on the list outside a row makes a folder in the nearest gap between rows: below every chat it goes last, between two chats it goes between them. */
+  function folderHere(event:MouseEvent){
+    if(showArchived||(event.target as HTMLElement).closest('button,a,input,form,.chat-list-action-slot'))return;
+    event.preventDefault();
+    const loose=Array.from(tree.current?.querySelectorAll<HTMLElement>('.desktop-sessions > button[data-chat-id]:not([data-nested])')||[]);
+    createFolder(undefined,loose.filter(row=>{const box=row.getBoundingClientRect();return box.top+box.height/2<event.clientY;}).length);
+  }
   const flip=(key:string,set:(update:(old:Set<string>)=>Set<string>)=>void,id:string)=>set(old=>{const next=new Set(old);if(next.has(id))next.delete(id);else next.add(id);writeIds(key,next);return next;});
   const archivedCount=allSessions.filter(s=>archived.has(s.sessionId)).length;
   const folderOf=new Map<string,string>();if(!showArchived)for(const f of folders)for(const c of f.chats)folderOf.set(c,f.id);
@@ -182,8 +192,9 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
     {marked.size>0&&<div className="desktop-list-caption"><span>{l('Selected','Выбрано')+' · '+marked.size}</span>
       <span className="bulk-toolbar"><button className="icon-button" aria-label={l('Delete selected chats','Удалить выбранные чаты')} disabled={!online} onClick={()=>selectTarget([...marked])}><Trash2 size={16}/></button><button className="icon-button" aria-label={l('Clear selection','Снять выделение')} onClick={clear}><X size={16}/></button></span>
     </div>}
-    {!showArchived&&<div className="desktop-folder-bar"><button type="button" className="icon-button desktop-new-folder" aria-label={l('New folder','Новая папка')} title={l('New folder','Новая папка')} onClick={()=>createFolder()}><FolderPlus size={16} aria-hidden="true"/></button></div>}
-    <div ref={tree} className="desktop-session-groups desktop-chat-list">{loading&&!ordered.length?<p role="status">{l('Loading chats…','Загружаем чаты…')}</p>:
+    {!showArchived&&<div className="desktop-folder-bar"><button type="button" className="icon-button desktop-new-folder" aria-label={l('New folder','Новая папка')} title={l('New folder','Новая папка')} onClick={()=>createFolder()}><FolderPlus size={16} aria-hidden="true"/></button>{barActions}</div>}
+    {!showArchived&&beforeChats}
+    <div ref={tree} className="desktop-session-groups desktop-chat-list" onContextMenu={folderHere}>{loading&&!ordered.length?<p role="status">{l('Loading chats…','Загружаем чаты…')}</p>:
       <div className="desktop-sessions" onDragOver={e=>{if(e.dataTransfer.types.includes(CHAT_DRAG))e.preventDefault();}}
         onDrop={e=>{const id=e.dataTransfer.getData(CHAT_DRAG);setDropTarget(undefined);if(id&&!(e.target as HTMLElement).closest('.desktop-chat-folder')){e.preventDefault();moveChat(id,null);}}}>{(()=>{
         let row=0;
@@ -202,7 +213,7 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
               {status&&status!=='running'&&<small className="desktop-run-label"><ChatRunStatus status={status}/></small>}</span>{!status&&<time className="chat-row-time" title={fullTime(s.lastModified)}>{relativeTime(s.lastModified)}</time>}
           </button><ChatListActions session={s} provider={lane} connection={connection} jobId={job?.id} row={index} running={running} open={actionId===s.sessionId} onOpen={openMenu} onClose={onCloseMenu}/></Fragment>;
         };
-        const folderRows=showArchived?[]:folders.map(f=>{
+        const folderRow=(f:ChatFolder)=>{
           const index=++row,chats=inFolder(f.id),Chevron=f.collapsed?ChevronRight:ChevronDown;
           const header=renaming===f.id
             ?<form className="desktop-chat-folder desktop-chat-folder-rename" style={{gridRow:index}} onSubmit={e=>{e.preventDefault();const name=new FormData(e.currentTarget).get('name')?.toString().trim();if(name)changeFolders(old=>old.map(x=>x.id===f.id?{...x,name:name.slice(0,120)}:x));setRenaming(undefined);}}>
@@ -216,8 +227,15 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
               <span className="chat-list-action-slot desktop-folder-actions" style={{gridRow:index}}><button type="button" className="chat-list-action" aria-label={l('Folder actions','Действия папки')} aria-description={f.name} aria-haspopup="menu" aria-expanded={folderMenu?.id===f.id}
                onClick={e=>{const rect=e.currentTarget.getBoundingClientRect();setFolderMenu(folderMenu?.id===f.id?undefined:{id:f.id,x:rect.right+6,y:rect.top});}}><MoreHorizontal size={18} aria-hidden="true"/></button></span></>;
           return <Fragment key={f.id}>{header}{!f.collapsed&&chats.map(s=>chatRow(s,true))}</Fragment>;
-        });
-        return <>{folderRows}{shown.map(s=>chatRow(s,false))}</>;
+        };
+        // Each folder stands before the chat at its place; a place past the shown chats puts it after the last one.
+        const placed=showArchived?[]:folders.map((f,i)=>({f,i,at:f.at??0})).sort((a,b)=>a.at-b.at||a.i-b.i);
+        const out:ReactNode[]=[];let next=0;
+        for(let k=0;k<=shown.length;k++){
+          while(next<placed.length&&(placed[next].at<=k||k===shown.length))out.push(folderRow(placed[next++].f));
+          if(k<shown.length)out.push(chatRow(shown[k],false));
+        }
+        return <>{out}</>;
       })()}</div>}
       {hidden>0&&<button type="button" className="rail-action desktop-more-chats" onClick={()=>setLimit(shown.length+CHAT_PAGE)}><ChevronDown size={16} aria-hidden="true"/><span>{l('Show more chats','Показать ещё чаты')} · {hidden}</span></button>}
       {archivedCount>0&&<button type="button" className="rail-action desktop-archived-chats" aria-pressed={showArchived} onClick={()=>{setShowArchived(value=>!value);setLimit(CHAT_PAGE);}}><Archive size={15} aria-hidden="true"/><span>{showArchived?l('Back to chats','Назад к чатам'):l('Archived','Архив')+' · '+archivedCount}</span></button>}

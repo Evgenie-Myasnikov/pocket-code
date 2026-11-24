@@ -19,10 +19,10 @@ function CopyButton({ text }: {text: string;}) {
   const [copied, setCopied] = useState(false);
   return <button className="icon-button copy-button" data-copied={copied||undefined} aria-label={t("Копировать")} onClick={async () => {try {await navigator.clipboard.writeText(text);setCopied(true);setTimeout(() => setCopied(false), 1500);} catch {setCopied(false);}}}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>;
 }
-type MessageProps={connection?:Connection|null;cwd?:string;message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean;mode?:DetailMode;live?:boolean;commandSlots?:CommandSlots;onCommandToggle?(key:string,open:boolean):void};
+type MessageProps={connection?:Connection|null;cwd?:string;message: ChatMessage;provider?: 'claude' | 'codex' | 'copilot';onSubagent?(agent:SubagentView):void;agents?:Map<string,SubagentView>;toolResults?:Map<string,Block>;running?:boolean;streaming?:boolean;animateInitial?:boolean;mode?:DetailMode;live?:boolean;caret?:boolean;commandSlots?:CommandSlots;onCommandToggle?(key:string,open:boolean):void};
 export function PartialMessage({text,...shared}:Omit<MessageProps,'message'|'animateInitial'>&{text:string}){
   const startedEmpty=useRef(!text);
-  return text?<Message {...shared} animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
+  return text?<Message {...shared} caret animateInitial={startedEmpty.current} message={{id:'partial',role:'assistant',blocks:[{type:'text',text}]}}/>:null;
 }
 export const MessageList=memo(function MessageList({messages,partialText,runningMessages,jobId,turnChanges,onReview,resultRoot,...shared}:Omit<MessageProps,'message'|'running'>&{messages:ChatMessage[];partialText?:string;runningMessages?:Set<ChatMessage>|null;jobId?:string;turnChanges?:Map<string,TurnChanges>;resultRoot?:string;onReview?:(changes:TurnChanges)=>void}){
   // Messages already present when this transcript mounts are a snapshot, even
@@ -65,7 +65,7 @@ export const MessageList=memo(function MessageList({messages,partialText,running
     const ids=anchors.length?anchors:[run.key];
     const delivery=run.message?delivered.current.get(run.message.id):undefined,key=delivery?.key||run.key;
     const body=run.message?
-    <Message key={key} message={run.message} running={activeMessages.has(run.message)} live={run.message===messages.at(-1)} {...shared} streaming={shared.streaming&&(!runningMessages||activeMessages.has(run.message))} onCommandToggle={rememberCommand} commandSlots={run.commandSlots} animateInitial={delivery?.animate??!initialIds.current.has(run.message.id)}/>:
+    <Message key={key} message={run.message} running={activeMessages.has(run.message)} live={run.message===messages.at(-1)} caret={run.message===messages.at(-1)&&!pending.current} {...shared} streaming={shared.streaming&&(!runningMessages||activeMessages.has(run.message))} onCommandToggle={rememberCommand} commandSlots={run.commandSlots} animateInitial={delivery?.animate??!initialIds.current.has(run.message.id)}/>:
     <article tabIndex={-1} data-enter={shared.streaming&&ids.some(id=>!initialIds.current.has(id))||undefined} key={run.key} className="message assistant tool-result" data-message-id={ids[0]}>
       {ids.slice(1).map(id=><span key={id} className="activity-message-anchor" data-message-id={id} aria-hidden="true"/>)}
       <ActivityGroup items={run.items!}/>
@@ -77,12 +77,12 @@ export const MessageList=memo(function MessageList({messages,partialText,running
   });
   const partial=pending.current;
   if(partial){
-    const body=<Fragment key={partial.key}><Message key={partial.key} {...shared} animateInitial={partial.animate} message={{id:'partial',role:'assistant',blocks:[{type:'text',text:partial.text}]}}/></Fragment>;
+    const body=<Fragment key={partial.key}><Message key={partial.key} {...shared} caret animateInitial={partial.animate} message={{id:'partial',role:'assistant',blocks:[{type:'text',text:partial.text}]}}/></Fragment>;
     content.push(body);
   }
   return content;
 });
-export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false,commandSlots,onCommandToggle }: MessageProps) {
+export const Message=memo(function Message({ message, provider = 'claude', onSubagent, agents,toolResults,running=false,streaming=false,animateInitial=false,connection,cwd,mode,live=false,caret=false,commandSlots,onCommandToggle }: MessageProps) {
   useLanguage();
   const assistantChat=useAssistantChat();
   // A message made only of background-task notices is an event line, not the person's bubble.
@@ -95,14 +95,15 @@ export const Message=memo(function Message({ message, provider = 'claude', onSub
   const plain=displayBlocks.filter(block=>block.type==='text').map(block=>block.text).join('\n');
   const attachments=isUser?displayBlocks.filter(block=>['attachment','image','document'].includes(block.type)):[];
   const displayMessage=isUser?{...message,blocks:displayBlocks.filter(block=>!attachments.includes(block))}:message;
-  const content = groupActivityBlocks(visibleMessageBlocks(displayMessage,toolResults,running,live),mode,commandSlots).map(run => {
+  const runs = groupActivityBlocks(visibleMessageBlocks(displayMessage,toolResults,running,live),mode,commandSlots);
+  const content = runs.map((run,runIndex) => {
       const {block,result}=run.items[0];
       const history=commandSlots?.get(run.items[0].index);
       const toggle=block.type==='tool_use'&&block.id&&onCommandToggle?(open:boolean)=>onCommandToggle(commandKey(message.id,block.id!),open):undefined;
       if(history?.[0]?.retained)return <RichBlock key={run.key} running={running} block={block} result={result} onCommandToggle={toggle}/>;
       if(history)return history.length?<ActivityGroup key={run.key} items={history} commandHistory/>:null;
       if(activityGroupKey(run.items[0],mode))return <ActivityGroup key={run.key} items={run.items}/>;
-      return <RichBlock key={block.type==='text'?`text:${message.blocks.slice(0,run.items[0].index).filter(item=>item.type==='text').length}`:run.key} running={running} streaming={streaming&&message.role==='assistant'&&(block.type!=='thinking'||run.items[0].live)} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent} onCommandToggle={toggle}/>;
+      return <RichBlock key={block.type==='text'?`text:${message.blocks.slice(0,run.items[0].index).filter(item=>item.type==='text').length}`:run.key} running={running} streaming={streaming&&message.role==='assistant'&&(block.type!=='thinking'||run.items[0].live)} caret={caret&&streaming&&message.role==='assistant'&&block.type==='text'&&runIndex===runs.length-1} animateInitial={animateInitial} block={block.agent && agents?.has(block.agent.id)?{...block,agent:agents.get(block.agent.id)}:block} result={result} onSubagent={onSubagent} onCommandToggle={toggle}/>;
     });
   if(!content.some(Boolean)&&!attachments.length)return (commandSlots||!message.blocks.length)?<span className="command-history-anchor" data-message-id={message.id} aria-hidden="true"/>:null;
   return <article tabIndex={-1} data-enter={animateInitial&&(streaming||running)||undefined} data-message-id={message.id} aria-label={isUser?t("ВЫ"):message.role==='assistant'?provider:undefined} className={`message ${toolOnly?'assistant':message.role} ${toolOnly ? 'tool-result' : ''}`}>

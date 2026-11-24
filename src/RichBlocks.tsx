@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useMemo, useEffect, useLayoutEffect, useId, type ComponentProps, type ReactNode } from 'react';
-import {HighlightedCode,languageForFence} from './code-highlight';
+import {HighlightedCode,languageForFence,languageForFile} from './code-highlight';
 import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
@@ -15,6 +15,7 @@ import {describeTool,stripAnsi,toolText,trivialResult,type PlanItem,type ToolVie
 import {plural} from './plural';
 import {ImageViewer} from './ImageViewer';
 import {EditActivity} from './EditActivity';
+import {QuestionActivity} from './QuestionActivity';
 import {isClaudeTaskNotificationPrefix, parseClaudeTaskNotification, type ClaudeTaskNotification} from './claude-task-notification';
 
 import {Installer as Documents} from './native-update';
@@ -158,10 +159,10 @@ const markdownElements:NonNullable<ComponentProps<typeof Streamdown>['components
 /** As in Strata: words of a streamed answer fade in as they arrive (240 ms, ease-out), never ahead of the text; saved text is static. */
 const streamAnimation={animation:'fadeIn' as const,duration:240,easing:'cubic-bezier(0,0,.2,1)',sep:'word' as const,maxBacklogMs:320};
 const reducedMotion=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-export const Markdown=memo(function Markdown({text,streaming=false}:{text:string;streaming?:boolean;animateInitial?:boolean}) {
+export const Markdown=memo(function Markdown({text,streaming=false,caret=false}:{text:string;streaming?:boolean;caret?:boolean;animateInitial?:boolean}) {
   useLanguage();
   const animate=streaming&&!reducedMotion();
-  return <div className="markdown"><Streamdown mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={animate?streamAnimation:false} isAnimating={animate} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
+  return <div className="markdown" data-caret={caret&&text?true:undefined}><Streamdown mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={animate?streamAnimation:false} isAnimating={animate} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.
@@ -206,6 +207,21 @@ export function ToolOutput({text,failed=false,command}:{text:string;failed?:bool
     {hidden>0&&<button type="button" className="text-button tool-output-more" onClick={()=>setExpanded(true)}>{plural(hidden,['… ещё {0} строка','… ещё {0} строки','… ещё {0} строк'])}</button>}
     {clean?<pre className="tool-output" tabIndex={0} role="region" aria-label={t('Результат инструмента')}>{hidden?all.slice(-TAIL).join('\n'):clean}</pre>:<p className="tool-output-empty">{t('Нет вывода')}</p>}
     {(command||clean)&&<div className="tool-output-actions">{command&&<CopyAction compact text={command} label={t('Копировать команду')}/>}{clean&&<CopyAction compact text={clean} label={t('Копировать вывод')}/>}</div>}
+  </div>;
+}
+const FILE_HEAD=12;
+/** The text of a read file, without the reader's line numbers and notes to the model. */
+export function fileReadText(raw:string){
+  return stripAnsi(raw).replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g,'').replace(/\s+$/,'').split(/\r?\n/).map(line=>line.replace(/^\s*\d+(?:→|\t)/,'')).join('\n');
+}
+/** A file the agent read looks like any code block of the chat: the file's own colours, the first lines, the rest on request. */
+function FileReadPreview({path,text}:{path:string;text:string}){
+  const lines=useMemo(()=>fileReadText(text).split('\n'),[text]),[all,setAll]=useState(false);
+  const hidden=all?0:Math.max(0,lines.length-FILE_HEAD),shown=hidden?lines.slice(0,FILE_HEAD).join('\n'):lines.join('\n');
+  if(!shown.trim())return <p className="tool-output-empty">{t('Пустой файл')}</p>;
+  return <div className="tool-file-preview markdown">
+    <CodeBlock><code><HighlightedCode text={shown} lang={languageForFile(path)}/></code></CodeBlock>
+    {hidden>0&&<button type="button" className="text-button tool-output-more" onClick={()=>setAll(true)}>{plural(hidden,['… ещё {0} строка','… ещё {0} строки','… ещё {0} строк'])}</button>}
   </div>;
 }
 function ToolResultContent({block,depth,command,prose=false}:{block:Block;depth:number;command?:string;prose?:boolean}) {
@@ -256,15 +272,17 @@ function ToolRow({block,result,running,depth,onCommandToggle}:{block:Block;resul
     result={result&&!trivialResult(result)&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}/>;
   const prose=view.kind==='agent'||view.kind==='web';
   const commandRow=view.kind==='command';
+  // A read file: the title names it, the full path is one muted line, and its text is a code block.
+  const readFile=view.kind==='explore'&&!view.search&&view.files.length===1?view.files[0]:undefined;
   return <Disclosure defaultOpen={commandRow&&view.active} onManualToggle={commandRow?onCommandToggle:undefined} className={`tool-card activity-row ${commandRow?'command-row':''} ${result?'combined':''} ${view.failed?'failed':''}`} summary={<>
     {commandRow?<><ChevronDown size={14} className="command-chevron" aria-hidden="true"/><span className="command-label">{view.status==='failed'?t('Команда не выполнилась'):view.title}</span>
       {view.command&&<><span className="command-separator" aria-hidden="true">·</span><span className="tool-title mono" title={view.command}>{view.command}</span></>}</>:
       <><Icon size={16} aria-hidden="true"/><span className={'tool-title'+(view.mono?' mono':'')}>{view.title}</span></>}
     {commandRow&&view.status==='failed'?<span className="tool-state" data-status="failed"><X size={13} aria-hidden="true"/><span>{t('Не удалось')}</span></span>:<ToolState view={view}/>}
   </>}>{()=> <div className="activity-details">
-    {commandRow?view.command&&<pre className="tool-command">{view.command}</pre>:view.plan?<PlanChecklist items={view.plan}/>:<ToolFields input={block.input}/>}
+    {commandRow?view.command&&<pre className="tool-command">{view.command}</pre>:view.plan?<PlanChecklist items={view.plan}/>:view.kind==='question'?<QuestionActivity input={input} result={result}/>:readFile?<p className="tool-file-path" title={readFile}>{readFile}</p>:<ToolFields input={block.input}/>}
     {commandRow&&!result&&typeof input.output==='string'&&input.output&&<ToolOutput text={input.output} failed={false} command={view.command}/>}
-    {result&&!trivialResult(result)&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth} command={view.command} prose={prose}/></div>}
+    {readFile&&result&&!result.is_error?<FileReadPreview path={readFile} text={toolText(result.content)}/>:result&&view.kind!=='question'&&!trivialResult(result)&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth} command={view.command} prose={prose}/></div>}
   </div>}</Disclosure>;
 }
 const notificationTitles={running:'Фоновые задачи выполняются',completed:'Фоновые задачи завершены',failed:'Ошибка фоновых задач',stopped:'Фоновые задачи остановлены',unknown:'Уведомление о фоновых задачах'} as const;
@@ -278,13 +296,13 @@ export function TaskNotificationEvent({notification}:{notification:ClaudeTaskNot
   </details>;
 }
 export const notificationSummary=(notification:ClaudeTaskNotification)=>t(notificationTitles[notification.status])+': '+notification.summary;
-export function RichBlock({block,depth=0,result,onSubagent,onCommandToggle,running=false,streaming=false,animateInitial=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;animateInitial?:boolean;onSubagent?(agent:SubagentView):void;onCommandToggle?(open:boolean):void}) {
+export function RichBlock({block,depth=0,result,onSubagent,onCommandToggle,running=false,streaming=false,animateInitial=false,caret=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;animateInitial?:boolean;caret?:boolean;onSubagent?(agent:SubagentView):void;onCommandToggle?(open:boolean):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;
   if(block.type==='text'){
     const text=block.text || '', notification=parseClaudeTaskNotification(text);
     if(notification)return <TaskNotificationEvent notification={notification}/>;
     if(isClaudeTaskNotificationPrefix(text))return <aside className="claude-task-notification transcript-event pending" aria-live="polite">{t('Обрабатывается уведомление о фоновых задачах')}</aside>;
-    return <Markdown text={text} streaming={streaming} animateInitial={streaming&&animateInitial}/>;
+    return <Markdown text={text} streaming={streaming} caret={caret} animateInitial={streaming&&animateInitial}/>;
   }
   if(block.type==='subagent' && block.agent) {
     const agent=block.agent,label=t(({running:'Работает',completed:'Готово',error:'Ошибка',stopped:'Остановлено',unknown:'Статус неизвестен'} as const)[agent.status]);

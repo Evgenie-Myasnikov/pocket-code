@@ -119,6 +119,10 @@ public static class DesktopSmoke {
             // 0.28.60+ endpoints the window calls: local model, Import chats, turn result sizes.
             Check(DesktopReadPolicy.Allows("/local-models"),"Local model status allowed");foreach(string path in new[]{"/local-models/start","/local-models/stop","/chat-library/import","/file-sizes"})Check(DesktopReadPolicy.AllowsWrite(path),"Write allowed: "+path);
             Check(!DesktopReadPolicy.AllowsWrite("/local-models/start/x")&&!DesktopReadPolicy.Allows("/local-models/start"),"Local model actions are writes only");
+            Check(DesktopReadPolicy.Allows("/scheduled-tasks"),"Scheduled tasks list allowed");
+            foreach(string path in new[]{"/scheduled-tasks","/scheduled-tasks/11111111-1111-4111-8111-111111111111","/scheduled-tasks/11111111-1111-4111-8111-111111111111/run","/scheduled-tasks/11111111-1111-4111-8111-111111111111/read","/scheduled-tasks/11111111-1111-4111-8111-111111111111/delete"})Check(DesktopReadPolicy.AllowsWrite(path),"Write allowed: "+path);
+            foreach(string path in new[]{"/scheduled-tasks/example/run","/scheduled-tasks/11111111-1111-4111-8111-111111111111/erase","/scheduled-tasks/../runtime/stop","/scheduled-tasks#hidden"})Check(!DesktopReadPolicy.AllowsWrite(path),"Unapproved scheduled task write denied: "+path);
+            Check(!DesktopReadPolicy.Allows("/scheduled-tasks/11111111-1111-4111-8111-111111111111/run"),"Scheduled task actions are writes only");
             Console.WriteLine("PASS: standalone host lifecycle, scoped bridge policy and nested child cleanup.");return 0;
         }catch(Exception error){Console.Error.WriteLine(error);return 1;}finally{if(owned!=null)owned.Dispose();}
     }

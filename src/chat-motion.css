@@ -37,3 +37,14 @@ details[open]>summary>.chat-disclosure-chevron{transform:rotate(90deg)}
 .chat-side-panel-body>*{animation:chat-content-enter .16s cubic-bezier(0,0,.2,1) both}
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.turn-result,.header-model-menu,.chat-side-panel,.composer-folder-chip,.chat-side-panel-body>*{animation:none}}
 @media(prefers-reduced-motion:reduce){[data-sd-animate]{animation:none}[data-sd-animate-marker]::marker{animation:none}}
+
+/* As in Strata: every transcript message rises in when it appears (6 px, 240 ms), a tool card from 8 px over 320 ms,
+   and a blinking accent caret follows the text that is still being written. */
+.conversation-inner .message{animation:chat-content-enter .24s cubic-bezier(0,0,.2,1) backwards}
+.conversation-inner .tool-card{animation:chat-card-enter .32s cubic-bezier(0,0,.2,1) both}
+@keyframes chat-card-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.markdown[data-caret]>div>:last-child:not(ul,ol,pre,table,blockquote,div)::after,
+.markdown[data-caret]>div>:is(ul,ol):last-child>li:last-child::after,
+.markdown[data-caret]>div>blockquote:last-child>:last-child::after{content:'';display:inline-block;width:7px;height:15px;margin-left:3px;vertical-align:-2px;background:var(--accent);border-radius:2px;animation:chat-caret-blink 1s steps(2,start) infinite}
+@keyframes chat-caret-blink{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce),(forced-colors:active){.conversation-inner .message,.conversation-inner .tool-card{animation:none}.markdown[data-caret] *::after{animation:none}}

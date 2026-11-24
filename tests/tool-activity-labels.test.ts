@@ -2,8 +2,10 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {toolActivity} from '../src/tool-activity.js';
 import {describeTool,stripAnsi} from '../src/tool-registry.js';
-import {canonicalCalls,turnChanges} from '../src/turn-changes.js';
+import {canonicalCalls,turnChanges,type TurnChanges} from '../src/turn-changes.js';
 import type {Block,ChatMessage} from '../server/types';
+/** Totals without the per-file diff lines, which one test checks on their own. */
+const totals=(value:TurnChanges|undefined):Omit<TurnChanges,'byFile'>|undefined=>{if(!value)return value;const {byFile:_lines,...rest}=value;return rest;};
 test('activity rows name the object of the action and keep an explicit state',()=>{
  assert.equal(toolActivity({type:'tool_use',name:'Command',input:{command:'npm run lint',status:'inProgress'}}).label,'npm run lint');
  assert.equal(toolActivity({type:'tool_use',name:'Command',input:{status:'inProgress'}}).status,'running');
@@ -36,14 +38,16 @@ test('a finished turn reports its changed files on its last assistant message',(
   {id:'u2',role:'user',blocks:[{type:'text',text:'Next'}]},
   {id:'a3',role:'assistant',blocks:[{type:'tool_use',id:'e2',name:'Edit',input:{file_path:'x.ts',old_string:'a',new_string:'b',status:'completed'}}]},
  ];
- assert.deepEqual(turnChanges(messages,undefined,true).get('a2'),{files:['new.ts'],added:2,removed:0});
+ assert.deepEqual(totals(turnChanges(messages,undefined,true).get('a2')),{files:['new.ts'],added:2,removed:0});
+ // each file keeps its own diff lines and counts for the side panel
+ assert.deepEqual(turnChanges(messages,undefined,true).get('a2')?.byFile?.['new.ts'],{lines:[{kind:'add',text:'a'},{kind:'add',text:'b'}],added:2,removed:0});
  assert.equal(turnChanges(messages,undefined,true).has('a3'),false);
- assert.deepEqual(turnChanges(messages).get('a3'),{files:['x.ts'],added:1,removed:1});
+ assert.deepEqual(totals(turnChanges(messages).get('a3')),{files:['x.ts'],added:1,removed:1});
 });
 test('turn results use confirmed scoped files and omit line counts for partial evidence',()=>{
  const msg=(name:string,input:Record<string,unknown>):ChatMessage[]=>[{id:'done',role:'assistant',blocks:[{type:'tool_use',id:'call',name,input}]}];
  const scope='C:\\Projects\\App';
- const read=(name:string,input:Record<string,unknown>)=>turnChanges(msg(name,input),undefined,false,scope).get('done');
+ const read=(name:string,input:Record<string,unknown>)=>totals(turnChanges(msg(name,input),undefined,false,scope).get('done'));
  assert.equal(read('Edit',{file_path:'src/a.ts',new_string:'a'}),undefined);
  assert.equal(read('Edit',{status:'failed',file_path:'src/a.ts'}),undefined);
  assert.equal(read('Edit',{status:'completed',file_path:'C:\\Projects\\Outside\\private.ts'}),undefined);
@@ -76,7 +80,7 @@ test('turns reconcile file snapshots by invocation and preserve unrelated calls'
  assert.deepEqual(projected[3].blocks,[]);
  assert.deepEqual(projected[5].blocks,messages[5].blocks);
  assert.equal(messages[1].blocks.length,4);
- assert.deepEqual([...turnChanges(messages)],[
+ assert.deepEqual([...turnChanges(messages)].map(([key,value])=>[key,totals(value)]),[
   ['settled',{files:['a.ts','b.ts'],added:3,removed:0}],
   ['more',{files:['c.ts'],added:1,removed:0}]
  ]);

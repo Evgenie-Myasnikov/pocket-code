@@ -11,7 +11,7 @@ import './setting-rows.css';
 type Swatch = { dark: [string, string]; light: [string, string] };
 type Palette = { id: string; name: string; hue: number; hslHue: number; swatch: Swatch; preferredTheme?: 'dark' | 'light' };
 export const palettes: Palette[] = [
-{ id: 'carbon', name: 'Карбон', hue: 0, hslHue: 0, preferredTheme: 'dark', swatch: { dark: ['#0e1113', '#34d399'], light: ['#f9fafb', '#0a7a55'] } },
+{ id: 'carbon', name: 'Карбон', hue: 0, hslHue: 0, preferredTheme: 'dark', swatch: { dark: ['#0f0f0f', '#e5e5e5'], light: ['#ffffff', '#171717'] } },
 { id: 'emerald', name: 'Изумруд', hue: 165, hslHue: 158, preferredTheme: 'dark', swatch: { dark: ['#101417', '#3ecf9a'], light: ['#f4f7f6', '#17694f'] } },
 { id: 'graphite', name: 'Графит', hue: 78, hslHue: 38, preferredTheme: 'dark', swatch: { dark: ['#191917', '#efb864'], light: ['#f6f4ef', '#77531d'] } },
 { id: 'slate', name: 'Сланец', hue: 237, hslHue: 202, preferredTheme: 'dark', swatch: { dark: ['#202831', '#9dd4f4'], light: ['#eef3f7', '#285e7e'] } },

@@ -39,6 +39,10 @@ test('folders are made, named, filled, collapsed, renamed and deleted',async({pa
  await row(page,'claude-4').dragTo(folder);
  await expect(folder).toHaveText(/Release\s*2/);
  await expect(row(page,'claude-2')).toHaveAttribute('data-nested','true');await expect(row(page,'claude-4')).toHaveAttribute('data-nested','true');
+ // a folder does not look like a chat: its chevron, folder icon and count are visible, its chats hang from a guide line
+ await expect(folder.locator('svg')).toHaveCount(2);for(const icon of await folder.locator('svg').all())await expect(icon).toBeVisible();
+ await expect(folder.locator('small')).toBeVisible();
+ expect(await row(page,'claude-2').evaluate(element=>getComputedStyle(element,'::before').width)).toBe('1px');
  await page.locator(rail).screenshot({path:'.local/chat-folders.png'});
  await folder.click();await expect(folder).toHaveAttribute('aria-expanded','false');await expect(row(page,'claude-2')).toHaveCount(0);
  await page.reload();await expect(page.locator(rail+' button.desktop-chat-folder')).toHaveAttribute('aria-expanded','false');
@@ -52,4 +56,25 @@ test('folders are made, named, filled, collapsed, renamed and deleted',async({pa
  await expect(folder).toHaveCount(0);
  // chats of a deleted folder go back to the list, they are not deleted
  await expect(row(page,'claude-4')).toBeVisible();await expect(row(page,'claude-4')).not.toHaveAttribute('data-nested','true');
+});
+
+test('a right click on the chat list makes a folder at the nearest gap: between chats in the middle, after the last chat below them',async({page})=>{
+ await chats(page);await desktop(page);
+ const loose=page.locator(rail+' .desktop-sessions > button[data-chat-id]:not([data-nested])');
+ const order=async()=>page.locator(rail+' .desktop-sessions > button').evaluateAll(list=>list.map(b=>b.classList.contains('desktop-chat-folder')?'folder':b.getAttribute('data-chat-id')));
+ const count=await loose.count();expect(count).toBeGreaterThan(2);
+ // between the first and the second chat
+ // the rows touch, so a right click there opens the chat's menu; the place is taken from the gap at the pointer
+ const first=(await loose.nth(0).boundingBox())!;
+ await page.locator(rail+' .desktop-sessions').evaluate((list,point)=>list.dispatchEvent(new MouseEvent('contextmenu',{clientX:point.x,clientY:point.y,bubbles:true,cancelable:true})),{x:first.x+4,y:first.y+first.height+1});
+ const name=page.getByRole('textbox',{name:'Folder name'});await name.fill('Middle');await name.press('Enter');
+ expect((await order()).indexOf('folder')).toBe(1);
+ // below every chat, far from the last one: after the last chat
+ const list=(await page.locator(rail+' .desktop-chat-list').boundingBox())!;
+ await page.mouse.click(list.x+list.width/2,list.y+list.height-8,{button:'right'});
+ await name.fill('End');await name.press('Enter');
+ const rows=await order();expect(rows.at(-1)).toBe('folder');expect(rows.filter(r=>r==='folder')).toHaveLength(2);
+ await expect(page.locator(rail+' button.desktop-chat-folder').last()).toHaveText(/End/);
+ // the places survive a reload
+ await page.reload();await expect.poll(order).toEqual(rows);
 });

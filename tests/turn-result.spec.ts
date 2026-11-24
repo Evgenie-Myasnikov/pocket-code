@@ -35,7 +35,7 @@ test('a finished turn opens its own output folder and files, exposes deletions a
  expect(folders.slice(-2)).toEqual([{cwd:root,path:root+'\\src'},{cwd:root,path:root}]);
  await expect(page.getByRole('dialog')).toHaveCount(0);
  // on the PC a file opens as a tab of the side panel beside the chat, not as a dialog
- await card.getByRole('button',{name:'src/catalog.ts'}).click();const side=page.locator('.chat-side-panel');await expect(side.getByRole('tab',{name:'catalog.ts'})).toHaveAttribute('aria-selected','true');await expect(side).toContainText('Synthetic readme');await expect(page.getByRole('dialog')).toHaveCount(0);
+ await card.getByRole('button',{name:'src/catalog.ts'}).click();const side=page.locator('.chat-side-panel');await expect(side.getByRole('tab',{name:'catalog.ts'})).toHaveAttribute('aria-selected','true');await expect(side.locator('.file-changes-diff')).toContainText('export const pages');await side.locator('.file-with-changes-switch button').nth(1).click();await expect(side).toContainText('Synthetic readme');await expect(page.getByRole('dialog')).toHaveCount(0);
  const calls=await page.evaluate(()=>(window as any).desktopCalls.filter((c:any)=>/^\/files?\?/.test(c.endpoint)).map((c:any)=>c.endpoint) as string[]);
  expect(calls.some(p=>p.includes('cwd=')&&decodeURIComponent(p).includes('src\\catalog.ts'))).toBe(true);
  await page.setViewportSize({width:390,height:844});

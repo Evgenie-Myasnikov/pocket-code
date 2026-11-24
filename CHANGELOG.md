@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.28.65 (2026-11-24)
+
+### Validation
+
+- Server and unit tests from PowerShell: a full run gave 624 tests, 615 passed, 1 skipped, 8 failed: the three known ones and five from this release (turn totals compared with the new per-file lines, two colour literals in the file changes styles, four new Russian strings without English); those were fixed and their files pass. A second full run stopped printing after the Codex limits tests, as on 0.28.63, and was ended.
+- Browser scenarios on Edge: 36 passed together across scheduled chats, chat folders and the flat chat list, the side panel and file changes, the turn result, the read file card, answered questions, motion, the new chat placeholder, settings scroll, the board, the Tasks provider menu, transcript rhythm, the token line and fonts.
+- Not checked: the installed Windows application (the windowed desktop smoke test), a real scheduled run with a provider, a phone, the full browser suite.
+
+### Features
+
+- Motion as in Strata (2026-11-24). Every transcript message rises in when it appears (6 px, 240 ms), a tool card from 8 px over 320 ms, and a blinking accent caret follows the text that is still being written, as Strata does. Before, only blocks that arrived during a streamed turn moved, so a chat whose provider sends whole blocks showed no motion at all.
+  - Validation: 2 new browser scenarios (the caret follows only the text being written and every message rises in; a finished chat has no caret) passed with the transcript, token line, side panel and turn result scenarios.
+- Carbon in black and white (2026-11-24). The default Carbon theme has no green: a near-black chat on a slightly lighter frame, grey lines and text, and a light grey accent, as in assistant-ui; the light mode is white with a near-black accent. The swatch matches.
+  - Validation: the palette contrast and design token tests passed.
+- Scheduled chats (2026-11-24). As with Claude's scheduled tasks, a task on the PC holds a prompt, a provider and model (the same menu as the chat header), a working folder and a schedule: every day at a time, weekdays at a time, or every N hours. The PC host starts a new chat with the prompt at each time until the task is deleted, and each run is an ordinary chat in the chat list. Tasks are listed above the chats with a clock and a dot while a run is unread; opening a task opens its latest run. Its "…" menu pauses or resumes, edits, runs now and deletes it. Schedules are stored on the host and survive a restart; a run missed while the PC was off starts once at the next start, not once per missed time, and a resumed task does not catch up. Runs use the default access mode, so an agent that needs permission waits for it in its chat. The Windows window allows the new `/scheduled-tasks` reads and writes (0.28.65+ host).
+  - Validation: 9 new server tests passed (next run time for daily, weekdays and every N hours; a missed run starts once after a restart; delete and pause stop runs; run now keeps the schedule; the API creates, runs a new chat, edits and deletes through the host). 3 new browser scenarios on Edge passed (create from the chat list with the header model menu, the clock and unread dot opening the latest run, the "…" menu pausing, running now, editing and deleting). The shell rules were checked by compiling DesktopWindow.cs with the DesktopSmoke.cs checks; the full windowed smoke test, the installed Windows application and a real scheduled provider run were not checked.
+
+### Bug Fixes
+
+- What changed in a file (2026-11-24). The turn result listed changed files with sizes only, and a file opened from it showed the whole file, so it was not clear what changed or where. Each file now has its own added and removed counts, and opens in the side panel on its changes: added and removed lines in colour with unchanged lines around them, every edit of that file in the turn, and a File switch to the whole file.
+  - Validation: the side panel and turn result browser scenarios check the counts, the changes view and the switch.
+- Read file card (2026-11-24). An opened "Read" line showed the reader's fields (path, offset, limit), the file text with the reader's line numbers in a large font, a nested frame and a sideways scrollbar. It now shows the full path as one muted line and the file's first 12 lines as an ordinary code block of the chat, with the rest on request; the reader's notes to the model are left out.
+  - Validation: a new browser scenario passed.
+- Folders in the chat list (2026-11-24). A folder looked like one more chat: the chat-row rule hid its chevron, folder icon and count. They are shown again, the folder stands a little apart, and its chats hang from a thin guide line. A right click on an empty spot of the list makes a folder there: below every chat it goes after the last one, in a gap between chats it goes between them; the place is kept.
+  - Validation: the folder scenario checks the icons, count and guide line; a new scenario checks the place of a new folder and that it survives a reload.
+- Answered questions (2026-11-24). A question the agent asked showed its raw fields (a JSON list of options) and the provider's reply text. It now shows the question, its choices with the chosen one marked, and the answer.
+  - Validation: a new browser scenario (Claude's answer format) passed.
+- Chat outline (2026-11-24). The frame around the chat and the side panel was the colour of the panel lines and almost invisible on the window background; it is a clear step lighter now.
+  - Validation: the side panel scenario checks that the outline differs from the window background.
+
 ## [0.28.64](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.63...v0.28.64) (2026-11-24)
 
 Published [0.28.64](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.64) from [69e10e7](https://github.com/Evgenie-Myasnikov/pocket-code/commit/69e10e71f2809d112f059dc1f5b75244598711af) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

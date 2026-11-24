@@ -2,8 +2,11 @@ import type {Block,ChatMessage} from '../server/types';
 import {describeTool} from './tool-registry';
 import {parseClaudeTaskNotification} from './claude-task-notification';
 import {resultPath} from './project-path';
+import {editFiles,type EditLine} from './edit-diff';
 
-export type TurnChanges={files:string[];added:number;removed:number;countsUnknown?:boolean;deleted?:string[]};
+/** What one file went through in a turn: its diff lines (with context) and their counts, from every edit of it in the turn. */
+export type FileChange={lines:EditLine[];added:number;removed:number};
+export type TurnChanges={files:string[];added:number;removed:number;countsUnknown?:boolean;deleted?:string[];byFile?:Record<string,FileChange>};
 /** A turn starts with something the person wrote; tool results and background notices do not start one. */
 export const startsTurn=(message:ChatMessage)=>message.role==='user'&&message.blocks.some(block=>block.type==='text'&&!parseClaudeTaskNotification(block.text||'')||block.type==='image'||block.type==='document'||block.type==='attachment');
 /** Resolve later snapshots of one invocation at its original position. One snapshot
@@ -35,10 +38,11 @@ export function canonicalCalls(messages:ChatMessage[]):ChatMessage[]{
 /** Files changed in each finished turn, keyed by the turn's last message, from the edit calls' own input. */
 export function turnChanges(messages:ChatMessage[],results?:Map<string,Block>,running=false,cwd?:string):Map<string,TurnChanges>{
  const changes=new Map<string,TurnChanges>(),files=new Map<string,boolean>();let added=0,removed=0,last='',countsUnknown=false;
+ let byFile:Record<string,FileChange>={};
  const close=()=>{
    const deleted=[...files].filter(([,gone])=>gone).map(([file])=>file);
-   if(files.size&&last)changes.set(last,{files:[...files.keys()],added,removed,...(deleted.length?{deleted}:{}),...(countsUnknown?{countsUnknown}: {})});
-   files.clear();added=0;removed=0;last='';countsUnknown=false;
+   if(files.size&&last)changes.set(last,{files:[...files.keys()],added,removed,...(deleted.length?{deleted}:{}),...(countsUnknown?{countsUnknown}: {}),byFile});
+   files.clear();added=0;removed=0;last='';countsUnknown=false;byFile={};
  };
  for(const message of canonicalCalls(messages)){
   if(startsTurn(message))close();
@@ -54,6 +58,13 @@ export function turnChanges(messages:ChatMessage[],results?:Map<string,Block>,ru
    let contained=0;
    for(const file of view.files){const path=cwd?resultPath(cwd,file):file;if(!path)continue;files.set(path,name==='delete_file'||deleted.has(file));contained++;}
    if(!contained)continue;
+   for(const edited of editFiles(input,name||'',name==='create'||name==='write'&&!('old_string' in input))){
+    const target=edited.path||view.files[0]||'',path=target&&(cwd?resultPath(cwd,target):target);
+    if(!path||!edited.lines.length)continue;
+    const entry=byFile[path]??={lines:[],added:0,removed:0};
+    if(entry.lines.length)entry.lines.push({kind:'meta',text:'@@'});
+    for(const line of edited.lines){entry.lines.push(line);if(line.kind==='add')entry.added++;else if(line.kind==='del')entry.removed++;}
+   }
    // A plain write may overwrite existing lines; a delete can omit the old file contents.
    const measured=details.length?details.every(c=>c&&typeof c.diff==='string'&&Boolean(c.diff)&&
      ((typeof c.kind==='object'?c.kind?.type:c.kind)==='add'||/^[+-](?![+-]{2})/m.test(c.diff))):

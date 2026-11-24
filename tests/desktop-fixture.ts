@@ -31,6 +31,13 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    if(p==='/custom-providers'&&(window as any).testTaskTextAccounts){reply(id,(window as any).testTaskTextAccounts.map((a:any)=>({...a,hasKey:true})));return;}
    if(p.startsWith('/custom-providers/')&&p.endsWith('/models')&&(window as any).testTaskTextModels){reply(id,(window as any).testTaskTextModels[p.split('/')[2]]||[]);return;}
    if(p==='/task-text/improve'&&typeof (window as any).testTaskTextResponse==='string'){reply(id,{text:(window as any).testTaskTextResponse});return;}
+   if(p.startsWith('/scheduled-tasks')){
+     const handler=(window as any).testScheduledRequest;
+     const result=handler?handler(p,message.data):{value:[]};
+     if(result.error)listeners.forEach(listener=>listener({data:{id,error:result.error,status:result.status}}));
+     else reply(id,result.value);
+     return;
+   }
    if(p.startsWith('/task-chains')){
      const handler=(window as any).testChainRequest;
      const result=handler?handler(p,message.data,url.searchParams):{value:[]};

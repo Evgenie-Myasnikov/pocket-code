@@ -6,7 +6,7 @@ import {PanelResizeHandle} from './PanelResizeHandle';
 import './chat-side-panel.css';
 
 /** Opens a file of the chat's folder as a tab of the PC window's side panel. Absent on phones, where files open full screen. */
-export const SidePreview=createContext<((root:string,path:string)=>void)|null>(null);
+export const SidePreview=createContext<((root:string,path:string,change?:import('./turn-changes').FileChange)=>void)|null>(null);
 export const useSidePreview=()=>useContext(SidePreview);
 
 const WIDTH='pocket-chat-side-width';

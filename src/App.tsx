@@ -21,6 +21,8 @@ import './compact-ui.css';
 import {ProviderPicker} from './ProviderPicker';
 import {ChatSidePanel,SidePreview,type SidePanelTab} from './ChatSidePanel';
 import {FilePreview} from './Files';
+import {FileWithChanges} from './FileChanges';
+import type {FileChange} from './turn-changes';
 import {FolderChip} from './FolderChip';
 import {HeaderModelMenu} from './HeaderModelMenu';
 import {MobileNavigation} from './MobileNavigation';
@@ -931,12 +933,12 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   },[job?.sessionId,selected?.sessionId,boardChat,connection,provider,demo,linkAttempt]);
   // The PC window shows files a turn made or changed as tabs of one side panel beside the chat (after the Strata preview sidebar).
   const docked=Boolean(embedded?.onProvider&&!embedded.taskDrawer);
-  const [sideExpanded,setSideExpanded]=useState(false),[previews,setPreviews]=useState<{id:string;root:string;path:string}[]>([]),[preview,setPreview]=useState(''),[previewRevision,setPreviewRevision]=useState(0);
+  const [sideExpanded,setSideExpanded]=useState(false),[previews,setPreviews]=useState<{id:string;root:string;path:string;change?:FileChange}[]>([]),[preview,setPreview]=useState(''),[previewRevision,setPreviewRevision]=useState(0);
   useEffect(()=>{setPreviews([]);setPreview('');setSideExpanded(false);},[parentChatId,provider]);
   const sideTab=preview&&previews.some(item=>item.id===preview)?preview:null;
   const sideTabs:SidePanelTab[]=previews.map(item=>({id:item.id,kind:'file' as const,label:item.path.split(/[\\/]/).pop()||item.path,title:item.path}));
   function closeSide(){setPreview('');setSideExpanded(false);}
-  const openPreview=useCallback((root:string,path:string)=>{const id='file:'+path.toLowerCase();setPreviews(old=>old.some(item=>item.id===id)?old:[...old,{id,root,path}].slice(-12));setPreview(id);},[]);
+  const openPreview=useCallback((root:string,path:string,change?:FileChange)=>{const id='file:'+path.toLowerCase();setPreviews(old=>old.some(item=>item.id===id)?old.map(item=>item.id===id&&change?{...item,change}:item):[...old,{id,root,path,change}].slice(-12));setPreview(id);},[]);
   function closePreview(id:string){const rest=previews.filter(item=>item.id!==id);setPreviews(rest);if(preview===id){setPreview(rest.at(-1)?.id||'');if(!rest.length)setSideExpanded(false);}}
   const activePreview=previews.find(item=>item.id===sideTab);
   // The header offers Rules and Changelog only for a folder that has them.
@@ -1314,7 +1316,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {!docked&&agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {!docked&&outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       {docked&&activePreview&&connection&&embedded?.visible!==false&&<ChatSidePanel tabs={sideTabs} active={activePreview.id} expanded={sideExpanded} onSelect={setPreview} onExpand={()=>setSideExpanded(value=>!value)} onClose={closeSide} onCloseTab={closePreview} onRefresh={()=>setPreviewRevision(value=>value+1)}>
-        <FilePreview docked key={activePreview.id} connection={connection} root={activePreview.root} path={activePreview.path} scoped revision={previewRevision} onClose={()=>closePreview(activePreview.id)}/>
+        <FileWithChanges key={activePreview.id} change={activePreview.change}><FilePreview docked connection={connection} root={activePreview.root} path={activePreview.path} scoped revision={previewRevision} onClose={()=>closePreview(activePreview.id)}/></FileWithChanges>
       </ChatSidePanel>}
       <ChatOverlay edge="top" enabled={chatSurface}>{chatSurface?<>
         <ChatHeader model={docked&&connection&&!boardChat?.context?<HeaderModelMenu connection={connection} provider={provider} onProvider={embedded?.onProvider&&!selected&&!job&&!taskRun?embedded.onProvider:undefined} models={(account?customModels.models:provider==='claude'?claudeCatalog.models:providerInfo?.models)||[]} model={account?customModels.model:model} onModel={account?customModels.setModel:setModel} onManage={()=>embedded?.onOpenSettings?.('providers')} disabled={busy||running||uploading||Boolean(selected?.readOnly)}/>:undefined} panel={docked?{open:Boolean(sideTab),available:previews.length>0,toggle:()=>{if(sideTab)closeSide();else if(previews.length)setPreview(previews.at(-1)!.id);}}:undefined} docs={headerDocs} actionsHost={embedded?.taskDrawer} board={chatBoard?{title:chatBoard.title,disabled:!connection||demo,open:()=>void openChatBoard(chatBoard)}:undefined} hideContext hideBack={Boolean(embedded)} backLabel={!embedded&&boardChat?.context?(language==='ru'?'К доске':'Back to board'):undefined} contextMenuOnly={Boolean(embedded&&boardChat?.context)} close={embedded&&boardChat?.context?{label:language==='ru'?'Закрыть чат доски':'Close board chat',open:()=>embedded.onBack()}:undefined} newBoardChat={boardChat?.conversation?{disabled:busy||uploading,open:()=>void launchBoardChat(boardChat,true)}:undefined} title={selected?.customTitle||(boardChat?.context?boardChat.note.title:chatTitle(selected?.summary||(!job&&taskRun?.title)||undefined,t('Новый разговор')))} project={basename(taskRun?.projectPath||selected?.cwd||cwd)} provider={engineName} branch={selected?.gitBranch}

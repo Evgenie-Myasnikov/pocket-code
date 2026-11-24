@@ -29,3 +29,23 @@ test('reduced motion shows streamed text without word animation',async({page})=>
  await expect(page.locator('.conversation-inner')).toContainText('a side panel for files');
  await expect(page.locator('.conversation-inner [data-sd-animate]')).toHaveCount(0);
 });
+
+test('as in Strata, a blinking accent caret follows the text being written and every message rises in',async({page})=>{
+ await page.addInitScript(()=>{
+   (window as any).testRuns=[{id:'run-alpha',provider:'claude',sessionId:'alpha',cwd:'C:\Demo\Atlas',status:'running',
+     messages:[{id:'u',role:'user',blocks:[{type:'text',text:'Explain the layout.'}]}],partial:'The layout keeps one column and a side panel for files.',approvals:[],revision:1,startedAt:Date.now(),baseMessageCount:0}];
+ });
+ await desktop(page);
+ await page.locator('.desktop-sessions > button[data-chat-id="alpha"]').click();
+ await expect(page.locator('.conversation-inner .markdown[data-caret]')).toHaveCount(1);
+ const caret=await page.locator('.conversation-inner .markdown[data-caret] p').last().evaluate(element=>{const c=getComputedStyle(element,'::after');return {name:c.animationName,width:c.width,display:c.display};});
+ expect(caret).toEqual({name:'chat-caret-blink',width:'7px',display:'inline-block'});
+ for(const name of await page.locator('.conversation-inner .message').evaluateAll(list=>list.map(element=>getComputedStyle(element).animationName)))expect(name).toBe('chat-content-enter');
+});
+
+test('a finished chat shows no caret',async({page})=>{
+ await desktop(page);
+ await page.locator('.desktop-sessions > button').first().click();
+ await expect(page.locator('.conversation-inner .message').first()).toBeVisible();
+ await expect(page.locator('.conversation-inner .markdown[data-caret]')).toHaveCount(0);
+});

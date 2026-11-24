@@ -5,6 +5,7 @@ import {RailButton} from './RailButton';
 import {RunStatusIcon,runStatusLabel} from './run-status';
 import {ChatActions,type ChatActionTarget} from './ChatActions';
 import {DesktopChatList} from './DesktopChatList';
+import {ScheduledTaskDialog,ScheduledTaskList,type ScheduledTask} from './ScheduledTasks';
 import {PanelResizeHandle} from './PanelResizeHandle';
 import './desktop-sidebar.css';
 import type {BoardSelection} from './board-selection-context';
@@ -38,7 +39,7 @@ import {ProviderConnections,HostStatus} from './ProviderConnections';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import QRCode from 'qrcode';
 import {releaseRepository} from './release-update';
-import {ListChecks,Home,PanelLeftClose,PanelLeftOpen,ArrowDown,BookOpen,FileText,Check,Folder,GitCompareArrows,Keyboard,MessageCirclePlus,MessageSquare,Monitor,Plus,Settings,Smartphone,Wifi,X} from 'lucide-react';
+import {CalendarClock,ListChecks,Home,PanelLeftClose,PanelLeftOpen,ArrowDown,BookOpen,FileText,Check,Folder,GitCompareArrows,Keyboard,MessageCirclePlus,MessageSquare,Monitor,Plus,Settings,Smartphone,Wifi,X} from 'lucide-react';
 import {request,type Connection} from './api';
 import {loadLinkedBoard} from './board-link';
 import {boardChatContext} from './board-chat-context';
@@ -128,6 +129,7 @@ export function DesktopApp(){
   const [settingsNonce,setSettingsNonce]=useState(0),[settingsInitial,setSettingsInitial]=useState('index');
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&!event.altKey&&event.key===','){event.preventDefault();setSettingsNonce(value=>value+1);setPage('settings');}};document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[]);
   const [provider,setProvider]=useState<Provider>(()=>{const value=saved('provider','claude');return value==='codex'||value==='copilot'?value:'claude';});
+  const [scheduleEditor,setScheduleEditor]=useState<ScheduledTask|'new'|null>(null);
   const [chatAction,setChatAction]=useState<ChatActionTarget|null>(null),[attachedProjects,setAttachedProjects]=useState<string[]>([]);
   const [otherSessions,setOtherSessions]=useState<Session[]>([]),[otherJobs,setOtherJobs]=useState<JobView[]>([]);
   // Set right before a provider switch that must keep the chat on screen: a chat of another provider opened from the list, or the provider chosen inside a new chat.
@@ -315,7 +317,9 @@ export function DesktopApp(){
       <div className="desktop-library" hidden={railCollapsed}>
       <DesktopChatList sessions={visible} jobs={listJobs} focusId={page==='chats'?selected?.sessionId:undefined}
         actionId={chatAction?.session.sessionId} loading={loading} online={state.online} connection={connection} provider={provider}
-        onOpen={openChat} onMenu={target=>setChatAction({...target,onDeleteFailed:(session,message)=>{setDeleteError(label('Could not delete','Не удалось удалить')+' «'+(session.customTitle||session.summary||session.sessionId)+'»: '+message);setRevision(value=>value+1);}})} onCloseMenu={()=>setChatAction(null)} onDeleted={(ids,lane)=>removeChats(ids,true,lane)}/></div>
+        onOpen={openChat} onMenu={target=>setChatAction({...target,onDeleteFailed:(session,message)=>{setDeleteError(label('Could not delete','Не удалось удалить')+' «'+(session.customTitle||session.summary||session.sessionId)+'»: '+message);setRevision(value=>value+1);}})} onCloseMenu={()=>setChatAction(null)} onDeleted={(ids,lane)=>removeChats(ids,true,lane)}
+        barActions={<button type="button" className="icon-button desktop-new-folder desktop-new-schedule" aria-label={label('New scheduled task','Новая запланированная задача')} title={label('New scheduled task','Новая запланированная задача')} disabled={!state.online||!projectRoot} onClick={()=>setScheduleEditor('new')}><CalendarClock size={16} aria-hidden="true"/></button>}
+        beforeChats={<ScheduledTaskList connection={connection} online={state.online} focusId={page==='chats'?selected?.sessionId:undefined} sessions={visible} onOpenChat={openChat} onEdit={setScheduleEditor}/>}/></div>
       </div>
     </aside>
     <main className={'desktop-main'+(page==='work'&&boardChat?.context&&(selected||creating)?' desktop-board-chat':'')}>{state.online&&<ConnectionStatus/>}{error&&<div className="desktop-error" role="alert">{error}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setError('')}><X size={16}/></button></div>}{deleteError&&<div className="desktop-error" role="alert">{deleteError}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setDeleteError('')}><X size={16}/></button></div>}
@@ -327,6 +331,7 @@ export function DesktopApp(){
     </div>):(page==='rules'||page==='changelog')&&docRoot?<div className="desktop-project"><FolderDocuments connection={connection} root={docRoot} kind={page} onBack={()=>setPage('chats')} onChat={state.online?(root,prompt)=>{setNotificationChat(null);setBoardChat(undefined);setProject(root);setDocDraft(prompt);setSelected(null);setCreating(true);setPage('chats');}:undefined}/></div>:<DesktopSettings initialPage={settingsInitial} onShortcuts={()=>setShortcutsOpen(true)} roots={allFolders} key={page+':'+settingsNonce} connectionPanel={connectionPanel} state={state} connection={connection} appearance={appearance} action={action}/>}
     </main>
     {chatAction&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={laneOf(chatAction.session)} jobId={listJobs.get(chatAction.session.sessionId)?.id} managementDisabled={!state.online} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{const lane=laneOf(chatAction.session);if(deleted){removeChats([session.sessionId],false,lane);return;}if(lane!==provider){setOtherSessions(old=>{const next=old.map(s=>s.sessionId===session.sessionId?{...session,provider:lane}:s);writeChatCache('desktop-local',lane,'sessions',next.filter(s=>s.provider===lane).map(({provider:_lane,...rest})=>rest as Session));return next;});if(selected?.sessionId===session.sessionId)setSelected({...session,provider:lane});setRevision(value=>value+1);return;}setSessions(old=>{const next=old.map(s=>s.sessionId===session.sessionId?session:s);writeChatCache('desktop-local',provider,'sessions',next);return next;});if(selected?.sessionId===session.sessionId)setSelected(session);setRevision(value=>value+1);}}/>}
-    {shortcutsOpen&&<div className="modal-backdrop" onClick={event=>{if(event.target===event.currentTarget)setShortcutsOpen(false);}}><section ref={shortcutsSheet} className="confirm-modal desktop-shortcuts" role="dialog" aria-modal="true" aria-label={label('Keyboard shortcuts','Сочетания клавиш')}><Keyboard size={32}/><h2>{label('Keyboard shortcuts','Сочетания клавиш')}</h2><dl>{shortcuts.map(([keys,text])=><div key={keys+text}><dt><kbd>{keys}</kbd></dt><dd>{text}</dd></div>)}</dl><button className="secondary" onClick={()=>setShortcutsOpen(false)}>{label('Close','Закрыть')}</button></section></div>}
+    {scheduleEditor&&<ScheduledTaskDialog connection={connection} task={scheduleEditor==='new'?undefined:scheduleEditor} defaultCwd={projectRoot} folders={allFolders} onClose={()=>setScheduleEditor(null)} onManage={()=>{setScheduleEditor(null);setSettingsInitial('providers');setSettingsNonce(value=>value+1);setPage('settings');}}/>}
+        {shortcutsOpen&&<div className="modal-backdrop" onClick={event=>{if(event.target===event.currentTarget)setShortcutsOpen(false);}}><section ref={shortcutsSheet} className="confirm-modal desktop-shortcuts" role="dialog" aria-modal="true" aria-label={label('Keyboard shortcuts','Сочетания клавиш')}><Keyboard size={32}/><h2>{label('Keyboard shortcuts','Сочетания клавиш')}</h2><dl>{shortcuts.map(([keys,text])=><div key={keys+text}><dt><kbd>{keys}</kbd></dt><dd>{text}</dd></div>)}</dl><button className="secondary" onClick={()=>setShortcutsOpen(false)}>{label('Close','Закрыть')}</button></section></div>}
   </div>;
 }
