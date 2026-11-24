@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {Clock3,MoreHorizontal,Pause,Pencil,Play,RotateCw,Trash2} from 'lucide-react';
+import {ChevronDown,ChevronRight,Clock3,MoreHorizontal,Pause,Pencil,Play,Plus,RotateCw,Trash2} from 'lucide-react';
 import {CardActionMenu} from './CardActionMenu';
 import {HeaderModelMenu} from './HeaderModelMenu';
 import {useClaudeModels} from './ModelPicker';
@@ -29,8 +29,11 @@ export function scheduleText(schedule:Schedule,ru:boolean){
  * Scheduled chats of this PC in the chat list: a clock, the task's name and a dot while one of its runs is unread.
  * Opening a task opens its latest run, an ordinary chat; its "…" menu pauses, edits, runs now and deletes it.
  */
-export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat,onEdit}:{
+const COLLAPSED='pocket-desktop-scheduled-collapsed';
+export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat,onEdit,onNew}:{
   connection:Connection;online:boolean;focusId?:string;sessions:Session[];onOpenChat(session:Session):void;onEdit(task:ScheduledTask):void;
+  /** The heading's "+": opens the editor for a new task; absent when there is no working folder to run in. */
+  onNew?():void;
 }){
   const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
   const [tasks,setTasks]=useState<ScheduledTask[]>([]),[menu,setMenu]=useState<{task:ScheduledTask;x:number;y:number}>(),[removing,setRemoving]=useState<ScheduledTask>(),[error,setError]=useState('');
@@ -46,10 +49,16 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
     onOpenChat(session);
     if(task.unread)void act('/scheduled-tasks/'+task.id+'/read');
   }
-  if(!tasks.length)return null;
+  const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem(COLLAPSED)==='1';}catch{return false;}});
+  const toggle=()=>setCollapsed(old=>{const next=!old;try{localStorage.setItem(COLLAPSED,next?'1':'0');}catch{/* The block stays as it is until the window closes. */}return next;});
+  const Chevron=collapsed?ChevronRight:ChevronDown;
   return <section className="scheduled-tasks" aria-label={l('Scheduled','Запланированные')}>
-    <p className="scheduled-tasks-caption">{l('Scheduled','Запланированные')}</p>
-    {tasks.map(task=>{
+    <div className="desktop-list-heading scheduled-tasks-heading">
+      <button type="button" className="desktop-list-heading-title" aria-expanded={!collapsed} onClick={toggle}><span>{l('Scheduled','Запланированные')}</span><Chevron size={13} aria-hidden="true"/></button>
+      {onNew&&<button type="button" className="icon-button desktop-list-heading-action" aria-label={l('New scheduled task','Новая запланированная задача')} title={l('New scheduled task','Новая запланированная задача')} disabled={!online} onClick={onNew}><Plus size={16} aria-hidden="true"/></button>}
+    </div>
+    {!collapsed&&!tasks.length&&<p className="scheduled-tasks-empty">{l('No scheduled tasks yet','Пока нет запланированных задач')}</p>}
+    {!collapsed&&tasks.map(task=>{
       const last=task.runs[0],state=task.paused?l('Paused','На паузе'):last?.error?l('Last run failed','Последний запуск не удался'):l('Next: ','Далее: ')+relativeTime(task.nextRunAt);
       const description=[scheduleText(task.schedule,ru),state,task.unread?l('New run','Новый запуск'):''].filter(Boolean).join(' · ');
       return <div key={task.id} className="scheduled-task" data-paused={task.paused||undefined} data-unread={task.unread||undefined}>

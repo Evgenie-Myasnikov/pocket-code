@@ -58,3 +58,13 @@
 /* The list reaches the bottom of the rail, so the empty space below the chats takes a right click for a new folder. */
 .desktop-app>.desktop-rail .desktop-rail-content>.desktop-library{flex:1 0 auto;flex-direction:column}
 .desktop-app>.desktop-rail .desktop-library>.desktop-chat-list{flex:1 0 auto}
+
+/* As in Strata: each block of the rail has a quiet heading and its own icons on the right of that heading
+   (Scheduled: collapse and "+"; Chats: new folder). */
+.desktop-app>.desktop-rail .desktop-list-heading{display:flex;align-items:center;justify-content:space-between;gap:4px;min-height:30px;padding:6px 2px 2px 8px;color:var(--muted)}
+.desktop-app>.desktop-rail .desktop-list-heading-title{display:inline-flex;align-items:center;gap:4px;min-width:0;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-size:calc(12px * var(--ui-scale,1));font-weight:var(--fw-semibold,600);letter-spacing:.01em;text-align:left}
+.desktop-app>.desktop-rail button.desktop-list-heading-title{cursor:pointer}
+.desktop-app>.desktop-rail button.desktop-list-heading-title:hover{color:var(--text)}
+.desktop-app>.desktop-rail .desktop-list-heading-action{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted)}
+.desktop-app>.desktop-rail .desktop-list-heading-action:hover:not(:disabled){color:var(--text);background:var(--surface)}
+.desktop-app>.desktop-rail .scheduled-tasks-empty{margin:0;padding:4px 8px 8px;color:var(--muted);font-size:calc(13px * var(--ui-scale,1))}

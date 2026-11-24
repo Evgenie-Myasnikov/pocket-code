@@ -96,11 +96,11 @@ type Props={
   /** Chats of every provider, newest first; each carries its provider. */
   sessions:Session[];jobs:Map<string,JobView>;focusId?:string;actionId?:string;connection:Connection;provider:Provider;
   loading:boolean;online:boolean;onOpen(s:Session):void;onMenu(target:ChatActionTarget):void;onCloseMenu():void;onDeleted(ids:string[],provider:Provider):void;
-  /** More buttons beside New folder, and a block shown above the chats (scheduled tasks). */
-  barActions?:ReactNode;beforeChats?:ReactNode;
+  /** A block shown above the chats (scheduled tasks). */
+  beforeChats?:ReactNode;
 };
 /** One flat list of chats. Only the first page is rendered; "Show more" adds the next one, so a long history costs nothing until asked for. */
-export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,loading,online,onOpen,onMenu,onCloseMenu,onDeleted,connection,provider,barActions,beforeChats}:Props){
+export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,loading,online,onOpen,onMenu,onCloseMenu,onDeleted,connection,provider,beforeChats}:Props){
   const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
   const tree=useRef<HTMLDivElement>(null),anchor=useRef<string|undefined>(undefined);
   const single=useRef<string|undefined>(undefined);
@@ -170,8 +170,7 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
   }
   function openMenu(t:ChatActionTarget){
     if(marked.has(t.session.sessionId)){onCloseMenu();setMenu({x:t.x,y:t.y});}
-    else{clear();const id=t.session.sessionId;onMenu({...t,select:()=>{anchor.current=id;setMarked(new Set([id]));},pin:{on:pinned.has(id),toggle:()=>flip(PINNED,setPinned,id)},archive:{on:archived.has(id),toggle:()=>flip(ARCHIVED,setArchived,id)},
-      folders:{list:folders.map(f=>({id:f.id,name:f.name})),current:folderOf.get(id),move:folder=>moveChat(id,folder),create:()=>createFolder(id)}});}
+    else{clear();const id=t.session.sessionId;onMenu({...t,select:()=>{anchor.current=id;setMarked(new Set([id]));},pin:{on:pinned.has(id),toggle:()=>flip(PINNED,setPinned,id)},archive:{on:archived.has(id),toggle:()=>flip(ARCHIVED,setArchived,id)}});}
   }
   function key(event:KeyboardEvent<HTMLButtonElement>,s:Session,running:boolean){
     const id=s.sessionId,ctrl=event.ctrlKey||event.metaKey;
@@ -192,8 +191,8 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
     {marked.size>0&&<div className="desktop-list-caption"><span>{l('Selected','Выбрано')+' · '+marked.size}</span>
       <span className="bulk-toolbar"><button className="icon-button" aria-label={l('Delete selected chats','Удалить выбранные чаты')} disabled={!online} onClick={()=>selectTarget([...marked])}><Trash2 size={16}/></button><button className="icon-button" aria-label={l('Clear selection','Снять выделение')} onClick={clear}><X size={16}/></button></span>
     </div>}
-    {!showArchived&&<div className="desktop-folder-bar"><button type="button" className="icon-button desktop-new-folder" aria-label={l('New folder','Новая папка')} title={l('New folder','Новая папка')} onClick={()=>createFolder()}><FolderPlus size={16} aria-hidden="true"/></button>{barActions}</div>}
     {!showArchived&&beforeChats}
+    {!showArchived&&<div className="desktop-list-heading"><span className="desktop-list-heading-title">{l('Chats','Чаты')}</span><button type="button" className="icon-button desktop-list-heading-action desktop-new-folder" aria-label={l('New folder','Новая папка')} title={l('New folder','Новая папка')} onClick={()=>createFolder()}><FolderPlus size={16} aria-hidden="true"/></button></div>}
     <div ref={tree} className="desktop-session-groups desktop-chat-list" onContextMenu={folderHere}>{loading&&!ordered.length?<p role="status">{l('Loading chats…','Загружаем чаты…')}</p>:
       <div className="desktop-sessions" onDragOver={e=>{if(e.dataTransfer.types.includes(CHAT_DRAG))e.preventDefault();}}
         onDrop={e=>{const id=e.dataTransfer.getData(CHAT_DRAG);setDropTarget(undefined);if(id&&!(e.target as HTMLElement).closest('.desktop-chat-folder')){e.preventDefault();moveChat(id,null);}}}>{(()=>{

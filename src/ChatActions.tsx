@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {Archive,ArchiveRestore,Bell,BellOff,FolderInput,FolderOutput,FolderPlus,ListChecks,Pencil,Pin,PinOff,Trash2} from 'lucide-react';
+import {Archive,ArchiveRestore,Bell,BellOff,ListChecks,Pencil,Pin,PinOff,Trash2} from 'lucide-react';
 import {CardActionMenu} from './CardActionMenu';
 import {request,type Connection} from './api';
 import type {Session} from './session';
@@ -11,9 +11,7 @@ export type ChatActionTarget={session:Session;x:number;y:number;running?:boolean
  /** The PC chat list: pin to the top and archive out of the list. With these the menu is Rename, Pin, Archive, Delete. */
  pin?:{on:boolean;toggle():void};archive?:{on:boolean;toggle():void};
  /** The PC chat list deletes at once: the row leaves the list, the host erases the transcript and the cache, and a refusal is reported here. */
- onDeleteFailed?(session:Session,message:string):void;
- /** The PC chat list: user folders this chat can move to, the one it is in, and a new folder made with it. */
- folders?:{list:{id:string;name:string}[];current?:string;move(folder:string|null):void;create():void}};
+ onDeleteFailed?(session:Session,message:string):void};
 /** Erase a chat's provider transcript and the Pocket Code cache. Throws with the host's reason. */
 export async function eraseChat(connection:Connection,provider:string,session:Session,ru:boolean){
  const result=await request<{deleted?:boolean;originalRemoved?:boolean}>(connection,`/sessions/${encodeURIComponent(session.sessionId)}/manage`,{provider,action:'erase',eraseOriginals:true,...(session.account?{account:session.account}:{})});
@@ -46,10 +44,6 @@ export function ChatActions({target,connection,provider,jobId,managementDisabled
  if(phase==='menu')return <CardActionMenu label={l('Chat actions','Действия чата')} point={target} onClose={closeMenu} items={[
   {label:l('Rename','Переименовать'),Icon:Pencil,disabled:managementDisabled,onSelect:()=>choose('rename')},
   ...(target.pin&&target.archive?[{label:target.pin.on?l('Unpin','Открепить'):l('Pin','Закрепить'),Icon:target.pin.on?PinOff:Pin,onSelect:()=>{target.pin!.toggle();onClose();}},{label:target.archive.on?l('Unarchive','Вернуть из архива'):l('Archive','В архив'),Icon:target.archive.on?ArchiveRestore:Archive,onSelect:()=>{target.archive!.toggle();onClose();}}]
-   .concat(target.folders?[
-    ...target.folders.list.filter(f=>f.id!==target.folders!.current).map(f=>({label:l('Move to ','Переместить в ')+'«'+f.name+'»',Icon:FolderInput,onSelect:()=>{target.folders!.move(f.id);onClose();}})),
-    ...(target.folders.current?[{label:l('Remove from folder','Убрать из папки'),Icon:FolderOutput,onSelect:()=>{target.folders!.move(null);onClose();}}]:[]),
-    {label:l('New folder with this chat','Новая папка с этим чатом'),Icon:FolderPlus,onSelect:()=>{target.folders!.create();onClose();}}]:[])
    :[...(target.select?[{label:l('Select chat','Выбрать чат'),Icon:ListChecks,onSelect:target.select}]:[]),{label:muted?l('Unmute notifications','Включить уведомления'):l('Mute notifications','Отключить уведомления'),Icon:muted?Bell:BellOff,onSelect:toggle}]),
   {label:target.pin?l('Delete','Удалить'):l('Erase chat…','Стереть чат…'),Icon:Trash2,danger:true,disabled:managementDisabled||target.running,onSelect:()=>{
    if(!target.onDeleteFailed){choose('delete');return;}

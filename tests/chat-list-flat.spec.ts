@@ -21,7 +21,7 @@ test('the sidebar is one list of chats of every provider that ends with Show mor
  // newest first across providers: the three Codex chats lead
  await expect(list.nth(0)).toHaveAttribute('data-provider','codex');await expect(list.nth(3)).toHaveAttribute('data-provider','claude');
  const more=page.getByRole('button',{name:/Show more chats · 13/});await expect(more).toBeVisible();
- await expect(page.locator(rail).getByText('Chats',{exact:true})).toHaveCount(0);
+ await expect(page.locator(rail).getByText('Chats',{exact:true})).toHaveCount(1); // one heading of the block, with the new folder icon; no group per provider
  await page.screenshot({path:'.local/chat-list-flat.png'});
  await more.click();await expect(list).toHaveCount(43);await expect(page.getByRole('button',{name:/Show more chats/})).toHaveCount(0);
 });
@@ -78,7 +78,7 @@ test('the row menu renames, pins, archives and deletes',async({page})=>{
  const list=page.locator(rail+' .desktop-sessions > button[data-chat-id]');
  const menu=async(id:string)=>{const row=page.locator(rail+' button[data-chat-id="'+id+'"]');await row.hover();await row.locator('+ .chat-list-action-slot').getByRole('button',{name:'Chat actions'}).click();};
  await menu('claude-5');
- await expect(page.getByRole('menuitem')).toHaveText(['Rename','Pin','Archive','New folder with this chat','Delete']);
+ await expect(page.getByRole('menuitem')).toHaveText(['Rename','Pin','Archive','Delete']);
  await page.waitForTimeout(400);await page.screenshot({path:'.local/chat-row-menu.png',clip:{x:0,y:0,width:560,height:420}});
  await page.getByRole('menuitem',{name:'Pin'}).click();
  await expect(list.first()).toHaveAttribute('data-chat-id','claude-5');

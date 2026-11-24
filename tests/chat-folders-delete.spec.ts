@@ -34,8 +34,8 @@ test('folders are made, named, filled, collapsed, renamed and deleted',async({pa
  await page.getByRole('button',{name:'New folder',exact:true}).click();
  const name=page.getByRole('textbox',{name:'Folder name'});await name.fill('Release');await name.press('Enter');
  const folder=page.locator(rail+' button.desktop-chat-folder');await expect(folder).toHaveText(/Release\s*0/);
- // the row menu moves a chat into the folder; a drag moves another one
- await menu(page,'claude-2');await page.getByRole('menuitem',{name:'Move to «Release»'}).click();
+ // a drag moves a chat into the folder (the row menu has no folder items)
+ await row(page,'claude-2').dragTo(folder);
  await row(page,'claude-4').dragTo(folder);
  await expect(folder).toHaveText(/Release\s*2/);
  await expect(row(page,'claude-2')).toHaveAttribute('data-nested','true');await expect(row(page,'claude-4')).toHaveAttribute('data-nested','true');
@@ -50,7 +50,7 @@ test('folders are made, named, filled, collapsed, renamed and deleted',async({pa
  await folder.hover();await page.locator(rail+' .desktop-folder-actions').getByRole('button',{name:'Folder actions'}).click();
  await page.getByRole('menuitem',{name:'Rename'}).click();await name.fill('Shipped');await name.press('Enter');
  await expect(folder).toHaveText(/Shipped\s*2/);
- await menu(page,'claude-2');await page.getByRole('menuitem',{name:'Remove from folder'}).click();
+ await row(page,'claude-2').dragTo(page.locator(rail+' .desktop-sessions > button[data-chat-id]:not([data-nested])').first());
  await expect(row(page,'claude-2')).not.toHaveAttribute('data-nested','true');await expect(folder).toHaveText(/Shipped\s*1/);
  await folder.click({button:'right'});await page.getByRole('menuitem',{name:'Delete folder'}).click();
  await expect(folder).toHaveCount(0);

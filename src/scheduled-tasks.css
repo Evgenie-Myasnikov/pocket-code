@@ -1,6 +1,5 @@
 /* Scheduled chats in the PC chat list: a clock, the name, and a dot while a run is unread (as in Claude's sidebar). */
 .desktop-app>.desktop-rail .scheduled-tasks{display:flex;flex-direction:column;gap:1px;padding:2px 0 6px;margin-block-end:4px;border-block-end:1px solid var(--line)}
-.desktop-app>.desktop-rail .scheduled-tasks-caption{margin:2px 8px 2px;color:var(--muted);font-size:calc(11px * var(--ui-scale,1));font-weight:var(--fw-semibold,600)}
 .desktop-app>.desktop-rail .scheduled-task{position:relative;display:flex;align-items:center;min-width:0}
 .desktop-app>.desktop-rail .scheduled-task-open{flex:1;display:flex;align-items:center;gap:8px;min-width:0;min-height:35px;margin:0;padding:6px 40px 6px 8px;border:0;border-radius:7px;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
 .desktop-app>.desktop-rail .scheduled-task-open:hover,.desktop-app>.desktop-rail .scheduled-task-open[aria-pressed=true]{background:var(--surface)}

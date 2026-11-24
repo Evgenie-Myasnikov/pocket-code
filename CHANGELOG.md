@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.28.66 (2026-11-24)
+
+### Validation
+
+- Browser scenarios on Edge: 20 passed together (scheduled tasks, chat folders, the flat chat list, the side panel, the follow-up composer and board point chats), after being updated for the new headings and menu; the earlier 36-scenario run of 0.28.65 covered the rest, and a screenshot of the rail was checked.
+- Server and unit tests: not rerun for this interface-only change (last full results on 0.28.65).
+- Not checked: the installed Windows application, a phone, the full browser suite.
+
+### Features
+
+- Rail as in Strata (2026-11-24). The PC rail is two blocks, each with a quiet heading and its icons on the right of that heading: Scheduled (collapsible, with its own "+" for a new scheduled task and a line while there are none) above Chats (with the new folder icon). The second icon beside New folder is gone, and the chat row menu no longer moves a chat into a folder or makes a folder with it; chats still go into a folder and back by dragging.
+  - Validation: the scheduled tasks, chat folders, flat chat list and side panel browser scenarios (20 together) passed after being updated for the new headings and menu.
+
 ## [0.28.65](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.64...v0.28.65) (2026-11-24)
 
 Published [0.28.65](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.65) from [906c678](https://github.com/Evgenie-Myasnikov/pocket-code/commit/906c678d41d79c1ae85be8bdf19cfb8471aef54e) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.
