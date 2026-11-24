@@ -11,6 +11,7 @@ import {BoardMcpRuntime} from './board-mcp-runtime.js';
 import {SessionGeneration} from './session-generation.js';
 import {ChatPageSync} from './chat-page-sync.js';
 import {CustomProviders,mountCustomProviders} from './custom-providers.js';
+import {LocalModels,mountLocalModels,discoverStrata,countStrataEngines} from './local-models.js';
 import {WindowsJiraStore} from './jira-vault.js';
 import {messageAttachment} from './message-attachment.js';
 import {projectRuleSettings,saveProjectRuleSettings} from './project-rules.js';
@@ -63,7 +64,7 @@ import {MiroIntegration} from './miro-integration.js';
 import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 
-export type Config = { port?:number; customProviders?:CustomProviders; claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
+export type Config = { port?:number; customProviders?:CustomProviders; localModels?:LocalModels;claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
   /** How long a provider's chat listing answers without being read again, and how long it may answer while a new one loads. */
   sessionListFreshMs?: number; sessionListStaleMs?: number;
   /** How long a chat list waits for a provider that usually answers quickly before it answers from the saved listing. */
@@ -186,6 +187,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   await mountBoards(app,roots,workspaceAccess,async()=>{if(config.devices){const next=pairingChange.then(async()=>{await config.devices!.rotatePairing();await config.refreshPairing?.();});pairingChange=next.catch(()=>{});await next;}},boardMcp,path.join(config.uploads,'.boards','backups'));
   const customProviders=config.customProviders??new CustomProviders(new WindowsJiraStore(path.join(config.uploads,'..','custom-providers.dat')));
   const guardCustomProviders=()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can use custom providers');};
+  const localModels=config.localModels??new LocalModels({runtime:()=>discoverStrata(),engines:countStrataEngines,store:new WindowsJiraStore(path.join(config.uploads,'..','local-models.dat')),providers:customProviders});
+  const guardLocalModels=()=>{if(workspaceAccess.current())throw new HttpError(403,'Only the host can manage local models');};
   type ConnectionStatus={id:string;installed:boolean;authenticated:boolean|null;server:string;version?:string};
   function localExecutors(status:ConnectionStatus[]){
     return textProviders.filter(id=>(id!=='copilot'||!!config.copilot)&&(id!=='codex'||!!config.codex)&&
@@ -503,6 +506,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...codexState },{id:'copilot',name:'GitHub Copilot',...copilotState}]);
   });
   mountCustomProviders(app,customProviders,guardCustomProviders);
+  mountLocalModels(app,localModels,guardLocalModels);
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
   app.post('/api/provider-connections/:provider/login/cancel',async(req,res)=>res.json(await providerConnections.cancel(providerSchema.parse(req.params.provider))));
   app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));

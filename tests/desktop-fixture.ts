@@ -26,6 +26,7 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    }
    if(p==='/task-text/plan'){reply(id,(window as any).testPlanResponse||{});return;}
    if(p==='/task-text/providers'){reply(id,(window as any).testTaskTextCatalog||{providers:['claude','codex','copilot'],accounts:(window as any).testTaskTextAccounts});return;}
+   if(p.startsWith('/local-models')&&typeof (window as any).testLocalModels==='function'){const result=(window as any).testLocalModels(p,message.data);if(result.error)listeners.forEach(listener=>listener({data:{id,error:result.error,status:result.status}}));else reply(id,result.value);return;}
    if(p==='/custom-providers'&&(window as any).testTaskTextAccounts){reply(id,(window as any).testTaskTextAccounts.map((a:any)=>({...a,hasKey:true})));return;}
    if(p.startsWith('/custom-providers/')&&p.endsWith('/models')&&(window as any).testTaskTextModels){reply(id,(window as any).testTaskTextModels[p.split('/')[2]]||[]);return;}
    if(p==='/task-text/improve'&&typeof (window as any).testTaskTextResponse==='string'){reply(id,{text:(window as any).testTaskTextResponse});return;}

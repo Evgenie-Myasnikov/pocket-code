@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Local model (2026-11-24). Settings → Providers on the PC can start and stop a local [Strata](https://github.com/Niko1221/Strata) model without the Strata window, which on the test PC used about 1 GB of RAM (its embedded browser, Node and PowerShell helpers) while the model server itself is the same. Choose an installed model, the context (32K–256K) and the drafting mode; the panel shows the state and the server address.
+  - The PC server calls Strata's own command line (`strata launch --no-tui`, `--status`, `--stop`, `models list`, JSON output) through its bundled `python.exe`, without `cmd.exe` or a shell. A start is refused while the Strata app already runs a model on the GPU, while another Strata model runs, or when the model would first download files.
+  - The server listens on 127.0.0.1 only and requires an API key generated once by the PC server, stored encrypted like other provider keys and handed to Strata through an environment variable, never on the command line. The running server is saved as one custom provider, `Strata · <model>`, updated in place on later starts, so it serves chats and, through Strata's Anthropic-compatible API, Claude Code tasks.
+  - The key is hexadecimal: in two real starts a base64url key (with `-` and `_`) made the Strata engine stop while loading (cuBLAS status 14); the same starts with a hexadecimal key loaded normally. The cause inside Strata was not investigated.
+  - Only the host manages the model; workspace guests get 403. Phone controls and starting a model together with Pocket Code are not included.
+
+### Validation
+
+- Server tests from PowerShell: 602 tests, 598 passed, 1 skipped, 3 failed: the same three that fail before this change (compatibility trigger stub, host packager fixture, three older board cards without a CHANGELOG reference). TypeScript and the documentation link check passed; the privacy guard passed on the changed files.
+- Unit and API tests: 7 new tests with a synthetic Strata command line (JSON parsing, start with the key only in the environment, one provider updated in place, refusals for a busy GPU, a download and a second model, launch failure, missing Strata, runtime discovery that rejects a folder outside the control directory, host-only routes).
+- Browser tests on Edge: 3 new desktop scenarios (start, starting, running with its address, stop and the remembered choice after reload; the Strata window holding the GPU; no Strata) and 3 settings navigation scenarios passed. The panel was checked on screenshots.
+- Real Strata 0.1.65 (engine 0.1.66) on a 16 GB NVIDIA GPU: the server module started IQ3_S (ready in about 51 s) and Coder IQ1_M (about 24 s) at a 128K context; `/v1/models` answered 200 with the key and 401 without it, a chat completion answered, the Anthropic Messages probe returned 400 (supported), and the stop left no engine running. The installed Pocket Code application and a phone were not tested.
+
 ## [0.28.58](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.57...v0.28.58) (2026-11-23)
 
 Published [0.28.58](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.58) from [99eb8b7](https://github.com/Evgenie-Myasnikov/pocket-code/commit/99eb8b7a49ca5a98e9134a54d72a9390b09af32e) on [release/0.28.1](https://github.com/Evgenie-Myasnikov/pocket-code/tree/release/0.28.1). The tag points to that commit and all four public downloads match the local SHA-256 hashes. 163 UI files matched across the APK and the Windows package; no private data was found in the unpacked packages. Android version code 145.
