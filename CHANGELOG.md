@@ -1,9 +1,12 @@
 # Changelog
 
-## 0.28.63 (2026-11-24)
+## [0.28.63](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.62...v0.28.63) (2026-11-24)
+
+Published [0.28.63](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.63) from [5616a1b](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5616a1bc736d03d9c570f7eb0364a73d59a184b2) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.
 
 ### Validation
 
+- Server and unit tests from PowerShell: 615 tests, 611 passed, 1 skipped, 3 failed, the same three as on earlier releases. A first run stopped printing after the Codex limits tests and was ended after 20 minutes; the second run finished.
 - Browser scenarios on Edge: 31 passed across the new chat placeholder, side panel and its drag speed, transcript rhythm, font, motion, token line, board and board selection, flat chat list, follow-up composer, board point chats and the Tasks provider menu.
 - Still failing, also on 0.28.62 without these changes: "codex saved chats reopen from cache without another health gate or stale navigation", "Codex keeps expanded beginning pages while reading and refreshes on Latest" and "a provider whose sign-in is still being checked takes the message and starts the turn once it is confirmed" time out.
 - Not checked: the installed Windows application, a phone, the full browser suite.
