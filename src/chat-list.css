@@ -32,3 +32,17 @@
 /* Menu items follow one another without a rule before the destructive one; it is marked by colour. */
 :root[data-theme][data-theme] .card-action-menu hr{display:none}
 :root[data-theme][data-theme] :is(.chat-menu,.card-action-menu,.provider-picker-menu,.access-menu,.composer-add-menu) button:hover{background:color-mix(in srgb,var(--text) 8%,transparent)}
+/* User folders: a quiet header row with a chevron; its chats are indented under it. */
+.desktop-app>.desktop-rail .desktop-folder-bar{display:flex;justify-content:flex-end;padding:2px 6px 0}
+.desktop-app>.desktop-rail .desktop-folder-bar .desktop-new-folder{width:28px;height:28px;min-width:28px;min-height:28px;padding:0;border:0;background:transparent;color:var(--muted)}
+.desktop-app>.desktop-rail .desktop-folder-bar .desktop-new-folder:hover{color:var(--text);background:var(--surface)}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>.desktop-chat-folder{grid-column:1/-1;display:flex;align-items:center;gap:6px;min-width:0;min-height:32px;padding:4px 74px 4px 8px;border:0;border-radius:var(--radius-sm,7px);background:transparent;color:var(--text);font:inherit;font-size:calc(13px * var(--ui-scale,1));text-align:left;cursor:pointer}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button.desktop-chat-folder:hover{background:var(--surface)}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>.desktop-chat-folder>svg{flex:none;color:var(--muted)}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>.desktop-chat-folder>strong{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:var(--fw-semibold,600)}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>.desktop-chat-folder>small{color:var(--muted);font-variant-numeric:tabular-nums}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>.desktop-chat-folder[data-drop]{outline:1px dashed var(--muted);outline-offset:-1px;background:var(--surface)}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>.desktop-chat-folder-rename{padding-inline-end:8px;cursor:default}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-chat-folder-rename input{flex:1;min-width:0;min-height:26px;padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit}
+.desktop-app>.desktop-rail .desktop-sessions>.desktop-chat-folder:is(:hover,:focus-visible)+.desktop-folder-actions .chat-list-action{opacity:1}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button[data-nested]{padding-inline-start:26px}

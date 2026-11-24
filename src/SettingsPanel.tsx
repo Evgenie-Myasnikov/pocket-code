@@ -31,6 +31,7 @@ import pkg from '../package.json';
 import {useEffect,useRef,type ReactNode} from 'react';
 import {useBackAction} from './navigation';
 import './settings.css';
+import {SwitchRow} from './SettingsRows';
 
 export type SettingsPage='index'|'appearance'|'workspace'|'usage'|'jira'|'miro'|'updates'|'connection'|'notifications'|'about'|'chat'|'board';
 type Subpage='index'|'account'|'access';
@@ -99,5 +100,6 @@ export function SettingsPanel({connectionPanel,workspaceSelector,page:requested,
 }
 export function RunAlertsToggle({desktop=false}:{desktop?:boolean}){
   useLanguage();const enabled=useRunAlertsPreference();
+  if(desktop)return <SwitchRow title={t('Уведомлять, когда агент завершил работу, упал или ждёт ответа')} note={t('Приходят, даже когда окно свёрнуто в трей')} checked={enabled} onChange={setRunAlerts}/>;
   return <div className="settings-run-alerts"><label className={desktop?'desktop-toggle':'checkbox-label'}><input type="checkbox" role={desktop?'switch':undefined} checked={enabled} onChange={event=>setRunAlerts(event.target.checked)}/><span>{desktop?t('Уведомлять, когда агент завершил работу, упал или ждёт ответа'):t('Уведомлять, когда чат на ПК завершён, упал или ждёт ответа')}</span></label><p className="muted">{desktop?t('Уведомления Windows приходят, даже когда окно Pocket Code свёрнуто в трей.'):t('Включая чаты, запущенные на ПК и не открытые на телефоне. Пока ПК подключён, Android показывает тихое уведомление о слежении.')}</p></div>;
 }

@@ -38,7 +38,7 @@ test('API authenticates, scopes sessions, prevents path escapes and routes attac
   let prompt = '';
   const run: any = ({ prompt: input }: any) => { return (async function* () { prompt = (await input[Symbol.asyncIterator]().next()).value.message.content; yield { type: 'system', subtype: 'init', session_id: id }; yield { type: 'result', subtype: 'success', is_error: false, total_cost_usd: 0 }; })(); };
   const jobs = new Jobs(run);
-  const { app } = await createApp({ desktopSessionIndexes: [], roots: [root], token, hostName: 'Test PC', uploads: path.join(temporary, 'uploads') }, jobs, sdk);
+  const { app } = await createApp({ listAllProviderChats:true,desktopSessionIndexes: [], roots: [root], token, hostName: 'Test PC', uploads: path.join(temporary, 'uploads') }, jobs, sdk);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(r => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
   const request = (route: string, body?: unknown, key = token) => fetch(base + route, { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });

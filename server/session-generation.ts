@@ -42,5 +42,7 @@ export class SessionGeneration {
   forget(provider:string,id:string){return this.serialize(async()=>{
     try{await unlink(this.location(provider,id));}catch(error){if(!missing(error))throw error;}
   });}
+  /** Whether Pocket Code ever finished a turn of this chat with a recorded generation. */
+  async has(provider:string,id:string){await this.pending;return (await this.fromDisk(this.location(provider,id)))!==undefined;}
   async flush(){await this.pending;}
 }

@@ -18,3 +18,12 @@
 .turn-result li button>svg:last-child,.turn-result-deleted small {margin-left:auto}.turn-result-deleted{color:var(--muted)}
 .turn-result-browser .files-panel {max-width:none;padding:1rem}
 @media(pointer:coarse){.turn-result button,.turn-result li>button{min-height:44px}}
+
+/* File rows after the Strata list: type, name, folder; a row opens the file in the side panel on the PC. */
+.turn-result li>button{display:flex;align-items:center;gap:10px;min-width:0;width:100%;text-align:left}
+.turn-result li>button{min-height:40px;padding:6px 14px;font-size:calc(14px * var(--ui-scale,1))}
+.turn-result .turn-result-type{flex:none;width:46px;color:var(--muted);font-size:.86em;font-weight:var(--fw-bold,700);letter-spacing:.01em}
+.turn-result .turn-result-thumb{flex:none;width:46px;height:28px;object-fit:cover;border-radius:5px;border:1px solid var(--line)}
+.turn-result .turn-result-name{flex:none;max-width:55%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--text);font-weight:var(--fw-medium,500)}
+.turn-result .turn-result-dir{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted)}
+.turn-result .turn-result-size{flex:none;margin-inline-start:auto;padding-inline-start:12px;color:var(--muted);font-variant-numeric:tabular-nums}

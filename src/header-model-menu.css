@@ -1,0 +1,15 @@
+/* The chat header's provider and model chip and its grouped menu, after Strata. */
+.header-model-chip{display:inline-flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0;max-width:340px;min-height:34px;padding:5px 12px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--text);font:inherit;font-size:calc(13.5px * var(--ui-scale,1));font-weight:var(--fw-medium,500);cursor:pointer}
+.header-model-chip>span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.header-model-chip>svg,.header-model-chip>.provider-mark{flex:none}
+.header-model-chip>svg:last-child{color:var(--muted)}
+.header-model-chip:hover,.header-model-chip[aria-expanded=true]{background:var(--surface)}
+.header-model-menu{position:fixed;z-index:var(--z-menu);overflow:auto;padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);box-shadow:0 8px 24px var(--shadow-soft)}
+.header-model-group{margin:10px 10px 6px;color:var(--muted);font-size:calc(11px * var(--ui-scale,1));font-weight:var(--fw-semibold,600);letter-spacing:.08em;text-transform:uppercase}
+.header-model-group:first-child{margin-top:4px}
+.header-model-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;padding:7px 10px;border:0;border-radius:8px;background:transparent;color:var(--text);font:inherit;font-size:calc(13.5px * var(--ui-scale,1));text-align:left;cursor:pointer}
+.header-model-menu button>span{display:flex;flex:1;flex-direction:column;min-width:0}
+.header-model-menu button strong{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:var(--fw-semibold,600)}
+.header-model-menu button small{color:var(--muted);font-size:.9em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.header-model-menu button:is(:hover,:focus-visible),.header-model-menu button[aria-checked=true]{background:var(--surface);outline:0}
+.header-model-manage{margin-top:6px;border-top:1px solid var(--line)!important;border-radius:0 0 8px 8px!important}

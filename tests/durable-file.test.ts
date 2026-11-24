@@ -98,7 +98,7 @@ test('chat lists and runs keep answering when the chat library on disk is damage
   const id='00000000-0000-4000-8000-000000000001',token='synthetic-damaged-library-token-000000000000';
   const sdk:any={listSessions:async()=>[{sessionId:id,summary:'Fixture',cwd:root,lastModified:1}],getSessionMessages:async()=>[{uuid:'message',type:'user',message:{content:'Fixture'}}]};
   const jobs=new Jobs();
-  const {app}=await createApp({roots:[root],token,uploads,hostName:'Fixture',desktopSessionIndexes:[]},jobs,sdk);
+  const {app}=await createApp({roots:[root],token,uploads,hostName:'Fixture',listAllProviderChats:true,desktopSessionIndexes:[]},jobs,sdk);
   const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
   t.after(async()=>{jobs.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(temp,{recursive:true,force:true});});
   const get=(route:string)=>fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api${route}`,{headers:{Authorization:`Bearer ${token}`}});

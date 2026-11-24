@@ -2,7 +2,7 @@ import path from 'node:path';
 import {HttpError} from './security.js';
 
 type Provider = 'claude' | 'codex' | 'copilot';
-type NativeHistory = {eraseOriginal(id:string,cwd:string):Promise<void>};
+type NativeHistory = {eraseOriginal(id:string,cwd:string,outsideRoots?:boolean):Promise<void>};
 type ClaudeHistory = {
   getSessionInfo?(id:string,options:{dir:string}):Promise<{sessionId:string;cwd?:string}|undefined>;
   deleteSession?(id:string,options:{dir:string}):Promise<void>;
@@ -16,7 +16,7 @@ export function createChatOriginals({sdk,codex,copilot}:{
     if(provider==='claude')return typeof sdk.deleteSession==='function'&&typeof sdk.getSessionInfo==='function';
     return typeof (provider==='codex'?codex:copilot)?.eraseOriginal==='function';
   }
-  async function remove(provider:Provider,id:string,cwd:string){
+  async function remove(provider:Provider,id:string,cwd:string,outsideRoots=false){
     if(!canRemove(provider))throw new HttpError(501,'This provider does not support erasing the original chat on this PC.');
     try {
       if(provider==='claude'&&sdk.getSessionInfo&&sdk.deleteSession){
@@ -29,7 +29,7 @@ export function createChatOriginals({sdk,codex,copilot}:{
           if(await sdk.getSessionInfo(id,options))throw new HttpError(409,'The original chat is still present on this PC.');
         }
       } else {
-        await (provider==='codex'?codex:copilot)!.eraseOriginal(id,cwd);
+        await (provider==='codex'?codex:copilot)!.eraseOriginal(id,cwd,outsideRoots);
       }
     } catch(error){
       if(error instanceof HttpError)throw error;

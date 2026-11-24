@@ -27,7 +27,7 @@ test('Desktop import merges CLI history, refreshes titles/messages and grants no
     getSessionMessages: async (id: string) => id === desktopId ? messages : [],
   };
   const token = 't'.repeat(43);
-  const { app, jobs, terminals } = await createApp({ roots: [root], token, hostName: 'Test', uploads: path.join(dir, 'uploads'), desktopSessionIndexes: [index], sessionListFreshMs: 0, sessionListStaleMs: 0 }, undefined, sdk);
+  const { app, jobs, terminals } = await createApp({ roots: [root], token, hostName: 'Test', uploads: path.join(dir, 'uploads'), listAllProviderChats:true,desktopSessionIndexes: [index], sessionListFreshMs: 0, sessionListStaleMs: 0 }, undefined, sdk);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
   const request = (route: string, body?: unknown) => fetch(base + route, { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });

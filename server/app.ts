@@ -67,6 +67,8 @@ import {mountMiro} from './miro-routes.js';
 export type Config = { port?:number; customProviders?:CustomProviders; localModels?:LocalModels;claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
   /** How long a provider's chat listing answers without being read again, and how long it may answer while a new one loads. */
   sessionListFreshMs?: number; sessionListStaleMs?: number;
+  /** List every provider chat as if imported (test fixtures that exercise listing itself). */
+  listAllProviderChats?: boolean;
   /** How long a chat list waits for a provider that usually answers quickly before it answers from the saved listing. */
   sessionListWaitMs?: number;
   /** How long the provider list waits for one provider's sign-in and model check before reporting its last known state. */
@@ -386,7 +388,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   jobs.onSession(job=>{const account=job.account;if(account)void customProviders.name(account).catch(()=>undefined).then(name=>chatLibrary.tagAccount(job.sessionId,account,name)).catch(()=>{});});
   const generationStore=new SessionGeneration(path.join(config.uploads,'.tasks','chat-generation'));
   for(const engine of [jobs,config.codex,config.copilot]){
-    if(engine)engine.recordGeneration=job=>{void generationStore.record(job).catch(()=>{});};
+    if(engine)engine.recordGeneration=job=>{void generationStore.record(job).catch(()=>{});if(job.sessionId)void chatLibrary.markOrigins(job.provider||'claude',[job.sessionId],'pocket').catch(()=>{});};
   }
   const loadSessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
     if (provider === 'copilot') return copilot().sessions();
@@ -520,9 +522,29 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(workspaceAccess.current())return [];
     await taskChains.init();
     const listed=await sessions(provider);
-    const linked=taskChains.chatMembership(engineFor(provider).list());
-    return listed.filter(chat=>!linked(provider,chat));
+    const runs=engineFor(provider).list(),linked=taskChains.chatMembership(runs);
+    // The list holds chats made in Pocket Code and chats imported with Import chats; other provider chats stay in the provider.
+    const live=new Set(runs.map(run=>run.sessionId).filter((id):id is string=>!!id));
+    let data=await chatLibrary.read();
+    const fresh=listed.filter(chat=>live.has(chat.sessionId)&&data.chats[provider+':'+chat.sessionId]?.origin!=='pocket').map(chat=>chat.sessionId);
+    if(!data.originsReady?.includes(provider)){
+      // Once: chats Pocket Code finished a turn in before origins were recorded.
+      for(const chat of listed)if(await generationStore.has(provider,chat.sessionId).catch(()=>false))fresh.push(chat.sessionId);
+      await chatLibrary.markOrigins(provider,fresh,'pocket',true);data=await chatLibrary.read();
+    }else if(fresh.length){await chatLibrary.markOrigins(provider,fresh,'pocket');data=await chatLibrary.read();}
+    return listed.filter(chat=>!linked(provider,chat)&&(config.listAllProviderChats||live.has(chat.sessionId)||!!data.chats[provider+':'+chat.sessionId]?.origin));
   }
+  // Import chats: the provider's current chats join the list. Chats made in Pocket Code keep that mark.
+  app.post('/api/chat-library/import',async(req,res)=>{
+    if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
+    const body=z.object({providers:z.array(providerSchema).min(1).max(3).optional()}).strict().parse(req.body||{});
+    const result:Record<string,{imported:number;total:number}>={};
+    for(const provider of body.providers||['claude','codex','copilot'] as const){
+      try{const listed=await sessions(provider,false,'current');result[provider]={imported:await chatLibrary.markOrigins(provider,listed.map(chat=>chat.sessionId),'imported'),total:listed.length};}
+      catch{result[provider]={imported:0,total:0};}
+    }
+    res.json(result);
+  });
   async function projectFolders() {
     const results = await Promise.allSettled([librarySessions('claude'), librarySessions('codex'),librarySessions('copilot')]);
     const projects = new Set([...roots,...await gitProjects.list()]);
@@ -548,7 +570,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const processChats=mountChatBulkDelete(app,chatLibrary,{
     personal:()=>!workspaceAccess.current(),
     // Deleting works from the provider's current chats, never from a saved listing.
-    sessions:(provider,includeDeleted)=>sessions(provider,includeDeleted,'current'),
+    sessions:(provider,includeDeleted,need='current')=>sessions(provider,includeDeleted,need),
     folderChatFilter:async provider=>{
       await taskChains.init();
       const linked=taskChains.chatMembership(engineFor(provider).list());
@@ -563,7 +585,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       return row?.sessionId===id&&!!row.cwd&&folderKey(row.cwd)===folderKey(cwd);
     },
     forget:async(provider,id)=>{await generationStore.forget(provider,id);engineFor(provider).forgetSession?.(id);previews.forget(provider,id);if(provider==='claude')terminals.forgetSession?.(id);},
-  });
+  },res=>res.locals.deviceAdmin===true);
   app.get('/api/chat-library/projects',async(_req,res)=>{
     if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
     const data=await chatLibrary.read();res.json(data.projects);
@@ -596,7 +618,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','erase','board','account']),eraseOriginals:z.boolean().optional(),account:uuid.optional(),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
     if(body.action==='erase'){
       if(!body.eraseOriginals)throw new HttpError(400,'Confirm original history removal.');
-      const id=String(req.params.id),result=await processChats({provider:body.provider,account:body.account,ids:[id],action:'delete',eraseOriginals:true});
+      const id=String(req.params.id),result=await processChats({provider:body.provider,account:body.account,ids:[id],action:'delete',eraseOriginals:true},undefined,{listing:'saved',outsideRoots:res.locals.deviceAdmin===true});
       if(result.running.length)throw new HttpError(409,'Stop this chat before deleting it.');
       if(result.unsupported.length)throw new HttpError(409,'This provider cannot erase original history.');
       if(result.failed.length)throw new HttpError(502,'The provider could not remove the original chat. Retry the removal.');
@@ -1006,6 +1028,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.get('/api/message-attachment', async (req,res) => {
     const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);
     res.json(await messageAttachment(cwd,config.uploads,text.parse(req.query.path)));
+  });
+  // Sizes for the file list of a turn result. Each path is checked against the chat's folder; a missing or outside file is null.
+  app.post('/api/file-sizes', async (req, res) => {
+    const body=z.object({cwd:text,paths:z.array(z.string().min(1).max(4096)).max(500)}).strict().parse(req.body);
+    const cwd=await allowedPath(accessRoots(),body.cwd,true),sizes:Record<string,number|null>={};
+    for(const file of body.paths){try{const target=await allowedPath([cwd],path.isAbsolute(file)?file:path.join(cwd,file),true);const info=await stat(target);sizes[file]=info.isFile()?info.size:null;}catch{sizes[file]=null;}}
+    res.json({sizes});
   });
   app.get('/api/project-artifact', async (req, res) => {
     const cwd=await allowedPath(accessRoots(),text.parse(req.query.cwd),true);

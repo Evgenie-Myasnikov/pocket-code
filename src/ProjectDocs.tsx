@@ -9,7 +9,6 @@ import {safeWebUrl,CodeBlock} from './RichBlocks';
 import {ImageViewer} from './ImageViewer';
 import {FilePreview} from './Files';
 import './project-docs.css';
-import {ProjectRuleSwitch} from './ProjectRuleSwitch';
 
 type Provider='claude'|'codex'|'copilot';
 type RuleReader={provider:Provider;status:'loaded'|'shadowed'|'on-demand'|'not-read';reason?:'claude-md'|'override'|'linked'|'paths'|'apply-to'};
@@ -22,7 +21,6 @@ type ReaderPrefs={wide:boolean;size:number};
 const readerKey='pocket-code-reader-v1',readerSizes=[0.9,1,1.1,1.25];
 function loadReaderPrefs():ReaderPrefs{try{const value=JSON.parse(localStorage.getItem(readerKey)||'{}');return {wide:value.wide===true,size:readerSizes.includes(value.size)?value.size:1};}catch{return {wide:false,size:1};}}
 const providerName:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'Copilot'};
-const codexBudget=32*1024,claudeLines=200;
 // The host always lists the built-in rule; older hosts omit it, so the card still has a document to open.
 const builtInFallback:ProjectDocument={path:'pocket-code:board-maintenance',name:'Board maintenance',kind:'rules',source:'Pocket Code',appliesTo:'all',bytes:0,builtIn:true};
 
@@ -70,8 +68,8 @@ function ProjectDocuments({refreshRevision=0,category,connection,root,onRefreshP
   const [index,setIndex]=useState<DocumentIndex|null>(null),[loading,setLoading]=useState(true),[listError,setListError]=useState('');
   const [indexRevision,setIndexRevision]=useState(0),[selected,setSelected]=useState<ProjectDocument|null>(null);
   const [document,setDocument]=useState<DocumentContent|null>(null),[reading,setReading]=useState(false),[documentError,setDocumentError]=useState('');
-  const [trail,setTrail]=useState<{doc:ProjectDocument;scroll:number}[]>([]),[filePreview,setFilePreview]=useState(''),[builtInOn,setBuiltInOn]=useState(true);
-  const [toc,setToc]=useState<Heading[]>([]),[tocOpen,setTocOpen]=useState(false),[showTop,setShowTop]=useState(false),[openSections,setOpenSections]=useState<Set<number>|null>(null),[chainProvider,setChainProvider]=useState<Provider>('claude');
+  const [trail,setTrail]=useState<{doc:ProjectDocument;scroll:number}[]>([]),[filePreview,setFilePreview]=useState('');
+  const [toc,setToc]=useState<Heading[]>([]),[tocOpen,setTocOpen]=useState(false),[showTop,setShowTop]=useState(false),[openSections,setOpenSections]=useState<Set<number>|null>(null);
   const refreshDocument=useRef<()=>void>(()=>{}),versionRef=useRef('');
   const scroller=useRef<HTMLElement|null>(null),listScroll=useRef(0),documentHeading=useRef<HTMLElement|null>(null),tocSheet=useRef<HTMLElement|null>(null);
   const returnFocus=useRef<HTMLButtonElement|null>(null),returnPath=useRef(''),focusBack=useRef(false),pendingAnchor=useRef(''),restoreScroll=useRef<number|null>(null);
@@ -169,10 +167,6 @@ function ProjectDocuments({refreshRevision=0,category,connection,root,onRefreshP
   useEffect(()=>{onReading?.(selected?docName(selected):'');},[selected,language]);
   useEffect(()=>()=>onReading?.(''),[]);
   const failure=(message:string,kind:'list'|'document',saved:boolean)=><div className="project-docs-error" role="alert"><p>{t(kind==='list'?'Не удалось обновить документы.':'Не удалось обновить документ.')}{saved?` ${t('Ниже остаётся последняя загруженная версия.')}`:''}</p><details><summary>{t('Подробности')}</summary><p>{t(message)}</p></details><button className="secondary" disabled={kind==='list'?loading:reading} onClick={()=>kind==='list'?setIndexRevision(value=>value+1):refreshDocument.current()}>{t('Повторить')}</button></div>;
-  const readerChips=(item:ProjectDocument)=>{
-    const readers=item.readers||[];if(readers.length&&readers.every(reader=>reader.status==='on-demand'&&reader.reason==='linked'))return <span className="rule-chip on-demand">{t('По ссылке из других правил')}</span>;
-    return readers.filter(reader=>reader.status!=='not-read').map(reader=><span key={reader.provider} className="rule-chip" data-status={reader.status}>{providerName[reader.provider]}: {reader.status==='loaded'?t('читает'):reader.status==='shadowed'?(reader.reason==='claude-md'?t('не читает (есть CLAUDE.md)'):t('заменён AGENTS.override.md')):reader.reason==='paths'||reader.reason==='apply-to'?t('для файлов {0}',item.scope||'…'):t('по ссылке')}</span>);
-  };
   const refreshLabel=t(selected?'Обновить документ':'Обновить документы');
   const refreshing=selected?reading:loading;
 
@@ -210,36 +204,8 @@ function ProjectDocuments({refreshRevision=0,category,connection,root,onRefreshP
       {listError&&failure(listError,'list',Boolean(index))}
       {loading&&!index&&<><div className="project-docs-list" aria-hidden="true">{[0,1,2].map(item=><span key={item} className="skeleton-card"/>)}</div><p className="visually-hidden" role="status">{t('Загружаем документы…')}</p></>}
       {index?.truncated&&<p className="project-docs-limit" role="status">{t('Показаны не все документы: достигнут лимит проекта.')}</p>}
-      {isRules&&index&&!listError&&authored&&builtIn&&<ProjectRuleSwitch connection={connection} root={root} onChange={setBuiltInOn} onOpen={()=>{listScroll.current=scroller.current?.scrollTop||0;returnPath.current='';returnFocus.current=null;setSelected(builtIn);}}/>}
-      <div className="project-docs-list">{documents.map(item=><button key={item.path} ref={element=>{if(item.path===returnPath.current)returnFocus.current=element;}} className="project-docs-item" onClick={event=>{listScroll.current=scroller.current?.scrollTop||0;returnPath.current=item.path;returnFocus.current=event.currentTarget;setSelected(item);}}>{item.kind==='rules'?<BookOpen size={20} aria-hidden="true"/>:<FileText size={20} aria-hidden="true"/>}<span><strong>{item.name}</strong>{item.path!==item.name&&<small>{item.source}</small>}{item.kind==='rules'&&<span className="rule-chips">{readerChips(item)}</span>}</span></button>)}</div>
-      {isRules&&authored&&<p className="project-docs-legend">{t('«Читает» — файл загружается автоматически. «По ссылке» — агент откроет его, если на файл ссылается другое правило.')}</p>}
-      {isRules&&authored&&index&&<AgentChain documents={index.documents} builtInOn={builtInOn} provider={chainProvider} onProvider={setChainProvider} onAudit={onChat?()=>onChat(root,t('Проверь правила этого проекта для AI-агентов: какие файлы читают Claude, Codex и Copilot, нет ли противоречий, дублей и устаревших указаний, не слишком ли они длинные. Ничего не меняй — только отчёт с предложениями.')):undefined}/>}
+      <div className="project-docs-list">{documents.map(item=><button key={item.path} ref={element=>{if(item.path===returnPath.current)returnFocus.current=element;}} className="project-docs-item" onClick={event=>{listScroll.current=scroller.current?.scrollTop||0;returnPath.current=item.path;returnFocus.current=event.currentTarget;setSelected(item);}}>{item.kind==='rules'?<BookOpen size={20} aria-hidden="true"/>:<FileText size={20} aria-hidden="true"/>}<span><strong>{item.name}</strong>{item.path!==item.name&&<small>{item.source}</small>}</span></button>)}</div>
       {!loading&&!listError&&!authored&&<div className="project-docs-empty"><h3>{t(isRules?'Правила проекта пока не найдены.':'Журнал изменений пока не найден.')}</h3><p>{t(isRules?'Поддерживаются AGENTS.md, AGENTS.override.md, CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md, RULES.md, .github/copilot-instructions.md, .github/instructions/*.instructions.md и Markdown-файлы в rules, .claude/rules, .codex/rules или .agents/rules.':'Здесь отображаются журналы CHANGELOG.md, CHANGES.md или HISTORY.md проекта, в том числе поддерживаемые варианты в docs/.')}</p>{isRules&&onChat&&<button className="secondary" onClick={()=>onChat(root,t('Создай в корне проекта файл AGENTS.md с правилами для AI-агентов: как собрать и проверить проект, структура папок, стиль кода и что нельзя делать. Сначала изучи репозиторий, затем покажи изменения на одобрение.'))}>{t('Создать AGENTS.md с помощью ИИ')}</button>}</div>}
     </div>
-  </section>;
-}
-
-const chainOrder=(path:string)=>{const lower=path.toLowerCase();return ['agents.override.md','agents.md','claude.md','.claude/claude.md','claude.local.md','.github/copilot-instructions.md'].indexOf(lower)+1||(lower.startsWith('.claude/rules/')?7:lower.startsWith('.github/instructions/')?8:9);};
-const standardSlots:Record<Provider,string[]>={claude:['CLAUDE.md','.claude/CLAUDE.md','CLAUDE.local.md'],codex:['AGENTS.override.md','AGENTS.md'],copilot:['.github/copilot-instructions.md','AGENTS.md']};
-/** What one provider reads in this project, in order, with missing standard files and size guidance. */
-function AgentChain({documents,builtInOn,provider,onProvider,onAudit}:{documents:ProjectDocument[];builtInOn:boolean;provider:Provider;onProvider(provider:Provider):void;onAudit?():void}){
-  const authored=documents.filter(item=>item.kind==='rules'&&!item.builtIn);
-  const reader=(item:ProjectDocument)=>item.readers?.find(value=>value.provider===provider);
-  const relevant=authored.filter(item=>reader(item)&&reader(item)!.status!=='not-read').sort((a,b)=>{const rank=(item:ProjectDocument)=>({loaded:0,'on-demand':1,shadowed:2,'not-read':3})[reader(item)!.status];return rank(a)-rank(b)||chainOrder(a.path)-chainOrder(b.path)||a.path.localeCompare(b.path);});
-  const missing=standardSlots[provider].filter(slot=>!authored.some(item=>item.path.toLowerCase()===slot.toLowerCase()));
-  const codexBytes=authored.filter(item=>reader(item)?.status==='loaded'&&provider==='codex').reduce((sum,item)=>sum+item.bytes,0);
-  const longClaude=provider==='claude'?authored.filter(item=>/(^|\/)claude(\.local)?\.md$/i.test(item.path)&&(item.lines||0)>claudeLines):[];
-  const kb=(bytes:number)=>(bytes/1024).toFixed(bytes<10240?1:0);
-  return <section className="agent-chain" aria-labelledby="agent-chain-title">
-    <h3 id="agent-chain-title"><ShieldCheck size={20} aria-hidden="true"/>{t('Что видит агент')}</h3>
-    <div className="segmented" role="group" aria-label={t('Провайдер')}>{(['claude','codex','copilot'] as const).map(value=><button key={value} aria-pressed={provider===value} onClick={()=>onProvider(value)}>{providerName[value]}</button>)}</div>
-    <ol className="agent-chain-list">
-      {builtInOn&&<li className="loaded"><span>{t('Обслуживание доски')}</span><small>{t('Встроено в Pocket Code')}</small></li>}
-      {relevant.map(item=>{const value=reader(item)!;return <li key={item.path} data-status={value.status}><span>{item.path}</span><small>{value.status==='loaded'?t('читается'):value.status==='shadowed'?(value.reason==='claude-md'?t('не читается: есть CLAUDE.md'):t('не читается: есть AGENTS.override.md')):value.reason==='linked'?t('только по ссылке'):t('для файлов {0}',item.scope||'…')}</small></li>;})}
-      {missing.map(slot=><li key={slot} className="missing"><span>{slot}</span><small>{t('не создан')}</small></li>)}
-    </ol>
-    {provider==='codex'&&<div className={'agent-chain-meter'+(codexBytes>codexBudget?' over':codexBytes>codexBudget*0.8?' warn':'')}><span>{t('Бюджет инструкций Codex: {0} КБ из {1} КБ',kb(codexBytes),kb(codexBudget))}</span><meter min={0} max={codexBudget} low={codexBudget*0.8} high={codexBudget} optimum={0} value={Math.min(codexBytes,codexBudget)}/>{codexBytes>codexBudget&&<small>{t('Codex обрежет инструкции сверх лимита.')}</small>}</div>}
-    {longClaude.map(item=><p key={item.path} className="agent-chain-meter warn">{t('{0}: {1} строк. Длинные файлы правил агент соблюдает хуже; старайтесь держать до {2}.',item.path,item.lines,claudeLines)}</p>)}
-    {onAudit&&<button className="secondary" onClick={onAudit}>{t('Проверить правила')}</button>}
   </section>;
 }

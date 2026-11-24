@@ -8,32 +8,34 @@ import { request, type Connection } from './api';
 type Listing = {path: string;parent: string | null;entries: {name: string;directory: boolean;path: string;}[];};
 const imageFile=/\.(png|jpe?g|gif|webp)$/i;
 /** Read-only preview of one project file: Markdown rendered or raw, wrap, find in file; images open in the shared viewer. Limits stay on the host (2 MB text, no binary). */
-export function FilePreview({connection,root,path,onClose,scoped=false}:{connection:Connection;root:string;path:string;onClose():void;scoped?:boolean}){
+/** docked: a tab of the PC window's side panel; the panel closes it, so it has no backdrop, modal focus or close button of its own. */
+export function FilePreview({connection,root,path,onClose,scoped=false,docked=false,revision=0}:{connection:Connection;root:string;path:string;onClose():void;scoped?:boolean;docked?:boolean;revision?:number}){
   const name=path.split(/[\\/]/).pop()||path,markdown=/\.md$/i.test(name),image=imageFile.test(name);
   const [text,setText]=useState<string|null>(null),[picture,setPicture]=useState(''),[error,setError]=useState(''),[raw,setRaw]=useState(!markdown),[wrap,setWrap]=useState(true),[query,setQuery]=useState(''),[match,setMatch]=useState(0);
   const panel=useRef<HTMLElement|null>(null),body=useRef<HTMLDivElement|null>(null);
   const [finding,setFinding]=useState(false);
   const searchInput=useRef<HTMLInputElement>(null),searchButton=useRef<HTMLButtonElement>(null);
   function closeSearch(){setFinding(false);setQuery('');searchButton.current?.focus();}
-  useModal(panel,!image||!picture,onClose);
+  useModal(panel,!docked&&(!image||!picture),onClose);
   useBackAction(()=>{closeSearch();return true;},110,finding);
   useEffect(()=>{if(finding)searchInput.current?.focus();},[finding]);
   useEffect(()=>{let valid=true;setText(null);setPicture('');setError('');
     (image?request<{mimeType:string;data?:string}>(connection,`/project-artifact?cwd=${encodeURIComponent(root)}&path=${encodeURIComponent(path)}`).then(value=>{if(valid&&value.data&&/^image\//.test(value.mimeType))setPicture(`data:${value.mimeType};base64,${value.data}`);else if(valid)setError(t('Этот файл нельзя показать'));})
       :request<{text:string}>(connection,'/file?path='+encodeURIComponent(path)+(scoped?'&cwd='+encodeURIComponent(root):'')).then(value=>{if(valid)setText(value.text);})).catch(e=>{if(valid)setError(t((e as Error).message));});
-    return()=>{valid=false;};},[connection,root,path,scoped]);
+    return()=>{valid=false;};},[connection,root,path,scoped,revision]);
   const parts=useMemo(()=>{if(text===null||!query.trim())return null;const needle=query.toLowerCase(),haystack=text.toLowerCase(),result:ReactNode[]=[];let from=0,index=haystack.indexOf(needle),count=0;while(index>=0&&count<500){result.push(text.slice(from,index),<mark key={count} data-match={count}>{text.slice(index,index+needle.length)}</mark>);from=index+needle.length;index=haystack.indexOf(needle,from);count++;}result.push(text.slice(from));return {result,count};},[text,query]);
   useEffect(()=>{setMatch(0);},[query]);
   useEffect(()=>{if(!parts?.count)return;const marks=body.current?.querySelectorAll('mark');marks?.forEach((mark,index)=>mark.classList.toggle('current',index===match));marks?.[match]?.scrollIntoView({block:'center'});},[match,parts]);
+  if(image&&picture&&docked)return <DockedImage src={picture} name={name}/>;
   if(image&&picture)return <ImageViewer src={picture} title={name} onClose={onClose}/>;
-  return <div className="modal-backdrop file-reader-backdrop"><section ref={panel} className="file-preview file-reader" role="dialog" aria-modal="true" aria-label={name}
+  const reader=<section ref={panel} className={'file-preview file-reader'+(docked?' file-reader-docked':'')} role={docked?'region':'dialog'} aria-modal={docked?undefined:true} aria-label={name}
     onKeyDown={event=>{if(text!==null&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='f'){event.preventDefault();setFinding(true);searchInput.current?.select();}}}>
     <header className="file-reader-header"><FileText size={17} aria-hidden="true"/><strong title={path}>{name}</strong>
       {text!==null&&<>
         {raw&&<button className="file-reader-action" aria-label={t('Перенос строк')} title={t('Перенос строк')} aria-pressed={wrap} onClick={()=>setWrap(value=>!value)}><WrapText size={17}/></button>}
         <button ref={searchButton} className="file-reader-action" aria-label={t('Найти в файле')} title={t('Найти в файле')} aria-expanded={finding} onClick={()=>finding?closeSearch():setFinding(true)}><Search size={17}/></button>
       </>}
-      <button className="file-reader-action" title={t('Закрыть файл')} aria-label={t('Закрыть файл')} onClick={onClose}><X size={18}/></button>
+      {!docked&&<button className="file-reader-action" title={t('Закрыть файл')} aria-label={t('Закрыть файл')} onClick={onClose}><X size={18}/></button>}
     </header>
     {text!==null&&(markdown||finding)&&<div className="file-reader-toolbar">
       {markdown&&<div className="segmented" role="group" aria-label={t('Вид файла')}><button aria-pressed={!raw} onClick={()=>{setRaw(false);setQuery('');}}>{t('Оформленный')}</button><button aria-pressed={raw} onClick={()=>setRaw(true)}>{t('Исходный')}</button></div>}
@@ -44,7 +46,16 @@ export function FilePreview({connection,root,path,onClose,scoped=false}:{connect
       {!error&&text===null&&!picture&&<p className="muted" role="status">{t('Загружаем файл…')}</p>}
       {text!==null&&(raw?<pre className={wrap?'wrap':''}>{parts?parts.result:text}</pre>:<div className="file-markdown"><Markdown text={text}/></div>)}
     </div>
-  </section></div>;
+  </section>;
+  return docked?reader:<div className="modal-backdrop file-reader-backdrop">{reader}</div>;
+}
+/** A picture in the side panel: fitted to the panel, or at its own size. */
+function DockedImage({src,name}:{src:string;name:string}){
+  const [fit,setFit]=useState(true);
+  return <section className="docked-image" aria-label={name} data-fit={fit||undefined}>
+    <div className="docked-image-view"><img src={src} alt={name}/></div>
+    <div className="segmented docked-image-zoom" role="group" aria-label={t('Масштаб')}><button aria-pressed={fit} onClick={()=>setFit(true)}>Fit</button><button aria-pressed={!fit} onClick={()=>setFit(false)}>100%</button></div>
+  </section>;
 }
 export function Files({ connection, root, onProject, initialDirectory=root, scoped=false }: {connection: Connection;root: string;onProject?: (path: string) => void;initialDirectory?:string;scoped?:boolean}) {
   const [current, setCurrent] = useState(initialDirectory),[listing, setListing] = useState<Listing | null>(null);

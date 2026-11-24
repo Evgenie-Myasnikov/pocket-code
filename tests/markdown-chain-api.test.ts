@@ -31,7 +31,7 @@ test('chain API runs distinct chats with their settings and isolates saved conte
   const ordinaryId=randomUUID();
   const listSessions=async()=>[ordinaryId,...Array.from(active.values(),run=>run.sessionId!)]
     .map(sessionId=>({sessionId,summary:'Work on step',cwd:project,lastModified:1}));
-  const {app,terminals,closeTaskServices}=await createApp({roots:[project,other],uploads,
+  const {app,terminals,closeTaskServices}=await createApp({roots:[project,other],listAllProviderChats:true,uploads,
     hostName:'Synthetic PC',token,desktopSessionIndexes:[]},jobs,{listSessions,getSessionMessages:async()=>[]});
   const server=app.listen(0,'127.0.0.1');
   await new Promise<void>(resolve=>server.once('listening',resolve));

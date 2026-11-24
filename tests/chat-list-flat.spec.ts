@@ -37,15 +37,19 @@ test('a chat of another provider opens from the list and stays open',async({page
  await page.waitForTimeout(500);await expect(codex).toHaveAttribute('aria-pressed','true');
 });
 
-test('the provider is chosen inside a new chat',async({page})=>{
+test('the provider and model are chosen in the chat header, as in Strata',async({page})=>{
  await manyChats(page);await desktop(page);
  await page.getByRole('button',{name:'New chat',exact:true}).click();
- const picker=page.locator('.desktop-chat-host .provider-picker-trigger:visible');await expect(picker).toHaveCount(1);
- await expect(picker).toBeVisible();await expect(picker).toContainText('Claude');
- await picker.click();await page.getByRole('menuitemradio',{name:/Codex/}).or(page.getByRole('option',{name:/Codex/})).or(page.locator('.provider-picker-menu').getByText('Codex',{exact:true})).first().click();
- await expect(page.locator('.desktop-chat-host .provider-picker-trigger:visible')).toContainText('Codex');
+ const host=page.locator('.desktop-chat-host');
+ // the composer keeps no provider or model picker of its own
+ await expect(host.locator('.composer .provider-picker-trigger')).toHaveCount(0);await expect(host.locator('.composer .model-picker')).toHaveCount(0);
+ const chip=host.locator('header .header-model-chip');await expect(chip).toContainText('Claude');
+ await chip.click();const menu=page.getByRole('menu',{name:'Provider and model'});
+ await expect(menu.getByText('Providers',{exact:true})).toBeVisible();await expect(menu.getByRole('menuitem',{name:'Manage API models'})).toBeVisible();
+ await page.screenshot({path:'.local/header-model-menu.png'});
+ await menu.getByRole('menuitemradio',{name:'Codex'}).click();
+ await expect(page.locator('.desktop-chat-host header .header-model-chip')).toContainText('Codex');
  await expect(page.locator('.desktop-chat-host')).toBeVisible();
- await page.locator('.desktop-chat-host').screenshot({path:'.local/new-chat-provider.png'});
 });
 
 test('appearance is a few flat rows with four themes',async({page})=>{
@@ -73,7 +77,7 @@ test('the row menu renames, pins, archives and deletes',async({page})=>{
  const list=page.locator(rail+' .desktop-sessions > button[data-chat-id]');
  const menu=async(id:string)=>{const row=page.locator(rail+' button[data-chat-id="'+id+'"]');await row.hover();await row.locator('+ .chat-list-action-slot').getByRole('button',{name:'Chat actions'}).click();};
  await menu('claude-5');
- await expect(page.getByRole('menuitem')).toHaveText(['Rename','Pin','Archive','Delete']);
+ await expect(page.getByRole('menuitem')).toHaveText(['Rename','Pin','Archive','New folder with this chat','Delete']);
  await page.waitForTimeout(400);await page.screenshot({path:'.local/chat-row-menu.png',clip:{x:0,y:0,width:560,height:420}});
  await page.getByRole('menuitem',{name:'Pin'}).click();
  await expect(list.first()).toHaveAttribute('data-chat-id','claude-5');

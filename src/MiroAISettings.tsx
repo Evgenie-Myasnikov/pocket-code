@@ -4,11 +4,13 @@ import {t,useLanguage} from './i18n';
 import {ChevronDown} from 'lucide-react';
 import {Notice} from './Notice';
 import './miro-settings.css';
+import {HelpTip,SettingRow,SettingsBlock,SettingsLine,SwitchRow} from './SettingsRows';
 
 type Status={configured:boolean;authenticated:boolean;enabled:boolean;allowWrite:boolean;signInPending:boolean;canManage:boolean;linked:boolean;redirectUri:string};
-export function MiroAISettings({connection,root,linked}:{connection:Connection;root:string;linked:string}){
+/** rows: the AI access card of rows in the PC window; the phone keeps the plain layout. */
+export function MiroAISettings({connection,root,linked,rows=false}:{connection:Connection;root:string;linked:string;rows?:boolean}){
  useLanguage();
- const [confirm,setConfirm]=useState(false);
+ const [confirm,setConfirm]=useState(false),[panel,setPanel]=useState<'setup'|'token'|null>(null);
  const [status,setStatus]=useState<Status>(),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[clientId,setClientId]=useState(''),[clientSecret,setClientSecret]=useState(''),[token,setToken]=useState(''),[loginUrl,setLoginUrl]=useState(''),[checked,setChecked]=useState<number>();
  const epoch=useRef(0);
  const reload=useCallback(async()=>{const at=epoch.current;const value=await request<Status>(connection,'/miro/status?root='+encodeURIComponent(root));if(at===epoch.current&&typeof value.configured==='boolean')setStatus(value);},[connection,root]);
@@ -16,6 +18,34 @@ export function MiroAISettings({connection,root,linked}:{connection:Connection;r
  useEffect(()=>{if(!status?.signInPending)return;const timer=setInterval(()=>void reload().catch(()=>{}),3000);return()=>clearInterval(timer);},[status?.signInPending,reload]);
  useEffect(()=>{if(status?.authenticated)setLoginUrl('');},[status?.authenticated]);
  async function run(action:()=>Promise<unknown>){const at=epoch.current;setBusy(true);setError('');try{await action();if(at===epoch.current)await reload();}catch(e){if(at===epoch.current)setError((e as Error).message);}finally{if(at===epoch.current)setBusy(false);}}
+ const signIn=()=>void run(async()=>{const reply=await request<{url:string}>(connection,'/miro/oauth/start',{});const parsed=new URL(reply.url);if(parsed.origin!=='https://miro.com'||parsed.pathname!=='/oauth/authorize')throw Error(t('Некорректный адрес входа.'));setLoginUrl(parsed.href);});
+ const setupForm=status&&<form className="miro-row-form" onSubmit={e=>{e.preventDefault();void run(async()=>{try{await request(connection,'/miro/config',{clientId,clientSecret});setLoginUrl('');}finally{setClientSecret('');}});}}>
+     <p>{t('Создайте приложение Miro с правами boards:read и boards:write и зарегистрируйте адрес возврата:')} <code>{status.redirectUri}</code> <a href="https://developers.miro.com/docs/getting-started-with-oauth" target="_blank" rel="noopener noreferrer">{t('Инструкция Miro')}</a></p>
+     <label>Client ID<input autoComplete="off" maxLength={200} value={clientId} disabled={busy} onChange={e=>setClientId(e.target.value)}/></label>
+     <label>Client secret<input type="password" autoComplete="new-password" maxLength={8192} value={clientSecret} disabled={busy} onChange={e=>setClientSecret(e.target.value)}/></label>
+     <button className="secondary" disabled={busy||!clientId||!clientSecret}>{t('Сохранить настройки приложения')}</button>
+    </form>;
+ const tokenForm=<form className="miro-row-form" onSubmit={e=>{e.preventDefault();void run(async()=>{try{await request(connection,'/miro/token',{root,token});}finally{setToken('');}});}}><p>{t('Для личного приложения разработчика Miro. Вставьте токен доступа здесь на ПК. Хост проверит привязанную доску и сохранит токен зашифрованным вне Git.')}</p><label>{t('Токен доступа')}<input type="password" autoComplete="new-password" value={token} maxLength={8192} onChange={e=>setToken(e.target.value)} disabled={busy}/></label><button className="secondary" disabled={busy||!token||!linked}>{t('Проверить и сохранить токен')}</button></form>;
+ if(rows){
+  const help=<HelpTip label={t('О доступе AI к Miro')}>{t('Для AI нужна отдельная авторизация приложения Miro. Вход внутри доски не даёт доступ к API.')} {t('Доступ AI включается отдельно для каждой привязанной доски. Отключение сохраняет доску и её привязку. Нужен интернет. Локальный выход не отзывает разрешение приложения в Miro.')}</HelpTip>;
+  if(!status)return <SettingsBlock title={t('Доступ AI')}><SettingsLine><p className="miro-api-unavailable">{loading?t('Загружаем доступ AI…'):t('Статус интеграции AI недоступен. Обновите или переподключите ПК.')}</p></SettingsLine></SettingsBlock>;
+  const locked=busy||!status.authenticated||!status.linked;
+  return <SettingsBlock title={t('Доступ AI')} action={help} className="miro-ai-settings-rows">
+   <SettingRow title={t('Вход Miro для AI')} note={status.authenticated?t('Вход Miro сохранён на этом ПК.'):!status.canManage?t('Настройте доступ на хост-ПК.'):t('Отдельно от входа внутри доски')}>{status.canManage&&status.configured&&<button className={status.authenticated?'secondary':'primary'} disabled={busy} onClick={signIn}>{status.authenticated?t('Войти в Miro заново'):t('Войти в Miro')}</button>}{status.canManage&&status.authenticated&&!confirm&&<button className="secondary danger" disabled={busy} onClick={()=>setConfirm(true)}>{t('Отключить доступ AI')}</button>}</SettingRow>
+   {loginUrl&&<SettingsLine><a className="miro-sign-in" href={loginUrl} target="_blank" rel="noopener noreferrer">{t('Продолжить в браузере на этом ПК')}</a></SettingsLine>}
+   {status.authenticated&&confirm&&<SettingsLine><div className="confirm-inline" role="group" aria-label={t('Отключить доступ AI')} onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();setConfirm(false);}}}><p>{t('AI перестанет читать и менять доски Miro с этого ПК. Доска и её привязка сохранятся.')}</p><div className="confirm-inline-actions"><button className="primary danger" disabled={busy} onClick={()=>void run(async()=>{await request(connection,'/miro/disconnect',{});setConfirm(false);})}>{t('Отключить сейчас')}</button><button className="secondary" autoFocus onClick={()=>setConfirm(false)}>{t('Отмена')}</button></div></div></SettingsLine>}
+   {status.canManage&&<>
+    <SwitchRow title={t('Разрешить AI читать эту доску')} note={t('Только для доски выбранного проекта')} checked={status.enabled} disabled={locked} onChange={value=>void run(()=>request(connection,'/miro/access',{root,enabled:value,allowWrite:false}))}/>
+    <SwitchRow title={t('Разрешить AI обновлять заметки, текст и карточки')} checked={status.allowWrite} disabled={locked||!status.enabled} onChange={value=>void run(()=>request(connection,'/miro/access',{root,enabled:true,allowWrite:value}))}/>
+    {status.enabled&&<SettingRow title={t('Проверка доступа')} note={checked!==undefined?t('Доступ проверен. Элементов на первой странице: ')+checked:undefined}><button className="secondary" disabled={busy} onClick={()=>void run(async()=>{const result=await request<{items:unknown[]}>(connection,'/miro/items?root='+encodeURIComponent(root));setChecked(result.items.length);})}>{t('Проверить доступ к доске')}</button></SettingRow>}
+    <SettingRow title={t('Настроить вход Miro')} note={t('Client ID и secret приложения Miro')}><button type="button" className="secondary" aria-expanded={panel==='setup'} onClick={()=>setPanel(value=>value==='setup'?null:'setup')}>{panel==='setup'?t('Скрыть'):t('Настроить')}</button></SettingRow>
+    {panel==='setup'&&<SettingsLine>{setupForm}</SettingsLine>}
+    <SettingRow title={t('Использовать токен приложения')} note={t('Токен личного приложения Miro')}><button type="button" className="secondary" aria-expanded={panel==='token'} onClick={()=>setPanel(value=>value==='token'?null:'token')}>{panel==='token'?t('Скрыть'):t('Ввести токен')}</button></SettingRow>
+    {panel==='token'&&<SettingsLine>{tokenForm}</SettingsLine>}
+   </>}
+   {error&&<SettingsLine><Notice tone="error">{error}</Notice></SettingsLine>}
+  </SettingsBlock>;
+ }
  if(!status)return <p className="miro-api-unavailable">{loading?t('Загружаем доступ AI…'):t('Статус интеграции AI недоступен. Обновите или переподключите ПК.')}</p>;
  return <section className="miro-ai-settings" aria-label={t('Доступ AI к Miro')}>
   <h3>{t('Доступ AI')}</h3>

@@ -110,7 +110,7 @@ test('concurrent API reads share SDK work and the next read revalidates project 
   };
   const gitOnly=path.join(root,'git-only');await mkdir(path.join(gitOnly,'.git'),{recursive:true});await writeFile(path.join(gitOnly,'.git','HEAD'),'ref: refs/heads/main');
   const jobs = new Jobs();
-  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', desktopSessionIndexes: [] }, jobs, sdk);
+  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', listAllProviderChats:true,desktopSessionIndexes: [] }, jobs, sdk);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
   t.after(async () => { jobs.close(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(temp, { recursive: true, force: true }); });
   const get = (route: string) => fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api${route}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -132,7 +132,7 @@ test('chats answer from the saved listing while a slow provider is read again in
     getSessionMessages: async () => [{ uuid: 'message', type: 'user', message: { content: 'Fixture' } }],
   };
   const jobs = new Jobs();
-  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', desktopSessionIndexes: [], sessionListFreshMs: 500, sessionListWaitMs: 150 }, jobs, sdk);
+  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', listAllProviderChats:true,desktopSessionIndexes: [], sessionListFreshMs: 500, sessionListWaitMs: 150 }, jobs, sdk);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
   t.after(async () => { jobs.close(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(temp, { recursive: true, force: true }); });
   const get = (route: string) => fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api${route}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -162,7 +162,7 @@ test('a provider that does not answer its sign-in check never holds back the oth
   let answer: Promise<object> = new Promise(() => {});
   const codex: any = { list: () => [], sessions: async () => [], status: () => answer };
   const jobs = new Jobs();
-  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', desktopSessionIndexes: [], codex, providerStatusWaitMs: 40 }, jobs, { listSessions: async () => [], getSessionMessages: async () => [] } as any);
+  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', listAllProviderChats:true,desktopSessionIndexes: [], codex, providerStatusWaitMs: 40 }, jobs, { listSessions: async () => [], getSessionMessages: async () => [] } as any);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
   t.after(async () => { jobs.close(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(temp, { recursive: true, force: true }); });
   const providers = async () => { const list = await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/providers`, { headers: { Authorization: `Bearer ${token}` } })).json() as any[]; return Object.fromEntries(list.map(item => [item.id, item])); };
@@ -187,7 +187,7 @@ test('a chat list shows what a quick provider has now instead of an aged listing
     getSessionMessages: async () => [],
   };
   const jobs = new Jobs();
-  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', desktopSessionIndexes: [], sessionListFreshMs: 40 }, jobs, sdk);
+  const { app } = await createApp({ roots: [root], token, uploads: path.join(temp, 'uploads'), hostName: 'Fixture', listAllProviderChats:true,desktopSessionIndexes: [], sessionListFreshMs: 40 }, jobs, sdk);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve));
   t.after(async () => { jobs.close(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(temp, { recursive: true, force: true }); });
   const ids = async () => ((await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions?provider=claude`, { headers: { Authorization: `Bearer ${token}` } })).json()) as { sessionId: string }[]).map(chat => chat.sessionId);

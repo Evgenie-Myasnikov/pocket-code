@@ -1,6 +1,7 @@
 import {t,useLanguage} from './i18n';
 import {useId,useState} from 'react';
-import {CircleHelp} from 'lucide-react';
+import {CircleHelp,ShieldAlert} from 'lucide-react';
+import {HelpTip,SettingRow} from './SettingsRows';
 import type {CodexAccess} from './preferences';
 import {AccessOptions} from './AccessOptions';
 import './codex-access.css';
@@ -12,9 +13,11 @@ const descriptions={
   full:'Codex может менять файлы и выполнять команды без запросов подтверждения и ограничений песочницы.',
 } as const;
 const consequences={ask:'Спрашивает перед действиями, которым нужно подтверждение.',auto:'Запросы оценивает проверяющий Codex, песочница папки проекта сохраняется.',full:'Команды и правки без вопросов и без ограничений песочницы.'} as const;
-export function CodexAccessSettings({value,onChange}:{value:CodexAccess;onChange(value:CodexAccess):void}){
+/** row: one settings row with a select, for the provider card in the PC window; otherwise the radio cards of the phone. */
+export function CodexAccessSettings({value,onChange,row=false}:{value:CodexAccess;onChange(value:CodexAccess):void;row?:boolean}){
   useLanguage();
   const [showHelp,setShowHelp]=useState(false),helpId=useId(),descriptionId=useId();
+  if(row)return <SettingRow title={t('Доступ агента')} htmlFor={helpId+'-select'} noteId={descriptionId} note={<>{value==='full'&&<ShieldAlert size={14} aria-hidden="true"/>}{t(consequences[value])}</>} help={<HelpTip label={t('О режимах доступа Codex')}>{t(descriptions[value])} {t('В режиме «План» доступ всегда только для чтения.')} {t('Это значение по умолчанию для этого устройства. Чип доступа в чате меняет режим только для этого чата.')}</HelpTip>}><select id={helpId+'-select'} aria-describedby={descriptionId} value={value} onChange={event=>onChange(event.target.value as CodexAccess)}>{(['ask','auto','full'] as const).map(option=><option key={option} value={option}>{codexAccessLabel(option)}</option>)}</select></SettingRow>;
   return <section className="codex-access-settings" aria-label={t('Доступ Codex')}>
     <fieldset><legend><span>{t('Доступ Codex')}</span><button className="icon-button codex-access-help-toggle" type="button" aria-label={t('О режимах доступа Codex')} title={t('О режимах доступа Codex')} aria-expanded={showHelp} aria-controls={helpId} onClick={()=>setShowHelp(open=>!open)}><CircleHelp size={20}/></button></legend><AccessOptions name="codex-access" value={value} onChange={onChange} describedBy={showHelp?descriptionId:undefined} options={(['ask','auto','full'] as const).map(option=>({value:option,label:codexAccessLabel(option),consequence:t(consequences[option]),risky:option==='full'}))}/></fieldset>
     <div className="codex-access-help" id={helpId} hidden={!showHelp}><p className="muted" id={descriptionId}>{t(descriptions[value])}</p>

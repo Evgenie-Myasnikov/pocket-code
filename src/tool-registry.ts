@@ -63,6 +63,14 @@ function mcpName(name:string){
 function errorTail(text:string){return stripAnsi(text).split(/\r?\n/).map(line=>line.trim()).filter(Boolean).slice(-3).map(line=>line.length>200?line.slice(0,199)+'…':line);}
 
 /** One registry for Claude, Codex and Copilot tools: a title naming the object, a kind for grouping and an explicit state. */
+/** Tools of the agent's own host application (its task list, wrap-up, panes): bookkeeping, not work on the project. */
+export const serviceTool=(name:string|undefined)=>/^mcp__ccd_[a-z_]+__/i.test(name||'');
+/** A result that only confirms the call worked ("File created successfully at …") repeats the row above it. */
+export function trivialResult(result:Block|undefined){
+  if(!result||result.is_error)return false;
+  const text=toolText(result.content).trim();
+  return text.length<400&&!text.includes('\n')&&/^(?:file created successfully at:|the file .+ has been (?:updated|created|written)|successfully (?:wrote|written|edited|updated|created|applied)\b|applied \d+ edits?\b|success\.?$|done\.?$|ok\.?$)/i.test(text);
+}
 export function describeTool(block:Block,result?:Block,running=false):ToolView{
   const name=block.name||'',input=(block.input&&typeof block.input==='object'?block.input:{}) as Input,rawStatus=str(input.status).toLowerCase();
   const text=result?toolText(result.content):'',denied=rawStatus==='declined'||Boolean(result?.is_error&&/user (?:denied|rejected)|doesn't want to proceed|permission denied by user/i.test(text));

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.28.60 (2026-11-24)
+
+### Bug Fixes
+
+- Deleting a chat (2026-11-24). In the PC chat list, "…" → Delete removes the chat at once, without a dialog: the row leaves the list and the PC server erases the provider transcript and the Pocket Code cache. A refusal (a running turn, a chat of a running task chain, a provider error) puts the chat back and shows the reason above the chat.
+  - Cause of the slow deletion: every delete read all of the provider's chats again (a full Codex archive scan). A single delete now decides from the saved listing and reads the provider again only when the chat is not in it.
+  - Cause of "Chat unavailable in this account": Codex lists chats whose folder is outside the shared projects as read-only, and erasing refused every read-only chat. By the product owner's decision the PC window now erases those transcripts too; the provider deletes only its own transcript and no project file is touched. Phones and workspace guests keep the earlier refusal.
+
+### Features
+
+- Chat list (2026-11-24). Folders are back as folders the person makes: create and name one, move chats into it from the row menu or by dragging, collapse it, rename and delete it (its chats return to the list). Folders, like pins, belong to this PC window.
+  - The list holds the chats started in Pocket Code. Chats Pocket Code finished a turn in before this version are marked once from its saved run records. Chats that exist only in Claude, Codex or Copilot join the list with Import chats in Settings (`POST /api/chat-library/import`); a chat made in Pocket Code keeps that mark when it is imported again.
+- Chat header and side panel after Strata (2026-11-24). The header shows the chat's name and a provider and model chip whose menu groups the providers, the API connections with the local model, the models of the chosen provider from its own catalog, and Manage API models; a chat that has started keeps its provider. The composer keeps access mode and effort; a new chat shows its folder as a chip above the message field; the token line under it shows speed of the last reply, total tokens and the share of the context, only from provider data.
+  - Removed from the header: the dots menu with Review, Results, Subagents, the branch, Reading mode, Go to beginning and Brief/Detailed, and the Rules and Changelog buttons of the rail. Rules and Changelog of the chat's folder are header buttons shown only when the folder has them. The Home button of the rail is removed.
+  - Files a turn made or changed are listed at the end of the turn with their type (a thumbnail for pictures), name, folder and size; a file opens as a tab of a side panel beside the chat with refresh, full screen and collapse, while the chat stays usable. Strata's interface has no license file, so none of its code was copied; the behaviour was rebuilt.
+- Rules (2026-11-24). The Rules page is the list of rule files: the board maintenance switch, reader chips, the legend and the "What the agent sees" block are removed. The built-in board maintenance stays on by default.
+- Tasks (2026-11-24). The Tasks page has one Create Task button that opens the step-by-step editor; Create chain, Import Markdown and Plan with AI are removed from it. The task folder picker is "Working folder" and accepts any folder the AI works in.
+- Transcript (2026-11-24). The welcome block of a new chat is removed. Results that only confirm success ("File created successfully at …") and the rows of the agent host's own bookkeeping tools are not shown.
+- Settings after Strata (2026-11-24). Settings sections are headings with rounded cards of rows: a name and one short line on the left, the control on the right, without long hints. Prepared in a parallel session; see its own notes for details.
+
+### Validation
+
+- Published at the product owner's request without waiting for the full test runs. TypeScript passed on the release tree.
+- Browser scenarios on Edge, passed: chat delete without a dialog, a refused delete coming back with its reason, folders (create, name, move by menu and by drag, collapse, survive reload, rename, delete); the side panel with file tabs from the turn result; the turn result card; chats on the board.
+- Server and unit tests: the first full `npm test` from PowerShell had 13 failures of 611: the 3 known on the previous release and 10 tests whose fixtures expected every provider chat in the list. Those fixtures now list every provider chat explicitly; the 10 tests, 2 new tests (chat origins with Import chats and file sizes; quiet tool rows) passed when run on their own. The second full run had not finished when the release was cut.
+- Not run: the full browser suite, the header model menu scenario, the settings scenarios of the parallel session, a phone, the installed Windows application, and a real provider turn.
+
 ## [0.28.59](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.58...v0.28.59) (2026-11-24)
 
 Published [0.28.59](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.59) from [beb7443](https://github.com/Evgenie-Myasnikov/pocket-code/commit/beb74438176aef5332a51222a7fd537c72bc31b1) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows application, update manifest) match the local SHA-256 hashes. The privacy guard passed on the commit, and the unpacked assets were scanned for the local home path, account name, author identity, employer name, keys and tokens without findings. The APK is signed with the same key as 0.28.58 (certificate SHA-256 beginning d0e5792c), so it installs over 0.28.58. Earlier releases came from release/0.28.1; this one comes from feature/strata-like-ui, which contains release/0.28.1 and the three commits of this version. Physical Android installation, the installed Windows application and the full browser suite were not run.

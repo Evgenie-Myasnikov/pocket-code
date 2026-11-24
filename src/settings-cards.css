@@ -1,0 +1,126 @@
+/* Settings as in a reading app: a heading per group, one rounded card, rows split by thin lines.
+   Each row: bold name and one muted line on the left, the control on the right at a fixed width. */
+.settings-block{margin:0 0 26px;min-width:0}
+.settings-block-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:32px;margin:0 2px 8px}
+.settings-block-head h3{margin:0;font-family:var(--font-display);font-size:calc(15px * var(--ui-scale,1));font-weight:var(--fw-semibold,600);color:var(--text)}
+.settings-block-head .icon-button{width:32px;height:32px;min-height:32px}
+.settings-card{display:grid;padding:0 20px;background:var(--panel);border:1px solid var(--line);border-radius:var(--ui-radius-card,14px);min-width:0}
+.settings-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px 24px;min-height:64px;padding:14px 0;border-top:1px solid var(--line);color:var(--text)}
+.settings-card>.settings-row:first-child,.settings-card>:first-child>.settings-row:first-child{border-top:0}
+.settings-row-text{display:grid;gap:3px;min-width:0}
+.settings-row-title{display:flex;align-items:center;gap:6px;min-width:0}
+.settings-row-title>:is(strong,label){font-weight:var(--fw-semibold,600);font-size:calc(14px * var(--ui-scale,1));line-height:1.35;overflow-wrap:anywhere;cursor:default}
+.settings-row-title>label{cursor:pointer}
+.settings-row-text>small{color:var(--muted);font-size:calc(12.5px * var(--ui-scale,1));line-height:1.4;overflow-wrap:anywhere}
+.settings-row-text>small svg{vertical-align:-2px;margin-inline-end:4px}
+.settings-row-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;min-width:0;max-width:100%}
+.settings-row-control>select,.settings-row-control>.settings-select{width:var(--settings-control-width,260px);max-width:100%;min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:var(--ui-radius-control,10px);background:var(--surface);color:var(--text);font:inherit;font-size:calc(13.5px * var(--ui-scale,1))}
+.settings-row-control>:is(button.secondary,button.primary,a.button){min-height:36px;padding:6px 14px;font-size:calc(13px * var(--ui-scale,1));white-space:nowrap}
+.settings-row-control>input:is([type=text],[type=url],[type=password],:not([type])){width:var(--settings-control-width,260px);max-width:100%;min-height:40px}
+.settings-row-control kbd{margin-inline-start:6px;color:var(--muted)}
+.settings-row.wide{grid-template-columns:minmax(0,1fr)}
+.settings-row.wide>.settings-row-control{justify-content:flex-start}
+/* A full-width line: a status, a notice or an inline confirmation inside the card. */
+.settings-line{display:block;min-height:0}
+.settings-line>:is(.notice,.confirm-inline,p){margin:0}
+.settings-line>p{color:var(--muted);font-size:calc(12.5px * var(--ui-scale,1));line-height:1.45}
+/* Help: one small icon after the title, its paragraph opens under the row text. */
+.settings-help{display:contents}
+.settings-help-toggle.icon-button{width:24px;height:24px;min-width:24px;min-height:24px;padding:0;color:var(--muted);border:0;background:transparent}
+.settings-help-toggle.icon-button:hover{color:var(--text)}
+.settings-help-text:not([hidden]){display:block;grid-column:1/-1;order:3;margin-top:4px;padding:10px 12px;border-radius:var(--ui-radius-control,10px);background:var(--surface);color:var(--muted);font-size:calc(12.5px * var(--ui-scale,1));font-weight:var(--fw-regular);line-height:1.5}
+.settings-row-title:has(.settings-help-text:not([hidden])){flex-wrap:wrap}
+.settings-row-title .settings-help-text:not([hidden]){flex-basis:100%}
+.settings-help-text a{color:var(--accent)}
+/* Switch: a 40 x 22 track and a sliding knob, drawn from the checkbox itself. */
+:root .settings-row input.settings-switch[role=switch][type=checkbox]{appearance:none;-webkit-appearance:none;position:relative;flex:0 0 40px;width:40px;height:22px;margin:0;padding:0;box-sizing:border-box;border:1px solid var(--muted);border-radius:999px;background:var(--surface);cursor:pointer;transition:background-color var(--dur-short,.16s),border-color var(--dur-short,.16s)}
+:root .settings-row input.settings-switch[role=switch][type=checkbox]::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:transform var(--dur-short,.16s),background-color var(--dur-short,.16s)}
+:root .settings-row input.settings-switch[role=switch][type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+:root .settings-row input.settings-switch[role=switch][type=checkbox]:checked::after{transform:translateX(18px);background:var(--bg)}
+:root .settings-row input.settings-switch[role=switch][type=checkbox]:disabled{opacity:.55;cursor:default}
+:root .settings-row input.settings-switch[role=switch][type=checkbox]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){:root .settings-row input.settings-switch[role=switch][type=checkbox],:root .settings-row input.settings-switch[role=switch][type=checkbox]::after{transition:none}}
+@media(forced-colors:active){:root .settings-row input.settings-switch[role=switch][type=checkbox]{appearance:auto;-webkit-appearance:auto}:root .settings-row input.settings-switch[role=switch][type=checkbox]::after{display:none}}
+/* A status value on the right instead of a control (server state, version). */
+.settings-value{color:var(--muted);font-size:calc(13px * var(--ui-scale,1));white-space:nowrap}
+.settings-value.ok{color:var(--text)}
+.settings-value svg{vertical-align:-3px;margin-inline-end:6px}
+.settings-dot{display:inline-block;width:8px;height:8px;margin-inline-end:8px;border-radius:50%;background:var(--muted);vertical-align:1px}
+.settings-dot.on{background:var(--success-fg)}
+/* Pairing: the QR on the left of the card, the address choice and timer beside it. */
+.settings-pairing{display:grid;grid-template-columns:200px minmax(0,1fr);gap:22px;align-items:center;padding:18px 0}
+.settings-pairing .desktop-qr{width:200px;height:200px;padding:10px;border:0;border-radius:12px;background:white}
+.settings-pairing-text{display:grid;gap:10px;min-width:0}
+.settings-pairing-text h4{margin:0;font-size:calc(15px * var(--ui-scale,1));font-weight:var(--fw-semibold,600)}
+.settings-pairing-text>p{margin:0;color:var(--muted);font-size:calc(12.5px * var(--ui-scale,1));line-height:1.45}
+.settings-pairing .desktop-routes{display:flex;flex-wrap:wrap;gap:6px}
+.settings-pairing .desktop-route{display:grid;gap:2px;min-height:0;padding:7px 12px;border:1px solid var(--line);border-radius:var(--ui-radius-control,10px);background:var(--surface);color:var(--text);text-align:left;font:inherit;font-size:calc(13px * var(--ui-scale,1))}
+.settings-pairing .desktop-route[aria-pressed=true]{border-color:var(--accent)}
+.settings-pairing .desktop-route small{color:var(--muted);font-size:.85em}
+.settings-install-qr{width:84px;height:84px;padding:4px;border-radius:8px;background:white}
+/* Lists inside a card (devices, custom providers, usage) drop their own frames. */
+.settings-card .settings-index{display:grid;gap:0;margin:0;max-width:none}
+.settings-card .settings-index .settings-category{min-height:60px;padding:12px 0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;box-shadow:none}
+.settings-card .settings-index .settings-category:first-child{border-top:0}
+.settings-card .settings-index .settings-category:hover{background:transparent}
+.settings-card .settings-index .settings-category strong{font-size:calc(14px * var(--ui-scale,1))}
+.settings-card .settings-index .settings-category small{display:block}
+.settings-card .settings-index .settings-category>svg:last-child{display:block}
+@media(max-width:640px){
+ .settings-row{grid-template-columns:minmax(0,1fr)}
+ .settings-row-control{justify-content:flex-start}
+ .settings-row-control>select,.settings-row-control>.settings-select,.settings-row-control>input:is([type=text],[type=url],[type=password],:not([type])){width:100%}
+ .settings-pairing{grid-template-columns:minmax(0,1fr)}
+}
+/* Connected devices: the list is the card body. */
+.desktop-devices.settings-block{margin-top:0}
+.settings-block-head h3{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.desktop-devices .settings-card>ul>li:first-child{border-top:0}
+.desktop-devices .settings-card>p.settings-line{padding:18px 0;color:var(--muted)}
+.desktop-devices .settings-card>p.settings-line+ul>li:first-child{border-top:1px solid var(--line)}
+.desktop-devices .settings-card>ul:empty{display:none}
+/* The settings page itself: section heading, one quiet scope line, cards below. */
+.settings-rows-layout .settings-detail>h2{margin:0 0 4px;font-size:calc(22px * var(--ui-scale,1))}
+.settings-rows-layout .settings-detail>.settings-scope{margin:0 0 22px}
+/* Spend limit: a narrow select, and the amount field beside it when "Other" is chosen. */
+.budget-row .settings-row-control>select{width:140px}
+.budget-row .settings-row-control>.budget-row-input{width:100px}
+.budget-row .budget-note.invalid{color:var(--danger-fg)}
+/* Sign-in methods sit as compact buttons at the right of their row. */
+.provider-rows .provider-login-methods{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.provider-rows .provider-login-methods>button{min-height:34px;padding:6px 12px;font-size:calc(13px * var(--ui-scale,1))}
+.provider-rows .provider-waiting{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.provider-rows .provider-waiting>button{margin-inline-start:auto}
+/* Miro link: the field takes the row's free width, the action stays at the right. */
+.miro-link-row{grid-template-columns:minmax(0,180px) minmax(0,1fr)}
+.miro-link-row .settings-row-control>input{width:100%;flex:1 1 220px}
+.miro-row-form{display:grid;gap:10px;max-width:520px}
+.miro-row-form>p{margin:0;color:var(--muted);font-size:calc(12.5px * var(--ui-scale,1));line-height:1.5;overflow-wrap:anywhere}
+.miro-row-form label{display:grid;gap:6px}
+.miro-row-form>button{justify-self:start}
+.miro-linked-status{display:inline-flex;align-items:center;gap:6px}
+/* Appearance keeps its own rows; inside the card they lose the outer spacing. */
+.settings-appearance .appearance-settings{margin:0}
+.settings-appearance .setting-row{padding:14px 0;min-height:64px}
+.settings-appearance .appearance-reset{justify-self:start;margin:6px 0 14px}
+.settings-appearance .appearance-settings>.notice{margin:6px 0 14px}
+/* Usage: provider rows as lines of the card, the selected provider's windows below. */
+.settings-usage .settings-card{padding-block:6px}
+.settings-usage .usage-overview{gap:0;margin:0}
+.settings-usage .usage-overview>h3{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.settings-usage .usage-overview-row{min-height:56px;padding:10px 0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}
+.settings-usage .usage-overview-row:first-of-type{border-top:0}
+.settings-usage .usage-overview-row[aria-pressed=true]{box-shadow:inset 3px 0 0 var(--accent);padding-inline-start:12px}
+.settings-usage .codex-usage{margin:0;padding:12px 0 14px;border-top:1px solid var(--line)}
+/* Local model and speech forms: rows only, no form spacing. */
+.settings-card>form{display:grid;min-width:0}
+/* Group headings: small, near their card (the shared heading scale is for page sections). */
+:root[data-theme] .desktop-settings .settings-block-head h3,:root[data-theme] .desktop-settings .settings-pairing-text h4{margin:0;font-size:calc(14.5px * var(--ui-scale,1));line-height:1.3;color:var(--text)}
+:root[data-theme] .desktop-settings .settings-block-head{margin:0 2px 8px}
+/* Segmented choices in a card: equal segments wide enough for every label. */
+.settings-appearance .setting-row .segmented-options{width:300px;min-width:0;max-width:100%}
+.settings-appearance .setting-row .segmented-options span{min-height:38px;padding:6px 10px;font-size:calc(13px * var(--ui-scale,1));overflow-wrap:normal;white-space:nowrap}
+.settings-appearance .setting-row:last-of-type{border-bottom:0}
+.settings-appearance .appearance-reset{margin:0 0 14px}
+:root[data-theme] .desktop-settings .settings-usage .codex-usage-heading h3{margin:0;font-size:calc(14px * var(--ui-scale,1))}
+.settings-usage .codex-usage-heading .icon-button{min-width:32px;min-height:32px;width:32px;height:32px}

@@ -18,7 +18,7 @@ async function apiFixture(t:TestContext){
   await mkdir(path.dirname(boardFile));await writeFile(boardFile,JSON.stringify(board));fixtureGit(base.source,'add','.');fixtureGit(base.source,'commit','-m','Synthetic board');
   const token='synthetic-task-token-'.repeat(3),sessions:any[]=[],starts:any[]=[];
   const jobs=new Jobs((({options}:any)=>{starts.push(options);return(async function*(){})();}) as any);
-  const app=await createApp({roots:[base.source],token,hostName:'Synthetic PC',uploads:path.join(base.temporary,'uploads'),desktopSessionIndexes:[]},jobs,{listSessions:async()=>sessions,getSessionMessages:async()=>[]} as any);
+  const app=await createApp({roots:[base.source],token,hostName:'Synthetic PC',uploads:path.join(base.temporary,'uploads'),listAllProviderChats:true,desktopSessionIndexes:[]},jobs,{listSessions:async()=>sessions,getSessionMessages:async()=>[]} as any);
   const server=app.app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
   const url=`http://127.0.0.1:${(server.address() as any).port}/api`,headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json'};
   base.onCleanup(async()=>{await app.closeTaskServices();jobs.close();app.terminals.close();await new Promise<void>(resolve=>server.close(()=>resolve()));});

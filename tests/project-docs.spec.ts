@@ -59,14 +59,12 @@ test('Rules without authored files show the supported names and an AI action ins
  await expect(panel(page).getByRole('switch')).toHaveCount(0);await expect(panel(page).locator('.project-docs-markdown')).toHaveCount(0);
  await panel(page).getByRole('button',{name:'Create AGENTS.md with AI'}).click();await expect(page.locator('.composer textarea')).toHaveValue(/Create an AGENTS\.md file/);
 });
-test('the built-in rule is one card with a switch, saved with feedback, and per-provider chips label authored files',async({page})=>{
+test('Rules is just the list of rule files: no built-in switch, reader chips, legend or agent view',async({page})=>{
  const state=await host(page);state.documents=[builtIn,{...rule,readers:[{provider:'claude',status:'shadowed',reason:'claude-md'},{provider:'codex',status:'loaded'},{provider:'copilot',status:'loaded'}]} as never,claude,changelog];await openRules(page);
  await expect(panel(page).locator('.project-docs-item')).toHaveCount(2);await expect(panel(page).getByText('pocket-code:board-maintenance')).toHaveCount(0);
- const toggle=panel(page).getByRole('switch',{name:'Board maintenance'});await expect(toggle).toHaveCount(1);await expect(toggle).toHaveAttribute('aria-checked','true');
- await toggle.click();await expect(toggle).toHaveAttribute('aria-checked','false');await expect(panel(page).getByRole('status').filter({hasText:/Saving…|Saved/})).toBeVisible();expect(state.boardMaintenance).toBe(false);
- await expect(panel(page).getByRole('button',{name:/^AGENTS.md/})).toContainText('Claude: not read (CLAUDE.md exists)');await expect(panel(page).getByRole('button',{name:/^AGENTS.md/})).toContainText('Codex: reads');
- await expect(panel(page).getByRole('heading',{name:'What the agent sees'})).toBeVisible();
- await panel(page).getByRole('button',{name:'What this rule does'}).click();await expect(panel(page).getByRole('heading',{name:'Board maintenance'})).toBeVisible();await expect(panel(page).getByRole('switch')).toHaveCount(0);
+ await expect(panel(page).getByRole('switch')).toHaveCount(0);await expect(panel(page).locator('.rule-chip')).toHaveCount(0);
+ await expect(panel(page).getByRole('heading',{name:'What the agent sees'})).toHaveCount(0);await expect(panel(page).locator('.project-docs-legend')).toHaveCount(0);
+ await panel(page).getByRole('button',{name:/^AGENTS.md/}).click();await expect(panel(page).getByRole('heading',{name:'Project conventions'}).or(panel(page).locator('.project-docs-markdown'))).toBeVisible();
 });
 test('relative links open project documents with Back to the source, anchors scroll and other files open in the preview',async({page})=>{
  const state=await host(page);state.content='# Project conventions\n\nSee [testing](.claude/rules/testing.md), [notes](docs/notes.md) and [the end](#final-section).\n\n'+('Filler line.\n\n'.repeat(80))+'## Final section\n\nDone.';await openRules(page);

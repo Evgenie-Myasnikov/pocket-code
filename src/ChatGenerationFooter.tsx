@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {Gauge} from 'lucide-react';
+import {Gauge,MemoryStick} from 'lucide-react';
 import {request,type Connection} from './api';
 import {useLanguage} from './i18n';
 import type {GenerationMetrics,JobView} from '../server/types';
@@ -33,10 +33,11 @@ export function ChatGenerationFooter({connection,provider,account,sessionId,job}
   const short=(n:number)=>n>=10000?n.toLocaleString(locale,{notation:'compact',maximumFractionDigits:1}):full(n);
   const rate=positive(outputTokensPerSecond)?(outputTokensPerSecond<.01?'<'+(.01).toLocaleString(locale):outputTokensPerSecond.toLocaleString(locale,{maximumFractionDigits:outputTokensPerSecond<1?2:1})):'';
   const pct=percentage!==undefined?(percentage>0&&percentage<1?'<1':Math.round(percentage).toLocaleString(locale)):'';
+  // As in Strata: an icon, the number in bold and a quiet word, centred under the message field.
+  const ring=percentage!==undefined?Math.min(100,Math.max(0,percentage)):0;
   return <div className="chat-generation-metrics" role="group" aria-label={ru?'Статистика токенов':'Token usage'}>
-    {positive(outputTokensPerSecond)&&<span className="chat-generation-rate" title={ru?'Средняя скорость по данным провайдера':'Average generation speed reported for this response'}><Gauge size={13} aria-hidden="true"/><b>{rate} {ru?'токенов/с':'tokens/s'}</b><span>· {running?(ru?'текущий ответ':'current response'):(ru?'последний ответ':'last response')}</span></span>}
-    {count(outputTokens)&&<span title={ru?'Выходные токены модели за этот ответ':'Model output tokens for this response'}>{ru?'Сгенерировано':'Generated'} <b>{full(outputTokens)}</b></span>}
-    {count(totalTokens)&&<span title={(ru?'Всего токенов за чат':'Total tokens for the conversation')+' · '+full(totalTokens)}>{ru?'Всего токенов':'Total tokens'} <b>{short(totalTokens)}</b></span>}
-    {percentage!==undefined&&<span title={full(contextTokens!)+' / '+full(contextWindow!)+(ru?' токенов':' tokens')}><b>{pct}%</b> {ru?'контекста':'context'}</span>}
+    {positive(outputTokensPerSecond)&&<span className="chat-generation-rate" title={ru?'Средняя скорость по данным провайдера':'Average generation speed reported for this response'}><Gauge size={15} aria-hidden="true"/><b>{rate}</b><span>{ru?'ток/с':'tok/s'} · {running?(ru?'текущий ответ':'current reply'):(ru?'последний ответ':'last reply')}</span></span>}
+    {count(totalTokens)&&<span title={(ru?'Всего токенов за чат':'Total tokens for the conversation')+' · '+full(totalTokens)}><MemoryStick size={15} aria-hidden="true"/><b>{short(totalTokens)}</b><span>{ru?'всего токенов':'total tokens'}</span></span>}
+    {percentage!==undefined&&<span title={full(contextTokens!)+' / '+full(contextWindow!)+(ru?' токенов':' tokens')}><svg className="chat-generation-ring" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeOpacity=".25" strokeWidth="2"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray={`${ring/100*40.84} 40.84`} transform="rotate(-90 8 8)" strokeLinecap="round"/></svg><b>{pct}</b><span>{ru?'% контекста':'% of context'}</span></span>}
   </div>;
 }

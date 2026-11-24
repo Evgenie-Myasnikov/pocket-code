@@ -9,8 +9,8 @@ type Chat={sessionId:string;cwd?:string;account?:string;readOnly?:boolean;source
 type Source={
   personal():boolean;
   folderChatFilter?(provider:Provider):Promise<(chat:Chat)=>boolean>;
-  sessions(provider:Provider,includeDeleted?:boolean):Promise<Chat[]>;
-  originals?:{canRemove(provider:Provider):boolean;remove(provider:Provider,id:string,cwd:string):Promise<void>};
+  sessions(provider:Provider,includeDeleted?:boolean,need?:'saved'|'current'):Promise<Chat[]>;
+  originals?:{canRemove(provider:Provider):boolean;remove(provider:Provider,id:string,cwd:string,outsideRoots?:boolean):Promise<void>};
   verifyDesktopOriginal?(id:string,cwd:string):Promise<boolean>;
   allowedOriginalCwd?(cwd:string):Promise<boolean>;
   forget?(provider:Provider,id:string):void|Promise<void>;
@@ -25,13 +25,22 @@ const target=z.object({
   &&(!body.account||body.provider==='claude'));
 export const folderKey=(folder?:string)=>folder?(process.platform==='win32'?path.normalize(folder).toLowerCase():path.normalize(folder)):'';
 
+/**
+ * saved: decide from the last provider listing and read the provider again only when the chat is not in it (one chat
+ * deleted from its row: a full Codex scan takes seconds). outsideRoots: the PC window may erase the provider transcript
+ * of a listed read-only chat whose folder is outside the shared projects; no project file is touched.
+ */
+export type ChatDeleteOptions={listing?:'saved'|'current';outsideRoots?:boolean};
 /** Confirmation carries the exact preview IDs. New chats in a folder never join a pending deletion. */
-export function mountChatBulkDelete(app:Express,library:ChatLibrary,source:Source){
-  async function processChats(body:z.infer<typeof target>,expected?:Map<string,string[]>){
+export function mountChatBulkDelete(app:Express,library:ChatLibrary,source:Source,isPcWindow:(res:{locals:Record<string,unknown>})=>boolean=()=>false){
+  async function processChats(body:z.infer<typeof target>,expected?:Map<string,string[]>,options:ChatDeleteOptions={}){
     if(!source.personal())throw new HttpError(403,'Personal chats belong to the connected PC');
     const {action,provider,account,ids,folder,eraseOriginals}=body;
     const before=await library.read();
-    const native=new Map((await source.sessions(provider,eraseOriginals||!!expected)).map(s=>[s.sessionId,s]));
+    const listing=async(need:'saved'|'current')=>new Map((await source.sessions(provider,eraseOriginals||!!expected,need)).map(s=>[s.sessionId,s]));
+    let native=await listing(options.listing??'current');
+    if(options.listing==='saved'&&ids?.some(id=>!native.has(id)))native=await listing('current');
+    const outside=!!options.outsideRoots;
     const catalog=new Map(native);
     // A verified, durable deletion intent survives a crash between provider erasure and the local tombstone.
     if(eraseOriginals)for(const [key,entry] of Object.entries(before.chats)){
@@ -64,7 +73,7 @@ export function mountChatBulkDelete(app:Express,library:ChatLibrary,source:Sourc
         const journal=entry?.originalRemoval,known=journal?.account===account&&folderKey(journal?.cwd)===folderKey(s.cwd);
         if(known&&journal?.status==='done')return native.has(id)&&s.source!=='desktop'?'unavailable':'alreadyRemoved';
         if(!native.has(id)&&entry?.account!==undefined&&entry.account!==account)return 'unavailable';
-        if(s.readOnly||!s.cwd||!native.has(id)&&!known)return 'unavailable';
+        if(s.readOnly&&!outside||!s.cwd||!native.has(id)&&!known)return 'unavailable';
         if(known&&journal?.status==='erased'&&native.has(id)&&s.source!=='desktop')return 'unavailable';
         if(!source.originals?.canRemove(provider))return 'unsupported';
       }else if(entry?.deleted)return 'alreadyRemoved';
@@ -77,17 +86,17 @@ export function mountChatBulkDelete(app:Express,library:ChatLibrary,source:Sourc
           const nativeChat=native.get(id);
           const journal=before.chats[provider+':'+id]?.originalRemoval;
           if((state==='alreadyRemoved'||journal?.status==='erased')&&nativeChat?.source==='desktop'&&nativeChat.cwd&&await source.verifyDesktopOriginal?.(id,nativeChat.cwd))state='unavailable';
-          if(state==='ids'&&source.allowedOriginalCwd&&!await source.allowedOriginalCwd(catalog.get(id)!.cwd!))state='unavailable';
+          if(state==='ids'&&!(outside&&catalog.get(id)?.readOnly)&&source.allowedOriginalCwd&&!await source.allowedOriginalCwd(catalog.get(id)!.cwd!))state='unavailable';
           if(state==='ids'&&provider==='claude'&&nativeChat?.source==='desktop'&&!journal){
             if(!nativeChat.cwd||!await source.verifyDesktopOriginal?.(id,nativeChat.cwd))state='unavailable';
           }
           if(state==='ids'&&action==='delete'){
-            const cwd=catalog.get(id)!.cwd!;
+            const cwd=catalog.get(id)!.cwd!,readOnly=outside&&!!catalog.get(id)!.readOnly;
             if(active().has(id)){result.running.push(id);continue;}
             const removed=await library.eraseOriginal(provider,id,{account,cwd},data=>{
               const entry=data.chats[provider+':'+id];
               return !active().has(id)&&(entry?.account===before.chats[provider+':'+id]?.account||entry?.account===account);
-            },()=>source.originals!.remove(provider,id,cwd),()=>source.forget?.(provider,id));
+            },()=>source.originals!.remove(provider,id,cwd,readOnly),()=>source.forget?.(provider,id));
             if(removed==='failed'){result.failed.push(id);continue;}
             state=removed;
           }
@@ -110,7 +119,7 @@ export function mountChatBulkDelete(app:Express,library:ChatLibrary,source:Sourc
     return result;
   }
   app.post('/api/chat-library/bulk-delete',async(req,res)=>{
-    const body=target.parse(req.body),result=await processChats(body);
+    const body=target.parse(req.body),result=await processChats(body,undefined,{outsideRoots:isPcWindow(res)});
     if(body.eraseOriginals)res.json({...result,ids:body.action==='delete'?[...result.ids,...result.alreadyRemoved]:result.ids,eraseOriginals:true});
     else res.json({ids:result.ids,running:result.running,unavailable:result.unavailable.concat(result.alreadyRemoved)});
   });

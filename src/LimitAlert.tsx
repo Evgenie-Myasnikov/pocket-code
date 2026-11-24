@@ -5,6 +5,7 @@ import {useLiveSettings} from './live-settings';
 import {limitLevel,narrowestWindow,percentLabel,usagePace,type LimitLevel,type NarrowestWindow} from './usage-format';
 import {resetLabel,windowLabel} from './CodexUsage';
 import './limit-alert.css';
+import {SwitchRow} from './SettingsRows';
 
 type Provider='claude'|'codex'|'copilot';
 const names:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'GitHub Copilot'};
@@ -42,5 +43,6 @@ export function LimitAlert({provider,onOpen}:{provider:Provider;onOpen():void}){
 }
 export function LimitAlertsToggle({desktop=false}:{desktop?:boolean}){
   useLanguage();const enabled=useLimitAlertsPreference();
+  if(desktop)return <SwitchRow title={t('Предупреждать о лимитах в чате')} note={t('При 75, 90 и 100 % окна провайдера и когда лимит восстановлен')} checked={enabled} onChange={setLimitAlerts}/>;
   return <div className="settings-run-alerts"><label className={desktop?'desktop-toggle':'checkbox-label'}><input type="checkbox" role={desktop?'switch':undefined} checked={enabled} onChange={event=>setLimitAlerts(event.target.checked)}/><span>{t('Предупреждать о лимитах в чате')}</span></label><p className="muted">{t('Строка над полем ввода, когда израсходовано 75, 90 и 100 % самого узкого окна или расход опережает время окна, и когда лимит восстановлен. Данные — из лимитов провайдера.')}</p></div>;
 }

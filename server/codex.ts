@@ -103,11 +103,12 @@ export class CodexService {
   async sessions(): Promise<CodexSession[]> {
     return this.sessionReads('sessions', () => this.loadSessions());
   }
-  async eraseOriginal(id:string,cwd:string) {
+  /** outsideRoots: a listed read-only chat (all project history) is erased from its own folder, which is not a shared project. */
+  async eraseOriginal(id:string,cwd:string,outsideRoots=false) {
     if(this.list().some(job=>job.sessionId===id&&job.status==='running'))throw new HttpError(409,'Stop the current turn before erasing this chat.');
     const rpc=await this.connect();
     try {
-      const thread=await this.readThread(id);
+      const thread=await this.readThread(id,false,outsideRoots);
       if(thread.id!==id||path.relative(cwd,thread.cwd)!=='')throw new HttpError(409,'The original chat belongs to a different project.');
       if(thread.status?.type==='active')throw new HttpError(409,'Stop the current turn before erasing this chat.');
     } catch(error){

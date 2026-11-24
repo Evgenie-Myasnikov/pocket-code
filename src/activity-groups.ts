@@ -1,5 +1,5 @@
 import type {Block,ChatMessage} from '../server/types';
-import {describeTool,basename} from './tool-registry';
+import {describeTool,basename,serviceTool} from './tool-registry';
 import {plural} from './plural';
 import {t} from './i18n';
 import {startsTurn} from './turn-changes';
@@ -12,6 +12,7 @@ export function visibleMessageBlocks(message:ChatMessage,results?:Map<string,Blo
  const items=message.blocks.flatMap((block,index):ActivityBlock[]=>{
   const previous=message.blocks[index-1],next=message.blocks[index+1];
   if(block.type==='tool_result'&&block.tool_use_id&&(results?.has(block.tool_use_id)||previous?.type==='tool_use'&&previous.id===block.tool_use_id))return [];
+  if(block.type==='tool_use'&&serviceTool(block.name))return [];
   const result=block.type==='tool_use'&&block.id?(results?.get(block.id)||(next?.type==='tool_result'&&next.tool_use_id===block.id?next:undefined)):undefined;
   return [{block,result,index,messageId:message.id,running}];
  });

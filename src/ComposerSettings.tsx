@@ -1,10 +1,19 @@
 import {t,useLanguage} from './i18n';
+import {SettingRow,SwitchRow} from './SettingsRows';
+import {useId} from 'react';
 import {useComposerPreferences,saveComposerPreferences,enterSends,approvalTimeout,type ApprovalTimeout} from './composer-preferences';
 
 /** Sending and approval behaviour, shared by the phone settings and the Windows window. */
-export function ComposerSettings({desktop}:{desktop:boolean}){
+/** rows: two settings rows for a card in the PC window. */
+export function ComposerSettings({desktop,rows=false}:{desktop:boolean;rows?:boolean}){
   useLanguage();
-  const stored=useComposerPreferences(),timeout=approvalTimeout(stored);
+  const stored=useComposerPreferences(),timeout=approvalTimeout(stored),id=useId();
+  if(rows)return <>
+    <SwitchRow title={t('Enter отправляет, Shift+Enter — новая строка')} note={t('Без этой настройки сообщение отправляется по Ctrl+Enter.')} checked={enterSends(stored,desktop)} onChange={value=>saveComposerPreferences({enterSends:value})}/>
+    <SettingRow title={t('Ожидание ответа на запрос разрешения')} htmlFor={id} note={timeout?t('Без ответа агент получит отказ'):t('Ожидающая задача занимает слот сервера')}><select id={id} value={timeout} onChange={event=>saveComposerPreferences({approvalTimeout:Number(event.target.value) as ApprovalTimeout})}>
+      <option value={0}>{t('Без ограничения')}</option><option value={10}>{t('10 минут')}</option><option value={60}>{t('1 час')}</option>
+    </select></SettingRow>
+  </>;
   return <section className="composer-settings" aria-label={t('Сообщения и подтверждения')}>
     <label className="desktop-toggle"><input type="checkbox" checked={enterSends(stored,desktop)} onChange={event=>saveComposerPreferences({enterSends:event.target.checked})}/>{t('Enter отправляет, Shift+Enter — новая строка')}</label>
     <p className="muted">{t('Без этой настройки сообщение отправляется по Ctrl+Enter.')}</p>

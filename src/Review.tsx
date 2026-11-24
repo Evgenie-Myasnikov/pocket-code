@@ -32,7 +32,7 @@ function scopeQueries(query:URLSearchParams,paths:string[]){
   return chunks;
 }
 type Selection={path:string}&LineSelection&{text:string[]};
-export function Review({connection,cwd,onClose,initialMode='working',taskRunId,onQuote,onlyPaths}:{connection:Connection;cwd:string;onClose:()=>void;initialMode?:'working'|'branch';taskRunId?:string;onQuote?:(text:string)=>void;onlyPaths?:string[]}){
+export function Review({connection,cwd,onClose,initialMode='working',taskRunId,onQuote,onlyPaths,docked=false}:{connection:Connection;cwd:string;onClose:()=>void;initialMode?:'working'|'branch';taskRunId?:string;onQuote?:(text:string)=>void;onlyPaths?:string[];/** Shown in the PC window's side panel beside the chat: not a modal dialog. */docked?:boolean}){
   useLanguage();
   const panel=useRef<HTMLElement|null>(null),diff=useRef<HTMLElement|null>(null),fileListElement=useRef<HTMLDivElement|null>(null),probe=useRef<HTMLSpanElement|null>(null),eye=useRef<HTMLButtonElement|null>(null),restore=useRef<HTMLButtonElement|null>(null),optionsButton=useRef<HTMLButtonElement|null>(null),filesButton=useRef<HTMLButtonElement|null>(null);
   const [reading,setReading]=useState(false),[options,setOptions]=useState(false),[navOpen,setNavOpen]=useState(false);
@@ -49,7 +49,7 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
   function toggleReading(value:boolean){scrollPosition.current={top:diff.current?.scrollTop||0,left:diff.current?.scrollLeft||0,focus:true};setReading(value);}
   useLayoutEffect(()=>{const position=scrollPosition.current;if(!position)return;if(diff.current){diff.current.scrollTop=position.top;diff.current.scrollLeft=position.left;}if(position.focus)(reading?restore:eye).current?.focus({preventScroll:true});scrollPosition.current=null;},[reading]);
   const [selection,setSelection]=useState<Selection|null>(null),[notice,setNotice]=useState('');
-  useModal(panel,true,()=>{if(selection)setSelection(null);else if(reading)toggleReading(false);else if(options){setOptions(false);optionsButton.current?.focus({preventScroll:true});}else onClose();});
+  useModal(panel,!docked,()=>{if(selection)setSelection(null);else if(reading)toggleReading(false);else if(options){setOptions(false);optionsButton.current?.focus({preventScroll:true});}else onClose();});
   const [mode,setMode]=useState<string>(initialMode),[base,setBase]=useState(''),[data,setData]=useState<Data|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0),[updated,setUpdated]=useState(0);
   const [fitWidth,setFitWidth]=useState(()=>stored('pocket-code-diff-fit-width')==='true');
   const [wrap,setWrap]=useState(()=>{const saved=stored('pocket-code-diff-wrap');return saved?saved==='true':window.innerWidth<COMPACT;});
@@ -198,7 +198,7 @@ export function Review({connection,cwd,onClose,initialMode='working',taskRunId,o
   const showTree=tree&&treeOpen&&visibleFiles.length>0;
   const startFailed=!!error&&!data;
   const comparisonBranch=data?.base&&data.base!=='HEAD'?data.base:'';
-  return <ReviewContext.Provider value={{metrics,bus}}><aside ref={panel} className={'review-panel'+(reading?' review-reading':'')} role="dialog" aria-label="Review" aria-modal="true" onPointerDown={()=>poke.current()}>
+  return <ReviewContext.Provider value={{metrics,bus}}><aside ref={panel} className={'review-panel'+(reading?' review-reading':'')} role={docked?"region":"dialog"} aria-label="Review" aria-modal={docked?undefined:"true"} onPointerDown={()=>poke.current()}>
     <span ref={probe} className="diff-probe" aria-hidden="true" style={{fontSize:fontSize?`${fontSize}px`:undefined}}>{'0'.repeat(100)}</span>
     <header className="review-header" hidden={reading}>
       <button className="icon-button" aria-label={t('Вернуться в чат')} title={t('Вернуться в чат')} onClick={onClose}><ArrowLeft size={20}/></button>

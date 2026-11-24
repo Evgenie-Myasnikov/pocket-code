@@ -5,10 +5,12 @@ import {fileBusy,readGuarded,writeDurable} from './durable-file.js';
 /** The board a chat was started from. Host-private: repository boards never store chat associations. */
 export type BoardLink={id:string;root:string;title:string;noteId?:string;kind?:'discussion'|'note'|'task'};
 type OriginalRemoval={cwd:string;account?:string;status:'pending'|'erased'|'done'};
-type Entry={title?:string;deleted?:boolean;board?:BoardLink;account?:string;accountName?:string;originalRemoval?:OriginalRemoval};
+/** pocket: started or continued in Pocket Code; imported: brought in from the provider with Import chats. */
+export type ChatOrigin='pocket'|'imported';
+type Entry={origin?:ChatOrigin;title?:string;deleted?:boolean;board?:BoardLink;account?:string;accountName?:string;originalRemoval?:OriginalRemoval};
 /** Which chat is a board's current discussion, keyed by board and project folder. Host-private like every chat association. */
 export type BoardChatPointer={provider:string;sessionId:string;at:number};
-type Library={chats:Record<string,Entry>;projects:string[];boardChats?:Record<string,BoardChatPointer>};
+type Library={/** Providers whose chats made in Pocket Code before origins were recorded have been marked. */originsReady?:string[];chats:Record<string,Entry>;projects:string[];boardChats?:Record<string,BoardChatPointer>};
 export class ChatLibrary {
  revision=0;
  private pending:Promise<unknown>=Promise.resolve();
@@ -90,6 +92,13 @@ export class ChatLibrary {
    this.cache={stamp:await this.stamp(),data:structuredClone(data)};
   });
   this.pending=write.then(()=>{this.revision++;});await this.pending;
+ }
+ /** Marks chats as made in Pocket Code or imported. A chat made in Pocket Code stays so when it is imported again. */
+ async markOrigins(provider:string,ids:string[],origin:ChatOrigin,ready=false){
+  const data=await this.read(),change=ids.filter(id=>{const entry=data.chats[provider+':'+id];return !entry?.origin||origin==='pocket'&&entry.origin!=='pocket';});
+  if(!change.length&&(!ready||data.originsReady?.includes(provider)))return 0;
+  await this.edit(next=>{for(const id of change){const key=provider+':'+id;next.chats[key]={...next.chats[key],origin};}if(ready&&!next.originsReady?.includes(provider))next.originsReady=[...(next.originsReady||[]),provider];});
+  return change.length;
  }
  /** Record the custom provider account of a Claude chat; only writes when it changes. */
  async tagAccount(sessionId:string,account:string,accountName?:string){const key='claude:'+sessionId,entry=(await this.read()).chats[key];if(entry?.account===account&&(!accountName||entry.accountName===accountName))return;await this.edit(data=>{data.chats[key]={...data.chats[key],account,...(accountName?{accountName}:{})};});}

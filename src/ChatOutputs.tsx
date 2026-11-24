@@ -11,7 +11,7 @@ import './chat-outputs.css';
 import {OutputImageCard,OutputImageViewer} from './OutputImage';
 import {thumbnailQueue} from './image-thumbnails';
 
-type Props={provider?:string;sessionId?:string;connection:Connection;cwd:string;messages:ChatMessage[];onClose:()=>void;onLoadMore?:()=>void;hasMore?:boolean;loadingMore?:boolean};
+type Props={provider?:string;sessionId?:string;connection:Connection;cwd:string;messages:ChatMessage[];onClose:()=>void;onLoadMore?:()=>void;hasMore?:boolean;loadingMore?:boolean;/** Shown in the PC window's side panel beside the chat: not a modal dialog. */docked?:boolean};
 type Artifact={name:string;mimeType:string;data?:string;text?:string};
 const words={
   title:['Results','Результаты'],close:['Back to chat','Вернуться в чат'],back:['All results','Все результаты'],
@@ -31,14 +31,14 @@ const words={
 const icons={images:Image,documents:FileText,code:Code2,links:Link,tools:Wrench};
 const categories=['all','images','documents','links'] as const;
 export function ChatOutputs(props:Props){return <OutputPanel key={`${props.connection.url}|${props.connection.token}|${props.cwd}`} {...props}/>;}
-function OutputPanel({connection,cwd,messages,onClose,onLoadMore,hasMore,loadingMore,provider='claude',sessionId}:Props){
+function OutputPanel({connection,cwd,messages,onClose,onLoadMore,hasMore,loadingMore,provider='claude',sessionId,docked=false}:Props){
   const language=useLanguage(),label=(key:keyof typeof words)=>words[key][language==='ru'?1:0];
   const index=useChatOutputIndex(connection,provider,sessionId,messages),outputs=useMemo(()=>index.outputs.filter(item=>item.category!=='tools'&&item.category!=='code'),[index.outputs]);
   const [visibleCount,setVisibleCount]=useState(100);
   const [source,setSource]=useState<OutputSource|'all'>('all'),[filter,setFilter]=useState<'all'|OutputCategory>('all'),[selected,setSelected]=useState<ChatOutput|null>(null);
   const [selectedImage,setSelectedImage]=useState<ChatOutput|null>(null),thumbnails=useMemo(()=>thumbnailQueue(),[connection,cwd]);
   const panel=useRef<HTMLElement|null>(null),scroll=useRef<HTMLDivElement|null>(null),backButton=useRef<HTMLButtonElement|null>(null),savedScroll=useRef(0),first=useRef(true);
-  useModal(panel,true,()=>selected?setSelected(null):onClose());
+  useModal(panel,!docked,()=>selected?setSelected(null):onClose());
   useEffect(()=>{if(scroll.current)scroll.current.scrollTop=selected?0:savedScroll.current;if(!first.current)backButton.current?.focus({preventScroll:true});first.current=false;},[selected]);
   const scoped=outputs.filter(item=>source==='all'||item.source===source),visible=scoped.filter(item=>filter==='all'||item.category===filter);
   const generic=(item:ChatOutput)=>item.title==='Image'?label('image'):item.title==='Document'?label('document'):item.title==='Code'?label('code'):item.title==='Tool result'?label('toolResult'):item.title==='Tool error'?label('toolError'):null;
@@ -47,7 +47,7 @@ function OutputPanel({connection,cwd,messages,onClose,onLoadMore,hasMore,loading
   const root=cwd.replace(/[\\/]+$/,''),relative=(path:string)=>{const normal=path.replace(/\\/g,'/'),base=root.replace(/\\/g,'/');return base&&normal.toLowerCase().startsWith(base.toLowerCase()+'/')?normal.slice(base.length+1):path;};
   const choose=(item:ChatOutput)=>{if(item.category==='images'){setSelectedImage(item);return;}savedScroll.current=scroll.current?.scrollTop||0;setSelected(item);};
   const changeSource=(value:OutputSource|'all')=>{setSource(value);setFilter('all');setVisibleCount(100);savedScroll.current=0;if(scroll.current)scroll.current.scrollTop=0;};
-  return <aside ref={panel} className="chat-outputs-panel" role="dialog" aria-modal="true" aria-label={label('title')}>
+  return <aside ref={panel} className="chat-outputs-panel" role={docked?"region":"dialog"} aria-modal={docked?undefined:"true"} aria-label={label('title')}>
     <header className="chat-outputs-header"><h2>{label('title')}{!selected&&<span className="chat-outputs-count"> · {visible.length}</span>}</h2><button className="icon-button" aria-label={label('close')} onClick={onClose}><X size={20}/></button></header>
     {selected?<div className="chat-outputs-back"><button ref={backButton} onClick={()=>setSelected(null)}><ArrowLeft size={20}/>{label('back')}</button></div>:<div className="chat-outputs-filters">
       <div className="chat-output-scope" role="group" aria-label={label('scope')}>{(['results','sources'] as const).map(value=><button key={value} aria-pressed={source===value} onClick={()=>changeSource(source===value?'all':value)}>{label(value)}</button>)}</div>

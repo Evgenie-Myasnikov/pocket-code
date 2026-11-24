@@ -7,7 +7,7 @@ import './transcript.css';
 import type { Block, SubagentView } from '../server/types';
 import { t, useLanguage } from './i18n';
 import {Terminal,Pencil,Wrench,FileText,Search,ListChecks,Bot,MessageCircle,Globe,Plug,LoaderCircle,Copy,Check,ChevronRight,Circle,CircleCheck,CircleDot,BellRing} from 'lucide-react';
-import {describeTool,stripAnsi,toolText,type PlanItem,type ToolView} from './tool-registry';
+import {describeTool,stripAnsi,toolText,trivialResult,type PlanItem,type ToolView} from './tool-registry';
 import {plural} from './plural';
 import {ImageViewer} from './ImageViewer';
 import {EditActivity} from './EditActivity';
@@ -245,7 +245,7 @@ function ToolRow({block,result,running,depth,onCommandToggle}:{block:Block;resul
   if(view.kind==='edit')return <EditActivity view={view} input={input} name={(block.name||'').toLowerCase()}
     created={!!result&&!result.is_error&&/^File created successfully at:/i.test(toolText(result.content).trim())}
     copy={(text,label)=><CopyAction text={text} label={label} compact/>} fallback={<ToolFields input={block.input}/>}
-    result={result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}/>;
+    result={result&&!trivialResult(result)&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth}/></div>}/>;
   const prose=view.kind==='agent'||view.kind==='web';
   const commandRow=view.kind==='command';
   return <Disclosure defaultOpen={commandRow&&view.active} onManualToggle={commandRow?onCommandToggle:undefined} className={`tool-card activity-row ${commandRow?'command-row':''} ${result?'combined':''} ${view.failed?'failed':''}`} summary={<>
@@ -256,7 +256,7 @@ function ToolRow({block,result,running,depth,onCommandToggle}:{block:Block;resul
   </>}>{()=> <div className="activity-details">
     {commandRow?view.command&&<pre className="tool-command">{view.command}</pre>:view.plan?<PlanChecklist items={view.plan}/>:<ToolFields input={block.input}/>}
     {commandRow&&!result&&typeof input.output==='string'&&input.output&&<ToolOutput text={input.output} failed={false} command={view.command}/>}
-    {result&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth} command={view.command} prose={prose}/></div>}
+    {result&&!trivialResult(result)&&<div className="tool-result-content"><ToolResultContent block={result} depth={depth} command={view.command} prose={prose}/></div>}
   </div>}</Disclosure>;
 }
 const notificationTitles={running:'Фоновые задачи выполняются',completed:'Фоновые задачи завершены',failed:'Ошибка фоновых задач',stopped:'Фоновые задачи остановлены',unknown:'Уведомление о фоновых задачах'} as const;

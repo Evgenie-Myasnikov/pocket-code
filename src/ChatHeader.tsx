@@ -1,6 +1,6 @@
 import {createPortal} from 'react-dom';
 import {plural} from './plural';
-import {ArrowLeft,LayoutDashboard,MessageSquarePlus,Eye,GitCompareArrows,PanelsTopLeft,GitBranch,Users,Ellipsis,ArrowUpToLine,Check,X} from 'lucide-react';
+import {ArrowLeft,BookOpen,FileText,PanelRight,LayoutDashboard,MessageSquarePlus,Eye,GitCompareArrows,PanelsTopLeft,GitBranch,Users,Ellipsis,ArrowUpToLine,Check,X} from 'lucide-react';
 import {t} from './i18n';
 import {useBackAction} from './navigation';
 import {useEffect,useRef,useState,type ReactNode,type RefObject} from 'react';
@@ -8,7 +8,7 @@ import type {DetailMode} from './activity-groups';
 import {RunStatusDot,type RunStatus} from './run-status';
 import './chat-header.css';
 
-type Props={actionsHost?:HTMLElement;close?:{label:string;open():void};board?:{title:string;disabled?:boolean;open():void};hideContext?:boolean;hideBack?:boolean;backLabel?:string;contextMenuOnly?:boolean;newBoardChat?:{disabled:boolean;open():void};title:string;project:string;provider:string;branch?:string;status?:{value:RunStatus;label:string};context?:ReactNode;onBack():void;review?:{disabled:boolean;open():void;stats?:{added:number;removed:number;files:number}};outputs?:{disabled:boolean;open():void};subagents?:{count:number;running:number;disabled:boolean;open():void};reading?:{disabled:boolean;open():void};top?:{disabled:boolean;open():void};detail?:{value:DetailMode;set(value:DetailMode):void}};
+type Props={/** The PC window: Review, Results and Subagents open in the side panel; the menu keeps only rare chat actions. */panel?:{open:boolean;available:boolean;toggle():void};/** The PC window: the chat's provider and model chip beside its name. */model?:ReactNode;/** Rules and changelog of the chat's folder, shown only when the folder has them. */docs?:{kind:'rules'|'changelog';open():void}[];actionsHost?:HTMLElement;close?:{label:string;open():void};board?:{title:string;disabled?:boolean;open():void};hideContext?:boolean;hideBack?:boolean;backLabel?:string;contextMenuOnly?:boolean;newBoardChat?:{disabled:boolean;open():void};title:string;project:string;provider:string;branch?:string;status?:{value:RunStatus;label:string};context?:ReactNode;onBack():void;review?:{disabled:boolean;open():void;stats?:{added:number;removed:number;files:number}};outputs?:{disabled:boolean;open():void};subagents?:{count:number;running:number;disabled:boolean;open():void};reading?:{disabled:boolean;open():void};top?:{disabled:boolean;open():void};detail?:{value:DetailMode;set(value:DetailMode):void}};
 /** One conversation header: Back (with the state of other chats), the title as h1, a subtitle that picks provider and project in a new chat, and only applicable, labelled actions. */
 /** Rare conversation actions: jump to the beginning and brief or detailed activity. Fixed position, so the header band never clips it. */
 function ChatMenu({target,top,detail,reading,review,outputs,subagents,branch,newBoardChat,board}:{target?:RefObject<HTMLDivElement|null>} & Pick<Props,'top'|'detail'|'reading'|'review'|'outputs'|'subagents'|'branch'|'newBoardChat'|'board'>){
@@ -39,8 +39,21 @@ function ChatMenu({target,top,detail,reading,review,outputs,subagents,branch,new
       {detail&&<div role="group" aria-label={t('Детализация ленты')}>{(['brief','detailed'] as const).map(value=><button key={value} role="menuitemradio" aria-checked={detail.value===value} onClick={()=>run(()=>detail.set(value))}><Check size={16} aria-hidden="true" style={{visibility:detail.value===value?'visible':'hidden'}}/>{t(value==='brief'?'Кратко':'Подробно')}</button>)}</div>}
     </div>,document.body)}</>;
 }
-export function ChatHeader({actionsHost,close,board,hideContext=false,hideBack=false,backLabel,contextMenuOnly=false,newBoardChat,title,project,provider,branch,status,context,onBack,review,outputs,subagents,reading,top,detail}:Props){
+export function ChatHeader({panel,model,docs=[],actionsHost,close,board,hideContext=false,hideBack=false,backLabel,contextMenuOnly=false,newBoardChat,title,project,provider,branch,status,context,onBack,review,outputs,subagents,reading,top,detail}:Props){
   const titleRef=useRef<HTMLDivElement>(null);
+  if(panel&&!actionsHost&&!contextMenuOnly){
+    const hasPanel=panel.available;
+    return <header className="chat-header chat-header-conversation chat-header-assistant chat-header-panel" data-section="chats">
+      <div className="chat-header-main"><div className="header-title"><h1 title={title}>{title}</h1>{model}
+        {board&&<button className="chat-board-link" disabled={board.disabled} title={t('Открыть доску')} aria-label={t('Чат доски: {0}',board.title)+'. '+t('Открыть доску')} onClick={board.open}><LayoutDashboard size={14} aria-hidden="true"/><span>{board.title}</span></button>}
+      </div></div>
+      <div className="chat-header-actions" role="group" aria-label={t('Действия чата')}>
+        {docs.map(doc=>{const label=doc.kind==='rules'?t('Правила'):t('История изменений'),Icon=doc.kind==='rules'?BookOpen:FileText;return <button key={doc.kind} className="icon-button chat-header-doc" data-doc={doc.kind} aria-label={label} title={label} onClick={doc.open}><Icon size={18}/></button>;})}
+        {newBoardChat&&<ChatMenu newBoardChat={newBoardChat}/>}
+        {hasPanel&&<button type="button" className="icon-button chat-header-panel-toggle" aria-pressed={panel.open} aria-label={panel.open?t('Свернуть панель'):t('Открыть панель')} title={panel.open?t('Свернуть панель'):t('Открыть панель')} onClick={panel.toggle}><PanelRight size={18}/></button>}
+      </div>
+    </header>;
+  }
   const actions=<ChatMenu target={contextMenuOnly?titleRef:undefined} top={top} detail={detail} reading={reading} review={review} outputs={outputs} subagents={subagents} branch={branch} newBoardChat={newBoardChat} board={board}/>;
   if(actionsHost)return createPortal(actions,actionsHost);
   return <header className={'chat-header chat-header-conversation chat-header-assistant'+(contextMenuOnly?' chat-header-context-menu':'')} data-section="chats">
@@ -52,8 +65,9 @@ export function ChatHeader({actionsHost,close,board,hideContext=false,hideBack=f
       {newBoardChat&&<button className="icon-button chat-panel-new" disabled={newBoardChat.disabled} aria-label={t('Новый чат доски')} title={t('Новый чат доски')} onClick={newBoardChat.open}><MessageSquarePlus size={18}/></button>}
       {close&&<button className="icon-button chat-panel-close" aria-label={close.label} title={close.label} onClick={close.open}><X size={18}/></button>}
     </div>}
-    {(review||outputs||subagents?.count||reading||top||detail||branch||newBoardChat||board)&&(contextMenuOnly?actions:<div className="chat-header-actions" role="group" aria-label={t('Действия чата')}>
-      {actions}
+    {(docs.length>0||review||outputs||subagents?.count||reading||top||detail||branch||newBoardChat||board)&&(contextMenuOnly?actions:<div className="chat-header-actions" role="group" aria-label={t('Действия чата')}>
+      {docs.map(doc=>{const label=doc.kind==='rules'?t('Правила'):t('История изменений'),Icon=doc.kind==='rules'?BookOpen:FileText;return <button key={doc.kind} className="icon-button chat-header-doc" data-doc={doc.kind} aria-label={label} title={label} onClick={doc.open}><Icon size={18}/></button>;})}
+      {(review||outputs||subagents?.count||reading||top||detail||branch||newBoardChat||board)&&actions}
     </div>)}
   </header>;
 }

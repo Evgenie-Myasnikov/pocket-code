@@ -77,7 +77,7 @@ export class CopilotService{
  async sessions(){const sessions=await(await this.connect()).listSessions();return Promise.all(sessions.filter(item=>!item.isRemote).map(async item=>{const cwd=item.context?.workingDirectory||'';let readOnly=true;try{await allowedPath(this.roots,cwd,true);readOnly=false;}catch{}return{sessionId:item.sessionId,summary:item.summary||'Copilot chat',cwd,lastModified:new Date(item.modifiedTime).getTime(),source:'copilot',provider:'copilot' as const,readOnly};}));}
  private historyReads=coalesceReads<string,ChatMessage[]>(0,8);
  async messages(id:string){return this.historyReads(id,()=>this.loadMessages(id));}
- async eraseOriginal(id:string,cwd:string) {
+ async eraseOriginal(id:string,cwd:string,outsideRoots=false) {
    if(this.list().some(job=>job.sessionId===id&&job.status==='running'))throw new HttpError(409,'Stop the current turn before erasing this chat.');
    const client=await this.connect();
    const matches=(await client.listSessions()).filter(item=>item.sessionId===id);
@@ -85,7 +85,7 @@ export class CopilotService{
    const [original]=matches;
    if(matches.length!==1||original.isRemote||!original.context?.workingDirectory||path.relative(cwd,original.context.workingDirectory)!=='')
      throw new HttpError(409,'The local original chat could not be verified in this project.');
-   await allowedPath(this.roots,cwd,true);
+   if(!outsideRoots)await allowedPath(this.roots,cwd,true);
    await client.deleteSession(id);
  }
  forgetSession(id:string) {

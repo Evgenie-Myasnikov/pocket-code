@@ -31,7 +31,7 @@ test('provider routes isolate history and dispatch jobs, approvals and stop to t
     stop:(id:string)=>engine.stop(id),approve:(...args:any[])=>(engine.approve as any)(...args),close:()=>engine.close(),
   };
   const jira:any={status:async()=>({connected:true,sites:[{id:'fixture-site',name:'Fixture'}]}),issue:async(_site:string,key:string)=>({key,summary:'Synthetic task',description:'Synthetic requirement',url:'https://example.invalid/'+key})};
-  const runtime=await createApp({roots:[root],uploads:path.join(temporary,'uploads'),token,hostName:'Fixture',desktopSessionIndexes:[],codex,jira},claude,{listSessions:async()=>[],getSessionMessages:async()=>[]} as any);
+  const runtime=await createApp({roots:[root],uploads:path.join(temporary,'uploads'),token,hostName:'Fixture',listAllProviderChats:true,desktopSessionIndexes:[],codex,jira},claude,{listSessions:async()=>[],getSessionMessages:async()=>[]} as any);
   const server=runtime.app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
   const url=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
   const request=(endpoint:string,body?:unknown)=>fetch(url+endpoint,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
@@ -89,7 +89,7 @@ test('shared projects include both providers while excluding out-of-scope and mi
     if (codexFails) throw new Error('Synthetic unavailable provider');
     return [{cwd:codexRoot}, {cwd:claudeRoot}, {cwd:outside}, {cwd:path.join(root, 'missing')}];
   }};
-  const runtime = await createApp({roots:[root], uploads:path.join(temporary, 'uploads'), token, hostName:'Fixture', desktopSessionIndexes:[], codex, sessionListFreshMs:0, sessionListStaleMs:0}, new Jobs(), {
+  const runtime = await createApp({roots:[root], uploads:path.join(temporary, 'uploads'), token, hostName:'Fixture', listAllProviderChats:true,desktopSessionIndexes:[], codex, sessionListFreshMs:0, sessionListStaleMs:0}, new Jobs(), {
     listSessions: async () => {
       if (claudeFails) throw new Error('Synthetic unavailable provider');
       return [{sessionId:randomUUID(), cwd:claudeRoot, lastModified:1}, {sessionId:randomUUID(), cwd:outside, lastModified:1}];

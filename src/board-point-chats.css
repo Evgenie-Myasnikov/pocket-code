@@ -51,7 +51,7 @@
 /* The limit ring of the provider stays around the send button; a second button of the same size chooses provider and model. */
 .board-point-body .composer .composer-submit { width:30px;height:30px; }
 .board-point-body .composer .composer-input { margin-inline-end:36px; }
-.board-point-model { position:absolute;z-index:2;inset-inline-end:58px;bottom:21px;display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer;transition:color var(--dur-short,.16s),background-color var(--dur-short,.16s); }
+.board-point-model { position:absolute;z-index:2;inset-inline-end:50px;bottom:14px;display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer;transition:color var(--dur-short,.16s),background-color var(--dur-short,.16s); }
 .board-point-model:hover,.board-point-model[aria-expanded=true] { color:var(--text);background:var(--bg); }
 .board-point-model:focus-visible { outline:2px solid var(--muted);outline-offset:1px; }
 @media(prefers-reduced-motion:reduce){ .board-point-model { transition:none; } }

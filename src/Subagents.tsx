@@ -9,7 +9,7 @@ import type {Block,ChatMessage,SubagentView} from '../server/types';
 export type {SubagentView} from '../server/types';
 import './subagents.css';
 
-type Props={connection:Connection;provider:'claude'|'codex'|'copilot';parentId:string;onClose:()=>void;initialAgentId?:string;initialAgent?:SubagentView};
+type Props={connection:Connection;provider:'claude'|'codex'|'copilot';parentId:string;onClose:()=>void;initialAgentId?:string;initialAgent?:SubagentView;/** Shown in the PC window's side panel beside the chat: not a modal dialog. */docked?:boolean};
 const states=new Set(['running','completed','error','stopped','unknown']);
 function status(agent:SubagentView){return states.has(agent.status)?agent.status:'unknown';}
 function State({agent}:{agent:SubagentView}){
@@ -19,7 +19,7 @@ function State({agent}:{agent:SubagentView}){
 
 /** Remount request state when its authenticated parent changes; never show another chat's children. */
 export function Subagents(props:Props){return <SubagentsPanel key={[props.connection.url,props.connection.token,props.provider,props.parentId].join('|')} {...props}/>;}
-function SubagentsPanel({connection,provider,parentId,onClose,initialAgentId,initialAgent}:Props){
+function SubagentsPanel({connection,provider,parentId,onClose,initialAgentId,initialAgent,docked=false}:Props){
   useLanguage();
   const [agents,setAgents]=useState<SubagentView[]>(initialAgent?[initialAgent]:[]);
   const [selected,setSelected]=useState(initialAgentId||initialAgent?.id||'');
@@ -30,7 +30,7 @@ function SubagentsPanel({connection,provider,parentId,onClose,initialAgentId,ini
   const [refresh,setRefresh]=useState(0);
   const panel=useRef<HTMLElement|null>(null),content=useRef<HTMLDivElement|null>(null),backButton=useRef<HTMLButtonElement|null>(null);
   const listScroll=useRef(0),firstSelection=useRef(true);
-  useModal(panel,true,()=>selected?setSelected(''):onClose());
+  useModal(panel,!docked,()=>selected?setSelected(''):onClose());
   const base=`/sessions/${encodeURIComponent(parentId)}/subagents`,query=`?provider=${provider}`;
   const agent=agents.find(item=>item.id===selected)||(initialAgent?.id===selected?initialAgent:undefined);
   const visibleMessages=messageAgentId===selected?messages:[];
@@ -74,7 +74,7 @@ function SubagentsPanel({connection,provider,parentId,onClose,initialAgentId,ini
     firstSelection.current=false;
   },[selected]);
   const choose=(id:string)=>{listScroll.current=content.current?.scrollTop||0;setSelected(id);};
-  return <aside ref={panel} className="subagents-panel" role="dialog" aria-modal="true" aria-label={label('agents')}>
+  return <aside ref={panel} className="subagents-panel" role={docked?"region":"dialog"} aria-modal={docked?undefined:"true"} aria-label={label('agents')}>
     <header className="subagents-header"><h2>{label('agents')} <span>{agents.length||''}</span></h2><button className="icon-button" aria-label={label('close')} onClick={onClose}><X size={20}/></button></header>
     <div className="subagents-toolbar">
       {selected?<button ref={backButton} className="subagent-back" onClick={()=>setSelected('')}><ArrowLeft size={20}/>{label('back')}</button>:<p>{label('note')}</p>}

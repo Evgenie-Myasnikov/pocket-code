@@ -1,16 +1,22 @@
 .chat-generation-metrics {
   display:flex;
-  align-items:baseline;
+  justify-content:center;
+  align-items:center;
   flex-wrap:wrap;
-  gap:.25rem 1rem;
-  margin:0 0 .4rem;
+  gap:.25rem 1.6rem;
+  margin:.55rem 0 0;
   padding:.15rem .25rem;
   color:var(--muted);
-  font-size:max(.75rem,var(--type-min));
+  font-size:max(.8rem,var(--type-min));
   line-height:1.4;
   font-variant-numeric:tabular-nums;
 }
-.chat-generation-metrics>span { display:inline-flex;align-items:center;gap:.3em;white-space:nowrap; }
-.chat-generation-metrics b { font-weight:var(--fw-medium,500);color:var(--text); }
-.chat-generation-rate>svg { flex:none; }
-@media(max-width:600px){.chat-generation-metrics{gap:.1rem .7rem;margin-bottom:.25rem;}}
+.chat-generation-metrics>span { display:inline-flex;align-items:center;gap:.4em;white-space:nowrap; }
+.chat-generation-metrics>span>svg { flex:none;opacity:.8; }
+.chat-generation-metrics b { font-weight:var(--fw-bold,700);color:var(--text); }
+@media(max-width:600px){.chat-generation-metrics{gap:.1rem .9rem;margin-top:.35rem;}}
+/* The folder chip above a new chat's message field. */
+.composer-folder-chip { display:inline-flex;align-items:center;gap:8px;max-width:min(100%,360px);min-height:34px;margin:0 0 8px 4px;padding:6px 14px;border:0;border-radius:10px;background:var(--surface);color:var(--text);font:inherit;font-size:calc(13.5px * var(--ui-scale,1));font-weight:var(--fw-semibold,600);cursor:pointer; }
+.composer-folder-chip>span { overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
+.composer-folder-chip>svg { flex:none;color:var(--muted); }
+.composer-folder-chip:hover { background:color-mix(in srgb,var(--text) 10%,var(--surface)); }
