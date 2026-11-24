@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.29.3 (2026-11-25)
+## [0.29.3](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.2...v0.29.3) (2026-11-25)
+
+Published [0.29.3](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.3) from [e3f8cef](https://github.com/Evgenie-Myasnikov/pocket-code/commit/e3f8cefa8ddeeeb42ffa7229dd17f3b515be6d78) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.
 
 ### Validation
 
