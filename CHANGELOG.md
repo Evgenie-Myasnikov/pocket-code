@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.28.64 (2026-11-24)
+
+### Validation
+
+- Browser scenarios on Edge: 8 passed (the new settings scroll scenario, side panel, settings rows, transcript rhythm).
+- Not run for this CSS-only fix: the server and unit tests (last run on 0.28.63), the full browser suite, the installed Windows application, a phone.
+
+### Bug Fixes
+
+- Settings scroll (2026-11-24). In 0.28.63 the chat frame clipped the window area, so Settings and other long pages did not scroll; the framed area scrolls vertically again.
+  - Validation: a new browser scenario (a long Appearance page scrolls with the wheel to Reset appearance) fails on 0.28.63 and passes now, with the side panel, settings rows and transcript rhythm scenarios.
+
 ## [0.28.63](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.62...v0.28.63) (2026-11-24)
 
 Published [0.28.63](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.63) from [5616a1b](https://github.com/Evgenie-Myasnikov/pocket-code/commit/5616a1bc736d03d9c570f7eb0364a73d59a184b2) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.
