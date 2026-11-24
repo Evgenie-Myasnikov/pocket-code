@@ -21,8 +21,8 @@ test('one real operation cursor follows offscreen targets and yields to manual n
  const viewport=page.locator('.whiteboard-viewport'),r=(await viewport.boundingBox())!;
  await page.mouse.move(r.x+50,r.y+50);await page.mouse.down({button:'middle'});await page.mouse.move(r.x+130,r.y+90,{steps:5});await page.mouse.up({button:'middle'});
  await expect(page.getByRole('button',{name:'Follow AI',exact:true})).toHaveAttribute('aria-pressed','false');
- const manual=await page.locator('.whiteboard-world').getAttribute('style');await signal(page,5000,'saved');await expect(page.locator('.wb-ai-cursor')).toHaveText('AI · updated');
- await expect(page.locator('.whiteboard-world')).toHaveAttribute('style',manual!);
+ const manual=await page.locator('.react-flow__viewport').getAttribute('style');await signal(page,5000,'saved');await expect(page.locator('.wb-ai-cursor')).toHaveText('AI · updated');
+ await expect(page.locator('.react-flow__viewport')).toHaveAttribute('style',manual!);
  await page.getByRole('button',{name:'Follow AI',exact:true}).click();await centered(page);
  await signal(page,6000,'failed');await expect(page.locator('.wb-ai-cursor')).toHaveText('AI · failed');await centered(page);
  await page.screenshot({path:'.local/ai-follow-preview.png'});

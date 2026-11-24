@@ -2,7 +2,7 @@ import {ChainStepReader} from './ChainStepReader';
 import {Disclosure,Markdown} from './RichBlocks';
 import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {ChainDeleteDialog} from './ChainDeleteDialog';
-import {ArrowLeft,Check,ChevronRight,ListOrdered,MessageSquare} from 'lucide-react';
+import {ArrowLeft,Check,ChevronRight,ListOrdered,MessageSquare,Repeat} from 'lucide-react';
 import {useLanguage} from './i18n';
 import {useBackAction} from './navigation';
 import {type ChainDeleteChat,type ChainDeletePreview,type ChainSourceInput,type ChainExecutor,type MarkdownChainDetail,type MarkdownChainSummary} from './markdown-chain';
@@ -13,7 +13,7 @@ export type MarkdownChainControls = {
   canStart?:boolean;
   list():Promise<MarkdownChainSummary[]>;
   detail(id:string):Promise<MarkdownChainDetail>;
-  start(input:{id:string;name:string;context:string;parallelSubtasks?:boolean;sourceFiles?:ChainSourceInput[];tasks:{title:string;source:string;body:string;executor?:ChainExecutor}[]}):Promise<MarkdownChainDetail>;
+  start(input:{id:string;name:string;context:string;parallelSubtasks?:boolean;loop?:{maxLaps:number;until?:string;stopIdle?:boolean};sourceFiles?:ChainSourceInput[];tasks:{title:string;source:string;body:string;executor?:ChainExecutor}[]}):Promise<MarkdownChainDetail>;
   stop(id:string):Promise<MarkdownChainDetail>;
   audit?(id:string):Promise<{diff:string}>;
   previewDeletion?(id:string):Promise<ChainDeletePreview>;
@@ -33,6 +33,12 @@ const phases={
 };
 const providerNames={claude:'Claude',codex:'Codex',copilot:'GitHub Copilot'};
 function statusLabel(status:keyof typeof labels,ru:boolean){return labels[status][ru?0:1];}
+const loopEndings={
+  condition:['Цикл остановлен: условие выполнено','Loop stopped: the condition is met'],
+  limit:['Цикл остановлен: достигнут предел кругов','Loop stopped: the lap limit is reached'],
+  idle:['Цикл остановлен: круг не внёс изменений','Loop stopped: the lap changed nothing'],
+};
+function lapLabel(loop:{lap:number;maxLaps:number},ru:boolean){return (ru?'Круг ':'Lap ')+loop.lap+(ru?' из ':' of ')+loop.maxLaps;}
 
 export function MarkdownChainPanel({controls,initial,initialId,onChat,onBrowse,drawerId,openSession,openJob}:{
   controls:MarkdownChainControls;initial?:MarkdownChainDetail;initialId?:string;
@@ -108,14 +114,15 @@ export function MarkdownChainPanel({controls,initial,initialId,onChat,onBrowse,d
       {error&&<p role="alert" className="error-banner">{error}</p>}
       {!id&&<div className="chain-index">{summaries?.map(chain=>
         <button type="button" className="chain-index-row" key={chain.id} data-status={chain.status} onClick={()=>browse(chain.id)}>
-          <ListOrdered size={19} aria-hidden="true"/><strong>{chain.name}</strong><span className="chain-state">{statusLabel(chain.status,ru)}</span><small>{chain.stepsDone} / {chain.stepCount}</small><ChevronRight size={16} aria-hidden="true"/>
+          <ListOrdered size={19} aria-hidden="true"/><strong>{chain.name}</strong><span className="chain-state">{statusLabel(chain.status,ru)}{chain.loop?' · '+lapLabel(chain.loop,ru):''}</span><small>{chain.stepsDone} / {chain.stepCount}</small><ChevronRight size={16} aria-hidden="true"/>
         </button>)}
         {summaries?.length===0&&<div className="chain-empty"><ListOrdered size={24} aria-hidden="true"/><p>{ru?'В этом проекте пока нет цепочек.':'No task chains in this project yet.'}</p></div>}
       </div>}
       {(!id&&!summaries||id&&!detail)&&!error&&<p role="status">{ru?'Загрузка…':'Loading…'}</p>}
       {detail&&<>
-        {!single&&detail.status!=='running'&&<p className="chain-outcome">{statusLabel(detail.status,ru)}</p>}
-        {detail.status==='done'&&detail.steps[0]?.baseCommit&&detail.steps.at(-1)?.headCommit&&<details><summary>{ru?'Финальный аудит и слияние':'Final review and merge'}</summary>{controls.audit&&<button type="button" onClick={async()=>{try{const result=await controls.audit!(detail.id);setAudit({id:detail.id,text:result.diff||(ru?'Без изменений':'No changes')});}catch(e){setError(String(e));}}}>{ru?'Показать общий diff':'Show cumulative diff'}</button>}{audit?.id===detail.id&&<pre tabIndex={0}>{audit.text}</pre>}<p>{ru?'В целевой ветке проверьте общий diff, затем выполните одно слияние.':'In the target branch, review the cumulative diff, then merge once.'}</p><pre>{'git diff '+detail.steps[0].baseCommit+' '+detail.steps.at(-1)?.headCommit+'\ngit merge --no-ff '+detail.steps.at(-1)?.headCommit}</pre></details>}
+        {detail.loop&&<p className="chain-outcome chain-loop-state"><Repeat size={14} aria-hidden="true"/>{lapLabel(detail.loop,ru)}{detail.loop.until?' · '+(ru?'до: ':'until: ')+detail.loop.until:''}</p>}
+        {(!single||detail.loop)&&detail.status!=='running'&&<p className="chain-outcome">{detail.loop?.ended?loopEndings[detail.loop.ended][ru?0:1]:statusLabel(detail.status,ru)}</p>}
+        {detail.status==='done'&&(detail.loop?.baseCommit||detail.steps[0]?.baseCommit)&&detail.steps.at(-1)?.headCommit&&<details><summary>{ru?'Финальный аудит и слияние':'Final review and merge'}</summary>{controls.audit&&<button type="button" onClick={async()=>{try{const result=await controls.audit!(detail.id);setAudit({id:detail.id,text:result.diff||(ru?'Без изменений':'No changes')});}catch(e){setError(String(e));}}}>{ru?'Показать общий diff':'Show cumulative diff'}</button>}{audit?.id===detail.id&&<pre tabIndex={0}>{audit.text}</pre>}<p>{ru?'В целевой ветке проверьте общий diff, затем выполните одно слияние.':'In the target branch, review the cumulative diff, then merge once.'}</p><pre>{'git diff '+(detail.loop?.baseCommit||detail.steps[0].baseCommit)+' '+detail.steps.at(-1)?.headCommit+'\ngit merge --no-ff '+detail.steps.at(-1)?.headCommit}</pre></details>}
         {activeIndex>=3&&<button type="button" className="chain-jump text-button" onClick={()=>{currentStep.current?.scrollIntoView({block:'center'});currentStep.current?.focus({preventScroll:true});}}>{ru?'К текущему шагу':'Go to current step'} · {activeIndex+1}</button>}
         <ol className="chain-steps">{detail.steps.map((step,i)=>{
           const isActive=activeIndex===i;

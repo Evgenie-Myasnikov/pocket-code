@@ -1,0 +1,69 @@
+/* The board canvas on React Flow in the flat style of the chat list and settings rows: panel fills, thin lines, no shadows. */
+.flow-board { --canvas-bg:var(--bg); }
+.flow-board .flow-board-surface { background-image:none;background:var(--bg);min-height:420px; }
+.flow-board .react-flow { --xy-background-color:var(--bg);--xy-background-pattern-color:var(--line);--xy-node-border-radius:var(--ui-radius-card,14px);
+  --xy-selection-background-color:color-mix(in srgb,var(--text) 8%,transparent);--xy-selection-border:1px solid var(--muted);
+  --xy-handle-background-color:var(--text);--xy-handle-border-color:var(--bg);--xy-connectionline-stroke:var(--muted);--xy-edge-stroke:var(--muted);
+  --xy-attribution-background-color:transparent;position:absolute;inset:0;color:var(--text); }
+.flow-board .react-flow__attribution { font-size:10px;opacity:.45; }
+.flow-board .react-flow__attribution a { color:var(--muted); }
+.flow-board .react-flow__pane { cursor:default; }
+.flow-board .react-flow__pane.dragging { cursor:grabbing; }
+.flow-board-defs { position:absolute; }
+/* In the Boards section the canvas tools sit in the header row, next to the board name. */
+.board-header-tools { display:flex;align-items:center;flex:none;margin-inline:auto 4px; }
+.board-header-tools[hidden] { display:none; }
+.board-header-tools .whiteboard-toolbar { flex-wrap:nowrap;padding:0;border:0;background:transparent; }
+.board-header-tools .whiteboard-toolbar button { color:var(--muted);border-radius:var(--ui-radius-control,10px); }
+.board-header-tools .whiteboard-toolbar button:hover:not(:disabled),.board-header-tools .whiteboard-toolbar button[aria-pressed=true] { background:var(--surface);color:var(--text); }
+.work-boards .board-header-navigation:has(.board-header-tools) .board-title { flex:1 1 auto;min-width:0; }
+@media(max-width:600px){ .work-boards .board-header-navigation:has(.board-header-tools) { flex-wrap:wrap; } .board-header-tools { order:5;flex-basis:100%;margin-inline:0; } }
+.flow-board .whiteboard-links { position:absolute;left:0;top:0;overflow:visible;color:var(--muted);pointer-events:none; }
+.flow-board .whiteboard-toolbar { background:var(--bg);border-bottom:1px solid var(--line); }
+.flow-board .whiteboard-toolbar button { border-radius:var(--ui-radius-control,10px);color:var(--muted);transition:background-color var(--dur-short,.16s),color var(--dur-short,.16s); }
+.flow-board .whiteboard-toolbar button:hover:not(:disabled) { background:var(--surface);color:var(--text); }
+.flow-board .whiteboard-toolbar button[aria-pressed=true] { background:var(--surface);color:var(--text); }
+
+/* Objects fill their React Flow node; the node carries position and size. */
+.flow-board .react-flow__node { cursor:grab; }
+.flow-board .whiteboard-item { position:relative;inset:auto;width:100%;height:100%;box-sizing:border-box;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:var(--ui-radius-card,14px);box-shadow:none;overflow:visible; }
+.flow-board .whiteboard-item.wb-selected,.flow-board .whiteboard-item.wb-found,.flow-board .wb-remote-updated { outline:1.5px solid var(--text);outline-offset:2px; }
+.flow-board .whiteboard-item.wb-found { outline-color:var(--accent);outline-width:2.5px; }
+.flow-board .wb-ai-active { box-shadow:none;outline:2px solid var(--muted);outline-offset:2px; }
+/* The chosen colour is a quiet edge, not a fill. */
+.flow-board .whiteboard-item:is(.wb-card,.wb-sticky,.wb-chart).wb-mint { border-inline-start:3px solid var(--sticky-mint); }
+.flow-board .whiteboard-item:is(.wb-card,.wb-sticky,.wb-chart).wb-blue { border-inline-start:3px solid var(--sticky-blue); }
+.flow-board .whiteboard-item:is(.wb-card,.wb-sticky,.wb-chart).wb-rose { border-inline-start:3px solid var(--sticky-rose); }
+.flow-board .whiteboard-item:is(.wb-card,.wb-sticky,.wb-chart).wb-violet { border-inline-start:3px solid var(--sticky-violet); }
+.flow-board .whiteboard-item.wb-text { background:transparent;border-color:transparent; }
+.flow-board .whiteboard-item.wb-frame { background:transparent;border:1px dashed var(--muted);border-radius:var(--ui-radius-card,14px);pointer-events:none; }
+.flow-board .wb-frame-node { pointer-events:none!important; }
+.flow-board .wb-frame .wb-frame-label { flex:0 0 auto;height:auto;padding:10px 14px!important;pointer-events:auto;color:var(--muted)!important;font-size:13px;font-weight:var(--fw-medium,500);text-align:start;align-self:flex-start;width:auto;cursor:grab; }
+.flow-board .wb-frame :is(.wb-editor,.react-flow__resize-control) { pointer-events:auto; }
+
+/* Card content never scrolls: it is clipped, the full text opens with a double click. */
+.flow-board .whiteboard-text { overflow:hidden;cursor:inherit;padding:14px!important;font-size:15px;scrollbar-gutter:auto; }
+.flow-board .wb-card .whiteboard-text { overflow:hidden;font-size:14px;gap:6px; }
+.flow-board .wb-card .whiteboard-text>span { flex:none;font-weight:var(--fw-semibold,600);line-height:1.35; }
+.flow-board .wb-card .whiteboard-text>p { flex:1 1 0;min-height:0;margin:0;overflow:hidden;color:var(--muted);font-size:13px;line-height:1.5; }
+.flow-board .whiteboard-item.wb-card :is(.whiteboard-text,.wb-card-meta) { overflow:hidden; }
+.flow-board .wb-card-meta { flex:none;max-height:55%;overflow:hidden;padding:0 14px 12px;scrollbar-gutter:auto; }
+.flow-board .wb-card-meta .board-images { padding:8px 0 0;max-height:none;overflow:visible; }
+.flow-board .wb-card-meta :is(.task-priority,.task-status) { color:var(--muted);background:var(--surface);border-radius:6px;padding:2px 6px; }
+.flow-board .wb-editor textarea { font-size:14px; }
+
+/* Ports appear on the object under the pointer and on the selected one. */
+.flow-board .wb-handle { width:10px;height:10px;border-radius:50%;opacity:0;transition:opacity var(--dur-short,.16s); }
+.flow-board .react-flow__node:is(:hover,.selected) .wb-handle,.flow-board .react-flow.connecting .wb-handle,.flow-board .wb-handle.connectingto { opacity:1; }
+.flow-board .wb-resize-handle { width:8px;height:8px;border-radius:2px;background:var(--bg);border:1px solid var(--text); }
+.flow-board .wb-resize-line { border-color:transparent; }
+.flow-board .wb-connection { color:var(--muted); }
+.flow-board .wb-connection-selected,.flow-board .react-flow__edge.selected .wb-connection { color:var(--text); }
+.flow-board .wb-link-hit { pointer-events:stroke;cursor:pointer; }
+.flow-board .wb-ai-cursor { transform:none;z-index:5; }
+.flow-board .whiteboard-empty { z-index:1; }
+.card-prompt textarea { resize:vertical;min-height:6rem;padding:.6rem .75rem; }
+.card-prompt select { justify-self:start;min-height:32px;padding:.2rem .5rem; }
+.card-prompt footer button { display:inline-flex;align-items:center;gap:.4rem; }
+@media(pointer:coarse){ .flow-board .wb-handle { width:16px;height:16px; } .flow-board .react-flow__node.selected .wb-handle { opacity:1; } }
+@media(prefers-reduced-motion:reduce){ .flow-board .wb-handle,.flow-board .whiteboard-toolbar button { transition:none; } }

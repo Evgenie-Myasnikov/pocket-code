@@ -1,8 +1,24 @@
 # Changelog
 
-## Unreleased
+## Unreleased (0.28.59)
 
 ### Features
+
+- Chats on the board (2026-11-24). A board conversation starts from a point of the canvas (Chat here in the canvas menu, Chat about this on an object) and opens as a window pinned to that point, with the application's own chat inside. It takes up to four nearest cards as context and sends them with each message as the board selection; a card can be detached or shown on the board. The window collapses to a pin and can be removed from the board, while the conversation stays in the chat list. Point chats are stored on this installation only, not in the board file.
+  - The side chat of the board is removed at the person's request: the Chat action in the board header, opening it from the gallery, and attaching or dragging gallery images into it.
+  - Validation: 1 unit test for choosing the nearest cards and 1 browser scenario on Edge (start at a point, attached card, pan with the board, collapse, reload, detach, remove) passed. Sending a message from a point chat to a real provider was not checked. Browser scenarios written for the removed side chat (board chat layout, panel, conversation and image selection specs) were not updated and are expected to fail where they open that chat.
+
+- Board canvas on React Flow (2026-11-24). The project board is drawn with React Flow 12 (`@xyflow/react`, MIT) instead of the hand-written canvas; the board file, the card sheet, the gallery, live updates, AI activity with camera following and MCP view control are unchanged.
+  - Cards, notes, text, frames and charts use the neutral panel style of the Carbon theme: thin borders, no shadows, the chosen colour as a thin edge. Card images stay. Nothing scrolls inside a card: content that does not fit is clipped and the wheel over a card pans the board.
+  - New card in the toolbar and Card in the canvas menu ask for one prompt; the selected provider drafts the description and the title through the existing `/api/task-text/improve`, and Without AI makes the card from the typed text.
+  - Boards with more than 120 objects render only the objects on screen. On a synthetic board of 500 cards and 974 connections 20 cards were in the page at 1440x900, and thirty wheel steps rendered card metadata 19 times.
+  - Not ported yet: a connection that ends at a free point can be shown and deleted but not created or re-attached; arrow-key moves, keyboard-only port connection and the touch long-press for a new note.
+  - Validation: 5 new browser scenarios for the canvas passed on Edge. Of the earlier board scenarios that go through the Boards section, 33 pass on the new canvas after six specs were pointed at the new viewport element and two scenarios were rewritten (no scrolling inside a card; a real wheel instead of a synthetic event); 5 fail the same way as on the earlier canvas (three phone and launch scenarios in the image selection spec, two legacy-record scenarios). The specs of the earlier canvas component were not run against the new one. A phone and the installed application were not checked.
+
+- Task chains (2026-11-24). Tasks → Create chain → Build step by step opens a short editor: each step is an instruction and a model; the chain is named after its first step. A chain can repeat in a loop: after the last step it starts again from the first one with the result of the previous lap.
+  - A loop always ends: the last step confirms the stop condition, the lap limit is reached (2–20, default 3), a lap in a Git project committed nothing, a step fails, a step does not confirm its result after 3 retries, or Stop chain is pressed. The chain list and the chain view show the current lap and why the loop stopped; the final review diff covers every lap.
+  - Chats of earlier laps stay task chats: they are not in the general chat list and open from their step under Previous attempts until the chain is deleted.
+  - Validation: 8 new server tests for the loop and 1 new browser scenario on Edge passed together with 14 neighbouring task scenarios; TypeScript passed. Server tests from PowerShell: 607 tests, 603 passed, 1 skipped, 3 failed, the same three as before this change. A loop with a real provider and the installed application were not checked.
 
 - Simpler PC window (2026-11-24). The sidebar is one list of chats.
   - The app name, the provider picker, the project filter and the folder groups are gone from the sidebar. Chats of Claude, Codex and Copilot are in one list, newest first, with the time on the right. The first 30 are drawn; "Show more chats" adds the next 30.
@@ -20,6 +36,9 @@
 
 ### Validation
 
+- 0.28.59 release checks (2026-11-24), on the commit that joins the simpler PC window, the local model, the board canvas, chats on the board and task chains: TypeScript, the production web build and the documentation link check passed. Server and unit tests from PowerShell: 609 tests, 604 passed, 1 skipped, 4 failed; one was a new board chat style naming a broad selector after `:has()`, fixed and rerun alone, and the other three are the ones that fail before these changes.
+  - Browser scenarios on Edge for the canvas, chats on the board, task chains and task creation passed. Specs written for the removed side chat of the board were updated: the board opens without it, the AI result and MCP entry scenarios start a chat on the board instead, and the side chat divider, its keyboard menu and the image selection spec (composer selection chip, gallery images into the chat) were removed with the feature. A card no longer turns into a scroll container on hover.
+  - Still failing on Edge, as on the earlier canvas: six repository board scenarios in `work-boards.spec.ts` and the legacy task record scenario in `canvas-board.spec.ts` at both widths. The full browser suite, a phone and the installed application were not run.
 - Simpler PC window: server and unit tests from PowerShell, 596 passed, 1 skipped and 3 failed of 600 (the same three as before this change). TypeScript and the documentation link check passed.
   - New browser scenarios on Edge, all passed: 6 for the chat list, the provider in a new chat, Appearance, the providers page and the row menu with pin and archive; 2 for following a streamed answer and reading back.
   - Existing scenarios: 6 for opening history and paging passed after one was changed to open the Codex chat from the list; 6 for chat row actions passed after their menu expectations were updated. In the main PC window file 21 scenarios fail, none new: they fail on the previous commit too, where 22 fail (the 22nd tested the removed edge fade). One message-actions scenario also fails on the previous commit.
@@ -28,6 +47,9 @@
 - Unit and API tests: 7 new tests with a synthetic Strata command line (JSON parsing, start with the key only in the environment, one provider updated in place, refusals for a busy GPU, a download and a second model, launch failure, missing Strata, runtime discovery that rejects a folder outside the control directory, host-only routes).
 - Browser tests on Edge: 3 new desktop scenarios (start, starting, running with its address, stop and the remembered choice after reload; the Strata window holding the GPU; no Strata) and 3 settings navigation scenarios passed. The panel was checked on screenshots.
 - Real Strata 0.1.65 (engine 0.1.66) on a 16 GB NVIDIA GPU: the server module started IQ3_S (ready in about 51 s) and Coder IQ1_M (about 24 s) at a 128K context; `/v1/models` answered 200 with the key and 401 without it, a chat completion answered, the Anthropic Messages probe returned 400 (supported), and the stop left no engine running. The installed Pocket Code application and a phone were not tested.
+
+- Codex runtime 0.172.0 compatibility review (2026-11-24). Compared the official [0.171.0 to 0.172.0 release notes](https://github.com/openai/codex/releases/tag/rust-v0.172.0) and [versioned app-server schema diff](https://github.com/openai/codex/compare/rust-v0.171.0...rust-v0.172.0) with the PC bridge and shared Android UI. No relevant bridge protocol contract changes or required compatibility edits were found; existing runtime capability checks remain in place.
+  - Validation: 61 targeted Codex, image, file-change, history, subagent, approval and activity unit/API checks passed; TypeScript/Vite production build passed. The exact installed runtime schema and live 0.172.0 run could not be checked because Codex is not available on this checkout's PATH. Browser UI checks could not launch because the configured Chrome executable is absent; physical Android and 0.172.0 MCP tool startup remain unverified.
 
 ## [0.28.58](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.57...v0.28.58) (2026-11-23)
 

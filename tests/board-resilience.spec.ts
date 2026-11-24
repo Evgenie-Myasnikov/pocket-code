@@ -100,7 +100,7 @@ test('board search finds text and status; a checklist is edited in the card shee
  const {stored,close}=await open(page,{format:'pocket-code-board',version:1,name:'Synthetic board',versions:[],notes:[note(a,'Water rendering',{status:'working',statusHistory:[{status:'working',at:new Date(Date.now()-3*86400000).toISOString().slice(0,19)+'Z'}]}),note(b,'Terrain shading',{x:600,description:'Uses the water depth buffer'})],canvas:{version:1,items:[{id:sticky,kind:'sticky',text:'Far away note about water',x:9000,y:7000,width:240,height:160,color:'mint'}],links:[]}});
  try{
   // Hidden connection ports no longer exist on every object.
-  await expect(page.locator('.wb-port')).toHaveCount(0);expect(await page.locator('.whiteboard-world').getAttribute('style')).not.toContain('--wb-handle-scale');
+  await expect(page.locator('.wb-port')).toHaveCount(0);expect(await page.locator('.react-flow__viewport').getAttribute('style')).not.toContain('--wb-handle-scale');
   await page.locator('.whiteboard-viewport').focus();await page.keyboard.press('Control+f');
   const finder=page.getByRole('search',{name:'Find on board',exact:true});await finder.getByLabel('Text to find',{exact:true}).fill('water');
   await expect(page.locator('.whiteboard-item.wb-found')).toHaveCount(3);await expect(finder.locator('output')).toHaveText('3');

@@ -114,3 +114,4 @@
 .chain-delete-ids li { display:grid;gap:.15rem; }
 .chain-delete-ids code { color:var(--muted);overflow-wrap:anywhere; }
 .chain-delete-dialog footer { display:flex;justify-content:flex-end;gap:.5rem;flex-wrap:wrap;margin-top:1.25rem; }
+.chain-loop-state { display:flex;align-items:center;gap:.4rem;flex-wrap:wrap; }

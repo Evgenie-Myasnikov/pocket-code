@@ -3,7 +3,7 @@ import {mkdir, readFile, readdir, stat} from 'node:fs/promises';
 import {writeDurable} from './durable-file.js';
 import {replaceFile} from './fs-retry.js';
 import path from 'node:path';
-import {buildChainStepPrompt, chainCompletionMarker, type ChainExecutor, type ChainSourceInput, type MarkdownChainDetail, type MarkdownChainStep, type MarkdownChainSummary} from '../src/markdown-chain.js';
+import {buildChainStepPrompt, chainCompletionMarker, readLoopDecision, CHAIN_LOOP_MAX_LAPS, CHAIN_LOOP_RETRIES, type ChainExecutor, type ChainSourceInput, type MarkdownChainDetail, type MarkdownChainStep, type MarkdownChainSummary} from '../src/markdown-chain.js';
 import type {CodexAccess} from './codex-access.js';
 import {allowedPath,HttpError} from './security.js';
 import type {JobView} from './types.js';
@@ -22,7 +22,7 @@ type LaunchSettings = {
   maxBudgetUsd?: number;
   approvalTimeoutMinutes?: number;
 };
-export type ChainInput = ChainScope & LaunchSettings & {id: string; name: string; context: string; tasks: Task[]; parallelSubtasks?:boolean; sourceFiles?:ChainSourceInput[]};
+export type ChainInput = ChainScope & LaunchSettings & {id: string; name: string; context: string; tasks: Task[]; parallelSubtasks?:boolean; sourceFiles?:ChainSourceInput[]; loop?:{maxLaps:number;until?:string;stopIdle?:boolean}};
 export function stepLaunchSettings(scope: ChainScope, settings: LaunchSettings, executor?: ChainExecutor) {
   if (!executor) return {provider:scope.provider, account:scope.account, ...settings};
   const sameAccount=executor.provider===scope.provider && executor.account===scope.account;
@@ -41,7 +41,7 @@ type Attempt=Omit<ChainDeleteChat,'sessionId'>&{step:number;jobId?:string;sessio
 export type ChainChatTarget=ChainDeleteChat&{cwd:string};
 type RemovalResult=ChainDeletePreview&{ok:boolean};
 type Intent={chats:ChainDeleteChat[];eraseOriginals:boolean};
-type RecordV1 = { attempts?:Attempt[]; deleting?:Intent; sourceUploads?:{name:string;text:string}[]; stacked?:boolean; trees?:Record<number,TaskWorktree>;version: 1; created: number; fingerprint: string; settings: LaunchSettings; chain: MarkdownChainDetail};
+type RecordV1 = { attempts?:Attempt[]; deleting?:Intent; sourceUploads?:{name:string;text:string}[]; stacked?:boolean; trees?:Record<number,TaskWorktree>; pastTrees?:TaskWorktree[];version: 1; created: number; fingerprint: string; settings: LaunchSettings; chain: MarkdownChainDetail};
 type DeletedRecord = {version: 1; deletedScope: string;result?:RemovalResult;intentHash?:string;audit?:{tree:TaskWorktree;base:string;head:string}};
 const chatKey=(s:ChainDeleteChat)=>JSON.stringify([s.provider,s.account||'',s.sessionId]);
 const intentHash=(intent:Intent)=>createHash('sha256').update(JSON.stringify([intent.eraseOriginals,intent.chats.map(chatKey).sort()])).digest('hex');
@@ -98,6 +98,7 @@ function captureOutput(chain: MarkdownChainDetail, step: MarkdownChainStep, job:
   const marker = chainCompletionMarker(chain.id, chain.steps.indexOf(step));
   if (text.trimEnd().split(/\r?\n/).at(-1)?.trim() === marker) {
     text = text.slice(0, text.lastIndexOf(marker)).trimEnd();
+    if (chain.loop) text = readLoopDecision(text, chain.id).text;
     delete step.output;
     delete step.outputTruncated;
   }
@@ -115,7 +116,9 @@ function livePhase(job: JobView): MarkdownChainStep['phase'] {
   if (action !== 'responding') return action;
 }
 function summary(chain: MarkdownChainDetail): MarkdownChainSummary {
+  const {loop} = chain;
   return {id: chain.id, name: chain.name, status: chain.status,
+    ...(loop ? {loop: {lap: loop.lap, maxLaps: loop.maxLaps, ...(loop.ended ? {ended: loop.ended} : {})}} : {}),
     stepsDone: chain.steps.filter(step => step.status === 'done').length, stepCount: chain.steps.length};
 }
 
@@ -176,7 +179,7 @@ export class MarkdownChains {
       }
       // A durable launch intent might already have reached the provider. Never
       // replay it after restart, even if its session ID had not arrived yet.
-      for(const tree of Object.values(record.trees??{})){
+      for(const tree of [...Object.values(record.trees??{}),...(record.pastTrees??[])]){
         try{const cwd=await this.options.worktrees?.verify(tree);if(cwd)this.options.registerTree?.(cwd);}catch{/* Missing trees never grant access. */}
       }
       const hadLinks = record.chain.steps.some(s => s.jobId);
@@ -260,6 +263,9 @@ export class MarkdownChains {
     return this.action(async () => {
       if (this.closed) throw new HttpError(503, 'Host is shutting down.');
       if (!uuid.test(input.id) || !input.tasks.length) throw new HttpError(400, 'Invalid task chain.');
+      const laps = input.loop?.maxLaps;
+      if (laps !== undefined && (!Number.isInteger(laps) || laps < 2 || laps > CHAIN_LOOP_MAX_LAPS))
+        throw new HttpError(400, 'A looped chain needs a lap limit from 2 to ' + CHAIN_LOOP_MAX_LAPS + '.');
       const key = input.id.toLowerCase();
       if (this.deleted.has(key)) throw new HttpError(409, 'Chain identifier already used.');
       const {model, mode, reasoningEffort, claudeEffort, claudeAccess, codexAccess, maxBudgetUsd, approvalTimeoutMinutes} = input;
@@ -281,6 +287,7 @@ export class MarkdownChains {
         id: input.id, cwd: input.cwd, provider: input.provider, account: input.account, name: input.name,
         context: input.context, status: 'running',
         ...(input.parallelSubtasks!==undefined?{parallelSubtasks:input.parallelSubtasks}:{}),
+        ...(input.loop?{loop:{maxLaps:input.loop.maxLaps,...(input.loop.until?.trim()?{until:input.loop.until.trim()}:{}),...(input.loop.stopIdle?{stopIdle:true}:{}),lap:1}}:{}),
         ...(sources.length?{sourceFiles:sources.map(({name,projectPath})=>({name,projectPath}))}:{}),
         steps: input.tasks.map(({title, source, body, executor}) => ({title, source, body, executor:executor && {...executor}, status: 'pending'}))
       };
@@ -360,7 +367,7 @@ export class MarkdownChains {
       const {tree,base,head}=removed.audit;return {diff:await this.options.worktrees.diff(tree,base,head)};
     }
     const record=this.record(id,scope),steps=record.chain.steps;
-    const tree=record.trees?.[steps.length-1],base=steps[0]?.baseCommit,head=steps.at(-1)?.headCommit;
+    const tree=record.trees?.[steps.length-1],base=record.chain.loop?.baseCommit??steps[0]?.baseCommit,head=steps.at(-1)?.headCommit;
     if(record.chain.status!=='done'||!tree||!base||!head||!this.options.worktrees)throw new HttpError(409,'No completed branch chain to review.');
     return {diff:await this.options.worktrees.diff(tree,base,head)};
   }
@@ -444,7 +451,7 @@ export class MarkdownChains {
       if(intent.eraseOriginals)await this.options.eraseChainFiles?.(record.chain.id,[...new Set((record.attempts||[]).flatMap(a=>a.jobId?[a.jobId]:[]))]);
     }
     const {chain}=record,key=chain.id.toLowerCase(),last=chain.steps.length-1;
-    const tree=record.trees?.[last],base=chain.steps[0]?.baseCommit,head=chain.steps[last]?.headCommit;
+    const tree=record.trees?.[last],base=chain.loop?.baseCommit??chain.steps[0]?.baseCommit,head=chain.steps[last]?.headCommit;
     const tombstone:DeletedRecord={version:1,deletedScope:scopeHash(chain),...(result&&intent?{result,intentHash:intentHash(intent)}:{}),
       ...(chain.status==='done'&&tree&&base&&head?{audit:{tree,base,head}}:{})};
     await this.writeRecord(chain.id,tombstone);
@@ -504,13 +511,24 @@ export class MarkdownChains {
       const marker = chainCompletionMarker(chain.id, chain.steps.indexOf(step));
       if (reply.split(/\r?\n/).at(-1)?.trim() === marker) {
         step.status = 'done';
-        const summary = reply.slice(0, reply.lastIndexOf(marker)).trim();
+        let summary = reply.slice(0, reply.lastIndexOf(marker)).trim();
+        if (chain.loop) {
+          const decision = readLoopDecision(summary, chain.id);
+          summary = decision.text.trim();
+          if (decision.finished && step === chain.steps.at(-1)) chain.loop.ended = 'condition';
+        }
         step.handoff = summary.length > 6000 ? '…\n' + summary.slice(-5998) : summary;
         if (chain.steps.every(s => s.status === 'done')) chain.status = 'done';
         return;
       }
       step.retryCount = (step.retryCount ?? 0) + 1;
       step.retryReport = step.output || step.retryReport;
+      // A loop must not spin on a step that never confirms its result.
+      if (chain.loop && step.retryCount > CHAIN_LOOP_RETRIES) {
+        step.status = 'failed'; step.error = 'The step did not confirm completion after ' + CHAIN_LOOP_RETRIES + ' retries. The loop was stopped.';
+        chain.status = 'failed';
+        return;
+      }
       step.retryAt = Date.now() + Math.min(60000, 1000 * 2 ** Math.min(step.retryCount, 6));
       step.status = 'pending';
       return;
@@ -524,11 +542,29 @@ export class MarkdownChains {
     const head=await this.options.worktrees!.completedHead(tree);
     if(head){step.headCommit=head;return;}
     delete step.handoff;
+    delete record.chain.loop?.ended;
     step.status='pending';
     record.chain.status='running';
     step.retryCount=(step.retryCount??0)+1;
     step.retryReport='Commit the outstanding intended changes in the assigned worktree before completing this step.';
     step.retryAt=Date.now()+2000;
+  }
+  /** Ends a finished lap: the loop stops by its condition, its lap limit or an idle lap; otherwise every step is queued again. */
+  private nextLap(record:RecordV1) {
+    const {chain}=record,loop=chain.loop;
+    if(!loop||chain.status!=='done')return;
+    const first=chain.steps[0],last=chain.steps.at(-1)!;
+    loop.baseCommit??=first.baseCommit;
+    if(loop.ended)return;
+    if(loop.lap>=loop.maxLaps){loop.ended='limit';return;}
+    if(loop.stopIdle&&last.headCommit&&last.headCommit===first.baseCommit){loop.ended='idle';return;}
+    if(last.handoff)loop.carry=last.handoff;else delete loop.carry;
+    if(last.headCommit)loop.headCommit=last.headCommit;
+    loop.lap++;
+    if(record.trees){(record.pastTrees??=[]).push(...Object.values(record.trees));delete record.trees;}
+    chain.steps=chain.steps.map(({title,body,source,executor,executorAccountName})=>({title,body,source,
+      ...(executor?{executor}:{}),...(executorAccountName?{executorAccountName}:{}),status:'pending' as const}));
+    chain.status='running';
   }
   private async advance(saved: RecordV1) {
     let record = structuredClone(saved);
@@ -555,7 +591,11 @@ export class MarkdownChains {
       await this.verifyStep(record,index);
       const old = saved.chain.steps[index];
       const childrenChanged = JSON.stringify(step.subtasks) !== JSON.stringify(old.subtasks);
-      if (childrenChanged || step.status !== old.status || step.sessionId !== old.sessionId) await this.save(record);
+      const changed = childrenChanged || step.status !== old.status || step.sessionId !== old.sessionId;
+      // The attempt of the finished lap is recorded before its steps are queued again.
+      if (changed) record.chain.steps.forEach((_,i)=>updateAttempt(record,i));
+      this.nextLap(record);
+      if (changed) await this.save(record);
       return;
     }
     const jobId = randomUUID();
@@ -573,7 +613,7 @@ export class MarkdownChains {
       if(record.stacked){
         const trees=record.trees??={};
         const manager=this.options.worktrees!;
-        const tree=trees[index]??=await manager.create(jobId,cwd,chain.steps[index-1]?.headCommit);
+        const tree=trees[index]??=await manager.create(jobId,cwd,chain.steps[index-1]?.headCommit??(index===0?chain.loop?.headCommit:undefined));
         current.branch=tree.branch;
         current.baseCommit=tree.baseCommit;
         current.launchCwd=await manager.projectDirectory(tree);
@@ -606,6 +646,8 @@ export class MarkdownChains {
       }
     }
     await this.verifyStep(record,index);
+    record.chain.steps.forEach((_,i)=>updateAttempt(record,i));
+    this.nextLap(record);
     await this.save(record);
   }
   async tick() {

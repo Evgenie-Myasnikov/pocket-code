@@ -37,7 +37,24 @@ export type MarkdownChainStep = {
   subtasks?: {id:string;name:string;status:'running'|'completed'|'error'|'stopped'|'unknown'}[];
   phase?: 'responding' | 'command' | 'files' | 'search' | 'agent' | 'tool' | 'approval' | 'question';
 };
+export const CHAIN_LOOP_MAX_LAPS = 20;
+export const CHAIN_LOOP_RETRIES = 3;
+/** A chain whose last step leads back to the first one. It always ends: by its condition, by the lap limit or by an idle lap. */
+export type ChainLoop = {
+  maxLaps: number;
+  /** What the last step checks to end the loop before the limit. */
+  until?: string;
+  /** End the loop after a lap that committed nothing (chains that run in Git worktrees). */
+  stopIdle?: boolean;
+  lap: number;
+  ended?: 'condition' | 'limit' | 'idle';
+  /** Result of the previous lap, handed to the first step of the next one. */
+  carry?: string;
+  baseCommit?: string;
+  headCommit?: string;
+};
 export type MarkdownChainDetail = {
+  loop?: ChainLoop;
   id: string;
   cwd: string;
   provider: ChainExecutor['provider'];
@@ -55,10 +72,20 @@ export type MarkdownChainDetail = {
 export type MarkdownChainSummary = Pick<MarkdownChainDetail, 'id' | 'name' | 'status'> & {
   stepsDone: number;
   stepCount: number;
+  loop?: Pick<ChainLoop, 'lap' | 'maxLaps' | 'ended'>;
 };
 
 export function chainCompletionMarker(id: string, index: number) {
   return `[STEP_COMPLETE ${id}/${index + 1}]`;
+}
+export function chainLoopMarker(id: string) {
+  return `[LOOP_FINISHED ${id}]`;
+}
+/** Splits the loop decision of the last step from its report. */
+export function readLoopDecision(text: string, id: string) {
+  const marker = chainLoopMarker(id), trimmed = text.trimEnd();
+  if (trimmed.split(/\r?\n/).at(-1)?.trim() !== marker) return {text, finished: false};
+  return {text: trimmed.slice(0, trimmed.lastIndexOf(marker)).trimEnd(), finished: true};
 }
 
 function joinSourcePath(folder:string,relative:string) {
@@ -85,9 +112,14 @@ export function buildChainStepPrompt(chain: MarkdownChainDetail, index: number) 
     'The host runs each step in a separate chat in this project. Use the shared context for this step only. Leave the remaining steps to the host.',
     `Shared context (${chain.name})\n${chain.context}`
   ];
+  const loop = chain.loop;
+  if (loop) sections.push(
+    `This chain repeats its steps in laps. This is lap ${loop.lap} of at most ${loop.maxLaps}. Continue from the state the previous laps left; do not redo finished work.`
+  );
   if (index > 0 && chain.steps[index - 1].handoff) {
     sections.push(`Previous step: ${chain.steps[index - 1].title}\n${chain.steps[index - 1].handoff}`);
   }
+  if (index === 0 && loop?.carry) sections.push(`Result of the previous lap (${chain.steps.at(-1)!.title})\n${loop.carry}`);
   if(chain.sourceFiles?.length){
     const files=sourceFileLocations(chain,step);
     sections.push('Selected source files for this step (project originals are reference material; make edits in the assigned working directory):\n'+
@@ -108,8 +140,13 @@ export function buildChainStepPrompt(chain: MarkdownChainDetail, index: number) 
   if (step.retryCount) sections.push(
     `Continue the unfinished step. Inspect existing changes and rerun outstanding checks. Avoid repeating completed work. Previous attempt report:\n${step.retryReport || "(no report)"}`
   );
+  sections.push(`Current task (${step.source})\n${step.body}`);
+  if (loop && index === chain.steps.length - 1 && loop.lap < loop.maxLaps) sections.push(
+    'Loop decision. After finishing this step, decide whether another lap is needed. ' +
+    (loop.until ? `The loop must stop when this holds: ${loop.until}` : 'The loop must stop when another lap would not improve the result.') +
+    `\nIf the loop must stop, put this exact line immediately before the completion line:\n${chainLoopMarker(chain.id)}\nOtherwise omit it and the host starts the next lap from the first step.`
+  );
   sections.push(
-    `Current task (${step.source})\n${step.body}`,
     `After completing and verifying this step, summarize the result and checks for the next chat, then end your reply with this exact line:\n${chainCompletionMarker(chain.id, index)}\nIf blocked, describe what is needed and omit the completion line.`
   );
   return sections.join('\n\n');

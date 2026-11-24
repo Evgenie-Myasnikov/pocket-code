@@ -858,6 +858,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const chainExecutor=z.object({provider:z.enum(['claude','codex','copilot']),account:uuid.optional(),model:z.string().regex(modelIdPattern).optional()}).strict();
   const chainPlanSchema=jobSettings.extend({id:uuid,name:z.string().min(1).max(512),context:z.string().max(chainSize),
     parallelSubtasks:z.boolean().optional(),
+    loop:z.object({maxLaps:z.number().int().min(2).max(20),until:z.string().max(2000).optional(),stopIdle:z.boolean().optional()}).strict().optional(),
     sourceFiles:z.array(z.object({name:z.string().min(1).max(4096).regex(/^[^\x00-\x1f]+$/),projectPath:z.string().min(1).max(4096).optional(),text:z.string().max(chainSize).optional()}).strict()).max(500).optional(),
     tasks:z.array(z.object({title:z.string().min(1).max(4096),source:z.string().min(1).max(4096),body:z.string().min(1).max(chainSize),executor:chainExecutor.optional()})).min(1).max(500)
   }).refine(plan=>plan.context.length+plan.tasks.reduce((total,step)=>total+step.title.length+step.body.length+step.source.length,0)<=chainSize,'The chain exceeds the character limit.');

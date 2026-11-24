@@ -28,7 +28,7 @@ async function openCanvas(page:Page,width:number,host=true){
 for(const width of [390,1440])test(`unified canvas preserves legacy task records at ${width}`,async({page})=>{
  const stored=await openCanvas(page,width);
  await expect(page.locator('.whiteboard-item')).toHaveCount(1);await expect(page.locator('.board-task-view,.board-view-toggle,.board-add-note')).toHaveCount(0);
- await expect(page.locator('.whiteboard-toolbar button')).toHaveCount(5);
+ await expect(page.locator('.whiteboard-toolbar button')).toHaveCount(6);
  await page.getByRole('button',{name:'Existing card',exact:true}).dblclick();await page.getByRole('textbox',{name:'Text',exact:true}).fill('Updated card');await page.getByRole('textbox',{name:'Description',exact:true}).fill('Updated criteria');await page.getByRole('textbox',{name:'Description',exact:true}).press('Control+Enter');
  await expect(page.getByRole('button',{name:'Updated card',exact:true})).toBeVisible();expect(stored().notes[0]).toMatchObject({id:noteId,title:'Updated card',description:'Updated criteria',status:'review',branch:'1.0',priority:'high'});
  await page.getByRole('button',{name:'Refresh board',exact:true}).click();await expect(page.getByRole('button',{name:'Updated card',exact:true})).toBeVisible();

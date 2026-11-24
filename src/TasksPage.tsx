@@ -1,9 +1,10 @@
 import {useId,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
-import {ChevronDown,FileUp,MessageSquare,Plus,Sparkles,X} from 'lucide-react';
+import {ChevronDown,FileUp,ListOrdered,MessageSquare,Plus,Sparkles,X} from 'lucide-react';
 import {useBackAction} from './navigation';
 import {useLanguage} from './i18n';
 import {MarkdownChainPanel,type MarkdownChainControls} from './MarkdownChainPanel';
 import {ChainPlannerDialog} from './ChainPlannerDialog';
+import {ChainEditorDialog} from './ChainEditorDialog';
 import {MarkdownTaskDialog,type MarkdownSelection} from './MarkdownTaskDialog';
 import type {ImproveScope} from './ImproveTaskText';
 import type {MarkdownChainDetail} from './markdown-chain';
@@ -21,7 +22,7 @@ type Props={
 
 export function TasksPage({controls,improveScope,scopePicker,unavailable,initialId,onPrepareDraft,maxDraftLength=1024*1024}:Props){
   const ru=useLanguage()==='ru',title=ru?'Задачи':'Tasks';
-  const [create,setCreate]=useState<'manual'|'import'|'ai'>();
+  const [create,setCreate]=useState<'manual'|'import'|'ai'|'steps'>();
   const [imported,setImported]=useState<{selection:MarkdownSelection;parallel:boolean}>();
   const [started,setStarted]=useState<MarkdownChainDetail>();
   const [chainOptions,setChainOptions]=useState(false);
@@ -48,6 +49,7 @@ export function TasksPage({controls,improveScope,scopePicker,unavailable,initial
         </div>
       </header>
       {chainOptions&&<div className="tasks-chain-options tasks-page-actions" role="group" aria-label={ru?'Создать цепочку':'Create chain'}>
+        <button type="button" className="secondary" disabled={!available} onClick={()=>setCreate('steps')}><ListOrdered aria-hidden="true" size={16}/>{ru?'Собрать по шагам':'Build step by step'}</button>
         <button type="button" className="secondary" disabled={!available} onClick={()=>setCreate('import')}><FileUp aria-hidden="true" size={16}/>{ru?'Импорт Markdown':'Import Markdown'}</button>
         {improveScope&&<button type="button" className="secondary" disabled={!available} onClick={()=>setCreate('ai')}><Sparkles aria-hidden="true" size={16}/>{ru?'Спланировать с ИИ':'Plan with AI'}</button>}
       </div>}
@@ -60,7 +62,8 @@ export function TasksPage({controls,improveScope,scopePicker,unavailable,initial
     {create==='ai'&&controls&&improveScope&&<ChainPlannerDialog controls={controls} improveScope={improveScope}
       initialFiles={imported?.selection.main?[imported.selection.main,...imported.selection.children]:undefined}
       initialParallelSubtasks={imported?.parallel} onClose={()=>{if(imported)setCreate('import');else close();}} onStarted={launched}/>}
-    {create&&create!=='ai'&&controls&&<MarkdownTaskDialog manual={create==='manual'} maxLength={maxDraftLength} improveScope={improveScope}
+    {create==='steps'&&controls&&<ChainEditorDialog controls={controls} improveScope={improveScope} onClose={close} onStarted={launched}/>}
+    {create&&create!=='ai'&&create!=='steps'&&controls&&<MarkdownTaskDialog manual={create==='manual'} maxLength={maxDraftLength} improveScope={improveScope}
       controls={controls} initialSelection={imported?.selection} initialParallelSubtasks={imported?.parallel}
       onPlan={improveScope?(selection,parallel)=>{setImported({selection,parallel});setCreate('ai');}:undefined}
       onClose={close} onPrepare={onPrepareDraft?prompt=>{close();onPrepareDraft(prompt);}:undefined} onStarted={launched}/>}
