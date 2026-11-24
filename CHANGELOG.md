@@ -1,6 +1,20 @@
 # Changelog
 
-## 0.28.60 (2026-11-24)
+## Unreleased
+
+### Features
+
+- Settings after Strata, details and follow-up (2026-11-24). The cards-of-rows settings that went out in 0.28.60 cover every section of the PC window. A group is a small heading and one rounded card; a row is a bold name with at most one short muted line on the left and its control on the right, at one width and on one edge. Rare explanations open from a "?" button next to the row name.
+  - Connection and startup: Phone access (the switch, the PC host and internet tunnel status, Connect through the internet, Keep the PC awake), a pairing card (the QR, the address choice, the timer and the Android app QR as one row), Connected devices with its explanation behind "?", and Windows application (Start with Windows, Restart the local server after a failure). The "Step 1/2" labels and the paragraphs under the switches are gone.
+  - Providers: one card per provider with Installation, Server, Account (sign-in state, Switch account, Sign out with its confirmation; sign-in methods as buttons when signed out), Agent access as a select with the consequence of the chosen mode, and Claude's spend limit as a select with Other for a typed amount. Usage limits are one card for all providers instead of a copy under each provider. Custom providers and the local model (Strata) are cards of rows. All values still come from the provider status, the provider usage reads and the saved device defaults.
+  - Updates: Pocket Code version with Check for updates and the automatic update switch; Claude Code on this PC as a row. Chat: Enter sends, the approval wait, Keyboard shortcuts, and Read aloud (engine, voice, voices on the PC). Board: grid step and Jira in one card, Miro (project, link, connect or change) and AI access to Miro (sign-in, read and write switches, access check, app setup and app token opened from their rows). Appearance & language: Language and Appearance cards. Notifications: two switches.
+  - The phone settings keep their layout; only the PC window uses the rows.
+  - Fix after 0.28.60: a PC without Strata shows the install hint as a line in a card again, without an empty Local model section.
+  - Validation: `tests/settings-rows.spec.ts`, 3 browser scenarios on Edge (every section is cards of rows with right-aligned controls, no step labels and no visible hint over 120 characters; connection switches call the PC shell and the devices explanation opens from "?"; provider access and spend limit selects save device defaults, sign-out keeps its confirmation, Device code starts Codex sign-in) passed. TypeScript passed. Screenshots were taken from the synthetic desktop fixture only. Not checked: the installed Windows application and a real provider sign-in.
+
+## [0.28.60](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.59...v0.28.60) (2026-11-24)
+
+Published [0.28.60](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.60) from [8597581](https://github.com/Evgenie-Myasnikov/pocket-code/commit/85975815d236feb8daff90910cba9f0351a041ea) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows application, update manifest) match the local SHA-256 hashes. The privacy guard passed on the commit, and the unpacked assets were searched for the local home path, account name, employer name, author e-mail, keys and tokens without findings (the public repository owner appears only in release links). The APK is signed with the same key as 0.28.59 (certificate SHA-256 beginning d0e5792c), so it installs over it. The release was built from a separate clean checkout of the same commit while another session kept editing the main one. Physical Android installation, the installed Windows application and the full browser suite were not run.
 
 ### Bug Fixes
 
