@@ -49,7 +49,7 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
    const messageBlock=(id:string,text:string)=>({id,role:'assistant',blocks:[{type:'text',text}]});
    if(p==='/pairing-role'){reply(id,{role:'host'});return;}
    if(p==='/health'){void Promise.resolve((window as any).testHealthGate).then(()=>reply(id,{name:'Synthetic PC',roots:['C:\\Demo\\Atlas','C:\\Demo\\Garden'],version:'0.22.7',protocol:1}));return;}
-   if(p==='/providers'){reply(id,[{id:'claude',available:true,models:[]},{id:'codex',available:true,authenticated:true,models:[]}]);return;}
+   if(p==='/providers'){reply(id,(window as any).testProviders||[{id:'claude',available:true,models:[]},{id:'codex',available:true,authenticated:true,models:[]}]);return;}
    if(/^\/workspaces\/[^/]+\/delete$/.test(p)){(window as any).testWorkspaces=(window as any).testWorkspaces.filter((w:any)=>w.id!==p.split('/')[2]);reply(id,{ok:true});return;}
    if(p==='/workspaces'){reply(id,{host:true,canManageWorkspaces:true,activeWorkspaceId:(window as any).testWorkspaces?.[0]?.id,workspaces:(window as any).testWorkspaces||[],boards:(window as any).testBoards||[]});return;}
    if(p==='/board-notifications'){reply(id,{items:(window as any).testBoardNotices||[]});return;}if(p==='/board-notifications/read'){(window as any).testBoardNotices=((window as any).testBoardNotices||[]).map((n:any)=>({...n,readAt:Date.now()}));reply(id,{ok:true});return;}

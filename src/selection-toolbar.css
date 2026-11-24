@@ -1,0 +1,5 @@
+.selection-toolbar{position:fixed;z-index:var(--z-popover,60);display:flex;gap:2px;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);box-shadow:0 6px 24px rgba(0,0,0,.35);transform:translate(-50%,0);animation:chat-content-enter .16s cubic-bezier(0,0,.2,1) both}
+.selection-toolbar[data-above]{transform:translate(-50%,-100%)}
+.selection-toolbar button{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:inherit;font:inherit;font-size:.92em;cursor:pointer;user-select:none}
+.selection-toolbar button:hover{background:color-mix(in srgb,var(--text) 10%,var(--surface))}
+@media(prefers-reduced-motion:reduce){.selection-toolbar{animation:none}}

@@ -60,3 +60,6 @@
 /* Transcript actions handle copying; draft and inline editors stay selectable. */
 :root .chat-canvas :is(.conversation,.conversation *,.chat-header){user-select:none;-webkit-user-select:none}
 :root .chat-canvas .conversation :is(input,textarea,[contenteditable=true],[contenteditable=true] *){user-select:text;-webkit-user-select:text}
+/* The words of the transcript can be selected and copied: answers, the person's messages, reasoning, commands and their output, code, files and questions. Buttons stay out of it. */
+:root .chat-canvas .conversation :is(.markdown,.markdown *,.user-message-content,.user-message-content *,.reasoning-content,.reasoning-content *,.tool-command,.tool-output,.tool-file-preview,.tool-file-preview *,.question-activity,.question-activity *,.activity-details,.activity-details *,.edit-live-snippet,.edit-diff,.edit-diff *){user-select:text;-webkit-user-select:text}
+:root .chat-canvas .conversation :is(button,[role=button],summary,.edit-sign,.edit-line-number,.copy-button,.message-actions *){user-select:none;-webkit-user-select:none}

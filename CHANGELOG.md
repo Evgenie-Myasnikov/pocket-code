@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.29.1 (2026-11-25)
+
+### Validation
+
+- Browser scenarios on Edge: the new scenarios for a local model chat without Claude, selecting and copying, and a plan chat of one message passed with the scheduled tasks, local models, follow-up composer, token line and Tasks provider menu scenarios. The chat open speed, ready-send and desktop-ui scenarios that fail here fail the same way on 0.29.0.
+- Server and unit tests: not rerun for this interface-only release (last full run on 0.29.0).
+- Not checked: the installed Windows application, a real local model chat with Claude signed out, a phone.
+
+### Bug Fixes
+
+- A plan chat is one message (2026-11-25). A plan chat opens like an ordinary chat that holds one message: the latest answer of its latest run. The prompt, the actions of the run, its turn result and earlier days are not shown, and there is no message field: the task writes to this chat on its schedule.
+  - Validation: the scheduled tasks browser scenario (opening the task shows one assistant message and no message field) passed; a screenshot was checked.
+- Selecting and copying in the chat (2026-11-25). The transcript was made unselectable, so its words could not be selected or copied. Answers, the person's messages, reasoning, commands and their output, code, read files and questions can be selected now (buttons stay out of it), Ctrl+C copies, and a selection shows a small toolbar over it, as in Strata: Copy, and Quote, which adds the words to the message field as a quotation.
+  - Validation: a new browser scenario (a paragraph is selectable and buttons are not; triple click selects it; Copy and Ctrl+C put it on the clipboard; Quote fills the message field) passed. The desktop-ui scenarios fail on 0.29.0 without these changes as they do with them.
+- Local model chats and Claude (2026-11-25). A chat through a local model or an API connection (a custom provider) asked to install Claude and sign in on the PC, because the chat could only start when Claude's own sign-in was ready. It needs only the PC now: the Claude check applies to chats that use the Claude sign-in. While a PC window chat has not connected yet, the banner says "Connecting to the PC…" instead of naming Claude.
+  - Validation: a new browser scenario (a chat of a custom provider shows no banner while Claude is signed out; a Claude chat still shows it) passed, and fails without the change.
+
 ## [0.29.0](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.67...v0.29.0) (2026-11-24)
 
 Published [0.29.0](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.0) from [fe1bf61](https://github.com/Evgenie-Myasnikov/pocket-code/commit/fe1bf61114f9faac5b2b09ba608ec2bb0401a810) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

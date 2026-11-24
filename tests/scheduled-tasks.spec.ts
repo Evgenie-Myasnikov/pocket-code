@@ -70,7 +70,10 @@ test('a scheduled task with an unread run shows a clock and a dot, and opening i
   await expect(row.locator('.scheduled-task-dot')).toHaveCount(0);
   // A run is read like a chat, named by its task and time, and nothing can be written to it
   await expect(page.locator('.desktop-chat-host header h1')).toContainText('Weekday morning brief · ');
-  const field=page.getByRole('textbox').last();await expect(field).toBeDisabled();
+  // it holds one message, the latest answer, and has no message field: the task writes to it on its schedule
+  await expect(page.locator('.conversation-inner .message')).toHaveCount(1);
+  await expect(page.locator('.conversation-inner .message.assistant')).toContainText('The responsive layout is ready.');
+  await expect(page.locator('.composer-area')).toBeHidden();await expect(page.getByRole('textbox',{name:/Message/})).toBeHidden();await page.screenshot({path:'.local/plan-chat.png'});
   expect(await page.evaluate(()=>(window as any).scheduledCalls.some((call:any)=>call.path==='/scheduled-tasks/44444444-4444-4444-8444-444444444444/read'))).toBe(true);
 });
 

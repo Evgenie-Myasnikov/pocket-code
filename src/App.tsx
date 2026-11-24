@@ -22,6 +22,7 @@ import {ProviderPicker} from './ProviderPicker';
 import {ChatSidePanel,SidePreview,type SidePanelTab} from './ChatSidePanel';
 import {FilePreview} from './Files';
 import {FileWithChanges} from './FileChanges';
+import {SelectionToolbar} from './SelectionToolbar';
 import type {FileChange} from './turn-changes';
 import {FolderChip} from './FolderChip';
 import {HeaderModelMenu} from './HeaderModelMenu';
@@ -185,7 +186,6 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   // One reachability model for every screen: requests report into it and one probe with backoff runs while the PC is away.
   const reach=useReachability(),unreachable=offline||hostDown(reach),gate=hostGate(connection?.url);
   const [providersLoaded,setProvidersLoaded]=useState(false);
-  const canRun = !unreachable && !!connection && (!embedded||connected) && providerInfo?.available === true && providerInfo.authenticated !== false && !connection?.workspaceId;
   const [boardChat,setBoardChat]=useState<BoardChat|null>(embedded?.boardChat||null);
   const [boardMissing,setBoardMissing]=useStateForWorkspace(false);
   const [boardSelection,setBoardSelection]=useState<BoardSelection|null>(null);
@@ -252,6 +252,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const claudeCatalog=useClaudeModels(demo?null:connection,provider,cwd);
   // A custom provider runs this Claude agent with its own URL, key and model catalog.
   const selectedAccount=useCustomAccount(),customAccount=embedded?.taskDrawer?(embedded.session?.account||''):selectedAccount,account=provider==='claude'&&!demo?customAccount:'',customModels=useCustomModels(demo?null:connection,account);
+  // A chat through an API connection or a local model does not use the Claude sign-in: only the PC has to answer.
+  const canRun = !unreachable && !!connection && (!embedded||connected) && (!!account || providerInfo?.available === true && providerInfo.authenticated !== false) && !connection?.workspaceId;
   const claudeDefaultModel=claudeCatalog.models.find(item=>item.isDefault)?.id||'sonnet';
   const claudeEffort=useCodexEffort(provider==='claude'?claudeCatalog.models:undefined,model,'claude');
   const localActivity=useActivity(demo||embedded?.activity?null:connection);
@@ -476,7 +478,14 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const transcript=useMemo(()=>job?.errorCode==='codex_thread_busy'||!jobTranscript.length?history:uniqueMessages([...history,...jobTranscript]),[history,jobTranscript,job?.errorCode]);
   const toolResults=useMemo(()=>{const blocks=outputMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b]));},[outputMessages]);
   const detail=useDetailMode();
-  const resultRoot=!selected?.readOnly&&!demo?(selected?.cwd||job?.cwd||cwd):undefined;
+  // A plan chat holds one message: the latest answer of its latest run, without the prompt, the actions or earlier days.
+  const planned=!!selected?.scheduled;
+  const shownTranscript=useMemo(()=>{
+    if(!planned)return transcript;
+    const last=[...transcript].reverse().find(message=>message.role==='assistant'&&message.blocks.some(block=>block.type==='text'&&!!block.text?.trim()));
+    return last?[{...last,blocks:last.blocks.filter(block=>block.type==='text')}]:[];
+  },[planned,transcript]);
+  const resultRoot=!selected?.readOnly&&!planned&&!demo?(selected?.cwd||job?.cwd||cwd):undefined;
   const changesByTurn=useMemo(()=>resultRoot?computeTurnChanges(outputMessages,toolResults,running,resultRoot):undefined,[outputMessages,toolResults,running,resultRoot]);
   const plan=useMemo(()=>latestPlan(outputMessages),[outputMessages]);
   // New replies since the person scrolled away from the end, counted for the round "latest" button.
@@ -1326,7 +1335,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           outputs={hasOutputs?{disabled:!connection||demo||loading,open:()=>setOutputsOpen(true)}:undefined}
           subagents={agentMap.size>0&&parentChatId?{count:agentMap.size,running:[...agentMap.values()].filter(agent=>agent.status==='running').length,disabled:!connection||demo,open:()=>setAgentPanel({})}:undefined}
           reading={outputMessages.length>0||Boolean(job?.partial)?{disabled:loading||!history.length&&!job,open:()=>toggleReadingMode(true)}:undefined}
-          top={selected&&!demo?{disabled:loading||busy,open:()=>void jumpHistory(true)}:undefined} detail={{value:detail,set:setDetailMode}}/>
+          top={selected&&!demo&&!planned?{disabled:loading||busy,open:()=>void jumpHistory(true)}:undefined} detail={{value:detail,set:setDetailMode}}/>
       </>:tab==='workspace'?<header className="chat-header" data-section="board"><h1>{t("Доска")}</h1></header>:tab==='tasks'?null:<header className="chat-header" data-section={tab}>
         <div className="header-title"><h1>{tab==='connection'||tab==='chats'?t('Подключение к ПК'):tab==='settings'?t("Настройки"):docView==='files'?t('Файлы'):docView==='rules'?t("Правила"):t("История изменений")}</h1></div>
       </header>}
@@ -1335,7 +1344,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       {embedded&&networkError&&!connectionScreen&&<div className="network-banner" role="status"><RefreshCw size={14} />{t(networkError)}</div>}
       {demo && <div className="demo-banner">{t("Демо · пример интерфейса, без подключения к Claude")}<button onClick={() => void disconnect()}>{t("Подключить ПК →")}</button></div>}
       {/* Only a PC that answered /providers can say a provider is missing or signed out; an unreachable PC is the status line's job. */}
-      {!canRun && !demo && !unreachable && providersLoaded && tab==='chats' && connection && !connection.workspaceId && <div className="network-banner" role="status">{providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить {0}.",engineName)}</div>}
+      {!canRun && !demo && !unreachable && providersLoaded && tab==='chats' && connection && !connection.workspaceId && <div className="network-banner" role="status">{embedded&&!connected ? t("Подключаемся к ПК…") : account ? t("Подключение к модели недоступно. Проверьте его на ПК.") : providerInfo?.error ? t(providerInfo.error) : providerInfo ? t("{0} недоступен. Установите приложение и войдите в аккаунт на ПК.",engineName) : t("Обновите сервер на ПК, чтобы включить {0}.",engineName)}</div>}
       <Updates connection={connection} expanded={tab === 'settings'&&settingsPage === 'updates'} />
       {tab==='chats'&&!readingMode&&chainControls&&connection&&(job?.id||selected?.sessionId)&&<ChatChainLink
         key={[cacheScope,chainQuery,job?.id,selected?.sessionId].join('|')} connection={connection} onOpen={openTasks}
@@ -1364,9 +1373,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             {loading && (!history.length&&!job?.messages?.length&&!job?.partial&&!pendingSend?<ChatHistorySkeleton/>:history.length?<p className="history-page-status muted" role="status">{t("Загружаем историю с ПК…")}</p>:null)}
             {!loading && !visibleOutgoing && !history.length && !job && !selected && taskRun && <section className="task-chat-card" aria-label={t('Задача')}><button type="button" className={'task-chat-stage task-stage-text task-stage-'+taskDisplayStage(taskRun)} onClick={()=>setTaskPanel(true)}>{taskRunStageLabel(taskRun)}</button><h2>{taskRun.title}</h2>{taskRun.worktree&&<p className="task-chat-branch"><code>{taskRun.worktree.branch}</code></p>}{(taskRun.noteSnapshot?.description||'').trim()&&<p className="task-chat-criteria">{(taskRun.noteSnapshot?.description||'').trim().split('\n').slice(0,4).join('\n')}</p>}<p className="muted">{t('Проверьте подготовленный запрос и отправьте его, чтобы агент начал. Сам он не отправляется.')}</p></section>}
             {!loading && selected && !history.length && !job && (unreachable||historyError&&hostDown(reach)?<div className="offline-empty muted" role="status"><p>{embedded?t('История чата загрузится, когда локальный сервер будет доступен.'):t("Этот чат ещё не сохранён на телефоне. Он загрузится, когда ПК будет доступен.")}</p><button className="secondary" onClick={()=>{retryNow();if(selected)void openSession(selected);}}>{t("Повторить")}</button></div>:<p className="muted">{t("В локальной истории пока нет сообщений. Проверьте, что этот чат открыт в {0} на ПК.",engineName)}</p>)}
-            {selected&&!loading&&(history.length>0||!unreachable)&&(loadingOlder||historyError||hasMore!==null&&(unreachable||!fromStart))&&<p className="history-page-status muted" role="status" aria-live="polite">{loadingOlder?<span className="history-loading"><LoaderCircle size={16} aria-hidden="true"/>{t('Загружаем сообщения…')}</span>:historyError?<>{t('Не удалось обновить историю')}{!unreachable&&<small className="history-error-reason">{t(historyError)}</small>}</>:unreachable?t('Остальная история загрузится, когда ПК будет на связи'):t('Выше есть ещё сообщения · прокрутите вверх')}{historyError&&hasMore!==null&&!unreachable&&<button className="text-button" onClick={()=>void extendHistory()}>{t('Повторить загрузку')}</button>}</p>}
+            {selected&&!planned&&!loading&&(history.length>0||!unreachable)&&(loadingOlder||historyError||hasMore!==null&&(unreachable||!fromStart))&&<p className="history-page-status muted" role="status" aria-live="polite">{loadingOlder?<span className="history-loading"><LoaderCircle size={16} aria-hidden="true"/>{t('Загружаем сообщения…')}</span>:historyError?<>{t('Не удалось обновить историю')}{!unreachable&&<small className="history-error-reason">{t(historyError)}</small>}</>:unreachable?t('Остальная история загрузится, когда ПК будет на связи'):t('Выше есть ещё сообщения · прокрутите вверх')}{historyError&&hasMore!==null&&!unreachable&&<button className="text-button" onClick={()=>void extendHistory()}>{t('Повторить загрузку')}</button>}</p>}
             {hasMore !== null && historyWindow.current >= 5000 && <p className="muted" role="status">{t("Достигнут предел окна: 5000 сообщений")}</p>}
-            <MessageList connection={connection} cwd={cwd} key={`${provider}-${navigation.current}`} jobId={job?.id} provider={provider} messages={transcript} partialText={job?.errorCode!=='codex_thread_busy'?job?.partial:undefined} streaming={running&&!runUnknown} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} resultRoot={resultRoot} onReview={docked?undefined:openTurnReview}/>
+            <MessageList connection={connection} cwd={cwd} key={`${provider}-${navigation.current}`} jobId={job?.id} provider={provider} messages={shownTranscript} partialText={job?.errorCode!=='codex_thread_busy'?job?.partial:undefined} streaming={running&&!runUnknown} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} resultRoot={resultRoot} onReview={docked?undefined:openTurnReview}/>
             {job?.expiredApprovals?.map((item,index)=><p key={`expired-${index}`} className="approval-expired transcript-event" role="status">{t('Время ожидания истекло — агенту отправлен отказ')} · {item.tool}</p>)}
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers, extra) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers, ...extra });if(allow&&a.tool==='ExitPlanMode'&&extra?.mode){const key=currentDraftKey(),mode=extra.mode;setAccessChoices(old=>({...old,[key]:mode}));}}} />)}
             {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error-banner">{t(job.error)}{provider==='claude'&&claudeOutdated(job.error)&&<ClaudeEngineUpdate connection={connection} compact/>}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
@@ -1391,12 +1400,12 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <ChatOverlay edge="bottom">
         {/* Hosts without the queue view still report how many follow-ups wait. */}
         {Boolean(job?.pendingInputIds?.length)&&!job?.queued&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}
-        <div className="composer-area">{boardChat?.context&&<div className="board-context-chip">{boardChat.context.name}</div>}{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}
+        <div className="composer-area" hidden={planned||undefined}>{boardChat?.context&&<div className="board-context-chip">{boardChat.context.name}</div>}{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}
           {!readingMode&&<OutboxShelf items={outbox} busy={busy}/>}
           {/* Only lost contact needs a notice here; action details stay in the transcript. */}
           {running&&job&&runUnknown&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)&&!runUnknown} lostAt={runUnknown?runLost??jobContact.current.at:undefined}/>}{!error&&connection&&!demo&&!readingMode&&!job?.approvals.length&&<LimitAlert provider={provider} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}{error &&<div className="error-banner" role="alert">{t(error)}{!embedded&&t(error)===t(budgetRangeMessage)&&<button className="text-button" onClick={()=>{setError('');setSettingsSubpage('access');setSettingsPage('workspace');setTab('settings');setMobileChat(true);}}>{t('Открыть настройки бюджета')}</button>}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error-banner" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
-          {!readingMode&&(()=>{const folder=!selected&&!job&&!taskRun&&!boardChat?.context?{
+          {!readingMode&&!planned&&(()=>{const folder=!selected&&!job&&!taskRun&&!boardChat?.context?{
               label:language==='ru'?'Папка чата':'Chat folder',value:cwd,paths:projects||health.roots,disabled:busy||uploading||demo,
               onChange:(root:string)=>{void api('/chat-library/projects',{cwd:root}).then(()=>{projectChosen.current=true;setCwd(root);window.dispatchEvent(new Event('pocket-chat-project-added'));}).catch(e=>setError(e.message));}
             }:undefined;return folder?<FolderChip {...folder}/>:null;})()}
@@ -1418,5 +1427,5 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     {!embedded&&<MobileNavigation open={moreOpen} onClose={()=>setMoreOpen(false)}><nav className="mobile-nav" onClick={event=>{if((event.target as HTMLElement).closest('button'))setMoreOpen(false);}}><button className={tab === 'files' ? 'active' : ''} aria-current={tab==='files'?'page':undefined} onClick={() => showSection('files')}><BookOpen size={20} />{t("Правила")}</button><button className={tab==='changelog'?'active':''} aria-current={tab==='changelog'?'page':undefined} onClick={()=>showSection('changelog')}><FileText size={20}/>{t("История изменений")}</button><button className={tab === 'settings'&&settingsPage!=='connection' ? 'active' : ''} aria-current={tab==='settings'&&settingsPage!=='connection'?'page':undefined} aria-description={liveSettings.update?t('Доступно обновление'):undefined} onClick={() => showSection('settings')}><Settings size={20} />{t("Настройки")}{liveSettings.update&&<span className="settings-badge" aria-hidden="true"/>}</button><button className={tab==='settings'&&settingsPage==='connection'?'active':''} aria-current={tab==='settings'&&settingsPage==='connection'?'page':undefined} onClick={()=>showSection('settings','connection')}><Laptop size={20}/><span className="mobile-nav-label">{t("Подключение к ПК")}<small>{pcStatus?(pcStatus.online?pcStatus.name:t('Нет связи · {0}',pcStatus.name)):saved?.name&&!saved.workspaceOnly?t('Нет связи · {0}',saved.name):t('Не подключено')}</small></span></button></nav></MobileNavigation>}
     {chatAction&&connection&&<ChatActions key={provider+chatAction.session.sessionId+chatAction.x+chatAction.y} target={chatAction} provider={provider} jobId={jobs.find(run=>run.sessionId===chatAction.session.sessionId)?.id} managementDisabled={busy||uploading||demo} connection={connection} onClose={()=>setChatAction(null)} onChanged={(session,deleted)=>{setSessions(old=>deleted?old.filter(s=>s.sessionId!==session.sessionId):old.map(s=>s.sessionId===session.sessionId?session:s));if(selected?.sessionId===session.sessionId){if(deleted){newChat();setMobileChat(false);}else setSelected(session);}}}/>}
     {branchTarget&&<MessageBranch connection={canRun&&connection?connection:undefined} cwd={cwd} provider={provider} key={branchTarget.sourceId+branchTarget.message.id} target={branchTarget} onClose={()=>setBranchTarget(null)} onSubmit={submitBranch}/>}
-  </div></AssistantChatProvider></SidePreview.Provider>;
+  {chatSurface&&<SelectionToolbar/>}</div></AssistantChatProvider></SidePreview.Provider>;
 }
