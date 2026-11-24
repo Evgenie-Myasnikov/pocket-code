@@ -54,3 +54,27 @@ test('a PC without Strata shows an install hint instead of controls',async({page
  await expect(page.getByText('Strata was not found on this PC.',{exact:false})).toBeVisible();
  await expect(page.getByRole('region',{name:'Local model (Strata)'})).toHaveCount(0);
 });
+
+test('the chat header model menu starts a local Strata model without its window, picks it and stops it',async({page})=>{
+ await localHost(page);
+ await page.addInitScript(()=>{(window as any).testTaskTextAccounts=[{id:'5b7c0d3e-0000-4000-8000-00000000a001',name:'Strata · flash-coder-iq1_m'}];});
+ await desktop(page);
+ await page.getByRole('button',{name:'New chat',exact:true}).click();
+ const chip=page.locator('.desktop-chat-host header .header-model-chip');await chip.click();
+ const menu=page.getByRole('menu',{name:'Provider and model'});
+ await expect(menu.getByText('Local models',{exact:true})).toBeVisible();
+ // the served connection is listed with its local model, not again under API connections
+ await expect(menu.getByText('API connections',{exact:true})).toHaveCount(0);
+ const coder=menu.getByRole('menuitemradio',{name:/flash-coder-iq1_m/});await expect(coder).toContainText('Downloaded, not running');
+ await page.screenshot({path:'.local/header-local-models.png'});
+ await coder.click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).localHost.started)).toEqual({model:'coder-iq1_m',context:131072,drafting:'auto'});
+ // ready: the chat switches to the local model's connection
+ await expect(chip).toContainText('Strata · flash-coder-iq1_m',{timeout:10000});
+ await chip.click();
+ await menu.getByRole('menuitem',{name:'Stop flash-coder-iq1_m'}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).localHost.stopped)).toBe(1);
+ // the old Custom providers dialog is gone: the menu leads to Settings → Providers
+ await menu.getByRole('menuitem',{name:/API connections and local models/}).click();
+ await expect(page.getByRole('region',{name:'Local model (Strata)'})).toBeVisible();
+});

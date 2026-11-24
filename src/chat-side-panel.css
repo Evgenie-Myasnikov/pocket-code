@@ -47,3 +47,8 @@
 .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title{display:flex!important;flex-direction:row;align-items:center;gap:12px;min-width:0;padding:0 4px;background:transparent;border:0;box-shadow:none}
 .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title>h1{flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;font-size:calc(15px * var(--ui-scale,1));font-weight:var(--fw-bold,700)}
 .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .chat-header-main{flex:1;min-width:0}
+/* The draggable left edge of the side panel. */
+.chat-side-panel-resizer{position:absolute;z-index:2;top:0;bottom:0;left:-4px;width:8px;cursor:col-resize;touch-action:none}
+.chat-side-panel-resizer::after{content:'';position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background-color var(--dur-short,.16s)}
+.chat-side-panel-resizer:is(:hover,:focus-visible)::after,body.desktop-resizing .chat-side-panel-resizer::after{background:var(--muted)}
+.chat-side-panel-resizer:focus-visible{outline:0}

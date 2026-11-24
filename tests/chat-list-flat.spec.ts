@@ -45,7 +45,7 @@ test('the provider and model are chosen in the chat header, as in Strata',async(
  await expect(host.locator('.composer .provider-picker-trigger')).toHaveCount(0);await expect(host.locator('.composer .model-picker')).toHaveCount(0);
  const chip=host.locator('header .header-model-chip');await expect(chip).toContainText('Claude');
  await chip.click();const menu=page.getByRole('menu',{name:'Provider and model'});
- await expect(menu.getByText('Providers',{exact:true})).toBeVisible();await expect(menu.getByRole('menuitem',{name:'Manage API models'})).toBeVisible();
+ await expect(menu.getByText('Providers',{exact:true})).toBeVisible();await expect(menu.getByRole('menuitem',{name:/API connections and local models/})).toBeVisible();
  await page.screenshot({path:'.local/header-model-menu.png'});
  await menu.getByRole('menuitemradio',{name:'Codex'}).click();
  await expect(page.locator('.desktop-chat-host header .header-model-chip')).toContainText('Codex');

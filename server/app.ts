@@ -1033,7 +1033,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/file-sizes', async (req, res) => {
     const body=z.object({cwd:text,paths:z.array(z.string().min(1).max(4096)).max(500)}).strict().parse(req.body);
     const cwd=await allowedPath(accessRoots(),body.cwd,true),sizes:Record<string,number|null>={};
-    for(const file of body.paths){try{const target=await allowedPath([cwd],path.isAbsolute(file)?file:path.join(cwd,file),true);const info=await stat(target);sizes[file]=info.isFile()?info.size:null;}catch{sizes[file]=null;}}
+    for(const file of body.paths){try{const target=await allowedPath([cwd],path.isAbsolute(file)?file:path.join(cwd,file));const info=await stat(target);sizes[file]=info.isFile()?info.size:null;}catch{sizes[file]=null;}}
     res.json({sizes});
   });
   app.get('/api/project-artifact', async (req, res) => {

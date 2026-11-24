@@ -33,7 +33,8 @@ export function LocalModelSettings({connection,online=true}:{connection:Connecti
   const refresh=<button className="icon-button" aria-label={t('Обновить состояние')} title={t('Обновить состояние')} disabled={busy} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={18}/></button>;
   const title=t('Локальная модель (Strata)');
   if(!status)return <SettingsBlock title={title} action={refresh}><SettingsLine>{error?<Notice tone="error">{error}</Notice>:<p role="status">{t('Проверяем локальные модели…')}</p>}</SettingsLine></SettingsBlock>;
-  if(!status.available)return <SettingsBlock title={title} action={refresh}><SettingsLine><p>{t('Strata не найдена на этом ПК. Установите её, чтобы запускать локальные модели отсюда.')}</p></SettingsLine></SettingsBlock>;
+  // Without Strata there is nothing to control: one line in a card, no local-model section.
+  if(!status.available)return <div className="settings-block"><div className="settings-card"><SettingsLine><p>{t('Strata не найдена на этом ПК. Установите её, чтобы запускать локальные модели отсюда.')}</p></SettingsLine></div></div>;
   const job=status.job,running=job.state==='ready'||status.running.length>0,working=busy||job.state==='starting'||job.state==='stopping';
   async function act(path:'/local-models/start'|'/local-models/stop',body:unknown){setBusy(true);setError('');try{await request(connection!,path,body);}catch(e){setError((e as Error).message);}finally{setBusy(false);setRevision(v=>v+1);}}
   function start(){const choice={model,context,drafting};writeChoice(choice);void act('/local-models/start',choice);}

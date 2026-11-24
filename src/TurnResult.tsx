@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {request} from './api';
 import {createPortal} from 'react-dom';
-import {ArrowUpRight,ChevronDown,FileText,Folder,FolderOpen,GitCompareArrows,X} from 'lucide-react';
+import {ChevronDown,FileText,Folder,FolderOpen,GitCompareArrows,X} from 'lucide-react';
 import type {Connection} from './api';
 import {Files,FilePreview} from './Files';
 import {t,useLanguage} from './i18n';
@@ -56,13 +56,14 @@ export function TurnResult({changes,root,connection,onReview}:{changes:TurnChang
      setFolderError(error instanceof Error?summary+' '+t(error.message):summary);
    }finally{setOpening(false);}
  }
- const folderRow=(title:string,path:string,main:boolean)=><div className="turn-result-location">
-   {main?<FolderOpen size={18}/>:<Folder size={15}/>}<span title={path}>{title}</span>
-   <button type="button" aria-label={folderAction+' · '+path} disabled={opening} onClick={()=>void openFolder(path)}>{folderAction}<ArrowUpRight size={13}/></button>
+ // As in Strata: a quiet label, the folder name in bold, and a short Open; the full action is the button's name.
+ const folderRow=(label:string,title:string,path:string,main:boolean)=><div className="turn-result-location">
+   {main?<FolderOpen size={18}/>:<Folder size={16}/>}<span title={path}>{label} <strong>{title}</strong></span>
+   <button type="button" aria-label={folderAction+' · '+path} title={folderAction} disabled={opening} onClick={()=>void openFolder(path)}>{ru?'Открыть':'Open'}</button>
  </div>;
  return <section className="turn-result" aria-label={ru?'Результат работы':'Turn result'}>
-   {outputs.length>0&&folderRow(ru?'Результат в '+(folder||name):'Result in '+(folder||name),result,true)}
-   {(folder||!outputs.length)&&folderRow(ru?'Рабочая папка · '+name:'Working folder · '+name,root,!outputs.length)}
+   {outputs.length>0&&folderRow(ru?'Результат в':'Delivered to',folder||name,result,true)}
+   {(folder||!outputs.length)&&folderRow(ru?'Рабочая папка':'Working folder',name,root,!outputs.length)}
    {folderError&&<p className="error-banner" role="alert">{folderError}</p>}
    <div className="turn-result-tools">
      <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(open=>!open)}><ChevronDown size={14} className="turn-result-chevron"/>{ru?'Файлов: '+changes.files.length:'Files: '+changes.files.length}</button>

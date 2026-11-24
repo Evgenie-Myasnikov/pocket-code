@@ -27,3 +27,22 @@
 .turn-result .turn-result-name{flex:none;max-width:55%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--text);font-weight:var(--fw-medium,500)}
 .turn-result .turn-result-dir{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted)}
 .turn-result .turn-result-size{flex:none;margin-inline-start:auto;padding-inline-start:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Proportions after Strata: the card spans the column, rows use the text font, the header rows are calm and equal. */
+.turn-result{width:100%;min-width:0;font-size:calc(14px * var(--ui-scale,1));border-radius:14px}
+.turn-result-location,.turn-result-tools{min-height:52px;padding:6px 10px 6px 18px;gap:10px}
+.turn-result-location:first-child{padding-top:6px;font-weight:var(--fw-regular,400)}
+.turn-result-location+.turn-result-location,.turn-result-tools{border-top:1px solid var(--line)}
+.turn-result-location>span{color:var(--muted)}
+.turn-result-location>button{min-height:34px;padding:4px 14px;border:1px solid var(--line);border-radius:10px;color:var(--text);font-weight:var(--fw-semibold,600)}
+.turn-result-location>button:hover{background:var(--panel)}
+.turn-result-tools{background:transparent;font-size:1em}
+.turn-result-tools>button{color:var(--text)}
+.turn-result-counts{margin-left:auto;padding-right:8px}
+.turn-result ul{max-height:22rem;padding:2px 0 6px}
+.turn-result li span,.turn-result li button{font-family:inherit;font-size:1em}
+.turn-result li>button{min-height:44px;padding:6px 18px;border-radius:0}
+.turn-result li>button:hover,.turn-result li>button:focus-visible{background:var(--panel)}
+.turn-result .turn-result-type{width:52px;font-size:.92em}
+.turn-result .turn-result-name{max-width:48%;font-weight:var(--fw-medium,500)}
+.turn-result-location>span strong{margin-left:.35em;color:var(--text);font-weight:var(--fw-bold,700)}

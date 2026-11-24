@@ -1,0 +1,52 @@
+/*
+ * The PC window's chat after Strata: a plain header with the chat's name on the left and a borderless model chip,
+ * a flat selection in the chat list, a quiet New chat button, and an even rhythm in the transcript.
+ */
+/* Header: no plate, no rounded box, the name on the left, one thin line under it across the column. */
+:root[data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel{
+  height:auto;min-height:56px;margin:0;padding:8px 16px 8px 24px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:var(--bg);box-shadow:none;justify-content:space-between}
+:root[data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .chat-header-main{justify-content:flex-start;background:transparent;border:0;box-shadow:none;padding:0}
+:root[data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title{justify-content:flex-start;gap:20px}
+:root[data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title>h1{text-align:left;font-size:calc(15px * var(--ui-scale,1));font-weight:var(--fw-bold,700)}
+:root[data-theme][data-theme] .header-model-chip{border:0;background:transparent;color:var(--muted);font-weight:400;padding:6px 8px}
+:root[data-theme][data-theme] .header-model-chip:hover,:root[data-theme][data-theme] .header-model-chip[aria-expanded=true]{background:var(--surface);color:var(--text)}
+/* Chat list: the open chat is one flat tone, without an accent edge. */
+:root[data-theme][data-theme] .desktop-app>.desktop-rail .desktop-sessions>button[aria-pressed=true]{box-shadow:none;background:var(--surface)}
+/* New chat is an ordinary rail icon: no green, no frame, no glow. */
+:root[data-theme][data-theme] .desktop-app>.desktop-rail>nav>button.desktop-new-chat{color:var(--muted);border:0;box-shadow:none;outline:0;background:transparent}
+:root[data-theme][data-theme] .desktop-app>.desktop-rail>nav>button.desktop-new-chat:is(:hover,.active){color:var(--text);background:var(--surface)}
+/* Transcript rhythm: answer buttons take no room under every answer; they appear on the last one, or on hover over the
+   answer without moving the text. Paragraph and message gaps are small and even. */
+:root[data-theme][data-theme] .conversation-inner article.message.assistant{position:relative;margin:0 0 var(--chat-block-gap,4px)}
+:root[data-theme][data-theme] .conversation-inner article.message.assistant .markdown>:last-child{margin-bottom:0}
+:root[data-theme][data-theme] .conversation-inner article.message.assistant:not(:last-of-type)>.message-actions{position:absolute;right:0;bottom:-6px;z-index:2;min-height:0;margin:0;opacity:0;pointer-events:none;transition:opacity var(--dur-short,.16s)}
+:root[data-theme][data-theme] .conversation-inner article.message.assistant:not(:last-of-type):is(:hover,:focus-within)>.message-actions{opacity:1;pointer-events:auto}
+:root[data-theme][data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title{background:transparent;border:0;border-radius:0;box-shadow:none;padding:0}
+:root[data-theme][data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .chat-header-actions :is(.icon-button,.chat-menu-button){background:transparent;border:0;box-shadow:none}
+:root[data-theme][data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .chat-header-actions :is(.icon-button,.chat-menu-button):hover{background:var(--surface)}
+/* Foreground after Strata: the side panel sits a step lighter than the chat, and the person's own message is a
+   bubble in the accent colour, so both stand apart from the answer at a glance. */
+:root[data-theme][data-theme] .chat-side-panel,:root[data-theme][data-theme] .chat-side-panel-bar{background:var(--panel)}
+:root[data-theme][data-theme] .chat-side-panel .chat-side-panel-tab[data-selected]{background:var(--surface)}
+:root[data-theme][data-theme][data-palette=carbon] .conversation-inner .message.user .user-message-content{background:color-mix(in srgb,var(--accent) 22%,var(--panel));border-color:transparent;color:var(--accent)}
+:root[data-theme=light][data-theme][data-palette=carbon] .conversation-inner .message.user .user-message-content{background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--accent)}
+/* The left side in steps, as in Strata: the icon strip a step lighter than the chat, the chat list between them. */
+:root[data-theme][data-theme] .desktop-app>.desktop-rail{background:color-mix(in srgb,var(--panel) 55%,var(--bg))}
+:root[data-theme][data-theme] .desktop-app>.desktop-rail>nav{background:var(--panel);border-inline-end:1px solid var(--line)}
+:root[data-theme][data-theme] .desktop-app>.desktop-rail .desktop-sessions>button[aria-pressed=true]{background:var(--surface)}
+:root[data-theme][data-theme][data-theme] .desktop-app>aside.desktop-rail{background:color-mix(in srgb,var(--panel) 55%,var(--bg))}
+:root[data-theme][data-theme][data-theme] .chat-side-panel-body>.file-reader-docked{background:transparent}
+/* Like Strata's sidebar and top bar: the chat list and the chat header are panels; only the chat itself is the dark field. */
+:root[data-theme][data-theme][data-theme][data-theme] .desktop-app.desktop-app.desktop-app>aside.desktop-rail.desktop-rail{background:var(--panel)}
+:root[data-theme][data-theme][data-theme] .desktop-app>aside.desktop-rail>nav{background:var(--panel)}
+:root[data-theme][data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel{background:var(--panel)}
+:root[data-theme][data-theme][data-theme] .desktop-app>.desktop-rail .desktop-sessions>button[aria-pressed=true]{background:var(--surface)}
+/* The transcript column spaces its blocks only by the Appearance setting (the flex gap would add its own 8 px). */
+:root[data-theme][data-theme] .conversation-inner{row-gap:0}
+:root[data-theme][data-theme] .conversation-inner>article.message.user{margin-bottom:calc(var(--chat-block-gap,4px) + 12px)}
+:root[data-theme][data-theme][data-theme] .conversation-inner>article.message.assistant{margin-top:0}
+:root[data-theme][data-theme][data-theme] .conversation-inner>article.message.user{margin-top:calc(var(--chat-block-gap,4px) + 12px)}
+/* Child margins must not leak through a message and add to the setting. */
+:root[data-theme][data-theme][data-theme] .conversation-inner>article.message.assistant{display:flow-root}
+:root[data-theme][data-theme][data-theme] .conversation-inner>article.message.assistant .markdown>:first-child{margin-top:0}
+:root[data-theme][data-theme][data-theme] .conversation-inner>article.message.tool-result>*{margin-top:0;margin-bottom:0}

@@ -6,6 +6,7 @@ import {useActivity} from './useActivity';
 import {providerName} from './ActivityList';
 import type {Connection} from './api';
 import './updates.css';
+import pkg from '../package.json';
 import {SettingRow,SettingsBlock,SettingsLine,SwitchRow} from './SettingsRows';
 const host:Connection={url:'http://127.0.0.1:4318',token:'',desktop:true};
 const megabytes=(bytes:number)=>(bytes/1048576).toLocaleString(undefined,{maximumFractionDigits:1});
@@ -26,7 +27,7 @@ export function DesktopUpdates({state,action}:{state:DesktopState;action:(name:s
  const statusLine=!state.online?<Notice tone="warning" id={reason} title={t('Сервер ПК не в сети')} action={<button className="secondary" disabled={state.busy||state.statusCode==='preparing'||state.statusCode==='starting'} onClick={()=>void action('restart-host')}>{t('Запустить локальный сервер')}</button>}>{updateState==='error'?t('Последнее обновление не удалось, предыдущая версия сохранена. Запустите сервер ПК, чтобы проверить снова.'):t('Проверка обновлений недоступна, пока сервер ПК не запущен.')}</Notice>
    :tones[updateState]?<Notice tone={tones[updateState]} action={updateState==='error'||updateState==='paused'?check:undefined}><div className="update-status">{details}</div></Notice>:null;
  return <SettingsBlock title="Pocket Code" className="desktop-updates">
-  <SettingRow title={t('Версия {0}',state.version||'')} note={!tones[updateState]&&state.online?<span className="update-status" role="status">{details}</span>:t('Windows-приложение и сервер ПК')}>{!(state.online&&(updateState==='error'||updateState==='paused'))&&check}</SettingRow>
+  <SettingRow title={t('Версия {0}',state.version||pkg.version)} note={!tones[updateState]&&state.online?<span className="update-status" role="status">{details}</span>:t('Windows-приложение и сервер ПК')}>{!(state.online&&(updateState==='error'||updateState==='paused'))&&check}</SettingRow>
   {statusLine&&<SettingsLine>{statusLine}</SettingsLine>}
   <SwitchRow title={t('Автоматически обновлять приложение и сервер ПК')} note={t('Каждые 6 часов; перезапуск после завершения задач')} checked={state.autoUpdate!==false} onChange={value=>void action('settings',{autoUpdate:value})}/>
  </SettingsBlock>;

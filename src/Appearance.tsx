@@ -18,8 +18,8 @@ export const palettes: Palette[] = [
 { id: 'ink', name: 'Тушь', hue: 327, hslHue: 301, preferredTheme: 'light', swatch: { dark: ['#201d23', '#d6acd8'], light: ['#f8f5ef', '#713f70'] } }];
 
 type Contrast = 'auto' | 'normal' | 'more';
-type Appearance = {chatFont:'golos'|'manrope'|'system';chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
-const defaults: Appearance = { chatFont:'golos',chatAlign:'center', palette: 'carbon', theme: 'dark', textSize: 14, scale: 100, spacing: 1.85, compact: false, contrast: 'auto', colorblind: false };
+type Appearance = {chatFont:'vscode'|'golos'|'manrope'|'system';chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;/** Space between transcript blocks (an action line, a paragraph, a result), px. */blockGap: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
+const defaults: Appearance = { chatFont:'vscode',chatAlign:'center', palette: 'carbon', theme: 'dark', textSize: 14, scale: 100, spacing: 1.6, blockGap: 4, compact: false, contrast: 'auto', colorblind: false };
 const storageKey = 'pocket-code-appearance-v1';
 const bounded = (value: unknown, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 function load(): Appearance {
@@ -29,10 +29,10 @@ function load(): Appearance {
     const data = JSON.parse(saved);
     // A palette that no longer exists (the removed colour palettes) becomes the default theme.
     const palette = palettes.some((p) => p.id === data.palette) ? data.palette : defaults.palette;
-    return { chatFont:['golos','manrope','system'].includes(data.chatFont)?data.chatFont:'golos',chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette,
+    return { chatFont:['manrope','system'].includes(data.chatFont)?data.chatFont:'vscode',chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette,
       theme: ['dark', 'light', 'system'].includes(data.theme) ? data.theme : defaults.theme,
       textSize: bounded(data.textSize, 8, 22, 14), scale: bounded(data.scale, 60, 130, 100),
-      spacing: bounded(data.spacing, 1.1, 2.2, 1.85), compact: data.compact === true,
+      spacing: data.spacing === 1.85 ? 1.6 : bounded(data.spacing, 1.1, 2.2, 1.6), blockGap: [0, 4, 10].includes(data.blockGap) ? data.blockGap : 4, compact: data.compact === true,
       contrast: ['auto', 'normal', 'more'].includes(data.contrast) ? data.contrast : defaults.contrast, colorblind: data.colorblind === true };
   } catch {return defaults;}
 }
@@ -51,7 +51,7 @@ export function useAppearance(ownsDocument = true) {
     const applyTheme = () => {root.dataset.theme = appearance.theme === 'system' ? system.matches ? 'light' : 'dark' : appearance.theme;};
     applyTheme();system.addEventListener('change', applyTheme);
     root.dataset.chatAlign = appearance.chatAlign;
-    root.style.setProperty('--font-chat',appearance.chatFont==='manrope'?"'Manrope','Golos Text',sans-serif":appearance.chatFont==='system'?"system-ui,'Golos Text',sans-serif":"'Golos Text',system-ui,sans-serif");
+    root.style.setProperty('--font-chat',appearance.chatFont==='manrope'?"'Manrope','Golos Text',sans-serif":appearance.chatFont==='system'?"system-ui,'Golos Text',sans-serif":'var(--font-sans)');
     root.dataset.compact = String(appearance.compact);
     root.dataset.palette = appearance.palette;
     const palette = palettes.find((p) => p.id === appearance.palette)!;
@@ -62,6 +62,7 @@ export function useAppearance(ownsDocument = true) {
     root.style.setProperty('--chat-font-size', `${appearance.textSize}px`);
     root.style.setProperty('--ui-scale', String(appearance.scale / 100));
     root.style.setProperty('--chat-line-height', String(appearance.spacing));
+    root.style.setProperty('--chat-block-gap', appearance.blockGap + 'px');
     try {localStorage.setItem(storageKey, JSON.stringify(appearance));setSaveError('');}
     catch {setSaveError(t("Настройки применены, но сохранить их на устройстве не удалось."));}
     return () => system.removeEventListener('change', applyTheme);
@@ -71,7 +72,7 @@ export function useAppearance(ownsDocument = true) {
 type Sizing = Pick<Appearance, 'textSize' | 'scale' | 'spacing' | 'compact'>;
 /** Three sizes cover most needs; the exact sliders (including the 8–22 px and 60–130 % extremes) stay under "More". */
 const sizePresets: { id: string; title: string; value: Sizing }[] = [
-  { id: 'compact', title: 'Компактно', value: { textSize: 13, scale: 90, spacing: 1.6, compact: true } },
+  { id: 'compact', title: 'Компактно', value: { textSize: 13, scale: 90, spacing: 1.45, compact: true } },
   { id: 'standard', title: 'Стандарт', value: { textSize: defaults.textSize, scale: defaults.scale, spacing: defaults.spacing, compact: defaults.compact } },
   { id: 'large', title: 'Крупно', value: { textSize: 17, scale: 115, spacing: 1.95, compact: false } }];
 const matchesPreset = (value: Appearance, preset: Sizing) => value.textSize === preset.textSize && value.scale === preset.scale && Math.abs(value.spacing - preset.spacing) < 0.001 && value.compact === preset.compact;
@@ -96,6 +97,8 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
       <div className="segmented-options">{([['dark', 'Тёмная'], ['light', 'Светлая'], ['system', 'Системная']] as const).map(([id, title]) => <label key={id}><input type="radio" name="appearance-theme" value={id} checked={appearance.theme === id} onChange={() => setAppearance((p) => ({ ...p, theme: id }))} /><span>{t(title)}</span></label>)}</div></div>
     <div className="setting-row" role="radiogroup" aria-labelledby="appearance-size-title"><div><strong id="appearance-size-title">{t("Размер")}</strong><small>{t("Размер текста и элементов интерфейса.")}</small></div>
       <div className="segmented-options">{sizePresets.map((item) => <label key={item.id}><input type="radio" name="appearance-size" checked={preset?.id === item.id} onChange={() => setAppearance((p) => ({ ...p, ...item.value }))} /><span>{t(item.title)}</span></label>)}</div></div>
+    <div className="setting-row" role="radiogroup" aria-labelledby="appearance-gap-title"><div><strong id="appearance-gap-title">{t("Расстояние между блоками")}</strong><small>{t("Между строками действий, абзацами ответа и результатами в чате.")}</small></div>
+      <div className="segmented-options">{([[0, 'Плотно'], [4, 'Обычно'], [10, 'Свободно']] as const).map(([value, title]) => <label key={value}><input type="radio" name="appearance-gap" checked={appearance.blockGap === value} onChange={() => setAppearance((p) => ({ ...p, blockGap: value }))} /><span>{t(title)}</span></label>)}</div></div>
     <label className="setting-row"><div><strong>{t("Цвета для дальтоников")}</strong><small>{t("Синий и оранжевый вместо зелёного и красного в статусах и Review")}</small></div>
       <input type="checkbox" role="switch" checked={appearance.colorblind} onChange={(e) => setAppearance((p) => ({ ...p, colorblind: e.target.checked }))} /></label>
     {undo ? <Notice tone="info" action={<button type="button" className="secondary" onClick={() => { setAppearance({ ...undo }); setUndo(null); }}>{t("Отменить")}</button>}>{t("Оформление сброшено.")}</Notice>

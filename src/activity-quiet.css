@@ -1,0 +1,42 @@
+/*
+ * Actions in the transcript after Strata: every kind (a command, an edit, a group of actions, a subagent) is one quiet
+ * line in the chat's own font and size, grey, regular weight, aligned with the text, the chevron after the words,
+ * and an even small gap between lines. The text size setting of Appearance changes them together with the text.
+ */
+:root[data-theme][data-theme] .conversation-inner .message.tool-result{margin:0 0 var(--chat-block-gap,4px)}
+:root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity)>summary,
+:root[data-theme][data-theme] .conversation-inner .edit-summary-line,
+:root[data-theme][data-theme] .conversation-inner .subagent-card,
+:root[data-theme][data-theme] .conversation-inner .subagent-inline>summary{
+  display:flex;align-items:center;justify-content:flex-start;gap:8px;min-height:0;margin:0;padding:0;
+  border:0;background:transparent;box-shadow:none;
+  font-family:var(--font-chat,inherit);font-size:var(--chat-font-size,14px);font-weight:400;line-height:1.45;color:var(--muted);text-align:left;
+}
+:root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity){margin:0;padding:0;border:0;background:transparent;box-shadow:none}
+:root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity)>summary:hover,
+:root[data-theme][data-theme] .conversation-inner .subagent-card:hover{color:var(--text);background:transparent}
+/* The words carry no weight of their own; a command's text stays monospace but quiet. */
+:root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity) :is(.tool-title,.command-label,.edit-summary-line>.tool-title){font-family:inherit;font-size:1em;font-weight:400;color:inherit}
+:root[data-theme][data-theme] .conversation-inner .command-row .tool-title.mono{font-family:var(--font-mono);font-size:.9em;opacity:.85}
+:root[data-theme][data-theme] .conversation-inner .command-separator{opacity:.6}
+/* Leading icons go; the chevron follows the words. */
+:root[data-theme][data-theme] .conversation-inner .activity-group>summary>svg:first-child,
+:root[data-theme][data-theme] .conversation-inner .tool-card.activity-row:not(.command-row)>summary>svg:first-child{display:none}
+:root[data-theme][data-theme] .conversation-inner :is(.command-chevron,.edit-chevron,.chat-disclosure-chevron,.subagent-card-chevron){order:50;flex:none;width:14px;height:14px;opacity:.75}
+:root[data-theme][data-theme] .conversation-inner :is(.tool-state,.tool-diffstat,.edit-metrics){order:40;font-size:.95em}
+/* A subagent reads "name · status" like the other lines. */
+:root[data-theme][data-theme] .conversation-inner .subagent-card{width:auto;max-width:100%}
+:root[data-theme][data-theme] .conversation-inner .subagent-card>span:not(.subagent-status-dot){display:inline-flex;align-items:baseline;gap:.5em;min-width:0}
+:root[data-theme][data-theme] .conversation-inner .subagent-card strong{font-weight:400;color:inherit;font-size:1em}
+:root[data-theme][data-theme] .conversation-inner .subagent-card small{font-size:1em;color:inherit}
+:root[data-theme][data-theme] .conversation-inner .subagent-card small::before{content:'· '}
+:root[data-theme][data-theme] .conversation-inner .activity-row:focus-within>summary,:root[data-theme][data-theme] .conversation-inner .activity-row>summary:focus-visible{outline:none}
+:root[data-theme][data-theme] .conversation-inner .activity-row>summary:focus-visible{text-decoration:underline;text-underline-offset:3px}
+:root[data-theme][data-theme] .conversation-inner :is(.command-chevron,.edit-chevron,.chat-disclosure-chevron,.subagent-card-chevron){margin:0!important;position:static!important;transform:none}
+:root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity)>summary>span{flex:0 1 auto;min-width:0}
+:root[data-theme][data-theme] .conversation-inner .message :is(.activity-row,.edit-activity)>summary{min-height:0}
+:root[data-theme][data-theme] .conversation-inner .message :is(.activity-row,.edit-activity)>summary :is(span,strong){font-size:inherit}
+:root[data-theme][data-theme] .conversation-inner .message .command-row>summary .tool-title.mono{font-size:.92em}
+:root[data-theme][data-theme] .conversation-inner .message :is(.activity-row,.edit-activity)>summary>span{margin-inline-start:0}
+/* An older rule gives every span in a tool line a 4 px left margin; inside the transcript the flex gap spaces them. */
+:root[data-theme][data-theme] .conversation-inner .message :is(.activity-row,.edit-activity)>summary span{margin-left:0}

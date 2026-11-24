@@ -58,3 +58,12 @@ test('provider card rows: access and spend limit are selects that save device de
  expect(await page.evaluate(()=>(window as any).desktopCalls.find((v:any)=>v.action==='provider-login'))).toMatchObject({provider:'codex',method:'device'});
  expect(await page.evaluate(()=>(window as any).desktopCalls.some((v:any)=>v.action==='provider-logout'))).toBeFalsy();
 });
+
+test('Chat settings have a Chat list card whose Import chats row brings provider chats in only on request',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('pocket-code-language-v1','en'));
+ await desktop(page);await page.getByRole('button',{name:'Settings',exact:true}).click();await open(page,'Chat');
+ const list=page.getByRole('region',{name:'Chat list',exact:true});
+ await expect(list.getByText('Import chats',{exact:true})).toBeVisible();
+ await expect(list.getByRole('button',{name:'Import',exact:true})).toBeEnabled();
+ expect(await page.evaluate(()=>(window as any).desktopCalls.some((c:any)=>c.endpoint==='/chat-library/import'))).toBeFalsy();
+});

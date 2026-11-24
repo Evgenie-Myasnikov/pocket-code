@@ -1,9 +1,12 @@
 import { memo, useState, useRef, useMemo, useEffect, useLayoutEffect, useId, type ComponentProps, type ReactNode } from 'react';
+import {HighlightedCode,languageForFence} from './code-highlight';
 import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
 import {ChevronDown,Ellipsis,Lightbulb,WrapText,X} from 'lucide-react';
 import './transcript.css';
+import './activity-quiet.css';
+import './strata-shell.css';
 import type { Block, SubagentView } from '../server/types';
 import { t, useLanguage } from './i18n';
 import {Terminal,Pencil,Wrench,FileText,Search,ListChecks,Bot,MessageCircle,Globe,Plug,LoaderCircle,Copy,Check,ChevronRight,Circle,CircleCheck,CircleDot,BellRing} from 'lucide-react';
@@ -140,7 +143,8 @@ const markdownElements:NonNullable<ComponentProps<typeof Streamdown>['components
   strong:'strong', em:'em', p:'p', h1:'h1', h2:'h2', h3:'h3', h4:'h4', h5:'h5', h6:'h6',
   ul:'ul', ol:'ol', li:'li', blockquote:'blockquote', hr:'hr', thead:'thead', tbody:'tbody', tr:'tr',
   th:'th', td:'td', sup:'sup', sub:'sub', section:'section',
-  code:({children,className})=><code className={className}>{children}</code>,
+  // A fenced block names its language (```hlsl); its text is coloured by the VS Code grammar of that language.
+  code:({children,className})=>{const lang=/(?:^|\s)language-(\S+)/.exec(className||'')?.[1];return <code className={className}>{lang&&typeof children==='string'?<HighlightedCode text={children.replace(/\n$/,'')} lang={languageForFence(lang)}/>:children}</code>;},
   table:({children})=><MarkdownTable>{children}</MarkdownTable>,
   pre:({children})=><CodeBlock>{children}</CodeBlock>,
   a:({href,children})=>safeWebUrl(href)?<a href={safeWebUrl(href)!} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>,

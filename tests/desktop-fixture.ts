@@ -83,7 +83,8 @@ export async function desktop(page:Page, initialState: {online?:boolean;statusCo
      if(!nested&&(window as any).withSourceFolder)entries.push({name:'docs',directory:true,path:folder+'\\docs'});
      reply(id,{path:folder,parent:nested?folder.slice(0,-5):null,entries});return;
    }
-   if(p==='/file'){reply(id,{name:'README.md',path:url.searchParams.get('path'),text:'Synthetic readme'});return;}
+   if(p==='/file-sizes'){const sizes=(window as any).testFileSizes||{};reply(id,{sizes:Object.fromEntries((message.data?.paths||[]).map((file:string)=>[file,sizes[file]??null]))});return;}
+   if(p==='/file'){const file=url.searchParams.get('path')||'',texts=(window as any).testFileTexts||{},name=Object.keys(texts).find(key=>file.endsWith(key));reply(id,{name:'README.md',path:file,text:name?texts[name]:'Synthetic readme'});return;}
    if(p==='/projects'){reply(id,(window as any).testProjectPaths||['C:\\Demo\\Atlas','C:\\Demo\\Garden']);return;}
    if(p==='/jobs'){reply(id,(window as any).testRuns||[]);return;}
    if(/^\/jobs\/[^/]+\/messages$/.test(p)&&action==='write'){if((window as any).rejectNextFollowup){(window as any).rejectNextFollowup=false;queueMicrotask(()=>listeners.forEach(listener=>listener({data:{id,error:'Synthetic turn closing',status:409}})));return;}const run=(window as any).testRuns.find((r:any)=>r.id===p.split('/')[2]);run.revision++;reply(id,run);return;}

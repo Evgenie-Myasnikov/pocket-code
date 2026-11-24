@@ -39,7 +39,8 @@
 /* Type: weights match the loaded faces (Golos 400/500/600, Manrope 500/700); one tracking value for uppercase labels; chrome never drops below 11 px on phones and 12 px on the PC at 100 %. */
 :root{
  --fw-regular:400;--fw-medium:500;--fw-semibold:600;--fw-display:700;--tracking-caps:.08em;
- --font-sans:'Golos Text',system-ui,sans-serif;--font-display:'Manrope','Golos Text',sans-serif;--font-mono:Consolas,'Cascadia Mono','JetBrains Mono',monospace;
+ /* The fonts of VS Code: its workbench and editor stacks, all system fonts (Segoe UI and Consolas on Windows). */
+ --font-sans:-apple-system,BlinkMacSystemFont,"Segoe WPC","Segoe UI",system-ui,"Ubuntu","Droid Sans",sans-serif;--font-display:-apple-system,BlinkMacSystemFont,"Segoe WPC","Segoe UI",system-ui,"Ubuntu","Droid Sans",sans-serif;--font-mono:Consolas,Menlo,Monaco,"Droid Sans Mono","Courier New",monospace;
  --font-chat:var(--font-sans);--font-chat-code:'JetBrains Mono',Consolas,monospace;--chat-prose-gap:.85em;--chat-icon-size:18px;--chat-action-icon-size:16px;
  --type-min:11px;
  --type-label-11:var(--fw-medium) calc(max(var(--type-min),11px) * var(--ui-scale,1))/1.4 var(--font-sans);

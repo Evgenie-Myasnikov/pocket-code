@@ -13,3 +13,8 @@
 .header-model-menu button small{color:var(--muted);font-size:.9em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .header-model-menu button:is(:hover,:focus-visible),.header-model-menu button[aria-checked=true]{background:var(--surface);outline:0}
 .header-model-manage{margin-top:6px;border-top:1px solid var(--line)!important;border-radius:0 0 8px 8px!important}
+.header-model-local{display:flex;align-items:center;gap:2px}
+.header-model-local>button[role=menuitemradio]{flex:1;min-width:0}
+.header-model-menu .header-model-stop{flex:none;width:34px;min-height:34px;padding:0;justify-content:center;color:var(--muted)}
+.header-model-menu .header-model-stop:hover{color:var(--text)}
+.header-model-error{margin:4px 10px 8px;color:var(--danger-fg,var(--danger));font-size:calc(12.5px * var(--ui-scale,1))}

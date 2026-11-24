@@ -3,6 +3,7 @@ import {useBackAction,useModal} from './navigation';
 import './file-preview.css';
 import {Markdown} from './RichBlocks';
 import {ImageViewer} from './ImageViewer';
+import {HighlightedCode,languageForFile} from './code-highlight';
 import { ArrowLeft, Folder, FileText, ChevronRight, X, Image as ImageIcon, Search, WrapText } from 'lucide-react';
 import { request, type Connection } from './api';
 type Listing = {path: string;parent: string | null;entries: {name: string;directory: boolean;path: string;}[];};
@@ -44,7 +45,7 @@ export function FilePreview({connection,root,path,onClose,scoped=false,docked=fa
     <div className="file-preview-body" ref={body}>
       {error&&<p className="project-docs-error" role="alert">{error}</p>}
       {!error&&text===null&&!picture&&<p className="muted" role="status">{t('Загружаем файл…')}</p>}
-      {text!==null&&(raw?<pre className={wrap?'wrap':''}>{parts?parts.result:text}</pre>:<div className="file-markdown"><Markdown text={text}/></div>)}
+      {text!==null&&(raw?<pre className={wrap?'wrap':''}>{parts?parts.result:<HighlightedCode text={text} lang={languageForFile(path)}/>}</pre>:<div className="file-markdown"><Markdown text={text}/></div>)}
     </div>
   </section>;
   return docked?reader:<div className="modal-backdrop file-reader-backdrop">{reader}</div>;

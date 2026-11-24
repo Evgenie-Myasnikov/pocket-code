@@ -1,7 +1,7 @@
 /* Workspace designs. Keep the same semantic roles in both luminosity modes. */
-/* Carbon, the default: neutral near-black panels, grey borders and a light accent. */
-:root[data-theme=dark][data-palette=carbon]{--bg:#0c0c0c;--panel:#121212;--surface:#1c1c1c;--line:#2b2b2b;--muted:#a6a6a6;--text:#f3f3f3;--accent:#e8e8e8;--accent-dark:#111111;}
-:root[data-theme=light][data-palette=carbon]{--bg:#fbfbfb;--panel:#f4f4f4;--surface:#eaeaea;--line:#d2d2d2;--muted:#5c5c5c;--text:#171717;--accent:#262626;--accent-dark:#ffffff;}
+/* Carbon, the default, in the colours of the Strata app: graphite panels a step lighter than the background, visible borders, soft grey text and a green accent. */
+:root[data-theme=dark][data-palette=carbon]{--bg:#0e1113;--panel:#161a1d;--surface:#1d2226;--line:#2a3036;--muted:#8e979f;--text:#eef1f3;--accent:#34d399;--accent-dark:#05261b;}
+:root[data-theme=light][data-palette=carbon]{--bg:#f9fafb;--panel:#ffffff;--surface:#eef1f4;--line:#dee5ee;--muted:#6f6f6f;--text:#221e1f;--accent:#0a7a55;--accent-dark:#ffffff;}
 /* Emerald: the same calm panels with one green accent. */
 :root[data-theme=dark][data-palette=emerald]{--bg:#101417;--panel:#161b1f;--surface:#1e252a;--line:#2c353b;--muted:#a7b1b6;--text:#eef2f2;--accent:#3ecf9a;--accent-dark:#06231a;}
 :root[data-theme=light][data-palette=emerald]{--bg:#f4f7f6;--panel:#fcfdfc;--surface:#e8edeb;--line:#cbd4d0;--muted:#55615c;--text:#1a2320;--accent:#17694f;--accent-dark:#ffffff;}

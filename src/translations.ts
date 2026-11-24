@@ -969,6 +969,12 @@ export const english: Record<string, string> = {
   "Разрешать такие в этом проекте": "Allow these in this project",
   "Выполнить команду?": "Run this command?",
   "Папка": "Folder",
+  "Расстояние между блоками": "Space between blocks",
+  "Между строками действий, абзацами ответа и результатами в чате.": "Between action lines, answer paragraphs and results in the chat.",
+  "Плотно": "Tight",
+  "Свободно": "Roomy",
+  "Ширина панели": "Panel width",
+  "Перетащите, чтобы изменить ширину. Двойной щелчок — половина окна.": "Drag to change the width. Double-click for half the window.",
   "Рабочая папка": "Working folder",
   "Панель чата": "Chat panel",
   "Предыдущие вкладки": "Previous tabs",
@@ -1717,4 +1723,5 @@ export const english: Record<string, string> = {
   'Новый вход': 'New sign-in',
   'Заменит текущий аккаунт CLI на этом ПК': 'Replaces the current CLI account on this PC',
   'Приходят, даже когда окно свёрнуто в трей': 'Arrive even when the window is in the tray',
+  'Список чатов': 'Chat list',
 };

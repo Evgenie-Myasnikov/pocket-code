@@ -1,0 +1,3 @@
+/* Shiki writes both theme colours as variables; the app's own light or dark theme picks one. */
+.code-line>span{color:var(--shiki-dark);font-style:var(--shiki-dark-font-style);font-weight:var(--shiki-dark-font-weight)}
+:root[data-theme=light] .code-line>span{color:var(--shiki-light);font-style:var(--shiki-light-font-style);font-weight:var(--shiki-light-font-weight)}

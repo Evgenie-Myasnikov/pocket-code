@@ -18,7 +18,7 @@ test('a finished turn opens its own output folder and files, exposes deletions a
  });
  await desktop(page);await page.locator('.desktop-sessions button').filter({hasText:'Interface review'}).click();
  const card=page.getByRole('region',{name:'Результат работы'});
- await expect(card).toContainText('Результат в src');await expect(card).toContainText('Рабочая папка · Atlas');
+ await expect(card).toContainText('Результат в src');await expect(card).toContainText('Рабочая папка Atlas');
  await expect(card).toContainText('+3');await expect(card).toContainText('−2');
  await card.getByRole('button',{name:'Файлов: 3'}).focus();await page.keyboard.press('Enter');
  await expect(card.getByText('Удалён')).toBeVisible();await expect(card.getByRole('button',{name:'src/legacy.ts'})).toHaveCount(0);

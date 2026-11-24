@@ -23,6 +23,10 @@ test('repeated calls collapse into a counted row and expose every command and re
  await expect(group).toContainText('echo first');await expect(group).toContainText('echo second');await expect(group).toContainText('First result');await expect(group).toContainText('Second result');
  await group.locator(':scope > summary').focus();await page.keyboard.press('Enter');await expect(group.locator('.activity-group-items')).toHaveCount(0);
  await page.screenshot({path:'.local/grouped-actions.png'});
+ // an action line has the text size and follows the text size setting
+ const px=(selector:string)=>page.locator(selector).first().evaluate(element=>parseFloat(getComputedStyle(element).fontSize));
+ const chat=await page.locator('.conversation-inner .activity-row>summary').first().evaluate(element=>parseFloat(getComputedStyle(element).getPropertyValue('--chat-font-size'))||14);
+ expect(await px('.conversation-inner .activity-row>summary')).toBeCloseTo(chat,1);
 });
 
 test('desktop brief mode collects each turn once and detailed mode restores the original rows',async({page})=>{
