@@ -30,6 +30,8 @@ type Options={
   session?(runId:string):string|undefined;
   /** Called once per run when its chat is known, so it joins the chat list as a Pocket Code chat. */
   adopt?(task:ScheduledTask,sessionId:string):Promise<void>;
+  /** Removes the chat of a run that is no longer the latest (and of every run of a deleted task); a throw keeps it for the next try. */
+  retire?(task:ScheduledTask,sessionId:string):Promise<void>;
   /** False while the host cannot start runs (stopping, updating, a provider sign-in): due runs wait for the next check. */
   ready?():boolean;
   now?():number;
@@ -101,7 +103,11 @@ export class ScheduledTasks{
     if(timing){task.anchor=now;task.nextRunAt=nextRunTime(task.schedule,now,now);}
     task.updatedAt=now;await this.save();this.arm();return structuredClone(task);
   });}
-  remove(id:string){return this.serial(async()=>{const before=this.tasks.length;this.tasks=this.tasks.filter(task=>task.id!==id);if(this.tasks.length!==before)await this.save();this.arm();return {ok:true};});}
+  remove(id:string){return this.serial(async()=>{
+    const gone=this.tasks.find(task=>task.id===id),before=this.tasks.length;this.tasks=this.tasks.filter(task=>task.id!==id);if(this.tasks.length!==before)await this.save();this.arm();
+    // The chat of its latest run goes with the task; nothing of a deleted task stays on the PC.
+    if(gone&&this.options.retire)for(const run of gone.runs)if(run.sessionId)void this.options.retire(structuredClone(gone),run.sessionId).catch(()=>{});
+    return {ok:true};});}
   read(id:string){return this.serial(async()=>{const task=this.find(id);if(task.unread){task.unread=false;await this.save();}return structuredClone(task);});}
   /** Starts a run now; the schedule keeps its next time. */
   async runNow(id:string){
@@ -129,7 +135,17 @@ export class ScheduledTasks{
       if(result&&result.sessionId)current.sessionId=result.sessionId;
       await this.save();
     });
-    if(result&&result.sessionId)await this.options.adopt?.(task,result.sessionId).catch(()=>{});
+    if(result&&result.sessionId){await this.options.adopt?.(task,result.sessionId).catch(()=>{});await this.retireOlder(task);}
+  }
+  /** The chats of the runs a task keeps: its latest only; older runs are removed once the latest has a chat. */
+  sessionIds(){return new Set(this.tasks.flatMap(task=>task.runs.flatMap(run=>run.sessionId?[run.sessionId]:[])));}
+  private async retireOlder(task:ScheduledTask){
+    if(!this.options.retire||!task.runs[0]?.sessionId)return;
+    for(const run of task.runs.slice(1)){
+      if(!run.sessionId)continue;
+      try{await this.options.retire(structuredClone(task),run.sessionId);}catch{continue;}
+      await this.serial(async()=>{const current=this.tasks.find(item=>item.id===task.id)?.runs.find(item=>item.id===run.id);if(current){delete current.sessionId;await this.save();}});
+    }
   }
   /** Runs whose chat was not named when they started learn it from the running job. */
   private async resolveSessions(){
@@ -141,7 +157,7 @@ export class ScheduledTasks{
     }
     if(!found.length)return;
     await this.serial(async()=>{for(const item of found)item.run.sessionId=item.sessionId;await this.save();});
-    for(const item of found)await this.options.adopt?.(item.task,item.sessionId).catch(()=>{});
+    for(const item of found){await this.options.adopt?.(item.task,item.sessionId).catch(()=>{});await this.retireOlder(item.task);}
   }
   /** Starts every task whose time has come, once each, and moves its next time past now. */
   check(){

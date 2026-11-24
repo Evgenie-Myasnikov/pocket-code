@@ -55,7 +55,7 @@ test('live file writes display received code and resolve into one completed edit
     const run=(window as any).testRuns[0],p=run.writePreviews[0];p.content+='\n}';p.totalBytes+=2;p.totalLines++;run.generation.outputTokens=135;run.revision++;
   });
   await expect(row.locator('.edit-metrics')).toContainText('6 строк');
-  await expect(metrics).toContainText('Сгенерировано 135');
+  await expect(metrics).toContainText('ток/с');
   expect(await row.evaluate(element=>(window as any).liveEditNode===element)).toBe(true);await expect(row).toHaveJSProperty('open',true);
   await page.evaluate(()=>{
     const run=(window as any).testRuns[0],p=run.writePreviews[0];run.writePreviews=[];

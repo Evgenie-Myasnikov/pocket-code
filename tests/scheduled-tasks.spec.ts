@@ -68,6 +68,9 @@ test('a scheduled task with an unread run shows a clock and a dot, and opening i
   await row.getByRole('button',{name:/Weekday morning brief/}).click();
   await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
   await expect(row.locator('.scheduled-task-dot')).toHaveCount(0);
+  // A run is read like a chat, named by its task and time, and nothing can be written to it
+  await expect(page.locator('.desktop-chat-host header h1')).toContainText('Weekday morning brief · ');
+  const field=page.getByRole('textbox').last();await expect(field).toBeDisabled();
   expect(await page.evaluate(()=>(window as any).scheduledCalls.some((call:any)=>call.path==='/scheduled-tasks/44444444-4444-4444-8444-444444444444/read'))).toBe(true);
 });
 

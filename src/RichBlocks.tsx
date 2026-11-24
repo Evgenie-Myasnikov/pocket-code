@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useMemo, useEffect, useLayoutEffect, useId, type ComponentProps, type ReactNode } from 'react';
 import {HighlightedCode,languageForFence,languageForFile} from './code-highlight';
 import {useSmoothText} from './smooth-text';
+import {revealCharacters,useRevealTail} from './reveal-chars';
 import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
@@ -183,15 +184,17 @@ function Document({block}:{block:Block}) {
 }
 function ReasoningBody({paragraphs,live,label}:{paragraphs:string[];live:boolean;label:string}){
   const body=useRef<HTMLDivElement>(null),follow=useRef(true);
-  const visible=paragraphs.join('\n\n');
+  // What is waiting is written word by word over the window set in Appearance, like the answer; its newest characters come down into place one by one.
+  const {text:visible,pending}=useSmoothText(paragraphs.join('\n\n'),live,live);
+  const animated=live||pending,{tailStart,delay}=useRevealTail(visible.length,animated);
   useLayoutEffect(()=>{
     if(live&&follow.current&&body.current)body.current.scrollTop=body.current.scrollHeight;
   },[visible,live]);
   let offset=0;
   return <div ref={body} onScroll={event=>{const el=event.currentTarget;follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<12;}} role="region" aria-label={label} tabIndex={0} className="reasoning-content">{paragraphs.map((paragraph,index)=>{
-    const part=visible.slice(offset,offset+paragraph.length);
+    const start=offset,part=visible.slice(start,start+paragraph.length);
     offset+=paragraph.length+2;
-    return part&&<p key={index}>{part}</p>;
+    return part&&<p key={index}>{animated?revealCharacters(part,start,tailStart,delay):part}</p>;
   })}</div>;
 }
 export function ReasoningDisclosure({paragraphs,live=false}:{paragraphs:string[];live?:boolean}){

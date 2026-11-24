@@ -556,7 +556,9 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       for(const chat of listed)if(await generationStore.has(provider,chat.sessionId).catch(()=>false))fresh.push(chat.sessionId);
       await chatLibrary.markOrigins(provider,fresh,'pocket',true);data=await chatLibrary.read();
     }else if(fresh.length){await chatLibrary.markOrigins(provider,fresh,'pocket');data=await chatLibrary.read();}
-    return listed.filter(chat=>!linked(provider,chat)&&(config.listAllProviderChats||live.has(chat.sessionId)||!!data.chats[provider+':'+chat.sessionId]?.origin));
+    // A scheduled run is opened from its task in the rail, not from the chat list.
+    const planned=scheduled.sessionIds();
+    return listed.filter(chat=>!linked(provider,chat)&&!planned.has(chat.sessionId)&&(config.listAllProviderChats||live.has(chat.sessionId)||!!data.chats[provider+':'+chat.sessionId]?.origin));
   }
   // Import chats: the provider's current chats join the list. Chats made in Pocket Code keep that mark.
   app.post('/api/chat-library/import',async(req,res)=>{
@@ -970,7 +972,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     file:path.join(config.uploads,'.tasks','scheduled-tasks.json'),
     ready:()=>!runtimeStopping&&!config.hostUpdater?.draining&&!providerConnections.isSigningIn(),
     session:id=>scheduledJob(id)?.sessionId,
-    adopt:async(task,sessionId)=>{await chatLibrary.markOrigins(task.provider,[sessionId],'pocket');},
+    retire:async(task,sessionId)=>{
+      const result=await processChats({provider:task.provider,...(task.account?{account:task.account}:{}),ids:[sessionId],action:'delete',eraseOriginals:true},undefined,{listing:'saved',outsideRoots:true});
+      if(result.failed.length||result.running.length)throw new Error('The chat of an earlier run could not be removed yet.');
+    },
     start:async(task,id)=>{
       const settings=scheduledSettings(task);
       const cwd=await allowedPath(accessRoots(),settings.cwd,true);

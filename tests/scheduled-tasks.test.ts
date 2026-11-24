@@ -102,6 +102,28 @@ test('run now starts at once and keeps the schedule; a failed start is recorded 
   await assert.rejects(tasks.runNow('00000000-0000-4000-8000-000000000000'),/deleted/);
 });
 
+test('only the latest run keeps a chat: an older run is removed when the next run has its chat, and a deleted task removes them all',async t=>{
+  const clock={now:localDay(1,8).getTime()},dir=await mkdtemp(path.join(tmpdir(),'pocket-schedules-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const retired:string[]=[];let count=0,failRetire=false;
+  const tasks=new ScheduledTasks({file:path.join(dir,'tasks.json'),now:()=>clock.now,start:async()=>({sessionId:'session-'+(++count)}),
+    retire:async(_task,id)=>{if(failRetire)throw new Error('busy');retired.push(id);}});
+  const task=await tasks.create(input);
+  await tasks.runNow(task.id);
+  assert.deepEqual([...tasks.sessionIds()],['session-1']);assert.deepEqual(retired,[]);
+  // the second run: the first run's chat is removed and forgotten, only the latest stays
+  await tasks.runNow(task.id);
+  assert.deepEqual(retired,['session-1']);assert.deepEqual([...tasks.sessionIds()],['session-2']);
+  // a chat that cannot be removed now stays hidden and is tried again with the next run
+  failRetire=true;await tasks.runNow(task.id);
+  assert.deepEqual([...tasks.sessionIds()].sort(),['session-2','session-3']);
+  failRetire=false;await tasks.runNow(task.id);
+  assert.deepEqual([...retired].sort(),['session-1','session-2','session-3']);assert.deepEqual([...tasks.sessionIds()],['session-4']);
+  // deleting the task removes the chat of its latest run too
+  await tasks.remove(task.id);
+  await new Promise(resolve=>setTimeout(resolve,20));
+  assert.deepEqual([...retired].sort(),['session-1','session-2','session-3','session-4']);assert.deepEqual([...tasks.sessionIds()],[]);
+});
+
 test('editing the schedule moves the next time; editing the prompt does not',async t=>{
   const clock={now:localDay(1,8).getTime()},{make}=await store(t,clock),tasks=make();
   const task=await tasks.create(input);

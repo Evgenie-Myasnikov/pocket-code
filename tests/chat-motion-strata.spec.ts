@@ -76,3 +76,29 @@ test('a block of text that arrives at once is written into the chat word by word
  const off=await watch(1);
  expect(off.filter(length=>length>0)[0]).toBe(second.length);
 });
+
+test('a reasoning writes itself word by word, each new character coming down from above into place while it fades in',async({page})=>{
+ await page.addInitScript(()=>{
+   localStorage.setItem('pocket-code-language-v1','en');localStorage.setItem('pocket-code-background-v1',JSON.stringify({enabled:false}));
+   (window as any).testHistoryPage=()=>({messages:[],previous:null,next:null});
+   (window as any).testRuns=[{id:'turn-fixture',provider:'claude',sessionId:'alpha',cwd:'C:\Demo\Atlas',status:'running',startedAt:Date.now(),baseMessageCount:0,approvals:[],revision:1,partial:'',
+     messages:[{id:'u',role:'user',blocks:[{type:'text',text:'Explain the layout.'}]}]}];
+ });
+ await desktop(page);
+ await page.locator('.desktop-sessions>button').first().click();
+ await expect(page.locator('.conversation-inner')).toContainText('Explain the layout.');
+ const thought='Inspect '+Array.from({length:90},(_,i)=>'thought'+i).join(' ');
+ await page.evaluate(value=>{const run=(window as any).testRuns[0];run.messages.push({id:'think',role:'assistant',blocks:[{type:'thinking',thinking:value}]});run.revision++;},thought);
+ const body=page.locator('details.thinking .reasoning-content');
+ const seen:number[]=[];let animation='';
+ for(let i=0;i<150;i++){
+   seen.push(await body.count()?((await body.first().textContent())||'').length:0);
+   if(!animation&&await body.locator('.rc').count())animation=await body.locator('.rc').first().evaluate(element=>{const c=getComputedStyle(element);return c.animationName+' '+c.display;});
+   await page.waitForTimeout(40);
+ }
+ expect(seen.some(length=>length>0&&length<thought.length)).toBe(true);expect(seen.at(-1)).toBe(thought.length);
+ for(let i=1;i<seen.length;i++)expect(seen[i]).toBeGreaterThanOrEqual(seen[i-1]);
+ // each character is its own box that fades in and comes down into place
+ expect(animation).toBe('chat-reasoning-char inline-block');
+});
+

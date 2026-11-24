@@ -1,6 +1,8 @@
 import {Fragment,useId,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {ChevronRight,FileCode2} from 'lucide-react';
 import {useLanguage} from './i18n';
+import {useSmoothText} from './smooth-text';
+import {revealCharacters,useRevealTail} from './reveal-chars';
 import type {ToolView} from './tool-registry';
 import {editFiles,type EditFile} from './edit-diff';
 import './edit-activity.css';
@@ -10,13 +12,19 @@ const lineForms:Record<string,string>={one:'строка',few:'строки',man
 const ruPlural=new Intl.PluralRules('ru');
 function diffText(file:EditFile){return file.content??file.lines.map(row=>signs[row.kind]+row.text).join('\n');}
 
-function LiveWriteSnippet({text,totalLines}:{text:string;totalLines:number|undefined}){
+function LiveWriteSnippet({text:received,totalLines}:{text:string;totalLines:number|undefined}){
   const viewport=useRef<HTMLSpanElement>(null);
-  const excerpt=text.slice(-4000);
+  // The code that arrives is written into the snippet word by word, its newest characters coming down into place one by one.
+  const {text,pending}=useSmoothText(received,true,false),{tailStart,delay}=useRevealTail(text.length,true,160);
+  void pending;
+  const excerpt=text.slice(-4000),excerptStart=text.length-excerpt.length;
   const visible=excerpt;
   const lines=visible.split(/\r?\n/);
   if(lines.at(-1)==='')lines.pop();
   const tail=lines.slice(-4);
+  // Where each shown line starts in the whole text, to know which characters are the newest.
+  const starts:number[]=[];{let at=excerptStart;const parts=excerpt.split(/\r?\n/);for(const line of parts){starts.push(at);at+=line.length+1;}}
+  const tailStarts=starts.slice(Math.max(0,lines.length-4),lines.length);
   const excerptLines=useMemo(()=>excerpt.split('\n').length-(excerpt.endsWith('\n')?1:0),[excerpt]);
   // The host may send only a suffix. Anchor its first line to the full received count.
   const first=totalLines!==undefined && excerpt.startsWith(visible)
@@ -25,7 +33,7 @@ function LiveWriteSnippet({text,totalLines}:{text:string;totalLines:number|undef
     if(viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight;
   },[visible]);
   return <span ref={viewport} className="edit-live-snippet" aria-hidden="true"><code>{tail.map((line,i)=>
-    <Fragment key={first===undefined?i:first+i}>{i>0&&'\n'}<span className="edit-live-line" data-number={first===undefined?undefined:first+i}><span>{line}</span></span></Fragment>
+    <Fragment key={first===undefined?i:first+i}>{i>0&&'\n'}<span className="edit-live-line" data-number={first===undefined?undefined:first+i}><span>{revealCharacters(line,tailStarts[i]??0,tailStart,delay)}</span></span></Fragment>
   )}</code></span>;
 }
 

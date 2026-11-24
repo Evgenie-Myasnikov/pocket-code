@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.29.0 (2026-11-24)
+
+### Validation
+
+- Server and unit tests from PowerShell: 632 tests, 628 passed, 1 skipped, 3 failed, the same three as on earlier releases (the compatibility trigger, the checked-in board identity check and the host packager check).
+- Browser scenarios on Edge: 49 passed in one run across the scheduled tasks, motion and smooth text (answer, reasoning), the token line, chat folders and plan chats, the side panel and file changes, the live file write, activity groups, settings and the board passed in separate runs of this release; the full browser suite was not run.
+- Not checked: the installed Windows application, a real scheduled run with a provider and the removal of its earlier run chats, a real provider answer with the smoothing, a phone.
+
+### Features
+
+- Reasoning and written code write themselves (2026-11-24). A reasoning and the code of a file being written are written word by word over the same smoothing window as the answer, and their newest characters (the last 360 of a reasoning, the last 160 of code) are drawn one by one: each comes down a little from above into its place while it fades in, with a small delay inside a batch. Older text is plain; reduced motion shows it at once.
+  - Validation: a browser scenario (a reasoning that arrives whole grows in steps, ends complete, and its characters are boxes with the "comes down and fades in" animation) passed; the live file write scenario, which failed on the last releases because the received code appeared in one piece, passes now, after its old wording of the token line was updated.
+- Plan chats keep only the latest run (2026-11-24). A plan chat opens from its row in the rail as a chat that holds only its latest run, named by the task and the time of that run (for example "Weekday morning brief · 09:00"), and nothing can be written to it. Runs are no longer chats of the Chats list. When the next run has its chat, the chat of the run before it is removed from the provider and forgotten, so older runs are not there; a chat that cannot be removed yet stays hidden and is tried again with the next run. Deleting a task removes the chat of its latest run too.
+  - Validation: a server test (the older run is removed once the next run has a chat, a failed removal is retried with the next run, a deleted task removes them all) and the scheduled tasks browser scenario (the run opens named by task and time, the message field is disabled) passed. Removing a real provider chat after a real scheduled run was not checked.
+
 ## [0.28.67](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.66...v0.28.67) (2026-11-24)
 
 Published [0.28.67](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.67) from [ac24ede](https://github.com/Evgenie-Myasnikov/pocket-code/commit/ac24edec0320172a3eb300df1a1c25d563dd76d6) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.
