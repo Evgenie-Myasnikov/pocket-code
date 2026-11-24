@@ -10,13 +10,13 @@
 :root[data-theme][data-theme] .conversation-inner .subagent-inline>summary{
   display:flex;align-items:center;justify-content:flex-start;gap:8px;min-height:0;margin:0;padding:0;
   border:0;background:transparent;box-shadow:none;
-  font-family:var(--font-chat,inherit);font-size:var(--chat-font-size,14px);font-weight:400;line-height:1.45;color:var(--muted);text-align:left;
+  font-family:var(--font-chat,inherit);font-size:var(--chat-font-size,14px);font-weight:var(--fw-regular);line-height:1.45;color:var(--muted);text-align:left;
 }
 :root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity){margin:0;padding:0;border:0;background:transparent;box-shadow:none}
 :root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity)>summary:hover,
 :root[data-theme][data-theme] .conversation-inner .subagent-card:hover{color:var(--text);background:transparent}
 /* The words carry no weight of their own; a command's text stays monospace but quiet. */
-:root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity) :is(.tool-title,.command-label,.edit-summary-line>.tool-title){font-family:inherit;font-size:1em;font-weight:400;color:inherit}
+:root[data-theme][data-theme] .conversation-inner :is(.activity-row,.edit-activity) :is(.tool-title,.command-label,.edit-summary-line>.tool-title){font-family:inherit;font-size:1em;font-weight:var(--fw-regular);color:inherit}
 :root[data-theme][data-theme] .conversation-inner .command-row .tool-title.mono{font-family:var(--font-mono);font-size:.9em;opacity:.85}
 :root[data-theme][data-theme] .conversation-inner .command-separator{opacity:.6}
 /* Leading icons go; the chevron follows the words. */
@@ -27,7 +27,7 @@
 /* A subagent reads "name · status" like the other lines. */
 :root[data-theme][data-theme] .conversation-inner .subagent-card{width:auto;max-width:100%}
 :root[data-theme][data-theme] .conversation-inner .subagent-card>span:not(.subagent-status-dot){display:inline-flex;align-items:baseline;gap:.5em;min-width:0}
-:root[data-theme][data-theme] .conversation-inner .subagent-card strong{font-weight:400;color:inherit;font-size:1em}
+:root[data-theme][data-theme] .conversation-inner .subagent-card strong{font-weight:var(--fw-regular);color:inherit;font-size:1em}
 :root[data-theme][data-theme] .conversation-inner .subagent-card small{font-size:1em;color:inherit}
 :root[data-theme][data-theme] .conversation-inner .subagent-card small::before{content:'· '}
 :root[data-theme][data-theme] .conversation-inner .activity-row:focus-within>summary,:root[data-theme][data-theme] .conversation-inner .activity-row>summary:focus-visible{outline:none}

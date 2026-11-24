@@ -8,7 +8,7 @@
 :root[data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .chat-header-main{justify-content:flex-start;background:transparent;border:0;box-shadow:none;padding:0}
 :root[data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title{justify-content:flex-start;gap:20px}
 :root[data-theme][data-theme] .desktop-app .desktop-main .embedded-chat header.chat-header.chat-header-panel .header-title>h1{text-align:left;font-size:calc(15px * var(--ui-scale,1));font-weight:var(--fw-bold,700)}
-:root[data-theme][data-theme] .header-model-chip{border:0;background:transparent;color:var(--muted);font-weight:400;padding:6px 8px}
+:root[data-theme][data-theme] .header-model-chip{border:0;background:transparent;color:var(--muted);font-weight:var(--fw-regular);padding:6px 8px}
 :root[data-theme][data-theme] .header-model-chip:hover,:root[data-theme][data-theme] .header-model-chip[aria-expanded=true]{background:var(--surface);color:var(--text)}
 /* Chat list: the open chat is one flat tone, without an accent edge. */
 :root[data-theme][data-theme] .desktop-app>.desktop-rail .desktop-sessions>button[aria-pressed=true]{box-shadow:none;background:var(--surface)}
