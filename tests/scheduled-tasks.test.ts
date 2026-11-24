@@ -163,6 +163,8 @@ test('scheduled task API: create, list, run now as a new chat, edit, delete; req
     const job=jobs.get(ran.runs[0].id);assert.equal(job.cwd,await (await import('node:fs/promises')).realpath(project));
     await new Promise(resolve=>setTimeout(resolve,50));
     assert.deepEqual(prompts,['List the synthetic files.']);
+    // the run's job is the task's chat, not a chat of the list
+    const listed=(await(await call('/jobs?provider=claude')).json()).find((item:any)=>item.id===ran.runs[0].id);assert.equal(listed?.taskChat,true);
     const edited=await(await call(`/scheduled-tasks/${created.id}`,{paused:true,schedule:{kind:'interval',hours:6}})).json();
     assert.equal(edited.paused,true);assert.deepEqual(edited.schedule,{kind:'interval',hours:6});assert.equal(edited.model,'haiku','a partial change keeps the other fields');
     assert.equal((await(await call(`/scheduled-tasks/${created.id}/read`,{})).json()).unread,false);

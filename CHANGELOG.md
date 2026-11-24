@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.29.2 (2026-11-25)
+
+### Validation
+
+- Server tests: the scheduled tasks tests (10, including the API test that checks the run job is marked) passed; a full run of npm test was not repeated (last on 0.29.0).
+- Browser scenarios on Edge: the scheduled tasks and flat chat list scenarios (9) passed.
+- Not checked: a real scheduled run on the installed host, the installed Windows application, a phone.
+
+### Bug Fixes
+
+- Plan chats stay plan chats (2026-11-25). The job of a scheduled run was listed under Chats as a chat named after its folder (for example "Dr3PC2"), so a plan chat seemed to move down into the common chats. A run's job is now marked as the task's own chat, like a task chat, and is left out of the Chats list; each plan chat opens only from its row under Plan chats.
+  - Validation: the scheduled task API test checks that the run's job is marked; the scheduled tasks and flat chat list browser scenarios passed.
+
 ## [0.29.1](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.0...v0.29.1) (2026-11-25)
 
 Published [0.29.1](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.1) from [7f48354](https://github.com/Evgenie-Myasnikov/pocket-code/commit/7f48354185bcfb42afc29f939ea81e855a6e30a1) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

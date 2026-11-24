@@ -139,6 +139,8 @@ export class ScheduledTasks{
   }
   /** The chats of the runs a task keeps: its latest only; older runs are removed once the latest has a chat. */
   sessionIds(){return new Set(this.tasks.flatMap(task=>task.runs.flatMap(run=>run.sessionId?[run.sessionId]:[])));}
+  /** The jobs of runs (a run starts its job under its own id): they are a task's chat, not chats of the list. */
+  runIds(){return new Set(this.tasks.flatMap(task=>task.runs.map(run=>run.id)));}
   private async retireOlder(task:ScheduledTask){
     if(!this.options.retire||!task.runs[0]?.sessionId)return;
     for(const run of task.runs.slice(1)){

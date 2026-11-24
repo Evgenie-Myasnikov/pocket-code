@@ -809,9 +809,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(workspaceAccess.current()){res.json([]);return;}
     await taskChains.init();
     const data=await chatLibrary.read(),runs=engineFor(provider).list().filter(job=>visibleRoot(job.cwd));
-    const linked=taskChains.chatMembership(runs);
+    const linked=taskChains.chatMembership(runs),planned=scheduled.runIds();
+    // A scheduled run opens from its task in the rail; like a task chat it is not a chat of the list.
     res.json(runs.filter(j=>j.status==='running'||!j.sessionId||!data.chats[provider+':'+j.sessionId]?.deleted)
-      .map(job=>linked(provider,job)?{...job,taskChat:true}:job));
+      .map(job=>linked(provider,job)||planned.has(job.id)?{...job,taskChat:true}:job));
   });
   app.get('/api/jobs/:id', (req, res) => {
     const job = jobView(uuid.parse(req.params.id));if(!visibleRoot(job.cwd))throw new HttpError(404,"Chat not found");
