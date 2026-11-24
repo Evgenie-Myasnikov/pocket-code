@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.28.67 (2026-11-24)
+
+### Validation
+
+- Unit tests: 4 for smooth text and 3 for the token speed passed. A full run of npm test was not repeated for this release (last on 0.28.65; its results are recorded there).
+- Browser scenarios on Edge: about 40 passed across smooth text and its setting, the token line, plan chats, folders and their moving, scheduled tasks, the side panel, file changes, the turn result, code highlighting, questions, the read file card, transcript rhythm, action lines, settings scroll, the board and the Tasks provider menu.
+- Still failing, also on 0.28.66 without these changes: the live file write check in `tests/chat-code-change.spec.ts` (intermediate frames of received code), plus the failures recorded earlier.
+- Not checked: the installed Windows application, a real provider answer with the smoothing, a phone, the full browser suite.
+
+### Features
+
+- Smooth text (2026-11-24). Text that arrives in chunks, or a whole block at once, is no longer written into the chat in one piece. What is waiting is spread over a window set in Appearance → Smooth text (Off, 0.3 s, 0.5 s by default, 1 s): it appears word by word, evenly, and every received word is in the chat at most that long after the last chunk arrived; a new block starts from nothing. A word fades in with a short rise and a trace of blur. Words are never shown half-written, reduced motion shows text at once, and a chat opened mid-answer shows what is written without replaying it.
+  - Validation: 4 unit tests (word stops, even reveal over the window, a chunk moving the end of the window, Off) and a browser scenario (a block that arrives whole grows in steps and is complete when the window ends; Off shows the next one at once) passed; the Appearance scenario checks the setting.
+- Token line always on (2026-11-24). The line under the message field is always shown, with a zero or a dash until a value is known. The speed is the average of the last 100 updates of the chat's generated tokens, measured by the window itself (a pause of several seconds is not measured across and a new turn starts from its own count); until two updates are seen it shows the provider's speed for the last reply. The "current reply" and "last reply" captions are gone.
+  - Validation: 3 unit tests (average, gaps and new turns, only the last 100) and the token line browser scenarios (updated for the line that is always there) passed.
+- Plan chats and moving folders (2026-11-24). The rail block of scheduled chats is called "Plan chats" ("Плановые чаты" in Russian). It no longer says that there are none: an empty block is a small lighter area, a step above the rail, and its tasks sit on that area. A folder is held with the mouse and dropped where it should stand among the other folders and the chats outside folders; its place is kept. A right click on the list no longer makes a folder; the new folder icon beside Chats does.
+  - Validation: the folder scenario holds a folder, drops it between chats, reloads and returns it to the top, and checks that a right click makes no folder; the scheduled tasks scenario checks the name and the lighter area (13 scenarios together passed); a screenshot of the rail was checked.
+
 ## [0.28.66](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.28.65...v0.28.66) (2026-11-24)
 
 Published [0.28.66](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.28.66) from [25bd4e2](https://github.com/Evgenie-Myasnikov/pocket-code/commit/25bd4e2e84c633e3f54def03c788b5213ad78f65) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

@@ -1,5 +1,5 @@
 /* Scheduled chats in the PC chat list: a clock, the name, and a dot while a run is unread (as in Claude's sidebar). */
-.desktop-app>.desktop-rail .scheduled-tasks{display:flex;flex-direction:column;gap:1px;padding:2px 0 6px;margin-block-end:4px;border-block-end:1px solid var(--line)}
+.desktop-app>.desktop-rail .scheduled-tasks{display:flex;flex-direction:column;gap:1px;padding:0 0 6px}
 .desktop-app>.desktop-rail .scheduled-task{position:relative;display:flex;align-items:center;min-width:0}
 .desktop-app>.desktop-rail .scheduled-task-open{flex:1;display:flex;align-items:center;gap:8px;min-width:0;min-height:35px;margin:0;padding:6px 40px 6px 8px;border:0;border-radius:7px;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
 .desktop-app>.desktop-rail .scheduled-task-open:hover,.desktop-app>.desktop-rail .scheduled-task-open[aria-pressed=true]{background:var(--surface)}
@@ -9,7 +9,7 @@
 .desktop-app>.desktop-rail .scheduled-task[data-paused] .scheduled-task-open strong{color:var(--muted)}
 .scheduled-task-icon{position:relative;display:inline-flex;flex:none;color:var(--muted)}
 .scheduled-task[data-unread] .scheduled-task-icon{color:var(--text)}
-.scheduled-task-dot{position:absolute;top:-2px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--panel)}
+.scheduled-task-dot{position:absolute;top:-2px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--surface)}
 .desktop-app>.desktop-rail .scheduled-task-actions{position:absolute;right:4px;top:50%;translate:0 -50%;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-width:28px;min-height:28px;margin:0;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted);opacity:0}
 .desktop-app>.desktop-rail .scheduled-task:is(:hover,:focus-within) .scheduled-task-actions,.desktop-app>.desktop-rail .scheduled-task-actions[aria-expanded=true]{opacity:1}
 .desktop-app>.desktop-rail .scheduled-task-actions:hover{color:var(--text);background:var(--panel)}
@@ -27,3 +27,8 @@
 .scheduled-task-schedule>label{flex:0 0 130px}
 .scheduled-task-dialog p{margin:0}
 @media (max-width:520px){.scheduled-task-schedule{flex-direction:column;align-items:stretch}.scheduled-task-schedule>label{flex:none}}
+
+/* The tasks sit on a lighter area of their own, a step above the rail; it keeps a little height while empty. */
+.desktop-app>.desktop-rail .scheduled-tasks-body{display:flex;flex-direction:column;gap:1px;min-height:36px;margin:2px 4px 0;padding:4px;border-radius:10px;background:var(--surface)}
+.desktop-app>.desktop-rail .scheduled-tasks-body .scheduled-task-open:hover,.desktop-app>.desktop-rail .scheduled-tasks-body .scheduled-task-open[aria-pressed=true]{background:color-mix(in srgb,var(--text) 9%,var(--surface))}
+.desktop-app>.desktop-rail .scheduled-tasks-body .scheduled-task-actions:hover{background:color-mix(in srgb,var(--text) 9%,var(--surface))}

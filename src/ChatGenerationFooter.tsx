@@ -3,7 +3,10 @@ import {Gauge,MemoryStick} from 'lucide-react';
 import {request,type Connection} from './api';
 import {useLanguage} from './i18n';
 import type {GenerationMetrics,JobView} from '../server/types';
+import {averageSpeed,recordTokens,type TokenSpeed} from './token-speed';
 import './chat-generation.css';
+/** The last updates of each chat's tokens, kept while the window is open so that reopening a chat keeps its speed. */
+const speeds=new Map<string,TokenSpeed>();
 
 const positive=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value)&&value>0;
 const count=(value:unknown):value is number=>positive(value)&&Number.isSafeInteger(value);
@@ -26,24 +29,31 @@ export function ChatGenerationFooter({connection,provider,account,sessionId,job}
       .then(reply=>{if(active)setRecord(reply?.generation);}).catch(()=>{});
     return()=>{active=false;};
   },[connection,provider,account,sessionId,running]);
-  const metrics=live||record?{...record,...live}:undefined;
+  // The speed is measured here, from the chat's token updates: the average of the last 100 of them.
+  const speedKey=provider+':'+(sessionId||job?.sessionId||job?.id||'new'),[,tick]=useState(0);
+  const generated=live?.outputTokens;
+  useEffect(()=>{
+    if(!matches||!job||!count(generated))return;
+    const state=speeds.get(speedKey)??{rates:[]};speeds.set(speedKey,state);
+    const before=state.rates.length;recordTokens(state,job.id,generated,performance.now());
+    if(speeds.size>200)speeds.delete(speeds.keys().next().value!);
+    if(state.rates.length!==before||state.rates.length)tick(value=>value+1);
+  },[speedKey,job?.id,generated,matches]);
+  const measured=speeds.get(speedKey),average=measured?averageSpeed(measured):undefined;
+  const metrics:GenerationMetrics={...record,...live};
   // A live context count with no known window must not borrow the last turn's window.
-  if(metrics&&live?.contextTokens!==undefined&&live.contextWindow===undefined)delete metrics.contextWindow;
-  // "current reply" only for a speed the provider reported for this turn; a carried one belongs to the last reply.
-  const liveRate=Boolean(live&&positive(live.outputTokensPerSecond));
-  if(!metrics)return null;
-  const {outputTokens,outputTokensPerSecond,totalTokens,contextTokens,contextWindow}=metrics;
+  if(live?.contextTokens!==undefined&&live.contextWindow===undefined)delete metrics.contextWindow;
+  const {totalTokens,contextTokens,contextWindow}=metrics,outputTokensPerSecond=average??metrics.outputTokensPerSecond;
   const percentage=typeof contextTokens==='number'&&Number.isSafeInteger(contextTokens)&&contextTokens>=0&&count(contextWindow)?contextTokens/contextWindow*100:undefined;
-  if(!count(outputTokens)&&!positive(outputTokensPerSecond)&&!count(totalTokens)&&percentage===undefined)return null;
   const full=(n:number)=>n.toLocaleString(locale);
   const short=(n:number)=>n>=10000?n.toLocaleString(locale,{notation:'compact',maximumFractionDigits:1}):full(n);
-  const rate=positive(outputTokensPerSecond)?(outputTokensPerSecond<.01?'<'+(.01).toLocaleString(locale):outputTokensPerSecond.toLocaleString(locale,{maximumFractionDigits:outputTokensPerSecond<1?2:1})):'';
+  const rate=positive(outputTokensPerSecond)?(outputTokensPerSecond<.01?'<'+(.01).toLocaleString(locale):outputTokensPerSecond.toLocaleString(locale,{maximumFractionDigits:outputTokensPerSecond<1?2:1})):(0).toLocaleString(locale);
   const pct=percentage!==undefined?(percentage>0&&percentage<1?'<1':Math.round(percentage).toLocaleString(locale)):'';
   // As in Strata: an icon, the number in bold and a quiet word, centred under the message field.
   const ring=percentage!==undefined?Math.min(100,Math.max(0,percentage)):0;
   return <div className="chat-generation-metrics" role="group" aria-label={ru?'Статистика токенов':'Token usage'}>
-    {positive(outputTokensPerSecond)&&<span className="chat-generation-rate" title={ru?'Средняя скорость по данным провайдера':'Average generation speed reported for this response'}><Gauge size={15} aria-hidden="true"/><b>{rate}</b><span>{ru?'ток/с':'tok/s'} · {running&&liveRate?(ru?'текущий ответ':'current reply'):(ru?'последний ответ':'last reply')}</span></span>}
-    {count(totalTokens)&&<span title={(ru?'Всего токенов за чат':'Total tokens for the conversation')+' · '+full(totalTokens)}><MemoryStick size={15} aria-hidden="true"/><b>{short(totalTokens)}</b><span>{ru?'всего токенов':'total tokens'}</span></span>}
-    {percentage!==undefined&&<span title={full(contextTokens!)+' / '+full(contextWindow!)+(ru?' токенов':' tokens')}><svg className="chat-generation-ring" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeOpacity=".25" strokeWidth="2"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray={`${ring/100*40.84} 40.84`} transform="rotate(-90 8 8)" strokeLinecap="round"/></svg><b>{pct}</b><span>{ru?'% контекста':'% of context'}</span></span>}
+    <span className="chat-generation-rate" title={ru?'Скорость: среднее за последние 100 обновлений токенов чата':'Speed: the average of the last 100 token updates of this chat'}><Gauge size={15} aria-hidden="true"/><b>{rate}</b><span>{ru?'ток/с':'tok/s'}</span></span>
+    <span title={(ru?'Всего токенов за чат':'Total tokens for the conversation')+(count(totalTokens)?' · '+full(totalTokens):'')}><MemoryStick size={15} aria-hidden="true"/><b>{count(totalTokens)?short(totalTokens):'0'}</b><span>{ru?'всего токенов':'total tokens'}</span></span>
+    <span title={percentage!==undefined?full(contextTokens!)+' / '+full(contextWindow!)+(ru?' токенов':' tokens'):(ru?'Окно контекста пока неизвестно':'The context window is not known yet')}><svg className="chat-generation-ring" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeOpacity=".25" strokeWidth="2"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray={`${ring/100*40.84} 40.84`} transform="rotate(-90 8 8)" strokeLinecap="round"/></svg><b>{pct||'—'}</b><span>{ru?'% контекста':'% of context'}</span></span>
   </div>;
 }

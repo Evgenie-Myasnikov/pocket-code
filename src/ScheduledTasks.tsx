@@ -52,13 +52,12 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
   const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem(COLLAPSED)==='1';}catch{return false;}});
   const toggle=()=>setCollapsed(old=>{const next=!old;try{localStorage.setItem(COLLAPSED,next?'1':'0');}catch{/* The block stays as it is until the window closes. */}return next;});
   const Chevron=collapsed?ChevronRight:ChevronDown;
-  return <section className="scheduled-tasks" aria-label={l('Scheduled','Запланированные')}>
+  return <section className="scheduled-tasks" aria-label={l('Scheduled chats','Плановые чаты')}>
     <div className="desktop-list-heading scheduled-tasks-heading">
-      <button type="button" className="desktop-list-heading-title" aria-expanded={!collapsed} onClick={toggle}><span>{l('Scheduled','Запланированные')}</span><Chevron size={13} aria-hidden="true"/></button>
+      <button type="button" className="desktop-list-heading-title" aria-expanded={!collapsed} onClick={toggle}><span>{l('Scheduled chats','Плановые чаты')}</span><Chevron size={13} aria-hidden="true"/></button>
       {onNew&&<button type="button" className="icon-button desktop-list-heading-action" aria-label={l('New scheduled task','Новая запланированная задача')} title={l('New scheduled task','Новая запланированная задача')} disabled={!online} onClick={onNew}><Plus size={16} aria-hidden="true"/></button>}
     </div>
-    {!collapsed&&!tasks.length&&<p className="scheduled-tasks-empty">{l('No scheduled tasks yet','Пока нет запланированных задач')}</p>}
-    {!collapsed&&tasks.map(task=>{
+    {!collapsed&&<div className="scheduled-tasks-body">{tasks.map(task=>{
       const last=task.runs[0],state=task.paused?l('Paused','На паузе'):last?.error?l('Last run failed','Последний запуск не удался'):l('Next: ','Далее: ')+relativeTime(task.nextRunAt);
       const description=[scheduleText(task.schedule,ru),state,task.unread?l('New run','Новый запуск'):''].filter(Boolean).join(' · ');
       return <div key={task.id} className="scheduled-task" data-paused={task.paused||undefined} data-unread={task.unread||undefined}>
@@ -72,7 +71,7 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
           onClick={e=>{const rect=e.currentTarget.getBoundingClientRect();setMenu(menu?.task.id===task.id?undefined:{task,x:rect.right+6,y:rect.top});}}><MoreHorizontal size={18} aria-hidden="true"/></button>
       </div>;
     })}
-    {error&&<p className="scheduled-tasks-error" role="alert">{error}</p>}
+    {error&&<p className="scheduled-tasks-error" role="alert">{error}</p>}</div>}
     {menu&&<CardActionMenu point={menu} label={l('Scheduled task actions','Действия запланированной задачи')} onClose={()=>setMenu(undefined)} items={[
       {label:menu.task.paused?l('Resume','Возобновить'):l('Pause','Приостановить'),Icon:menu.task.paused?Play:Pause,disabled:!online,onSelect:()=>void act('/scheduled-tasks/'+menu.task.id,{paused:!menu.task.paused})},
       {label:l('Edit','Изменить'),Icon:Pencil,disabled:!online,onSelect:()=>onEdit(menu.task)},

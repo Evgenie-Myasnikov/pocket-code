@@ -25,6 +25,8 @@ test('code in answers and in the side panel is coloured by the VS Code grammars,
  await expect(card.locator('.turn-result-size')).toHaveText('7.2 KB');
  await card.getByRole('button',{name:'shaders/lighting.hlsl'}).click();
  const panel=page.locator('.chat-side-panel');await expect(panel.getByRole('tab',{name:'lighting.hlsl'})).toBeVisible();
+ // a file from the turn result opens on what changed in it; the whole file is the other view
+ await panel.getByRole('button',{name:'File',exact:true}).click();
  const code=panel.locator('.file-preview-body pre');await expect(code.locator('.code-line').first()).toBeVisible({timeout:10000});
  await expect(code).toContainText('float4 main(float4 position : SV_Position) : SV_Target');
  const keyword=await code.locator('.code-line span',{hasText:'cbuffer'}).first().evaluate(span=>getComputedStyle(span).color);

@@ -1,5 +1,6 @@
 import { memo, useState, useRef, useMemo, useEffect, useLayoutEffect, useId, type ComponentProps, type ReactNode } from 'react';
 import {HighlightedCode,languageForFence,languageForFile} from './code-highlight';
+import {useSmoothText} from './smooth-text';
 import { Capacitor } from '@capacitor/core';
 import {Streamdown} from 'streamdown';
 import remarkGfm from 'remark-gfm';
@@ -157,12 +158,14 @@ const markdownElements:NonNullable<ComponentProps<typeof Streamdown>['components
 };
 
 /** As in Strata: words of a streamed answer fade in as they arrive (240 ms, ease-out), never ahead of the text; saved text is static. */
-const streamAnimation={animation:'fadeIn' as const,duration:240,easing:'cubic-bezier(0,0,.2,1)',sep:'word' as const,maxBacklogMs:320};
+const streamAnimation={animation:'chatWord',duration:260,easing:'cubic-bezier(0,0,.2,1)',sep:'word' as const,stagger:12,maxBacklogMs:120};
 const reducedMotion=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-export const Markdown=memo(function Markdown({text,streaming=false,caret=false}:{text:string;streaming?:boolean;caret?:boolean;animateInitial?:boolean}) {
+export const Markdown=memo(function Markdown({text:written,streaming=false,caret=false,animateInitial=false}:{text:string;streaming?:boolean;caret?:boolean;animateInitial?:boolean}) {
   useLanguage();
-  const animate=streaming&&!reducedMotion();
-  return <div className="markdown" data-caret={caret&&text?true:undefined}><Streamdown mode={streaming?"streaming":"static"} parseIncompleteMarkdown={streaming} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={animate?streamAnimation:false} isAnimating={animate} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
+  // What arrives is written into the chat word by word over the window set in Appearance, even a block that arrives whole.
+  const {text,pending}=useSmoothText(written,streaming,animateInitial);
+  const live=streaming||pending,animate=live&&!reducedMotion();
+  return <div className="markdown" data-caret={caret&&(live||pending)&&text?true:undefined}><Streamdown mode={live?"streaming":"static"} parseIncompleteMarkdown={live} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={animate?streamAnimation:false} isAnimating={animate} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.

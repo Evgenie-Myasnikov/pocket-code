@@ -67,4 +67,7 @@
 .desktop-app>.desktop-rail button.desktop-list-heading-title:hover{color:var(--text)}
 .desktop-app>.desktop-rail .desktop-list-heading-action{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted)}
 .desktop-app>.desktop-rail .desktop-list-heading-action:hover:not(:disabled){color:var(--text);background:var(--surface)}
-.desktop-app>.desktop-rail .scheduled-tasks-empty{margin:0;padding:4px 8px 8px;color:var(--muted);font-size:calc(13px * var(--ui-scale,1))}
+
+/* A folder is moved by holding it with the mouse; while it is held it is dimmed. */
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button.desktop-chat-folder[draggable=true]{cursor:grab}
+.desktop-app>.desktop-rail .desktop-chat-list .desktop-sessions>button.desktop-chat-folder[data-dragging]{opacity:.45;cursor:grabbing}

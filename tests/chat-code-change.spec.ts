@@ -22,7 +22,7 @@ test('live file writes display received code and resolve into one completed edit
   const snippet=row.locator('.edit-live-snippet'),title=row.locator('.edit-summary-line');
   expect(await snippet.locator('.edit-live-line').evaluateAll(lines=>lines.map(line=>line.getAttribute('data-number')))).toEqual(['2','3','4','5']);
   const metrics=page.getByRole('group',{name:'Статистика токенов'});
-  await expect(metrics).toContainText('Сгенерировано 111');await expect(metrics).toContainText('55 токенов/с');
+  await expect(metrics).toContainText('55ток/с');
   await expect(metrics).toContainText('68% контекста');
   if(process.env.POCKET_LIVE_TOKENS_PREVIEW)await page.screenshot({path:process.env.POCKET_LIVE_TOKENS_PREVIEW,animations:'disabled'});
   expect(await snippet.evaluate(el=>getComputedStyle(el).fontFamily)).toMatch(/mono|Consolas/i);

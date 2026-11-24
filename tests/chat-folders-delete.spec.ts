@@ -58,23 +58,25 @@ test('folders are made, named, filled, collapsed, renamed and deleted',async({pa
  await expect(row(page,'claude-4')).toBeVisible();await expect(row(page,'claude-4')).not.toHaveAttribute('data-nested','true');
 });
 
-test('a right click on the chat list makes a folder at the nearest gap: between chats in the middle, after the last chat below them',async({page})=>{
+test('a folder is held with the mouse and moved among the chats and the other folders; a right click on the list makes no folder',async({page})=>{
  await chats(page);await desktop(page);
- const loose=page.locator(rail+' .desktop-sessions > button[data-chat-id]:not([data-nested])');
- const order=async()=>page.locator(rail+' .desktop-sessions > button').evaluateAll(list=>list.map(b=>b.classList.contains('desktop-chat-folder')?'folder':b.getAttribute('data-chat-id')));
- const count=await loose.count();expect(count).toBeGreaterThan(2);
- // between the first and the second chat
- // the rows touch, so a right click there opens the chat's menu; the place is taken from the gap at the pointer
- const first=(await loose.nth(0).boundingBox())!;
- await page.locator(rail+' .desktop-sessions').evaluate((list,point)=>list.dispatchEvent(new MouseEvent('contextmenu',{clientX:point.x,clientY:point.y,bubbles:true,cancelable:true})),{x:first.x+4,y:first.y+first.height+1});
- const name=page.getByRole('textbox',{name:'Folder name'});await name.fill('Middle');await name.press('Enter');
- expect((await order()).indexOf('folder')).toBe(1);
- // below every chat, far from the last one: after the last chat
+ const make=async(title:string)=>{await page.getByRole('button',{name:'New folder',exact:true}).click();const name=page.getByRole('textbox',{name:'Folder name'});await name.fill(title);await name.press('Enter');};
+ await make('First');await make('Second');
+ const order=()=>page.locator(rail+' .desktop-sessions > button').evaluateAll(list=>list.map(b=>b.classList.contains('desktop-chat-folder')?(b.querySelector('strong')?.textContent||'folder'):b.getAttribute('data-chat-id')));
+ expect((await order()).slice(0,2)).toEqual(['First','Second']);
+ // a right click on empty space of the list does not create a folder
  const list=(await page.locator(rail+' .desktop-chat-list').boundingBox())!;
  await page.mouse.click(list.x+list.width/2,list.y+list.height-8,{button:'right'});
- await name.fill('End');await name.press('Enter');
- const rows=await order();expect(rows.at(-1)).toBe('folder');expect(rows.filter(r=>r==='folder')).toHaveLength(2);
- await expect(page.locator(rail+' button.desktop-chat-folder').last()).toHaveText(/End/);
- // the places survive a reload
+ await expect(page.getByRole('textbox',{name:'Folder name'})).toHaveCount(0);expect(await page.locator(rail+' button.desktop-chat-folder').count()).toBe(2);
+ // hold "First" and drop it under the second chat outside folders: it takes that place
+ const loose=page.locator(rail+' .desktop-sessions > button[data-chat-id]:not([data-nested])');
+ const second=(await loose.nth(1).boundingBox())!;
+ await page.locator(rail+' button.desktop-chat-folder',{hasText:'First'}).dragTo(loose.nth(1),{targetPosition:{x:20,y:Math.round(second.height-4)}});
+ let rows=await order();const first=rows.indexOf('First');
+ expect(rows.indexOf('Second')).toBe(0);expect(first).toBe(3);
+ // and it stays there after a reload
  await page.reload();await expect.poll(order).toEqual(rows);
+ // dropped on the top of the list it goes back above everything
+ await page.locator(rail+' button.desktop-chat-folder',{hasText:'First'}).dragTo(page.locator(rail+' button.desktop-chat-folder',{hasText:'Second'}),{targetPosition:{x:20,y:2}});
+ rows=await order();expect(rows.slice(0,2)).toEqual(['First','Second']);
 });

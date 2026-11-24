@@ -18,8 +18,8 @@ export const palettes: Palette[] = [
 { id: 'ink', name: 'Тушь', hue: 327, hslHue: 301, preferredTheme: 'light', swatch: { dark: ['#201d23', '#d6acd8'], light: ['#f8f5ef', '#713f70'] } }];
 
 type Contrast = 'auto' | 'normal' | 'more';
-type Appearance = {chatFont:'vscode'|'golos'|'manrope'|'system'|'installed';/** The family name of an installed font, for chatFont 'installed'. */customFont:string;/** Set once the person picks a font; Golos saved before that was the old default and becomes VS Code's fonts. */fontChosen?:boolean;chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;/** Space between transcript blocks (an action line, a paragraph, a result), px. */blockGap: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
-const defaults: Appearance = { chatFont:'vscode',customFont:'',chatAlign:'center', palette: 'carbon', theme: 'dark', textSize: 14, scale: 100, spacing: 1.6, blockGap: 4, compact: false, contrast: 'auto', colorblind: false };
+type Appearance = {chatFont:'vscode'|'golos'|'manrope'|'system'|'installed';/** The family name of an installed font, for chatFont 'installed'. */customFont:string;/** Set once the person picks a font; Golos saved before that was the old default and becomes VS Code's fonts. */fontChosen?:boolean;chatAlign:'center'|'left'|'right';palette: string;theme: 'dark' | 'light' | 'system';textSize: number;scale: number;spacing: number;/** Space between transcript blocks (an action line, a paragraph, a result), px. */blockGap: number;/** How long a received text takes to appear in the chat, ms; 0 shows it at once. */textDelay: number;compact: boolean;contrast: Contrast;colorblind: boolean;};
+const defaults: Appearance = { chatFont:'vscode',customFont:'',chatAlign:'center', palette: 'carbon', theme: 'dark', textSize: 14, scale: 100, spacing: 1.6, blockGap: 4, textDelay: 500, compact: false, contrast: 'auto', colorblind: false };
 const storageKey = 'pocket-code-appearance-v1';
 const bounded = (value: unknown, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 function load(): Appearance {
@@ -32,7 +32,7 @@ function load(): Appearance {
     return { chatFont:['golos','manrope','system','installed'].includes(data.chatFont)&&!(data.chatFont==='golos'&&!data.fontChosen)?data.chatFont:'vscode',customFont:typeof data.customFont==='string'?fontName(data.customFont):'',...(data.fontChosen===true?{fontChosen:true}:{}),chatAlign:['left','center','right'].includes(data.chatAlign)?data.chatAlign:'center', palette,
       theme: ['dark', 'light', 'system'].includes(data.theme) ? data.theme : defaults.theme,
       textSize: bounded(data.textSize, 8, 22, 14), scale: bounded(data.scale, 60, 130, 100),
-      spacing: data.spacing === 1.85 ? 1.6 : bounded(data.spacing, 1.1, 2.2, 1.6), blockGap: [0, 4, 10].includes(data.blockGap) ? data.blockGap : 4, compact: data.compact === true,
+      spacing: data.spacing === 1.85 ? 1.6 : bounded(data.spacing, 1.1, 2.2, 1.6), blockGap: [0, 4, 10].includes(data.blockGap) ? data.blockGap : 4, textDelay: [0, 300, 500, 1000].includes(data.textDelay) ? data.textDelay : 500, compact: data.compact === true,
       contrast: ['auto', 'normal', 'more'].includes(data.contrast) ? data.contrast : defaults.contrast, colorblind: false /* The setting was removed; a saved choice no longer applies. */ };
   } catch {return defaults;}
 }
@@ -66,6 +66,7 @@ export function useAppearance(ownsDocument = true) {
     root.style.setProperty('--ui-scale', String(appearance.scale / 100));
     root.style.setProperty('--chat-line-height', String(appearance.spacing));
     root.style.setProperty('--chat-block-gap', appearance.blockGap + 'px');
+    root.dataset.textDelay = String(appearance.textDelay);
     try {localStorage.setItem(storageKey, JSON.stringify(appearance));setSaveError('');}
     catch {setSaveError(t("Настройки применены, но сохранить их на устройстве не удалось."));}
     return () => system.removeEventListener('change', applyTheme);
@@ -115,6 +116,8 @@ export function AppearanceSettings({ appearance, setAppearance, saveError }: Ret
         {appearance.chatFont==='installed'&&<input aria-label={t("Название установленного шрифта")} placeholder="Inter" defaultValue={appearance.customFont} maxLength={60} onBlur={(e) => setAppearance((p) => ({ ...p, customFont: fontName(e.target.value) }))} onKeyDown={(e) => {if(e.key==='Enter')(e.target as HTMLInputElement).blur();}} />}</div></div>
     <div className="setting-row" role="radiogroup" aria-labelledby="appearance-gap-title"><div><strong id="appearance-gap-title">{t("Расстояние между блоками")}</strong><small>{t("Между строками действий, абзацами ответа и результатами в чате.")}</small></div>
       <div className="segmented-options">{([[0, 'Плотно'], [4, 'Обычно'], [10, 'Свободно']] as const).map(([value, title]) => <label key={value}><input type="radio" name="appearance-gap" checked={appearance.blockGap === value} onChange={() => setAppearance((p) => ({ ...p, blockGap: value }))} /><span>{t(title)}</span></label>)}</div></div>
+    <div className="setting-row" role="radiogroup" aria-labelledby="appearance-delay-title"><div><strong id="appearance-delay-title">{t("Плавное появление текста")}</strong><small>{t("Текст, который пришёл сразу, появляется в чате по словам за это время.")}</small></div>
+      <div className="segmented-options">{([[0, 'Сразу'], [300, '0,3 с'], [500, '0,5 с'], [1000, '1 с']] as const).map(([value, title]) => <label key={value}><input type="radio" name="appearance-delay" checked={appearance.textDelay === value} onChange={() => setAppearance((p) => ({ ...p, textDelay: value }))} /><span>{t(title)}</span></label>)}</div></div>
     {undo ? <Notice tone="info" action={<button type="button" className="secondary" onClick={() => { setAppearance({ ...undo }); setUndo(null); }}>{t("Отменить")}</button>}>{t("Оформление сброшено.")}</Notice>
       : <button type="button" className="text-button appearance-reset" disabled={!changed} onClick={() => { setUndo({ ...appearance }); setAppearance({ ...defaults }); }}><RotateCcw size={16} aria-hidden="true" />{t("Сбросить оформление")}</button>}
     {saveError && <p role="alert" className="error-banner">{t(saveError)}</p>}

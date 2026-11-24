@@ -26,7 +26,10 @@ test('a scheduled task is created from the chat list with a provider, folder and
   await page.setViewportSize({width:1440,height:900});await desktop(page);
   const rail=page.locator('.desktop-rail');
   // the Scheduled block is always there, with its own "+" and a line while it is empty; the Chats heading holds the new folder icon
-  await expect(rail.locator('.scheduled-tasks')).toContainText('No scheduled tasks yet');
+  await expect(rail.locator('.scheduled-tasks .desktop-list-heading')).toContainText('Scheduled chats');
+  await expect(rail.locator('.scheduled-tasks')).not.toContainText('No scheduled tasks yet');
+  const back=await rail.locator('.scheduled-tasks-body').evaluate(element=>({color:getComputedStyle(element).backgroundColor,rail:getComputedStyle(document.querySelector('.desktop-rail')!).backgroundColor,height:element.getBoundingClientRect().height}));
+  expect(back.color).not.toBe(back.rail);expect(back.height).toBeGreaterThan(20);
   await expect(rail.locator('.desktop-list-heading').filter({hasText:'Chats'}).getByRole('button',{name:'New folder'})).toBeVisible();
   await expect(rail.getByRole('button',{name:'New scheduled task'})).toHaveCount(1);
   await rail.getByRole('button',{name:'New scheduled task',exact:true}).click();
@@ -89,7 +92,7 @@ test('the "…" menu pauses, runs now and deletes a scheduled task',async({page}
   const confirm=page.getByRole('dialog',{name:'Delete scheduled task'});
   await expect(confirm).toContainText('Weekday morning brief');
   await confirm.getByRole('button',{name:'Delete',exact:true}).click();
-  await expect(page.locator('.desktop-rail .scheduled-task')).toHaveCount(0);await expect(page.locator('.desktop-rail .scheduled-tasks')).toContainText('No scheduled tasks yet');
+  await expect(page.locator('.desktop-rail .scheduled-task')).toHaveCount(0);await expect(page.locator('.desktop-rail .scheduled-tasks-body')).toBeVisible();
   const paths=await page.evaluate(()=>(window as any).scheduledCalls.filter((call:any)=>call.data).map((call:any)=>call.path));
   expect(paths).toEqual(['/scheduled-tasks/44444444-4444-4444-8444-444444444444','/scheduled-tasks/44444444-4444-4444-8444-444444444444/run','/scheduled-tasks/44444444-4444-4444-8444-444444444444/delete']);
   // The chats of earlier runs stay in the list.

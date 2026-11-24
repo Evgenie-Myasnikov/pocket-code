@@ -90,7 +90,7 @@ function readFolders():ChatFolder[]{
   catch{return [];}
 }
 function writeFolders(folders:ChatFolder[]){try{localStorage.setItem(FOLDERS,JSON.stringify(folders));}catch{/* The folders still hold until the window closes. */}}
-const CHAT_DRAG='application/x-pocket-chat';
+const CHAT_DRAG='application/x-pocket-chat',FOLDER_DRAG='application/x-pocket-folder';
 const providerNames:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'Copilot'};
 type Props={
   /** Chats of every provider, newest first; each carries its provider. */
@@ -112,13 +112,26 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
   const changeFolders=(change:(old:ChatFolder[])=>ChatFolder[])=>setFolders(old=>{const next=change(old);writeFolders(next);return next;});
   /** Moves a chat out of every folder and, unless folder is null, into that one. */
   const moveChat=(id:string,folder:string|null)=>changeFolders(old=>old.map(f=>({...f,chats:f.id===folder?[...f.chats.filter(c=>c!==id),id]:f.chats.filter(c=>c!==id)})));
-  const createFolder=(chat?:string,at?:number)=>{const id=crypto.randomUUID();changeFolders(old=>[...old.map(f=>chat?{...f,chats:f.chats.filter(c=>c!==chat)}:f),{id,name:l('New folder','Новая папка'),collapsed:false,chats:chat?[chat]:[],...(at?{at}:{})}]);setRenaming(id);};
-  /** A right click on the list outside a row makes a folder in the nearest gap between rows: below every chat it goes last, between two chats it goes between them. */
-  function folderHere(event:MouseEvent){
-    if(showArchived||(event.target as HTMLElement).closest('button,a,input,form,.chat-list-action-slot'))return;
-    event.preventDefault();
-    const loose=Array.from(tree.current?.querySelectorAll<HTMLElement>('.desktop-sessions > button[data-chat-id]:not([data-nested])')||[]);
-    createFolder(undefined,loose.filter(row=>{const box=row.getBoundingClientRect();return box.top+box.height/2<event.clientY;}).length);
+  const createFolder=()=>{const id=crypto.randomUUID();changeFolders(old=>[...old,{id,name:l('New folder','Новая папка'),collapsed:false,chats:[]}]);setRenaming(id);};
+  const [draggingFolder,setDraggingFolder]=useState<string>();
+  /**
+   * Puts a folder where the pointer was let go, among the other folders and the chats outside folders: it goes after every one
+   * whose middle is above the pointer. Each folder keeps how many outside chats come before it, so the order survives a reload.
+   */
+  function placeFolder(id:string,y:number){
+    const items=Array.from(tree.current?.querySelectorAll<HTMLElement>('.desktop-sessions > button.desktop-chat-folder, .desktop-sessions > button[data-chat-id]:not([data-nested])')||[]);
+    const order=items.filter(item=>item.dataset.folderId!==id).map(item=>({folder:item.dataset.folderId,above:item.getBoundingClientRect().top+item.getBoundingClientRect().height/2<y}));
+    const at=order.filter(item=>item.above).length;
+    order.splice(at,0,{folder:id,above:false});
+    changeFolders(old=>{
+      const byId=new Map(old.map(f=>[f.id,f]));let loose=0;const next:ChatFolder[]=[];
+      for(const item of order){
+        if(!item.folder){loose++;continue;}
+        const f=byId.get(item.folder);
+        if(f){const {at:_old,...rest}=f;next.push(loose?{...rest,at:loose}:rest);byId.delete(item.folder);}
+      }
+      return [...next,...byId.values()];
+    });
   }
   const flip=(key:string,set:(update:(old:Set<string>)=>Set<string>)=>void,id:string)=>set(old=>{const next=new Set(old);if(next.has(id))next.delete(id);else next.add(id);writeIds(key,next);return next;});
   const archivedCount=allSessions.filter(s=>archived.has(s.sessionId)).length;
@@ -193,9 +206,9 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
     </div>}
     {!showArchived&&beforeChats}
     {!showArchived&&<div className="desktop-list-heading"><span className="desktop-list-heading-title">{l('Chats','Чаты')}</span><button type="button" className="icon-button desktop-list-heading-action desktop-new-folder" aria-label={l('New folder','Новая папка')} title={l('New folder','Новая папка')} onClick={()=>createFolder()}><FolderPlus size={16} aria-hidden="true"/></button></div>}
-    <div ref={tree} className="desktop-session-groups desktop-chat-list" onContextMenu={folderHere}>{loading&&!ordered.length?<p role="status">{l('Loading chats…','Загружаем чаты…')}</p>:
-      <div className="desktop-sessions" onDragOver={e=>{if(e.dataTransfer.types.includes(CHAT_DRAG))e.preventDefault();}}
-        onDrop={e=>{const id=e.dataTransfer.getData(CHAT_DRAG);setDropTarget(undefined);if(id&&!(e.target as HTMLElement).closest('.desktop-chat-folder')){e.preventDefault();moveChat(id,null);}}}>{(()=>{
+    <div ref={tree} className="desktop-session-groups desktop-chat-list">{loading&&!ordered.length?<p role="status">{l('Loading chats…','Загружаем чаты…')}</p>:
+      <div className="desktop-sessions" onDragOver={e=>{if(e.dataTransfer.types.includes(CHAT_DRAG)||e.dataTransfer.types.includes(FOLDER_DRAG))e.preventDefault();}}
+        onDrop={e=>{const folder=e.dataTransfer.getData(FOLDER_DRAG);if(folder){e.preventDefault();setDraggingFolder(undefined);placeFolder(folder,e.clientY);return;}const id=e.dataTransfer.getData(CHAT_DRAG);setDropTarget(undefined);if(id&&!(e.target as HTMLElement).closest('.desktop-chat-folder')){e.preventDefault();moveChat(id,null);}}}>{(()=>{
         let row=0;
         const chatRow=(s:Session,nested:boolean)=>{
           const index=++row;
@@ -217,7 +230,8 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
           const header=renaming===f.id
             ?<form className="desktop-chat-folder desktop-chat-folder-rename" style={{gridRow:index}} onSubmit={e=>{e.preventDefault();const name=new FormData(e.currentTarget).get('name')?.toString().trim();if(name)changeFolders(old=>old.map(x=>x.id===f.id?{...x,name:name.slice(0,120)}:x));setRenaming(undefined);}}>
                <Folder size={15} aria-hidden="true"/><input name="name" autoFocus aria-label={l('Folder name','Название папки')} defaultValue={f.name} maxLength={120} onFocus={e=>e.currentTarget.select()} onBlur={e=>e.currentTarget.form?.requestSubmit()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setRenaming(undefined);}}}/></form>
-            :<><button type="button" className="desktop-chat-folder" style={{gridRow:index}} data-folder-id={f.id} data-drop={dropTarget===f.id||undefined} aria-expanded={!f.collapsed}
+            :<><button type="button" className="desktop-chat-folder" style={{gridRow:index}} data-folder-id={f.id} data-drop={dropTarget===f.id||undefined} data-dragging={draggingFolder===f.id||undefined} aria-expanded={!f.collapsed}
+               draggable={!showArchived} onDragStart={e=>{e.dataTransfer.setData(FOLDER_DRAG,f.id);e.dataTransfer.effectAllowed='move';setDraggingFolder(f.id);}} onDragEnd={()=>setDraggingFolder(undefined)}
                onClick={()=>changeFolders(old=>old.map(x=>x.id===f.id?{...x,collapsed:!x.collapsed}:x))} onDoubleClick={()=>setRenaming(f.id)}
                onContextMenu={e=>{e.preventDefault();setFolderMenu({id:f.id,x:e.clientX,y:e.clientY});}}
                onDragOver={e=>{if(e.dataTransfer.types.includes(CHAT_DRAG)){e.preventDefault();e.stopPropagation();setDropTarget(f.id);}}} onDragLeave={()=>setDropTarget(old=>old===f.id?undefined:old)}

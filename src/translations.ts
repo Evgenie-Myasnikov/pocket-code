@@ -1734,4 +1734,10 @@ export const english: Record<string, string> = {
   'без ответа': 'no answer',
   'Вопрос отклонён': 'Question declined',
   'Пустой файл': 'Empty file',
+  'Плавное появление текста': 'Smooth text',
+  'Текст, который пришёл сразу, появляется в чате по словам за это время.': 'Text that arrives at once appears in the chat word by word over this time.',
+  'Сразу': 'At once',
+  '0,3 с': '0.3 s',
+  '0,5 с': '0.5 s',
+  '1 с': '1 s',
 };

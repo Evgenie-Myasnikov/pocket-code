@@ -48,3 +48,7 @@ details[open]>summary>.chat-disclosure-chevron{transform:rotate(90deg)}
 .markdown[data-caret]>div>blockquote:last-child>:last-child::after{content:'';display:inline-block;width:7px;height:15px;margin-left:3px;vertical-align:-2px;background:var(--accent);border-radius:2px;animation:chat-caret-blink 1s steps(2,start) infinite}
 @keyframes chat-caret-blink{50%{opacity:0}}
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.conversation-inner .message,.conversation-inner .tool-card{animation:none}.markdown[data-caret] *::after{animation:none}}
+
+/* A word of the answer fades in with a short rise and a trace of blur, then settles (Strata-like). Inline words cannot move, so they are inline blocks. */
+[data-sd-animate]{display:inline-block;white-space:pre-wrap}
+@keyframes sd-chatWord{from{opacity:0;transform:translateY(3px);filter:blur(1.5px)}to{opacity:1;transform:none;filter:none}}
