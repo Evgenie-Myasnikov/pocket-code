@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
-import {ChevronDown,ChevronRight,Clock3,MoreHorizontal,Pause,Pencil,Play,Plus,RotateCw,Trash2} from 'lucide-react';
+import {BookmarkPlus,ChevronDown,ChevronRight,Clock3,MoreHorizontal,Pause,Pencil,Play,Plus,RotateCw,Trash2} from 'lucide-react';
 import {CardActionMenu} from './CardActionMenu';
 import {HeaderModelMenu} from './HeaderModelMenu';
+import {ImproveTaskText} from './ImproveTaskText';
 import {useClaudeModels} from './ModelPicker';
 import {request,type Connection} from './api';
 import {useCustomModels} from './custom-account';
@@ -14,6 +15,23 @@ import type {Session} from './session';
 import './scheduled-tasks.css';
 
 type Provider='claude'|'codex'|'copilot';
+/**
+ * A plan chat kept as a template: its name, prompt and schedule. The provider, model and folder are chosen when a task
+ * is made from it, so one template serves any provider. Templates belong to this PC window, like its folders.
+ */
+export type ScheduledTemplate={id:string;name:string;prompt:string;schedule:Schedule};
+const TEMPLATES='pocket-scheduled-templates';
+export function readTemplates():ScheduledTemplate[]{
+  try{const value=JSON.parse(localStorage.getItem(TEMPLATES)||'[]');
+    return Array.isArray(value)?value.filter(item=>item&&typeof item.id==='string'&&typeof item.name==='string'&&typeof item.prompt==='string'&&item.schedule&&typeof item.schedule.kind==='string').slice(0,50):[];}
+  catch{return [];}
+}
+function writeTemplates(list:ScheduledTemplate[]){try{localStorage.setItem(TEMPLATES,JSON.stringify(list.slice(0,50)));}catch{/* The template holds until the window closes. */}}
+/** Keeps a task's name, prompt and schedule; a template of the same name is replaced. */
+export function saveTemplate(task:{name:string;prompt:string;schedule:Schedule}){
+  const others=readTemplates().filter(item=>item.name!==task.name);
+  writeTemplates([{id:crypto.randomUUID(),name:task.name,prompt:task.prompt,schedule:task.schedule},...others]);
+}
 export type {ScheduledTask};
 /** Other parts of the window (the editor) ask the list to read the tasks again. */
 export const SCHEDULED_TASKS_CHANGED='pocket-scheduled-tasks';
@@ -36,7 +54,8 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
   onNew?():void;
 }){
   const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
-  const [tasks,setTasks]=useState<ScheduledTask[]>([]),[menu,setMenu]=useState<{task:ScheduledTask;x:number;y:number}>(),[removing,setRemoving]=useState<ScheduledTask>(),[error,setError]=useState('');
+  const [tasks,setTasks]=useState<ScheduledTask[]>([]),[menu,setMenu]=useState<{task:ScheduledTask;x:number;y:number}>(),[removing,setRemoving]=useState<ScheduledTask>(),[error,setError]=useState(''),[notice,setNotice]=useState('');
+  useEffect(()=>{if(!notice)return;const timer=window.setTimeout(()=>setNotice(''),3500);return()=>window.clearTimeout(timer);},[notice]);
   const load=async()=>{try{const list=await request<ScheduledTask[]>(connection,'/scheduled-tasks');setTasks(Array.isArray(list)?list:[]);}catch{/* An older host has no scheduled tasks; the list stays as it was. */}};
   useEffect(()=>{if(!online)return;const stop=startVisiblePoll(load,30000);window.addEventListener(SCHEDULED_TASKS_CHANGED,load);return()=>{stop();window.removeEventListener(SCHEDULED_TASKS_CHANGED,load);};},[online,connection.url,connection.token]);
   const act=async(path:string,data:unknown={})=>{setError('');try{await request(connection,path,data);}catch(e){setError((e as Error).message);}await load();};
@@ -74,11 +93,12 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
           onClick={e=>{const rect=e.currentTarget.getBoundingClientRect();setMenu(menu?.task.id===task.id?undefined:{task,x:rect.right+6,y:rect.top});}}><MoreHorizontal size={18} aria-hidden="true"/></button>
       </div>;
     })}
-    {error&&<p className="scheduled-tasks-error" role="alert">{error}</p>}</div>}
+    {error&&<p className="scheduled-tasks-error" role="alert">{error}</p>}{notice&&<p className="scheduled-tasks-notice" role="status">{notice}</p>}</div>}
     {menu&&<CardActionMenu point={menu} label={l('Scheduled task actions','Действия запланированной задачи')} onClose={()=>setMenu(undefined)} items={[
       {label:menu.task.paused?l('Resume','Возобновить'):l('Pause','Приостановить'),Icon:menu.task.paused?Play:Pause,disabled:!online,onSelect:()=>void act('/scheduled-tasks/'+menu.task.id,{paused:!menu.task.paused})},
       {label:l('Edit','Изменить'),Icon:Pencil,disabled:!online,onSelect:()=>onEdit(menu.task)},
       {label:l('Run now','Запустить сейчас'),Icon:RotateCw,disabled:!online,onSelect:()=>void act('/scheduled-tasks/'+menu.task.id+'/run')},
+      {label:l('Save as template','Сохранить как шаблон'),Icon:BookmarkPlus,onSelect:()=>{saveTemplate(menu.task);setNotice(l('Saved as a template: it can be made for any provider with "+".','Сохранено как шаблон: из него можно создать задачу для любого провайдера через «+».'));}},
       {label:l('Delete','Удалить'),Icon:Trash2,danger:true,disabled:!online,onSelect:()=>setRemoving(menu.task)}]}/>}
     {removing&&<ScheduleDialog label={l('Delete scheduled task','Удалить запланированную задачу')} onClose={()=>setRemoving(undefined)}>
       <h2>{l('Delete scheduled task','Удалить запланированную задачу')}</h2>
@@ -112,6 +132,15 @@ export function ScheduledTaskDialog({connection,task,defaultCwd,folders,onClose,
   const [provider,setProvider]=useState<Provider>(task?.provider||'claude'),[account,setAccount]=useState(task?.account||''),[model,setModel]=useState(task?.model||'');
   const [kind,setKind]=useState<Schedule['kind']>(task?.schedule.kind||'weekdays'),[time,setTime]=useState(task&&task.schedule.kind!=='interval'?task.schedule.time:'09:00'),[hours,setHours]=useState(task?.schedule.kind==='interval'?task.schedule.hours:4);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
+  // A local model is kept by its id: it is started for each run, not now.
+  const [localModel,setLocalModel]=useState(task?.localModel||'');
+  const [templates,setTemplates]=useState(readTemplates),[template,setTemplate]=useState('');
+  function applyTemplate(id:string){
+    setTemplate(id);const chosen=templates.find(item=>item.id===id);if(!chosen)return;
+    setName(chosen.name);setPrompt(chosen.prompt);setKind(chosen.schedule.kind);
+    if(chosen.schedule.kind==='interval')setHours(chosen.schedule.hours);else setTime(chosen.schedule.time);
+  }
+  function dropTemplate(){const rest=templates.filter(item=>item.id!==template);writeTemplates(rest);setTemplates(rest);setTemplate('');}
   const claude=useClaudeModels(connection,provider,cwd),custom=useCustomModels(connection,provider==='claude'?account:'');
   const [catalog,setCatalog]=useState<Record<string,ProviderModel[]>>({});
   useEffect(()=>{let live=true;void request<{id:string;models?:ProviderModel[]}[]>(connection,'/providers').then(list=>{if(live&&Array.isArray(list))setCatalog(Object.fromEntries(list.map(item=>[item.id,item.models||[]])));}).catch(()=>{});return()=>{live=false;};},[connection.url,connection.token]);
@@ -121,19 +150,23 @@ export function ScheduledTaskDialog({connection,task,defaultCwd,folders,onClose,
   async function save(event:React.FormEvent){
     event.preventDefault();if(busy)return;
     if(!name.trim()||!prompt.trim()||!cwd){setError(l('Fill in the name, the prompt and the folder.','Заполните название, промпт и папку.'));return;}
-    if(provider==='claude'&&account&&!(model||custom.model)){setError(l('Choose a model of this connection.','Выберите модель этого подключения.'));return;}
+    if(!localModel&&provider==='claude'&&account&&!(model||custom.model)){setError(l('Choose a model of this connection.','Выберите модель этого подключения.'));return;}
     setBusy(true);setError('');
-    const body={name:name.trim(),prompt:prompt.trim(),provider,account:provider==='claude'?account:'',model:provider==='claude'&&account?model||custom.model:model,cwd,schedule};
+    const body={name:name.trim(),prompt:prompt.trim(),provider,account:provider==='claude'&&!localModel?account:'',model:localModel?'':provider==='claude'&&account?model||custom.model:model,cwd,schedule,localModel};
     try{await request(connection,task?'/scheduled-tasks/'+task.id:'/scheduled-tasks',body);changed();onClose();}
     catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   const title=task?l('Edit scheduled task','Изменить запланированную задачу'):l('New scheduled task','Новая запланированная задача');
   return <ScheduleDialog label={title} onClose={onClose}><form onSubmit={e=>void save(e)}>
     <h2>{title}</h2>
-    <label>{l('Name','Название')}<input value={name} maxLength={120} placeholder={l('Weekday morning brief','Утренняя сводка по будням')} onChange={e=>setName(e.target.value)}/></label>
-    <label>{l('Prompt','Промпт')}<textarea value={prompt} maxLength={20000} rows={5} placeholder={l('What should the agent do at each run?','Что агент делает при каждом запуске?')} onChange={e=>setPrompt(e.target.value)}/></label>
+    {!task&&templates.length>0&&<div className="scheduled-task-template"><label>{l('Template','Шаблон')}<select value={template} onChange={e=>applyTemplate(e.target.value)}>
+      <option value="">{l('No template','Без шаблона')}</option>{templates.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      {template&&<button type="button" className="text-button" onClick={dropTemplate}>{l('Delete template','Удалить шаблон')}</button>}</div>}
+    <label>{l('Name','Название')}<span className="scheduled-task-input"><input value={name} maxLength={120} placeholder={l('Weekday morning brief','Утренняя сводка по будням')} onChange={e=>setName(e.target.value)}/>{cwd&&<ImproveTaskText connection={connection} cwd={cwd} provider={provider} field="title" value={name} context={prompt} maxLength={120} compact onApply={setName}/>}</span></label>
+    <label>{l('Prompt','Промпт')}<span className="scheduled-task-input"><textarea value={prompt} maxLength={20000} rows={5} placeholder={l('What should the agent do at each run?','Что агент делает при каждом запуске?')} onChange={e=>setPrompt(e.target.value)}/>{cwd&&<ImproveTaskText connection={connection} cwd={cwd} provider={provider} field="instructions" value={prompt} context={name} maxLength={20000} compact onApply={setPrompt}/>}</span></label>
     <div className="scheduled-task-field"><span>{l('Provider and model','Провайдер и модель')}</span>
-      <HeaderModelMenu connection={connection} provider={provider} onProvider={value=>{setProvider(value);setModel('');}} account={account} onAccount={value=>{setAccount(value);setModel('');}} models={models} model={provider==='claude'&&account?model||custom.model:model} onModel={setModel} onManage={onManage}/></div>
+      <HeaderModelMenu connection={connection} provider={provider} onProvider={value=>{setProvider(value);setModel('');setLocalModel('');}} account={account} onAccount={value=>{setAccount(value);setModel('');setLocalModel('');}} models={localModel?[]:models} model={provider==='claude'&&account?model||custom.model:model} onModel={setModel} onManage={onManage}
+        localModel={localModel} onLocalModel={id=>{setLocalModel(id);setProvider('claude');setAccount('');setModel('');}}/></div>
     <label>{l('Folder','Папка')}<select value={cwd} onChange={e=>setCwd(e.target.value)}>{!cwd&&<option value="">—</option>}{choices.map(folder=><option key={folder} value={folder} title={folder}>{basename(folder)}</option>)}</select></label>
     <fieldset className="scheduled-task-schedule"><legend>{l('Schedule','Расписание')}</legend>
       <select aria-label={l('Repeat','Повтор')} value={kind} onChange={e=>setKind(e.target.value as Schedule['kind'])}>

@@ -10,7 +10,7 @@ export {suggestedTaskChecks,type TaskCheck,type TaskCheckEvidence} from './task-
 export type TaskStage='questions'|'working'|'checks'|'review'|'approved'|'failed';
 export type TaskProvider='claude'|'codex'|'copilot';
 export type TaskNoteSnapshot={title:string;description:string;branch:string;priority:'critical'|'high'|'normal'|'low'};
-type ObservedJob={id:string;status:'running'|'done'|'error'|'stopped';sessionId?:string;approvals?:unknown[];error?:string};
+type ObservedJob={id:string;status:'running'|'done'|'error'|'stopped';sessionId?:string;approvals?:unknown[];error?:string;pausedFor?:'local-model'};
 export type TaskRun={
   id:string;boardId:string;noteId:string;noteRevision:string;title:string;provider:TaskProvider;projectPath:string;ownerId?:string;
   noteSnapshot?:TaskNoteSnapshot;
@@ -119,10 +119,12 @@ export class TaskRuns{
     const run=this.find(id);if(run.jobId!==job.id)return copy(run);
     const previous=run.jobs.at(-1);if(!previous||previous.status!=='running')return copy(run);
     const sessionId=job.sessionId??run.sessionId;
-    const stage:TaskStage=job.status==='running'?(job.approvals?.length?'questions':'working'):job.status==='done'?'checks':job.status==='error'?'failed':'questions';
+    // A turn paused for a local model swap stays at work: its continuation is attached as the next attempt.
+    const paused=job.status==='stopped'&&job.pausedFor==='local-model';
+    const stage:TaskStage=job.status==='running'?(job.approvals?.length?'questions':'working'):job.status==='done'?'checks':job.status==='error'?'failed':paused?'working':'questions';
     if(previous.status===job.status&&previous.sessionId===sessionId&&stage===run.stage)return copy(run);
     const linked={...previous,sessionId,status:job.status,...(job.status==='running'?{}:{endedAt:Date.now()})};
-    return this.update(run,{sessionId,stage,error:job.status==='error'?'The agent stopped with an error. Open its chat for details.':job.status==='stopped'?'The agent was stopped. Resume explicitly when ready.':undefined,jobs:[...run.jobs.slice(0,-1),linked]});
+    return this.update(run,{sessionId,stage,error:job.status==='error'?'The agent stopped with an error. Open its chat for details.':paused?'Paused while the local model is swapped for a scheduled run. It continues when the model is back.':job.status==='stopped'?'The agent was stopped. Resume explicitly when ready.':undefined,jobs:[...run.jobs.slice(0,-1),linked]});
   });}
   resume(id:string,revision:number){return this.serial(async()=>{
     const run=this.current(id,revision);this.editable(run);

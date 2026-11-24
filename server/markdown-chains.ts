@@ -63,11 +63,14 @@ type Options = {
   accountName?(id: string): Promise<string | undefined>;
   manageChats?(targets:ChainChatTarget[],confirmed:ChainDeleteChat[]|undefined,eraseOriginals:boolean):Promise<ChainDeletePreview>;
   eraseChainFiles?(chainId:string,jobIds:string[]):Promise<void>;
-  start(input: ChainInput, jobId: string, prompt: string, verifiedCwd?:string, sourcePaths?:string[]): Promise<JobView> | JobView;
+  /** `sessionId` continues the step's own chat (a step paused for a local model swap). */
+  start(input: ChainInput, jobId: string, prompt: string, verifiedCwd?:string, sourcePaths?:string[], sessionId?:string): Promise<JobView> | JobView;
   view(jobId: string): Promise<JobView | undefined> | JobView | undefined;
   stop(jobId: string): Promise<void> | void;
   intervalMs?: number;
 };
+/** The turn that continues a chain step paused for a local model swap, in the step's own session. */
+export const CHAIN_SWAP_CONTINUATION = 'The local model was swapped for a scheduled run and interrupted this step. It is back now: continue the same step from where you stopped and finish it as its instructions say, including the completion line.';
 const uuid = /^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const activeStep = (step: MarkdownChainStep) => step.status === 'running' || step.status === 'waiting';
 const sameScope = (chain: ChainScope, scope: ChainScope) =>
@@ -191,6 +194,7 @@ export class MarkdownChains {
       } else if (record.chain.status === 'running') {
         const step = record.chain.steps.find(activeStep) || record.chain.steps.find(s => s.status === 'pending');
         if (step) {
+          delete step.paused; delete step.resumeJobId;
           step.status = 'failed'; step.error = 'Host restarted. Check the chat before repeating this task.';
         }
         record.chain.status = 'failed';
@@ -492,6 +496,8 @@ export class MarkdownChains {
       }
       const retry = record.chain.steps.find(s => s.retryAt !== undefined);
       if (retry) { delete retry.retryAt; retry.status = 'stopped'; }
+      const paused = record.chain.steps.find(s => s.paused && !s.jobId && s.status === 'pending');
+      if (paused) { delete paused.paused; delete paused.resumeJobId; paused.status = 'stopped'; }
       if (step && activeStep(step)) step.status = 'stopped';
       if (record.chain.status === 'running') record.chain.status = 'stopped';
       await this.save(record);
@@ -503,8 +509,17 @@ export class MarkdownChains {
     captureOutput(chain, step, job);
     if (job.status === 'running') {
       step.status = job.approvals.length ? 'waiting' : 'running';
+      // A continuation waiting for the local model to come back still shows the step as paused.
+      if (job.heldFor) step.paused = job.heldFor; else delete step.paused;
       return;
     }
+    // Paused, not stopped: the chain goes on and the step continues in its session once the model is back.
+    if (job.status === 'stopped' && job.pausedFor) {
+      step.status = 'pending'; step.paused = job.pausedFor;
+      if (job.resumedBy) step.resumeJobId = job.resumedBy;
+      return;
+    }
+    delete step.paused;
     if (job.status === 'done') {
       const last = job.messages.filter(m => m.role === 'assistant').at(-1);
       const reply = last?.blocks.filter(b => b.type === 'text').map(b => b.text).join('\n').trimEnd() || '';
@@ -594,11 +609,16 @@ export class MarkdownChains {
       const changed = childrenChanged || step.status !== old.status || step.sessionId !== old.sessionId;
       // The attempt of the finished lap is recorded before its steps are queued again.
       if (changed) record.chain.steps.forEach((_,i)=>updateAttempt(record,i));
+      // A paused step lets go of its stopped job; the next tick starts its continuation.
+      if (step.paused && step.status === 'pending') delete step.jobId;
       this.nextLap(record);
       if (changed) await this.save(record);
       return;
     }
-    const jobId = randomUUID();
+    const resume = step.paused && step.sessionId ? step.sessionId : undefined;
+    const jobId = resume && step.resumeJobId || randomUUID();
+    delete step.resumeJobId;
+    if (!resume) delete step.paused;
     step.jobId = jobId; step.status = 'running';
     await this.save(record);
     record = structuredClone(record); chain = record.chain;
@@ -628,12 +648,14 @@ export class MarkdownChains {
         current.worktreeCwd=tree.cwd;
         this.options.registerTree?.(current.worktreeCwd);
       }
-      if(input.sourceFiles?.length && this.options.prepareSources){
+      if(input.sourceFiles?.length && this.options.prepareSources && !resume){
         const paths=await this.options.prepareSources(id,input.sourceFiles);
         if(Object.keys(paths).length)current.uploadPaths=paths;
       }
       await this.save(structuredClone(record));
-      const job = await this.options.start(input, jobId, buildChainStepPrompt(chain, index),current.launchCwd,Object.values(current.uploadPaths??{}));
+      const job = resume
+        ? await this.options.start(input, jobId, CHAIN_SWAP_CONTINUATION, current.launchCwd, [], resume)
+        : await this.options.start(input, jobId, buildChainStepPrompt(chain, index),current.launchCwd,Object.values(current.uploadPaths??{}));
       this.observe(chain, current, job);
     } catch (error) {
       const started = await this.options.view(jobId);

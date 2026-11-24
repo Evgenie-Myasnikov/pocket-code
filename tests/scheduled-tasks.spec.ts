@@ -47,7 +47,7 @@ test('a scheduled task is created from the chat list with a provider, folder and
   await dialog.getByRole('button',{name:'Create',exact:true}).click();
   await expect(dialog).toHaveCount(0);
   const created=await page.evaluate(()=>(window as any).scheduledCalls.find((call:any)=>call.path==='/scheduled-tasks'&&call.data)?.data);
-  expect(created).toEqual({name:'Weekday morning brief',prompt:'Summarise the synthetic changes since yesterday.',provider:'codex',account:'',model:'',cwd:'C:\\Demo\\Garden',schedule:{kind:'weekdays',time:'08:30'}});
+  expect(created).toEqual({name:'Weekday morning brief',prompt:'Summarise the synthetic changes since yesterday.',provider:'codex',account:'',model:'',cwd:'C:\\Demo\\Garden',schedule:{kind:'weekdays',time:'08:30'},localModel:''});
   const row=rail.locator('.scheduled-task');
   await expect(row).toHaveCount(1);
   await expect(row.getByRole('button',{name:/Weekday morning brief/})).toContainText('Weekdays at 08:30');
@@ -83,7 +83,7 @@ test('the "…" menu pauses, runs now and deletes a scheduled task',async({page}
   const row=page.locator('.desktop-rail .scheduled-task'),actions=row.getByRole('button',{name:'Scheduled task actions',exact:true});
   await row.hover();await actions.click();
   const menu=page.getByRole('menu',{name:'Scheduled task actions'});
-  await expect(menu.getByRole('menuitem')).toHaveText(['Pause','Edit','Run now','Delete']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Pause','Edit','Run now','Save as template','Delete']);
   await menu.getByRole('menuitem',{name:'Pause'}).click();
   await expect(row).toHaveAttribute('data-paused','true');await expect(row).toContainText('Paused');
   await row.hover();await actions.click();
@@ -103,4 +103,60 @@ test('the "…" menu pauses, runs now and deletes a scheduled task',async({page}
   expect(paths).toEqual(['/scheduled-tasks/44444444-4444-4444-8444-444444444444','/scheduled-tasks/44444444-4444-4444-8444-444444444444/run','/scheduled-tasks/44444444-4444-4444-8444-444444444444/delete']);
   // The chats of earlier runs stay in the list.
   await expect(page.locator('.desktop-sessions>button')).toHaveCount(2);
+});
+
+test('a plan chat is kept as a template and a new task is made from it for another provider; the fields have the AI improve button',async({page})=>{
+  await scheduledHost(page,[{...briefing,unread:false}]);
+  await page.setViewportSize({width:1440,height:900});await desktop(page);
+  const rail=page.locator('.desktop-rail'),row=rail.locator('.scheduled-task');
+  await row.getByRole('button',{name:'Scheduled task actions',exact:true}).click();
+  await page.getByRole('menu',{name:'Scheduled task actions'}).getByRole('menuitem',{name:'Save as template'}).click();
+  await expect(rail.locator('.scheduled-tasks-notice')).toContainText('Saved as a template');
+  await rail.getByRole('button',{name:'New scheduled task',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'New scheduled task'});
+  // the name and the prompt carry the "improve with AI" button, as the message field does
+  await expect(dialog.locator('.scheduled-task-input button')).toHaveCount(2);
+  await dialog.getByLabel('Template').selectOption({label:'Weekday morning brief'});
+  await expect(dialog.getByRole('textbox',{name:'Name'})).toHaveValue('Weekday morning brief');
+  await expect(dialog.getByRole('textbox',{name:'Prompt'})).toHaveValue('Summarise the synthetic changes since yesterday.');
+  await expect(dialog.getByLabel('Repeat')).toHaveValue('weekdays');await expect(dialog.getByLabel('Time')).toHaveValue('09:00');
+  await dialog.getByRole('button',{name:/^Provider and model: Claude/}).click();
+  await page.getByRole('menu',{name:'Provider and model'}).getByRole('menuitemradio',{name:'Codex'}).click();
+  await dialog.getByRole('button',{name:'Create',exact:true}).click();
+  await expect(dialog).toHaveCount(0);
+  const created=await page.evaluate(()=>(window as any).scheduledCalls.find((call:any)=>call.path==='/scheduled-tasks'&&call.data)?.data);
+  expect(created).toMatchObject({name:'Weekday morning brief',prompt:'Summarise the synthetic changes since yesterday.',provider:'codex',schedule:{kind:'weekdays',time:'09:00'}});
+  // the template stays, and it can be deleted from the dialog
+  await rail.getByRole('button',{name:'New scheduled task',exact:true}).click();
+  await dialog.getByLabel('Template').selectOption({label:'Weekday morning brief'});
+  await dialog.getByRole('button',{name:'Delete template'}).click();
+  await expect(dialog.getByLabel('Template')).toHaveCount(0);
+});
+
+test('choosing a local model for a plan chat starts nothing now: each run starts it and unloads it after',async({page})=>{
+  await scheduledHost(page);
+  await page.addInitScript(()=>{
+    const w=window as any;w.localStarts=0;
+    w.testLocalModels=(path:string)=>{
+      if(path==='/local-models')return {value:{available:true,version:'9.9.9',port:18600,models:[{id:'coder-iq1_m',name:'flash-coder-iq1_m',context:131072,ready:true}],running:[],busy:false,job:{state:'stopped'}}};
+      if(path==='/local-models/start'){w.localStarts++;return {value:{state:'starting'}};}
+      return {error:'unexpected '+path,status:404};
+    };
+  });
+  await page.setViewportSize({width:1440,height:900});await desktop(page);
+  await page.locator('.desktop-rail').getByRole('button',{name:'New scheduled task',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'New scheduled task'});
+  await dialog.getByRole('textbox',{name:'Name'}).fill('Local brief');await dialog.getByRole('textbox',{name:'Prompt'}).fill('Summarise the synthetic day.');
+  await dialog.getByRole('button',{name:/^Provider and model:/}).click();
+  const menu=page.getByRole('menu',{name:'Provider and model'});
+  const local=menu.getByRole('menuitemradio',{name:/flash-coder-iq1_m/});
+  await expect(local).toContainText('Starts for each run and unloads after it');
+  await local.click();
+  await expect(dialog.getByRole('button',{name:'Provider and model: Strata · coder-iq1_m'})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).localStarts)).toBe(0);
+  await dialog.getByRole('button',{name:'Create',exact:true}).click();
+  await expect(dialog).toHaveCount(0);
+  const created=await page.evaluate(()=>(window as any).scheduledCalls.find((call:any)=>call.path==='/scheduled-tasks'&&call.data)?.data);
+  expect(created).toMatchObject({provider:'claude',account:'',model:'',localModel:'coder-iq1_m'});
+  expect(await page.evaluate(()=>(window as any).localStarts)).toBe(0);
 });

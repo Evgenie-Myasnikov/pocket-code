@@ -66,3 +66,19 @@ test('while a turn runs and the provider has reported only the context, the chat
   // the live count has no known window, so no share of the context is borrowed from the last turn
   await expect(footer).toContainText('—% of context');
 });
+
+test('a local model that reports no output count shows an estimated speed and total while it writes',async({page})=>{
+  await page.addInitScript(()=>{
+    localStorage.setItem('pocket-code-language-v1','en');localStorage.setItem('pocket-code-background-v1',JSON.stringify({enabled:false}));
+    const w=window as any;w.testHistoryPage=()=>({messages:[],previous:null,next:null});
+    w.testRuns=[{id:'turn-fixture',provider:'claude',sessionId:'alpha',cwd:'C:\Demo\Atlas',status:'running',startedAt:Date.now(),baseMessageCount:0,approvals:[],revision:1,partial:'',
+      messages:[{id:'u',role:'user',blocks:[{type:'text',text:'Plan the features.'}]}],generation:{contextTokens:4600,contextWindow:32768,estimatedTokens:10}}];
+  });
+  await desktop(page);
+  await page.locator('.desktop-sessions>button').first().click();
+  const footer=page.getByRole('group',{name:'Token usage'});
+  await expect(footer).toContainText('≈4,600total tokens');
+  // the estimate grows as the model writes: the line shows an estimated speed
+  for(let i=1;i<=6;i++){await page.evaluate(step=>{const run=(window as any).testRuns[0];run.generation={...run.generation,estimatedTokens:10+step*40};run.revision++;},i);await page.waitForTimeout(1000);}
+  await expect(footer.locator('.chat-generation-rate b')).toHaveText(/^≈\d/);
+});

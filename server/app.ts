@@ -65,7 +65,7 @@ import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 import {ScheduledTasks} from './scheduled-tasks.js';
 
-export type Config = { port?:number; customProviders?:CustomProviders; localModels?:LocalModels;claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
+export type Config = { port?:number; customProviders?:CustomProviders; localModels?:LocalModels;/** Tests: how often a scheduled run checks a busy local model (ms). */localModelWaitMs?:number;claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
   /** How long a provider's chat listing answers without being read again, and how long it may answer while a new one loads. */
   sessionListFreshMs?: number; sessionListStaleMs?: number;
   /** List every provider chat as if imported (test fixtures that exercise listing itself). */
@@ -881,7 +881,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       try{return jobView(id);}catch(error){if(error instanceof HttpError&&error.status===404)return undefined;throw error;}
     },
     stop:id=>engineForJob(id).stop(id),
-    start:async(input,id,prompt,verifiedCwd,sourcePaths=[])=>{
+    start:async(input,id,prompt,verifiedCwd,sourcePaths=[],sessionId)=>{
       const settings=jobSettings.parse(input);
       const cwd=await allowedPath(accessRoots(),settings.cwd,true);
       validateJobSettings(settings);
@@ -898,7 +898,10 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
         message='Run the single chain step described in the attached markdown-step.md file.';
       }
       const text=attachmentPaths.length?message+'\n\nFiles attached by the user (read these local files as needed):\n'+attachmentPaths.map(file=>JSON.stringify(file)).join('\n'):message;
-      return launchJob(settings,{id,cwd:verifiedCwd??cwd,text,displayText:message,attachmentPaths,baseMessageCount:0});
+      const stepCwd=verifiedCwd??cwd;
+      // A step paused for a local model swap continues in its own session.
+      const baseMessageCount=sessionId?await sdk.getSessionMessages(sessionId,{dir:stepCwd}).then(list=>list.length,()=>0):0;
+      return launchJob(settings,{id,cwd:stepCwd,text,displayText:message,attachmentPaths,baseMessageCount,...(sessionId?{sessionId}:{})});
     },
   });
   const scopeSchema=jobSettings.pick({cwd:true,provider:true,account:true});
@@ -960,7 +963,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     z.object({kind:z.literal('interval'),hours:z.number().int().min(1).max(24)}).strict(),
   ]);
   const scheduledInput=z.object({name:z.string().trim().min(1).max(120),prompt:z.string().trim().min(1).max(20000),provider:z.enum(['claude','codex','copilot']),
-    account:z.union([z.literal(''),uuid]).optional(),model:z.union([z.literal(''),z.string().regex(modelIdPattern)]),cwd:text,schedule:scheduleSchema}).strict();
+    account:z.union([z.literal(''),uuid]).optional(),model:z.union([z.literal(''),z.string().regex(modelIdPattern)]),cwd:text,schedule:scheduleSchema,
+    localModel:z.union([z.literal(''),z.string().regex(/^[A-Za-z0-9][\w.-]{0,119}$/)]).optional()}).strict();
   // No defaults in the shared shape: a partial change (pause) must not reset the fields it leaves out.
   const scheduledCreate=scheduledInput.extend({model:scheduledInput.shape.model.default('')}).strict();
   const scheduledSettings=(task:{provider:'claude'|'codex'|'copilot';account?:string;model:string;cwd:string})=>{
@@ -969,6 +973,89 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   };
   const personalSchedules=()=>{if(workspaceAccess.current())throw new HttpError(403,'Scheduled chats belong to the connected PC');};
   const scheduledJob=(id:string)=>{try{return jobView(id);}catch{return undefined;}};
+  /** Chats that are answering through an API connection right now (a turn held for a model swap is not answering yet). */
+  const answeringThrough=(providerId:string)=>jobs.list().filter(job=>job.status==='running'&&!job.heldFor&&job.account===providerId).length;
+  type LocalContext=32768|65536|131072|262144;
+  /**
+   * A scheduled run that swaps the local model. Every Strata model answers through one API connection, so until the
+   * previous model is back, any other turn through it (a new chat, a follow-up chat, a continuation) waits.
+   */
+  let swap:{providerId:string;owner:string;done:Promise<void>;release:()=>void}|undefined;
+  jobs.hold=({id,account})=>swap&&account===swap.providerId&&id!==swap.owner?swap.done:undefined;
+  function beginSwap(providerId:string,owner:string){
+    let release!:()=>void;const done=new Promise<void>(resolve=>{release=resolve;});
+    swap={providerId,owner,done,release:()=>{if(swap?.done===done)swap=undefined;release();}};
+    return swap;
+  }
+  const swapContinuation='The local model was swapped for a scheduled run and interrupted your previous turn. It is back now: continue from where you stopped.';
+  /**
+   * Pauses the chats and chain steps answering through the running local model and queues their continuations:
+   * each one goes on in its own session once the model is back. A chain continues its own steps.
+   */
+  async function pauseAnswering(providerId:string){
+    const paused=jobs.list().filter(job=>job.status==='running'&&!job.heldFor&&job.account===providerId).map(job=>({id:job.id,next:randomUUID()})).filter(job=>jobs.pause(job.id,job.next));
+    const until=Date.now()+120000;
+    while(paused.some(job=>scheduledJob(job.id)?.status==='running')&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,Math.min(config.localModelWaitMs??1000,1000)));
+    const chainJobs=taskChains.observingJobs();
+    for(const {id} of paused){
+      if(chainJobs.has(id))continue;
+      try{
+        const job=jobs.get(id);if(!job.sessionId||job.status==='running')continue;
+        const baseMessageCount=await sdk.getSessionMessages(job.sessionId,{dir:job.cwd}).then(list=>list.length,()=>0);
+        // A board task's agent keeps its task run: the continuation is its next attempt.
+        const run=await taskRuntime?.runs.findByWorktree(job.cwd).catch(()=>undefined);
+        if(run?.jobId===id){await taskRuntime!.runs.observeJob(run.id,jobs.view(job)).catch(()=>{});await taskRuntime!.bindJob({id:job.resumedBy!,cwd:job.cwd,provider:'claude',sessionId:job.sessionId}).catch(()=>{});}
+        jobs.resumePaused(id,{text:swapContinuation,displayText:swapContinuation,baseMessageCount});
+      }catch{/* The chat stays paused; the person can continue it. */}
+    }
+  }
+  /** The local model a scheduled run asks for: the running one, or started now (the running one is paused and stopped first). */
+  async function prepareLocalModel(model:string,runId:string){
+    // One swap at a time: a second run waits until the first has brought its previous model back.
+    await waitUntil(()=>!swap,6*3600000,'Another scheduled run kept the local model for six hours; the run waits for the next time.');
+    const now=localModels.serving();
+    if(now?.model===model)return {providerId:now.providerId,started:false};
+    const status=await localModels.status();
+    if(!status.available)throw new HttpError(404,'Strata is not installed on this PC.');
+    if(status.busy)throw new HttpError(409,'The Strata app is running a model of its own; the run waits for the next time.');
+    const previous=status.running.length&&now?{model:now.model!,context:now.context}:undefined;
+    // Chats and chain steps answering through the running model pause and continue when it is back, instead of the run waiting for them.
+    const swapping=now&&previous?beginSwap(now.providerId,runId):undefined;
+    try{
+      if(swapping)await pauseAnswering(swapping.providerId);
+      if(status.running.length)await localModels.stop();
+      await localModels.start({model,context:131072,drafting:'auto'});
+      const ready=await localModels.ready();
+      return {providerId:ready.providerId,started:true,previous,swapping};
+    }catch(error){
+      if(swapping)void restorePrevious(previous,swapping);
+      throw error;
+    }
+  }
+  /** Starts the model that ran before a swap again and lets the turns that wait for it go on. */
+  async function restorePrevious(previous?:{model:string;context:number},swapping?:{release():void}){
+    try{
+      if(localModels.serving()||(await localModels.status().catch(()=>undefined))?.running.length)await localModels.stop();
+      if(previous){await localModels.start({model:previous.model,context:previous.context as LocalContext,drafting:'auto'});await localModels.ready();}
+    }catch{/* The waiting turns go on and report the connection error themselves. */}
+    finally{swapping?.release();}
+  }
+  async function waitUntil(done:()=>boolean,limitMs:number,message:string){
+    const until=Date.now()+limitMs;
+    while(!done()){if(Date.now()>until)throw new HttpError(409,message);await new Promise(resolve=>setTimeout(resolve,config.localModelWaitMs??15000));}
+  }
+  /** Unloads a model a scheduled run started, once the run has its answer and no other chat answers through it. */
+  function unloadAfter(jobId:string,providerId:string,previous?:{model:string;context:number},swapping?:{release():void}){
+    const timer=setInterval(()=>{
+      const job=scheduledJob(jobId);
+      if(job&&job.status==='running')return;
+      clearInterval(timer);
+      if(localModels.serving()?.providerId!==providerId||answeringThrough(providerId)){swapping?.release();return;}
+      // The model that was running before the run is started again; the chats and steps paused for it then continue.
+      void restorePrevious(previous,swapping);
+    },config.localModelWaitMs??5000);
+    timer.unref?.();
+  }
   const scheduled=new ScheduledTasks({
     file:path.join(config.uploads,'.tasks','scheduled-tasks.json'),
     ready:()=>!runtimeStopping&&!config.hostUpdater?.draining&&!providerConnections.isSigningIn(),
@@ -978,6 +1065,19 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       if(result.failed.length||result.running.length)throw new Error('The chat of an earlier run could not be removed yet.');
     },
     start:async(task,id)=>{
+      // A local model is started for the run if it is not running, and unloaded after the answer if this run started it.
+      if(task.localModel){
+        const local=await prepareLocalModel(task.localModel,id);
+        try{
+          const listed=await customProviders.models(local.providerId).catch(()=>[]),first=listed[0] as string|{id:string}|undefined;
+          const settings=scheduledSettings({...task,provider:'claude',account:local.providerId,model:(typeof first==='string'?first:first?.id)||task.localModel});
+          const cwd=await allowedPath(accessRoots(),settings.cwd,true);
+          return await launchJob(settings,{id,cwd,text:task.prompt,displayText:task.prompt,attachmentPaths:[],baseMessageCount:0});
+        }finally{
+          // Also when the run could not start: the previous model comes back and the paused chats continue.
+          if(local.started)unloadAfter(id,local.providerId,local.previous,local.swapping);
+        }
+      }
       const settings=scheduledSettings(task);
       const cwd=await allowedPath(accessRoots(),settings.cwd,true);
       return launchJob(settings,{id,cwd,text:task.prompt,displayText:task.prompt,attachmentPaths:[],baseMessageCount:0});

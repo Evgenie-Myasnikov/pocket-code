@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.29.3 (2026-11-25)
+
+### Validation
+
+- Server and unit tests from PowerShell: 637 tests, 633 passed, 1 skipped, 3 failed, the same three as on earlier releases (the run of the pause and resume work on this code). A second run for the release stopped printing after the Codex limits tests, as on earlier releases, and was ended.
+- Browser scenarios on Edge: 48 passed in one run across plan chats (templates, local models), local models, the token line, motion, selection, the local model banner, the chat list and folders, the side panel, the turn result, the live file write, activity groups, the follow-up composer, the Tasks provider menu and the chains. The chain delete and step navigation scenarios that fail here fail the same way on 0.29.2.
+- Not checked: a real Strata model swap with a running chain, a real scheduled run, the installed Windows application, a phone.
+
+### Features
+
+- Plan chat templates (2026-11-25). A plan chat's "…" menu has Save as template: its name, prompt and schedule are kept in this PC window. The "+" of Plan chats then offers a Template choice that fills them in, while the provider, model and folder are chosen as for any new task, so one template serves any provider; a template can be deleted from the same dialog.
+  - Validation: a browser scenario (save, make a task from the template for Codex, delete the template) passed.
+- Plan chats with a local model (2026-11-25). Choosing a local model for a plan chat only records it: nothing is started and no running model is needed to create the task ("Starts for each run and unloads after it"). At each run the host starts that model if it is not running, answers through it, and unloads it after the answer if the run started it. When another local model is running, the run swaps the models (see the next entry) and after its answer starts the first model again with its own context.
+  - Validation: a server test (a stopped model is started for the run and unloaded after) and a browser scenario (choosing a local model starts nothing and the task keeps it) passed. A real Strata swap was not checked.
+- A local model swap pauses and resumes the chats on the other model (2026-11-25). A plan chat run that needs a different local model no longer waits for the chats and task chain steps answering through the running one: they are paused (shown as "Paused" for a model swap, not as an error or a stop; a chain keeps running and a board task stays at work), the models are swapped, the run answers, and once the previous model is back each paused chat gets a continuation turn in its own session and each paused chain step continues as the same step. All local models share one connection, so a chat started or written to during the swap waits ("Waiting for the local model") until the previous model is back instead of reaching the swapped one; Stop ends such a waiting turn at once. One swap runs at a time.
+  - Validation: 2 server tests (a chat and a one-step chain answering through the running model are paused, a chat sent during the swap is held, and after the previous model returns the chat continues in its session, the step finishes in its session and the held chat runs, none of them on the swapped model; a held turn that is stopped never reaches the model) passed. A real Strata swap and the paused/waiting labels in the browser were not checked.
+- AI improve on plan chat fields (2026-11-25). The name and the prompt of a plan chat carry the same "improve with AI" button as the message field.
+  - Validation: the template scenario checks both buttons.
+
+### Bug Fixes
+
+- Steady text while it writes itself (2026-11-25). Earlier characters of a reasoning (and words of an answer) jumped while new ones appeared: every new character was its own block, and when it settled into plain text the line could wrap differently. Characters and words now stay ordinary text and only the new one moves, by a relative offset that never moves the text around it.
+  - Validation: the reasoning scenario checks that a written character keeps its place while later ones appear and after its own entrance ends.
+- Tokens and speed with a local model (2026-11-25). A model behind a proxy (a local model) reports no output count while it writes, so the speed and the total showed 0 until the turn ended. The host now estimates the written tokens from the streamed text (about 4 characters each), only while the turn runs and only when the model reports nothing; the line shows that speed with ≈, and the current context with ≈ as the total until the provider's own total arrives. The estimate is never saved.
+  - Validation: 2 unit tests (an estimate for an unmetered model that the result replaces; none for a model that counts) and a browser scenario (≈ total, then ≈ speed) passed.
+
 ## [0.29.2](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.1...v0.29.2) (2026-11-25)
 
 Published [0.29.2](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.2) from [18d6adc](https://github.com/Evgenie-Myasnikov/pocket-code/commit/18d6adc321aa23b94b1da2794f6cf08b241ba42b) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

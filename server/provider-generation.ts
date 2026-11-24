@@ -12,6 +12,9 @@ export class ClaudeGeneration {
   private model='';
   private input?:number;
   private anchor?:{at:number;tokens:number};
+  /** Messages whose provider reported an output count; text of the others is estimated. */
+  private measured=new Set<string>();
+  private streamed=0;
   constructor(private now=()=>performance.now()){}
 
   private message(job:JobView,id:string,model:string,usage:ClaudeUsage|undefined){
@@ -32,6 +35,7 @@ export class ClaudeGeneration {
       if(count(cached)&&count(written))this.input=usage.input_tokens+cached+written;
     }
     const output=usage.output_tokens;
+    if(count(output)&&output>0)this.measured.add(id);
     if(!count(output)||previous!==undefined&&output<previous)return;
     const stats=job.generation??={};
     stats.outputTokens=(stats.outputTokens??0)+output-(previous??0);
@@ -47,8 +51,15 @@ export class ClaudeGeneration {
       const part=event.event;
       if(part.type==='message_start')this.message(job,part.message.id,part.message.model,part.message.usage);
       if(part.type==='message_delta')this.message(job,this.current,this.model,part.usage);
+      // A model that reports no output count while it writes (a local model behind a proxy): the streamed text gives an estimate.
+      if(part.type==='content_block_delta'&&this.current&&!this.measured.has(this.current)){
+        const delta=part.delta as {text?:string;thinking?:string;partial_json?:string};
+        const added=(delta.text||delta.thinking||delta.partial_json||'').length;
+        if(added){this.streamed+=added;(job.generation??={}).estimatedTokens=Math.ceil(this.streamed/4);}
+      }
     }else if(event.type==='assistant')this.message(job,event.message.id,event.message.model,event.message.usage);
     else if(event.type==='result'){
+      if(job.generation)delete job.generation.estimatedTokens;
       const output=event.usage?.output_tokens;
       if(count(output)&&output>0)(job.generation??={}).outputTokens=output; // Native per-turn main-loop count.
       const models=Object.entries(event.modelUsage??{});
@@ -63,7 +74,7 @@ export class ClaudeGeneration {
     }
   }
   nextTurn(job:JobView){
-    this.outputs.clear();this.current='';this.model='';this.input=undefined;this.anchor=undefined;
+    this.outputs.clear();this.current='';this.model='';this.input=undefined;this.anchor=undefined;this.measured.clear();this.streamed=0;
     const totalTokens=job.generation?.totalTokens;
     job.generation=count(totalTokens)?{totalTokens}:undefined;
   }

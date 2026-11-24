@@ -17,18 +17,20 @@ const names:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'Copi
  * providers, API connections (the local model among them) and the models of the chosen provider.
  * The models come from the provider's own catalog; a chat that has started keeps its provider.
  */
-export function HeaderModelMenu({connection,provider,onProvider,models,model,onModel,onManage,disabled,account:chosenAccount,onAccount}:{
+export function HeaderModelMenu({connection,provider,onProvider,models,model,onModel,onManage,disabled,account:chosenAccount,onAccount,localModel,onLocalModel}:{
   connection:Connection;provider:Provider;onProvider?(value:Provider):void;
   models:ProviderModel[];model:string;onModel(value:string):void;
   /** Settings → Providers: API connections are added there and the local model is started there. */onManage?():void;disabled?:boolean;
   /** A form of its own (a scheduled task) keeps its API connection here instead of changing the one chats use. */account?:string;onAccount?(id:string):void;
+  /** A scheduled task keeps a local model by its id: choosing one starts nothing now, each run starts it when needed. */
+  localModel?:string;onLocalModel?(id:string):void;
 }){
   const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
   const [open,setOpen]=useState(false),[local,setLocal]=useState<LocalModelStatus|null>(null),[localError,setLocalError]=useState(''),[pending,setPending]=useState(''),trigger=useRef<HTMLButtonElement>(null),menu=useRef<HTMLDivElement>(null);
   const {accounts}=useCustomAccountsState(connection),deviceAccount=useCustomAccount(),account=onAccount?chosenAccount||'':deviceAccount,pickAccount=onAccount||setCustomAccount,active=provider==='claude'?accounts.find(a=>a.id===account):undefined;
   const current=models.find(item=>item.id===model)||(!model?models.find(item=>item.isDefault)||(models.length===1?models[0]:undefined):undefined);
   const modelName=current?.name||model||(provider==='copilot'?'Auto':l('Default','По умолчанию'));
-  const label=(active?.name||names[provider])+' · '+modelName;
+  const label=onLocalModel&&localModel?'Strata · '+localModel:(active?.name||names[provider])+' · '+modelName;
   // The local models (Strata) on this PC, read each time the menu opens; a PC without Strata shows none.
   // While a start or stop is in progress the status is read every two seconds, also with the menu closed.
   const job=local?.job?.state,moving=job==='starting'||job==='stopping'||!!pending;
@@ -64,7 +66,7 @@ export function HeaderModelMenu({connection,provider,onProvider,models,model,onM
       onClick={()=>{if(!open)customProvidersChanged();setOpen(value=>!value);}}><ProviderMark provider={active?'custom':provider}/><span>{label}</span><ChevronDown size={14} aria-hidden="true"/></button>
     {open&&createPortal(<div ref={menu} className="header-model-menu" role="menu" aria-label={l('Provider and model','Провайдер и модель')} style={{left,top,width,maxHeight:Math.max(160,window.innerHeight-top-12)}} onKeyDown={keys}>
       {onProvider&&<><p className="header-model-group" role="presentation">{l('Providers','Провайдеры')}</p>
-        {(Object.keys(names) as Provider[]).map(id=>{const checked=provider===id&&!active;return <button key={id} type="button" role="menuitemradio" aria-checked={checked} onClick={()=>choose(()=>{pickAccount('');onProvider(id);})}><ProviderMark provider={id}/><span>{names[id]}</span>{checked&&<Check size={15} aria-hidden="true"/>}</button>;})}
+        {(Object.keys(names) as Provider[]).map(id=>{const checked=provider===id&&!active&&!(onLocalModel&&localModel);return <button key={id} type="button" role="menuitemradio" aria-checked={checked} onClick={()=>choose(()=>{pickAccount('');onProvider(id);})}><ProviderMark provider={id}/><span>{names[id]}</span>{checked&&<Check size={15} aria-hidden="true"/>}</button>;})}
         {accounts.some(a=>!(local?.available&&/^strata\b/i.test(a.name)))&&<p className="header-model-group" role="presentation">{l('API connections','API-подключения')}</p>}
         {accounts.filter(a=>!(local?.available&&/^strata\b/i.test(a.name))).map(a=><button key={a.id} type="button" role="menuitemradio" aria-checked={active?.id===a.id} onClick={()=>choose(()=>{pickAccount(a.id);onProvider('claude');})}><ProviderMark provider="custom"/><span><strong>{a.name}</strong>{!a.hasKey&&<small>{l('No API key','Нет API-ключа')}</small>}</span>{active?.id===a.id&&<Check size={15} aria-hidden="true"/>}</button>)}
       </>}
@@ -74,11 +76,12 @@ export function HeaderModelMenu({connection,provider,onProvider,models,model,onM
           const busy=pending===item.id||(local.job.state==='starting'&&local.job.model===item.id);
           // A running model is served as the API connection "Strata · <model>"; choosing it picks that connection.
           const served=running?accounts.find(a=>a.name.toLowerCase().includes(item.name.toLowerCase())||a.name.toLowerCase().includes(item.id.toLowerCase())):undefined;
-          const checked=!!served&&active?.id===served.id;
-          const note=busy?l('Starting… the window stays usable','Запускается… можно продолжать'):running?(served?l('Running','Запущена'):l('Running · connecting…','Запущена · подключается…')):item.ready?l('Downloaded, not running','Скачана, не запущена'):l('Not downloaded · Strata downloads it','Не скачана · скачивается в Strata');
+          const checked=onLocalModel?localModel===item.id:!!served&&active?.id===served.id;
+          const later=onLocalModel&&!running&&item.ready;
+          const note=later?l('Starts for each run and unloads after it','Запустится для каждого запуска и выгрузится после'):busy?l('Starting… the window stays usable','Запускается… можно продолжать'):running?(served?l('Running','Запущена'):l('Running · connecting…','Запущена · подключается…')):item.ready?l('Downloaded, not running','Скачана, не запущена'):l('Not downloaded · Strata downloads it','Не скачана · скачивается в Strata');
           return <div key={item.id} className="header-model-local" data-running={running||undefined}>
             <button type="button" role="menuitemradio" aria-checked={checked} disabled={busy||!item.ready&&!running} title={running?l('Use this model in the chat','Использовать в чате'):l('Start without the Strata window and use it','Запустить без окна Strata и выбрать')}
-              onClick={()=>{if(served)choose(()=>{pickAccount(served.id);onProvider('claude');});else if(!running)startLocal(item.id,item.name);}}>
+              onClick={()=>{if(onLocalModel)choose(()=>onLocalModel(item.id));else if(served)choose(()=>{pickAccount(served.id);onProvider('claude');});else if(!running)startLocal(item.id,item.name);}}>
               {busy?<LoaderCircle size={16} className="tool-spinner" aria-hidden="true"/>:running?<Cpu size={16} aria-hidden="true"/>:<Play size={16} aria-hidden="true"/>}<span><strong>{item.name}</strong><small>{note}</small></span>{checked&&<Check size={15} aria-hidden="true"/>}</button>
             {running&&<button type="button" role="menuitem" className="header-model-stop" disabled={pending==='stop'||local.job.state==='stopping'} aria-label={l('Stop ','Остановить ')+item.name} title={l('Stop the local model and free its memory','Остановить модель и освободить память')} onClick={stopLocal}><Square size={14} aria-hidden="true"/></button>}
           </div>;})}

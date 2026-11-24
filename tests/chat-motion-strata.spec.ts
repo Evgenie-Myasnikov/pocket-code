@@ -90,15 +90,22 @@ test('a reasoning writes itself word by word, each new character coming down fro
  const thought='Inspect '+Array.from({length:90},(_,i)=>'thought'+i).join(' ');
  await page.evaluate(value=>{const run=(window as any).testRuns[0];run.messages.push({id:'think',role:'assistant',blocks:[{type:'thinking',thinking:value}]});run.revision++;},thought);
  const body=page.locator('details.thinking .reasoning-content');
- const seen:number[]=[];let animation='';
+ const seen:number[]=[];let animation='';const places=new Set<string>();let first:number|undefined;
+ // where the 40th character stands: it must not move while later characters are written or when its own animation ends
+ const place=()=>body.first().evaluate(element=>{const walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT);let left=40,node:Node|null;while((node=walker.nextNode())){const length=node.textContent!.length;if(left<length){const range=document.createRange();range.setStart(node,left);range.setEnd(node,left+1);const box=range.getBoundingClientRect(),rail=element.getBoundingClientRect();return Math.round(box.left-rail.left)+','+Math.round(box.top-rail.top+element.scrollTop);}left-=length;}return '';});
  for(let i=0;i<150;i++){
    seen.push(await body.count()?((await body.first().textContent())||'').length:0);
+   if(await body.count()&&seen.at(-1)!>60){first??=i;if(i>=first+10&&i%5===0){const at=await place();if(at)places.add(at);}}
    if(!animation&&await body.locator('.rc').count())animation=await body.locator('.rc').first().evaluate(element=>{const c=getComputedStyle(element);return c.animationName+' '+c.display;});
    await page.waitForTimeout(40);
  }
  expect(seen.some(length=>length>0&&length<thought.length)).toBe(true);expect(seen.at(-1)).toBe(thought.length);
  for(let i=1;i<seen.length;i++)expect(seen[i]).toBeGreaterThanOrEqual(seen[i-1]);
  // each character is its own box that fades in and comes down into place
- expect(animation).toBe('chat-reasoning-char inline-block');
+ expect(animation).toBe('chat-reasoning-char inline');
+ // a character that is written stays where it is (only its own short entrance moves it, and that does not move the text)
+ await page.waitForTimeout(400);places.add(await place());
+ const spots=[...places].map(value=>value.split(',').map(Number));
+ for(const [x,y] of spots){expect(Math.abs(x-spots[0][0])).toBeLessThanOrEqual(1);expect(Math.abs(y-spots[0][1])).toBeLessThanOrEqual(1);}
 });
 

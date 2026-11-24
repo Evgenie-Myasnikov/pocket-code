@@ -13,7 +13,8 @@ import {ClaudeGeneration} from './provider-generation.js';
 import {projectBoardInstructions} from './project-rules.js';
 
 type Run = typeof query;
-type Job = JobView & { controller: AbortController; pending: Map<string, (result: PermissionResult) => void>; inputs:PromptStream; waiting:FollowupInput[]; followups:Followups; acceptingInput:boolean; query?:ReturnType<Run>; approvalTimeoutMs:number; stopRequested?:boolean };
+type Job = JobView & { controller: AbortController; pending: Map<string, (result: PermissionResult) => void>; inputs:PromptStream; waiting:FollowupInput[]; followups:Followups; acceptingInput:boolean; query?:ReturnType<Run>; approvalTimeoutMs:number; stopRequested?:boolean; input?:StartInput };
+type StartInput = Parameters<Jobs['start']>[0];
 /** The model reads this in English whatever the interface language; the person's comment follows it. */
 export const deniedMessage=(comment?:string)=>'The user denied this action.'+(comment?.trim()?' The user said: '+comment.trim():'');
 const queueView=(job:Job)=>{job.pendingInputIds=job.waiting.map(message=>message.id);job.queued=job.waiting.map(message=>({id:message.id,text:message.displayText??message.text,attachments:message.attachmentPaths?.length||0}));};
@@ -45,9 +46,11 @@ export class Jobs {
   /** Called once a task learns its session ID, so a custom provider account is recorded before any list request. */
   onSession(listener: (job: { sessionId: string; account?: string }) => void) { this.sessionListeners.push(listener); }
   private announceSession(job: Job) { if (!job.sessionId) return; for (const listener of this.sessionListeners) { try { listener({ sessionId: job.sessionId, ...(job.account ? { account: job.account } : {}) }); } catch { /* A listener never breaks the task. */ } } }
+  /** A turn that must wait before it reaches its provider (a local model swapped out for a scheduled run) gets the promise to wait for. */
+  hold?:(job:{id:string;account?:string})=>Promise<void>|undefined;
   constructor(private run: Run = query) {}
   view(job: Job): JobView {
-    const { controller, pending, inputs, waiting, followups, acceptingInput, query, approvalTimeoutMs, stopRequested, ...view } = job;
+    const { controller, pending, inputs, waiting, followups, acceptingInput, query, approvalTimeoutMs, stopRequested, input, ...view } = job;
     return view;
   }
   list() { return [...this.jobs.values()].map(j => ({ ...this.view(j), messages: [], partial: '', writePreviews:undefined, reasoningPreviews:undefined })); }
@@ -99,12 +102,42 @@ export class Jobs {
       messages: [{ id: randomUUID(), role: 'user', blocks: userInputBlocks(input) }],
       partial: '', approvals: [], startedAt: Date.now(), revision: 0, baseMessageCount: input.baseMessageCount || 0, jira: input.jira,
       controller: new AbortController(), pending: new Map(),inputs:new PromptStream(),waiting:[],followups:new Followups(),acceptingInput:true,approvalTimeoutMs:input.approvalTimeoutMs??0,
-      permissionMode: input.mode==='plan'?'plan':input.claudeAccess||'default' };
+      permissionMode: input.mode==='plan'?'plan':input.claudeAccess||'default', input };
     job.inputs.push(job.messages[0].id,input.text,input.sessionId);
     job.controller.signal.addEventListener('abort',()=>{job.acceptingInput=false;job.inputs.close();delete job.writePreviews;delete job.reasoningPreviews;job.revision++;},{once:true});
     this.jobs.set(job.id, job);
-    void this.execute(job, input);
+    const held = this.hold?.({ id: job.id, account: input.account });
+    if (held) {
+      // The turn is accepted (follow-ups queue behind it) and reaches the provider once the hold ends; Stop ends it at once.
+      job.heldFor = 'local-model';
+      void held.catch(() => {}).then(() => {
+        if (this.jobs.get(job.id) !== job || job.status !== 'running' || !job.heldFor) return;
+        delete job.heldFor; job.revision++;
+        void this.execute(job, input);
+      });
+    } else void this.execute(job, input);
     return this.view(job);
+  }
+  /**
+   * Pauses a running turn to free its local model: it is stopped like Stop, but marked as paused (not an error), and
+   * `next` names the job that will continue it in the same session.
+   */
+  pause(id: string, next: string) {
+    const job = this.get(id);
+    if (job.status !== 'running' || job.heldFor) return false;
+    job.pausedFor = 'local-model'; job.resumedBy = next;
+    this.stop(id);
+    return true;
+  }
+  /** Starts the turn that continues a paused chat in its session, with the settings it ran with; undefined when it cannot. */
+  resumePaused(id: string, turn: { text: string; displayText: string; baseMessageCount: number }) {
+    const job = this.jobs.get(id);
+    if (!job?.pausedFor || !job.resumedBy || !job.sessionId || !job.input || job.status === 'running') return;
+    if (this.jobs.has(job.resumedBy)) return this.view(this.jobs.get(job.resumedBy)!);
+    // A person who wrote to the chat meanwhile already continues it.
+    if ([...this.jobs.values()].some(other => other.status === 'running' && other.sessionId === job.sessionId)) return;
+    const mode = job.permissionMode === 'plan' ? 'plan' : 'default', access = job.permissionMode === 'plan' ? undefined : job.permissionMode;
+    return this.start({ ...job.input, id: job.resumedBy, sessionId: job.sessionId, mode, claudeAccess: access, text: turn.text, displayText: turn.displayText, attachmentPaths: [], baseMessageCount: turn.baseMessageCount });
   }
   async execute(job: Job, input: Parameters<Jobs['start']>[0]) {
     let stream: ReturnType<Run> | undefined;
@@ -273,6 +306,8 @@ export class Jobs {
     const job = this.get(id); job.revision++;
     delete job.writePreviews;delete job.reasoningPreviews;
     if (job.status !== 'running') return;
+    // A held turn never reached its provider: it ends here.
+    if (job.heldFor) { delete job.heldFor; job.status = 'stopped'; job.acceptingInput = false; job.controller.abort(); job.messagesRevision = (job.messagesRevision || 0) + 1; return; }
     const query = job.query;
     if (job.stopRequested || !query?.interrupt) { job.controller.abort(); return; }
     job.stopRequested = true; job.acceptingInput = false;
@@ -281,5 +316,5 @@ export class Jobs {
     const timer = setTimeout(kill, graceMs); timer.unref?.();
     query.interrupt().catch(() => { clearTimeout(timer); kill(); });
   }
-  close() { for (const j of this.jobs.values()) if (j.status === 'running') j.controller.abort(); }
+  close() { for (const j of this.jobs.values()) if (j.status === 'running') { if (j.heldFor) { delete j.heldFor; j.status = 'stopped'; } j.controller.abort(); } }
 }

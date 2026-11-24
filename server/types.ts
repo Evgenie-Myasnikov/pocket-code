@@ -17,7 +17,9 @@ export type ActivityItem = {
   resultMessageId?: string;
   action?: 'command' | 'files' | 'search' | 'agent' | 'responding' | 'tool';
 };
-export type GenerationMetrics={outputTokens?:number;outputTokensPerSecond?:number;totalTokens?:number;contextTokens?:number;contextWindow?:number};
+export type GenerationMetrics={outputTokens?:number;outputTokensPerSecond?:number;totalTokens?:number;contextTokens?:number;contextWindow?:number;
+  /** While a turn runs through a model that reports no output count yet (a local model behind a proxy): tokens estimated from the streamed text, about 4 characters each. Never saved. */
+  estimatedTokens?:number};
 export type JobView = {
   taskChat?:boolean;
   generation?:GenerationMetrics;
@@ -31,6 +33,12 @@ export type JobView = {
   queued?:QueuedInput[];
   /** Requests that timed out; the agent received a denial for each. */
   expiredApprovals?:{tool:string;at:number}[];
+  /** Stopped to free the local model for a scheduled run on another one: not an error, the chat continues when the model is back. */
+  pausedFor?:'local-model';
+  /** The job that continues a paused chat in the same session. */
+  resumedBy?:string;
+  /** Running, but its turn waits until the local model a scheduled run swapped out is back. */
+  heldFor?:'local-model';
   /** Claude's current permission mode; a running turn can change it. */
   permissionMode?:'default'|'acceptEdits'|'bypassPermissions'|'plan';
   provider?: 'claude' | 'codex' | 'copilot';

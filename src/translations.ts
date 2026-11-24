@@ -490,6 +490,8 @@ export const english: Record<string, string> = {
   "Claude ждёт вашего решения": "Claude is waiting for your decision",
   "Claude работает на компьютере…": "Claude is working on your computer…",
   "Задача остановлена. Можно отправить новое сообщение.": "Task stopped. You can send another message.",
+  "Пауза: локальная модель занята запуском по расписанию. Чат продолжится, когда она вернётся.": "Paused: the local model is busy with a scheduled run. The chat continues when it is back.",
+  "Ждёт локальную модель: она вернётся после запуска по расписанию.": "Waiting for the local model: it comes back after the scheduled run.",
   "Готово": "Done",
   "В начало чата": "Go to beginning",
   "К новым сообщениям ↓": "Latest messages ↓",

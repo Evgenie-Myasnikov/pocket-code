@@ -31,7 +31,8 @@ export function ChatGenerationFooter({connection,provider,account,sessionId,job}
   },[connection,provider,account,sessionId,running]);
   // The speed is measured here, from the chat's token updates: the average of the last 100 of them.
   const speedKey=provider+':'+(sessionId||job?.sessionId||job?.id||'new'),[,tick]=useState(0);
-  const generated=live?.outputTokens;
+  // A model that reports no output count while it writes gives the host's estimate from the streamed text (shown with ≈).
+  const estimated=!count(live?.outputTokens)&&count(live?.estimatedTokens),generated=estimated?live!.estimatedTokens:live?.outputTokens;
   useEffect(()=>{
     if(!matches||!job||!count(generated))return;
     const state=speeds.get(speedKey)??{rates:[]};speeds.set(speedKey,state);
@@ -52,8 +53,8 @@ export function ChatGenerationFooter({connection,provider,account,sessionId,job}
   // As in Strata: an icon, the number in bold and a quiet word, centred under the message field.
   const ring=percentage!==undefined?Math.min(100,Math.max(0,percentage)):0;
   return <div className="chat-generation-metrics" role="group" aria-label={ru?'Статистика токенов':'Token usage'}>
-    <span className="chat-generation-rate" title={ru?'Скорость: среднее за последние 100 обновлений токенов чата':'Speed: the average of the last 100 token updates of this chat'}><Gauge size={15} aria-hidden="true"/><b>{rate}</b><span>{ru?'ток/с':'tok/s'}</span></span>
-    <span title={(ru?'Всего токенов за чат':'Total tokens for the conversation')+(count(totalTokens)?' · '+full(totalTokens):'')}><MemoryStick size={15} aria-hidden="true"/><b>{count(totalTokens)?short(totalTokens):'0'}</b><span>{ru?'всего токенов':'total tokens'}</span></span>
+    <span className="chat-generation-rate" title={ru?'Скорость: среднее за последние 100 обновлений токенов чата':'Speed: the average of the last 100 token updates of this chat'}><Gauge size={15} aria-hidden="true"/><b>{estimated&&average!==undefined?'≈'+rate:rate}</b><span>{ru?'ток/с':'tok/s'}</span></span>
+    <span title={(ru?'Всего токенов за чат':'Total tokens for the conversation')+(count(totalTokens)?' · '+full(totalTokens):'')}><MemoryStick size={15} aria-hidden="true"/><b>{count(totalTokens)?short(totalTokens):count(contextTokens)?'≈'+short(contextTokens):'0'}</b><span>{ru?'всего токенов':'total tokens'}</span></span>
     <span title={percentage!==undefined?full(contextTokens!)+' / '+full(contextWindow!)+(ru?' токенов':' tokens'):(ru?'Окно контекста пока неизвестно':'The context window is not known yet')}><svg className="chat-generation-ring" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeOpacity=".25" strokeWidth="2"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray={`${ring/100*40.84} 40.84`} transform="rotate(-90 8 8)" strokeLinecap="round"/></svg><b>{pct||'—'}</b><span>{ru?'% контекста':'% of context'}</span></span>
   </div>;
 }

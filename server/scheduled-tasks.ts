@@ -10,6 +10,8 @@ export type Schedule={kind:'daily';time:string}|{kind:'weekdays';time:string}|{k
 export type ScheduledRun={id:string;at:number;sessionId?:string;error?:string;manual?:boolean};
 export type ScheduledTask={
   id:string;name:string;prompt:string;provider:ScheduledProvider;account?:string;model:string;cwd:string;schedule:Schedule;
+  /** A Strata model of this PC: each run starts it if it is not running, and unloads it after the answer if the run started it. */
+  localModel?:string;
   paused:boolean;createdAt:number;updatedAt:number;
   /** Interval schedules count their hours from here: creation, or the last change of the schedule or of pause. */
   anchor:number;
@@ -19,7 +21,7 @@ export type ScheduledTask={
   /** Newest first, at most RUN_HISTORY. */
   runs:ScheduledRun[];
 };
-export type ScheduledTaskInput=Pick<ScheduledTask,'name'|'prompt'|'provider'|'model'|'cwd'|'schedule'>&{account?:string};
+export type ScheduledTaskInput=Pick<ScheduledTask,'name'|'prompt'|'provider'|'model'|'cwd'|'schedule'>&{account?:string;localModel?:string};
 export type ScheduledTaskPatch=Partial<ScheduledTaskInput>&{paused?:boolean};
 type Store={version:1;tasks:ScheduledTask[]};
 type Options={
@@ -92,6 +94,7 @@ export class ScheduledTasks{
     const now=this.now();
     const task:ScheduledTask={id:randomUUID(),...input,...(input.account?{account:input.account}:{}),paused:false,createdAt:now,updatedAt:now,anchor:now,nextRunAt:nextRunTime(input.schedule,now,now),unread:false,runs:[]};
     if(!input.account)delete task.account;
+    if(!input.localModel)delete task.localModel;
     this.tasks.push(task);await this.save();this.arm();return structuredClone(task);
   });}
   update(id:string,patch:ScheduledTaskPatch){return this.serial(async()=>{
@@ -99,6 +102,7 @@ export class ScheduledTasks{
     const timing=patch.schedule&&JSON.stringify(patch.schedule)!==JSON.stringify(task.schedule)||patch.paused===false&&task.paused;
     for(const key of ['name','prompt','provider','model','cwd','schedule','paused'] as const)if(patch[key]!==undefined)(task as Record<string,unknown>)[key]=patch[key];
     if('account' in patch){if(patch.account)task.account=patch.account;else delete task.account;}
+    if('localModel' in patch){if(patch.localModel)task.localModel=patch.localModel;else delete task.localModel;}
     // A new schedule, or a resumed task, counts from now: runs missed while paused do not start on resume.
     if(timing){task.anchor=now;task.nextRunAt=nextRunTime(task.schedule,now,now);}
     task.updatedAt=now;await this.save();this.arm();return structuredClone(task);

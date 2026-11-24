@@ -789,6 +789,20 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const stop=startVisiblePoll(poll,900,true,document,hostGate(connection.url));return () => {cancelled = true;stop();};
   }, [connection, job?.id, job?.status, demo, provider]);
   useEffect(() => {
+    // A chat paused for a local model swap is continued by another job in the same session: the screen follows it.
+    if (!connection || demo || job?.status !== 'stopped' || !job.pausedFor || !job.resumedBy) return;
+    const paused = job, next = job.resumedBy;
+    let cancelled = false;
+    async function follow() {
+      try {
+        const updated = await request<JobView | null>(connection!, `/jobs/${next}`);
+        if (!cancelled && updated) {setJob(old => old?.id === paused.id ? updated : old);return false;}
+      } catch {/* Not started yet: the swap is still stopping the turn. */}
+      return true;
+    }
+    const stop=startVisiblePoll(follow,3000,true,document,hostGate(connection.url));return () => {cancelled = true;stop();};
+  }, [connection, demo, job?.id, job?.status, job?.pausedFor, job?.resumedBy]);
+  useEffect(() => {
     // A stopped or failed turn never hands over to history (that waits for "done"), so its chat keeps syncing:
     // replies written from the PC or another device still appear. Messages are merged by ID, without duplicates.
     // A finished turn with no answer (a slash command) has nothing to hand over either.
@@ -1378,7 +1392,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             <MessageList connection={connection} cwd={cwd} key={`${provider}-${navigation.current}`} jobId={job?.id} provider={provider} messages={shownTranscript} partialText={job?.errorCode!=='codex_thread_busy'?job?.partial:undefined} streaming={running&&!runUnknown} toolResults={toolResults} runningMessages={runningMessages} agents={agentMap} onSubagent={connection&&parentChatId ? openSubagent : undefined} mode={detail} turnChanges={changesByTurn} resultRoot={resultRoot} onReview={docked?undefined:openTurnReview}/>
             {job?.expiredApprovals?.map((item,index)=><p key={`expired-${index}`} className="approval-expired transcript-event" role="status">{t('Время ожидания истекло — агенту отправлен отказ')} · {item.tool}</p>)}
             {job?.approvals.map((a) => <ApprovalCard key={`${provider}-${a.id}`} provider={provider} approval={a} autoOpenQuestions={a.id===job.approvals.find(item=>item.tool==='AskUserQuestion')?.id} decide={async (allow, answers, extra) => {await api(`/jobs/${job.id}/approvals/${a.id}`, { allow, answers, ...extra });if(allow&&a.tool==='ExitPlanMode'&&extra?.mode){const key=currentDraftKey(),mode=extra.mode;setAccessChoices(old=>({...old,[key]:mode}));}}} />)}
-            {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error-banner">{t(job.error)}{provider==='claude'&&claudeOutdated(job.error)&&<ClaudeEngineUpdate connection={connection} compact/>}</div>}{job?.status === 'stopped' && <p className="muted">{t("Задача остановлена. Можно отправить новое сообщение.")}</p>}
+            {job?.error && job.errorCode!=='codex_thread_busy' && <div className="error-banner">{t(job.error)}{provider==='claude'&&claudeOutdated(job.error)&&<ClaudeEngineUpdate connection={connection} compact/>}</div>}{job?.status === 'stopped' && <p className="muted">{job.pausedFor ? t("Пауза: локальная модель занята запуском по расписанию. Чат продолжится, когда она вернётся.") : t("Задача остановлена. Можно отправить новое сообщение.")}</p>}{job?.status === 'running' && job.heldFor && <p className="muted">{t("Ждёт локальную модель: она вернётся после запуска по расписанию.")}</p>}
             {job?.status === 'done' && <div className="turn-complete" role="status"><ShieldCheck size={14} />{t(" Готово ")}{turnEnd?.id===job.id&&<><span>· <time dateTime={new Date(turnEnd.at).toISOString()}>{new Date(turnEnd.at).toLocaleTimeString(locale(),{hour:'2-digit',minute:'2-digit'})}</time></span><span className="turn-duration">· {elapsed(turnEnd.at-job.startedAt)}</span></>}{job.cost !== undefined && <span>· ${job.cost.toFixed(4)}</span>}</div>}
             {visibleOutgoing&&<article className="message user" aria-busy="true"><div className="user-message-content">
               {visibleOutgoing.files.map(file=><div key={file.id}>{file.name}</div>)}

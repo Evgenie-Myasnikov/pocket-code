@@ -29,6 +29,10 @@ export type MarkdownChainStep = {
   previousChats?: (ChainDeleteChat & {cwd:string;attempt:number})[];
   jobId?: string;
   sessionId?: string;
+  /** Paused while the local model is swapped for a scheduled run: the step continues in its session when the model is back. */
+  paused?: 'local-model';
+  /** The job that continues the paused step. */
+  resumeJobId?: string;
   error?: string;
   handoff?: string;
   /** Latest visible assistant text, with streaming deltas while the job runs. */

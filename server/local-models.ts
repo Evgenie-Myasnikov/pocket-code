@@ -139,6 +139,19 @@ export class LocalModels{
    return this.job;
   });
  }
+ /** The model this host started and the API connection serving it, while it is ready. */
+ serving(){return this.job.state==='ready'&&this.served?{model:this.job.model,providerId:this.served.providerId,context:this.served.context}:undefined;}
+ /** Waits for a start to end: the connection serving the model, or the reason it did not start. */
+ async ready(timeoutMs=20*60000){
+  const until=this.now()+timeoutMs;
+  for(;;){
+   const serving=this.serving();if(serving)return serving;
+   if(this.job.state==='error')throw new HttpError(409,this.job.error||'The local model did not start.','local_model_failed');
+   if(this.job.state!=='starting')throw new HttpError(409,'The local model is not starting.','local_model_failed');
+   if(this.now()>until)throw new HttpError(504,'The local model took too long to start.','local_model_timeout');
+   await new Promise(resolve=>setTimeout(resolve,1000));
+  }
+ }
  /** For tests: resolves when the background launch has finished. */
  settled(){return this.work.catch(()=>{});}
 }

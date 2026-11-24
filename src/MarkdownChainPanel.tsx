@@ -137,7 +137,7 @@ export function MarkdownChainPanel({controls,initial,initialId,onChat,onBrowse,d
           return <li key={i} data-status={step.status} aria-current={isActive?'step':undefined} ref={isActive?currentStep:undefined} tabIndex={isActive?-1:undefined}>
           <div className="chain-node" aria-hidden="true">{step.status==='done'?<Check size={15}/>:i+1}</div>
           <div className="chain-step">
-            <div className="chain-step-heading">{(!single||step.title!==detail.name)&&<h3>{step.title}</h3>}<span className="chain-state">{step.retryAt ? (ru ? 'Ожидает повтора' : 'Retry scheduled') : statusLabel(step.status,ru)}{step.retryCount ? ` · ${ru ? 'Попытка' : 'Attempt'} ${step.retryCount + 1}` : ''}</span></div>
+            <div className="chain-step-heading">{(!single||step.title!==detail.name)&&<h3>{step.title}</h3>}<span className="chain-state">{step.paused ? (ru ? 'Пауза: смена локальной модели' : 'Paused for a local model swap') : step.retryAt ? (ru ? 'Ожидает повтора' : 'Retry scheduled') : statusLabel(step.status,ru)}{step.retryCount ? ` · ${ru ? 'Попытка' : 'Attempt'} ${step.retryCount + 1}` : ''}</span></div>
             {step.executor&&!isActive&&<small>{executionProvider}</small>}
             {Boolean(step.subtasks?.length)&&<details className="chain-subtasks">
               <summary>{ru?'Подзадачи':'Subtasks'} · {step.subtasks!.length}</summary>

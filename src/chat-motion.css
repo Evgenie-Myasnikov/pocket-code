@@ -50,11 +50,11 @@ details[open]>summary>.chat-disclosure-chevron{transform:rotate(90deg)}
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.conversation-inner .message,.conversation-inner .tool-card{animation:none}.markdown[data-caret] *::after{animation:none}}
 
 /* A word of the answer fades in with a short rise and a trace of blur, then settles (Strata-like). Inline words cannot move, so they are inline blocks. */
-[data-sd-animate]{display:inline-block;white-space:pre-wrap}
-@keyframes sd-chatWord{from{opacity:0;transform:translateY(3px);filter:blur(1.5px)}to{opacity:1;transform:none;filter:none}}
+/* Words stay inline, so the text wraps exactly as it will when written; a relative offset moves a word without moving any other. */
+[data-sd-animate]{position:relative}
+@keyframes sd-chatWord{from{opacity:0;top:3px;filter:blur(1.5px)}to{opacity:1;top:0;filter:none}}
 
 /* Text that writes itself (a reasoning, the code of a file being written): each of its newest characters comes down a little from above into its place while it fades in. */
-.rc{display:inline-block;animation:chat-reasoning-char .3s cubic-bezier(0,0,.2,1) both}
-.rc-word{white-space:nowrap}
-@keyframes chat-reasoning-char{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.rc{position:relative;animation:chat-reasoning-char .3s cubic-bezier(0,0,.2,1) both}
+@keyframes chat-reasoning-char{from{opacity:0;top:-5px}to{opacity:1;top:0}}
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.rc{animation:none}}

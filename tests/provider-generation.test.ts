@@ -93,3 +93,22 @@ test("an API connection's chat shows the context it was started with, never Clau
     }finally{pipe.end();jobs.close();}
   }
 });
+
+test('a model that reports no output count while it writes gets an estimate from the streamed text, which is never saved',()=>{
+  let now=1000;const job={} as JobView,meter=new ClaudeGeneration(()=>now);
+  meter.observe(job,{type:'stream_event',event:{type:'message_start',message:{id:'local',model:'qwen-local',usage:{input_tokens:100,output_tokens:0}}},parent_tool_use_id:null} as any);
+  meter.observe(job,{type:'stream_event',event:{type:'content_block_delta',index:0,delta:{type:'text_delta',text:'x'.repeat(40)}},parent_tool_use_id:null} as any);
+  assert.equal(job.generation?.estimatedTokens,10);
+  now+=500;meter.observe(job,{type:'stream_event',event:{type:'content_block_delta',index:0,delta:{type:'thinking_delta',thinking:'y'.repeat(41)}},parent_tool_use_id:null} as any);
+  assert.equal(job.generation?.estimatedTokens,21);
+  // the turn's own result replaces the estimate with what the provider counted
+  meter.observe(job,{type:'result',usage:{output_tokens:30},modelUsage:{'qwen-local':{inputTokens:100,outputTokens:30,cacheReadInputTokens:0,cacheCreationInputTokens:0,contextWindow:32768}}} as any);
+  assert.equal(job.generation?.estimatedTokens,undefined);assert.equal(job.generation?.outputTokens,30);assert.equal(job.generation?.totalTokens,130);
+});
+
+test('a model that reports its output count gets no estimate',()=>{
+  const job={} as JobView,meter=new ClaudeGeneration(()=>1000);
+  meter.observe(job,{type:'stream_event',event:{type:'message_start',message:{id:'real',model:'sonnet',usage:{input_tokens:10,output_tokens:1}}},parent_tool_use_id:null} as any);
+  meter.observe(job,{type:'stream_event',event:{type:'content_block_delta',index:0,delta:{type:'text_delta',text:'z'.repeat(80)}},parent_tool_use_id:null} as any);
+  assert.equal(job.generation?.estimatedTokens,undefined);assert.equal(job.generation?.outputTokens,1);
+});
