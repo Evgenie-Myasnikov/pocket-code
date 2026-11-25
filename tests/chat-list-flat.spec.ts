@@ -73,20 +73,16 @@ test('all providers are on one settings page',async({page})=>{
  await page.screenshot({path:'.local/settings-providers.png',fullPage:false});
 });
 
-test('the row menu renames, pins, archives and deletes',async({page})=>{
+test('the row menu renames, pins and deletes; there is no archive, and a chat archived before is back in the list',async({page})=>{
+ await page.addInitScript(()=>{localStorage.setItem('pocket-desktop-archived-chats',JSON.stringify(['codex-0']));});
  await manyChats(page);await desktop(page);
  const list=page.locator(rail+' .desktop-sessions > button[data-chat-id]');
  const menu=async(id:string)=>{const row=page.locator(rail+' button[data-chat-id="'+id+'"]');await row.hover();await row.locator('+ .chat-list-action-slot').getByRole('button',{name:'Chat actions'}).click();};
+ await expect(page.locator(rail+' button[data-chat-id="codex-0"]')).toBeVisible();await expect(page.getByRole('button',{name:/Archived/})).toHaveCount(0);
  await menu('claude-5');
- await expect(page.getByRole('menuitem')).toHaveText(['Rename','Pin','Archive','Delete']);
- await page.waitForTimeout(400);await page.screenshot({path:'.local/chat-row-menu.png',clip:{x:0,y:0,width:560,height:420}});
+ await expect(page.getByRole('menuitem')).toHaveText(['Rename','Pin','Delete']);
  await page.getByRole('menuitem',{name:'Pin'}).click();
  await expect(list.first()).toHaveAttribute('data-chat-id','claude-5');
- await menu('codex-0');await page.getByRole('menuitem',{name:'Archive'}).click();
- await expect(page.locator(rail+' button[data-chat-id="codex-0"]')).toHaveCount(0);
  await page.reload();await expect(list.first()).toHaveAttribute('data-chat-id','claude-5');
- await page.getByRole('button',{name:'Archived · 1'}).click();await expect(list).toHaveCount(1);
- await menu('codex-0');await page.getByRole('menuitem',{name:'Unarchive'}).click();
- await expect(page.locator(rail+' button[data-chat-id="codex-0"]')).toBeVisible();await expect(page.getByRole('button',{name:/Archived/})).toHaveCount(0);
- await menu('claude-5');await page.getByRole('menuitem',{name:'Unpin'}).click();await expect(list.first()).toHaveAttribute('data-chat-id','codex-0');
+ await menu('claude-5');await page.getByRole('menuitem',{name:'Unpin'}).click();await expect(list.first()).not.toHaveAttribute('data-chat-id','claude-5');
 });

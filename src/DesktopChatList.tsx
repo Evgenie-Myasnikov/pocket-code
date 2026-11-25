@@ -1,5 +1,5 @@
 import {Fragment,useEffect,useRef,useState,type KeyboardEvent,type MouseEvent,type ReactNode} from 'react';
-import {Archive,Check,ChevronDown,ChevronRight,Folder,FolderPlus,LayoutDashboard,MoreHorizontal,Pencil,Pin,Trash2,X} from 'lucide-react';
+import {Check,ChevronDown,ChevronRight,Folder,FolderPlus,LayoutDashboard,MoreHorizontal,Pencil,Pin,Trash2,X} from 'lucide-react';
 import {CardActionMenu} from './CardActionMenu';
 import {ChatListActions} from './ChatListActions';
 import type {ChatActionTarget} from './ChatActions';
@@ -80,7 +80,9 @@ export const CHAT_PAGE=30;
 /** Pinned and archived chats are a choice of this PC window, kept in its local storage. */
 function readIds(key:string){try{const value=JSON.parse(localStorage.getItem(key)||'[]');return new Set<string>(Array.isArray(value)?value.filter(item=>typeof item==='string').slice(0,2000):[]);}catch{return new Set<string>();}}
 function writeIds(key:string,ids:Set<string>){try{localStorage.setItem(key,JSON.stringify([...ids]));}catch{/* The choice still holds until the window closes. */}}
-const PINNED='pocket-desktop-pinned-chats',ARCHIVED='pocket-desktop-archived-chats',FOLDERS='pocket-desktop-chat-folders';
+const PINNED='pocket-desktop-pinned-chats',FOLDERS='pocket-desktop-chat-folders';
+/** There is no archive: every chat is in the list (chats archived before stay in the list again). */
+const NO_ARCHIVE:ReadonlySet<string>=new Set();
 /** Folders are made and named by the person; like pins they belong to this PC window. A chat is in at most one folder. */
 /** `at` is the folder's place among the chats outside folders: how many of them are above it (none: at the top). */
 export type ChatFolder={id:string;name:string;collapsed:boolean;chats:string[];at?:number};
@@ -107,7 +109,7 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
   const [marked,setMarked]=useState(new Set<string>()),[queue,setQueue]=useState<(Target&Scope)[]>([]);
   const [menu,setMenu]=useState<{x:number;y:number}>();
   const [limit,setLimit]=useState(CHAT_PAGE);
-  const [pinned,setPinned]=useState(()=>readIds(PINNED)),[archived,setArchived]=useState(()=>readIds(ARCHIVED)),[showArchived,setShowArchived]=useState(false);
+  const [pinned,setPinned]=useState(()=>readIds(PINNED)),archived=NO_ARCHIVE,showArchived=false;
   const [folders,setFolders]=useState<ChatFolder[]>(readFolders),[renaming,setRenaming]=useState<string>(),[folderMenu,setFolderMenu]=useState<{id:string;x:number;y:number}>(),[dropTarget,setDropTarget]=useState<string>();
   const changeFolders=(change:(old:ChatFolder[])=>ChatFolder[])=>setFolders(old=>{const next=change(old);writeFolders(next);return next;});
   /** Moves a chat out of every folder and, unless folder is null, into that one. */
@@ -183,7 +185,7 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
   }
   function openMenu(t:ChatActionTarget){
     if(marked.has(t.session.sessionId)){onCloseMenu();setMenu({x:t.x,y:t.y});}
-    else{clear();const id=t.session.sessionId;onMenu({...t,select:()=>{anchor.current=id;setMarked(new Set([id]));},pin:{on:pinned.has(id),toggle:()=>flip(PINNED,setPinned,id)},archive:{on:archived.has(id),toggle:()=>flip(ARCHIVED,setArchived,id)}});}
+    else{clear();const id=t.session.sessionId;onMenu({...t,select:()=>{anchor.current=id;setMarked(new Set([id]));},pin:{on:pinned.has(id),toggle:()=>flip(PINNED,setPinned,id)}});}
   }
   function key(event:KeyboardEvent<HTMLButtonElement>,s:Session,running:boolean){
     const id=s.sessionId,ctrl=event.ctrlKey||event.metaKey;
@@ -251,7 +253,6 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
         return <>{out}</>;
       })()}</div>}
       {hidden>0&&<button type="button" className="rail-action desktop-more-chats" onClick={()=>setLimit(shown.length+CHAT_PAGE)}><ChevronDown size={16} aria-hidden="true"/><span>{l('Show more chats','Показать ещё чаты')} · {hidden}</span></button>}
-      {archivedCount>0&&<button type="button" className="rail-action desktop-archived-chats" aria-pressed={showArchived} onClick={()=>{setShowArchived(value=>!value);setLimit(CHAT_PAGE);}}><Archive size={15} aria-hidden="true"/><span>{showArchived?l('Back to chats','Назад к чатам'):l('Archived','Архив')+' · '+archivedCount}</span></button>}
       {!loading&&!ordered.length&&!online&&<p className="muted">{l('Chats will load when the local server is available.','Чаты загрузятся, когда локальный сервер будет доступен.')}</p>}
     </div>
     {folderMenu&&<CardActionMenu point={folderMenu} label={l('Folder actions','Действия папки')} onClose={()=>setFolderMenu(undefined)} items={[

@@ -48,15 +48,18 @@ export function scheduleText(schedule:Schedule,ru:boolean){
  * Opening a task opens its latest run, an ordinary chat; its "…" menu pauses, edits, runs now and deletes it.
  */
 const COLLAPSED='pocket-desktop-scheduled-collapsed';
-export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat,onEdit,onNew}:{
+export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat,onEdit,onNew,onRuns}:{
   connection:Connection;online:boolean;focusId?:string;sessions:Session[];onOpenChat(session:Session):void;onEdit(task:ScheduledTask):void;
   /** The heading's "+": opens the editor for a new task; absent when there is no working folder to run in. */
   onNew?():void;
+  /** The chats and jobs of every run: they belong to their task, never to the chat list. */
+  onRuns?(runs:{sessions:Set<string>;jobs:Set<string>}):void;
 }){
   const ru=useLanguage()==='ru',l=(en:string,rs:string)=>ru?rs:en;
   const [tasks,setTasks]=useState<ScheduledTask[]>([]),[menu,setMenu]=useState<{task:ScheduledTask;x:number;y:number}>(),[removing,setRemoving]=useState<ScheduledTask>(),[error,setError]=useState(''),[notice,setNotice]=useState('');
   useEffect(()=>{if(!notice)return;const timer=window.setTimeout(()=>setNotice(''),3500);return()=>window.clearTimeout(timer);},[notice]);
-  const load=async()=>{try{const list=await request<ScheduledTask[]>(connection,'/scheduled-tasks');setTasks(Array.isArray(list)?list:[]);}catch{/* An older host has no scheduled tasks; the list stays as it was. */}};
+  const load=async()=>{try{const list=await request<ScheduledTask[]>(connection,'/scheduled-tasks');const next=Array.isArray(list)?list:[];setTasks(next);
+    onRuns?.({sessions:new Set(next.flatMap(task=>task.runs.flatMap(run=>run.sessionId?[run.sessionId]:[]))),jobs:new Set(next.flatMap(task=>task.runs.map(run=>run.id)))});}catch{/* An older host has no scheduled tasks; the list stays as it was. */}};
   useEffect(()=>{if(!online)return;const stop=startVisiblePoll(load,30000);window.addEventListener(SCHEDULED_TASKS_CHANGED,load);return()=>{stop();window.removeEventListener(SCHEDULED_TASKS_CHANGED,load);};},[online,connection.url,connection.token]);
   const act=async(path:string,data:unknown={})=>{setError('');try{await request(connection,path,data);}catch(e){setError((e as Error).message);}await load();};
   // Opening a run's chat from anywhere marks its task read.
@@ -65,7 +68,9 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
     // The latest run is the chat: a run that has just started has no chat yet, so its job is opened (pending-<run id>) and
     // fills in as it answers. An earlier run's chat is removed once the next run has one, so it is never opened instead.
     const latest=task.runs[0],run=latest?.sessionId?latest:latest&&!latest.error?{...latest,sessionId:'pending-'+latest.id}:task.runs.find(item=>item.sessionId);
-    if(!run?.sessionId){onEdit(task);return;}
+    // A task that has not run yet opens as its (empty) plan chat, saying when the first run starts.
+    if(!run?.sessionId){onOpenChat({sessionId:'pending-'+task.id,cwd:task.cwd,summary:task.prompt,lastModified:task.createdAt,provider:task.provider,...(task.account?{account:task.account}:{}),customTitle:task.name,scheduled:true,
+      scheduledNote:task.paused?l('No run yet. The task is paused.','Запусков ещё не было. Задача на паузе.'):l('No run yet. The first run starts ','Запусков ещё не было. Первый запуск — ')+fullTime(task.nextRunAt)+'.'});return;}
     // Only the latest run is there, named by its time (09:00, or the day and time when it is not today); nothing can be written to it.
     const found=sessions.find(item=>item.sessionId===run.sessionId)||{sessionId:run.sessionId,cwd:task.cwd,summary:task.prompt,lastModified:run.at,provider:task.provider,...(task.account?{account:task.account}:{})};
     // The task is the stable chat entry; a new run replaces its visible answer without exposing a new chat title.

@@ -19,7 +19,7 @@ async function scheduledHost(page:Page,tasks:unknown[]=[]){
   },tasks);
 }
 const briefing={id:'44444444-4444-4444-8444-444444444444',name:'Weekday morning brief',prompt:'Summarise the synthetic changes since yesterday.',provider:'claude',model:'',cwd:'C:\\Demo\\Atlas',
-  schedule:{kind:'weekdays',time:'09:00'},paused:false,createdAt:1,updatedAt:1,anchor:1,nextRunAt:Date.now()+3600000,unread:true,runs:[{id:'55555555-5555-4555-8555-555555555555',at:Date.now()-60000,sessionId:'alpha'}]};
+  schedule:{kind:'weekdays',time:'09:00'},paused:false,createdAt:1,updatedAt:1,anchor:1,nextRunAt:Date.now()+3600000,unread:true,runs:[{id:'55555555-5555-4555-8555-555555555555',at:Date.now()-60000,sessionId:'plan-run'}]};
 
 test('a scheduled task is created from the chat list with a provider, folder and schedule',async({page})=>{
   await scheduledHost(page);
@@ -180,4 +180,18 @@ test('a run that has just started opens at once: the plan chat shows it working,
   await page.evaluate(()=>{const r=(window as any).testRuns[0];r.sessionId='gamma';r.messages.push({id:'a',role:'assistant',blocks:[{type:'text',text:'Yesterday: three commits. Today: two Jira tasks.'}]});r.revision++;});
   await expect(page.locator('.conversation-inner')).toContainText('Yesterday: three commits.');
   await expect(page.locator('.chat-generation-metrics')).toHaveCount(0);
+});
+
+test('a plan chat opens at once after it is made, before its first run, and its runs never show under Chats',async({page})=>{
+  await scheduledHost(page,[{...briefing,unread:false,runs:[]},{...briefing,id:'34343434-3434-4343-8343-343434343434',name:'Evening digest',unread:false,runs:[{id:'56565656-5656-4565-8565-565656565656',at:Date.now()-60000,sessionId:'beta'}]}]);
+  await page.setViewportSize({width:1440,height:900});await desktop(page);
+  // the chat of a run belongs to its task: it is not listed under Chats
+  await expect(page.locator('.desktop-sessions > button[data-chat-id="beta"]')).toHaveCount(0);
+  await expect(page.locator('.desktop-sessions > button[data-chat-id="alpha"]')).toHaveCount(1);
+  // a task with no run yet opens as its plan chat, not as the editor
+  await page.locator('.desktop-rail .scheduled-task').filter({hasText:'Weekday morning brief'}).getByRole('button',{name:/Weekday morning brief/}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.desktop-chat-host header h1')).toHaveText('Weekday morning brief');
+  await expect(page.locator('.plan-chat-empty')).toContainText('No run yet. The first run starts');
+  await expect(page.locator('.composer-area')).toBeHidden();
 });

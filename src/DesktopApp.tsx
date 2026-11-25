@@ -230,8 +230,9 @@ export function DesktopApp(){
     return()=>{live=false;window.removeEventListener('pocket-chat-transcripts-removed',removed);};
   },[provider]);
   const previousAccount=useRef(account);useEffect(()=>{if(previousAccount.current===account)return;previousAccount.current=account;if(!selected?.account&&!account||selected?.account===account)return;if(creating&&!selected)return;setSelected(null);setCreating(false);if(boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));},[account]);
+  const [planRuns,setPlanRuns]=useState<{sessions:Set<string>;jobs:Set<string>}>(()=>({sessions:new Set(),jobs:new Set()}));
   const latestJobs=useMemo(()=>{const map=new Map<string,JobView>();for(const job of [...jobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[jobs]);
-  const chatSessionsAll=useMemo(()=>{const map=new Map(sessions.map(item=>[item.sessionId,item]));for(const job of latestJobs.values())if(!job.taskChat&&job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,{sessionId:job.sessionId,cwd:job.cwd,summary:name(job.cwd),lastModified:job.startedAt,...(job.account?{account:job.account}:{})});return [...map.values()].sort((a,b)=>Number(latestJobs.get(b.sessionId)?.status==='running')-Number(latestJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[sessions,latestJobs]);
+  const chatSessionsAll=useMemo(()=>{const map=new Map(sessions.map(item=>[item.sessionId,item]));for(const job of latestJobs.values())if(!job.taskChat&&!planRuns.jobs.has(job.id)&&job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,{sessionId:job.sessionId,cwd:job.cwd,summary:name(job.cwd),lastModified:job.startedAt,...(job.account?{account:job.account}:{})});return [...map.values()].sort((a,b)=>Number(latestJobs.get(b.sessionId)?.status==='running')-Number(latestJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[sessions,latestJobs]);
   const allFolders=useMemo(()=>Array.from(new Set([...projects,...sessions.map(item=>item.cwd||'').filter(Boolean)])).sort(),[projects,sessions]);
   const folders=attachedProjects;
   useEffect(()=>{if(!state.online)return;let alive=true;const load=async()=>{await request<string[]>(connection,'/chat-library/projects').then(data=>{if(alive)setAttachedProjects(data);}).catch(()=>{});};const stop=startVisiblePoll(load,60000);window.addEventListener('pocket-chat-project-added',load);return()=>{alive=false;stop();window.removeEventListener('pocket-chat-project-added',load);};},[state.online,revision]);
@@ -240,9 +241,11 @@ export function DesktopApp(){
   const laneOf=(session:Session):Provider=>session.provider==='codex'||session.provider==='copilot'||session.provider==='claude'?session.provider:provider;
   const listJobs=useMemo(()=>{const map=new Map(latestJobs);for(const job of [...otherJobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[latestJobs,otherJobs]);
   // Every provider's chats in one list, running ones first, then the most recent.
-  const visible=useMemo(()=>{const own=new Map(chatSessionsAll.map(item=>[item.sessionId,{...item,provider} as Session]));
+  const visible=useMemo(()=>{// A plan run's chat belongs to its task in the rail, also when the host lists it (an older host) or its job runs.
+    const planned=new Set(planRuns.sessions);for(const job of [...jobs,...otherJobs])if(job.sessionId&&planRuns.jobs.has(job.id))planned.add(job.sessionId);
+    const own=new Map(chatSessionsAll.filter(item=>!planned.has(item.sessionId)).map(item=>[item.sessionId,{...item,provider} as Session]));
     const seen=new Set(own.keys());
-    return [...own.values(),...otherSessions.filter(item=>!seen.has(item.sessionId)&&!!seen.add(item.sessionId))].sort((a,b)=>Number(listJobs.get(b.sessionId)?.status==='running')-Number(listJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[chatSessionsAll,otherSessions,listJobs,provider]);
+    return [...own.values(),...otherSessions.filter(item=>!planned.has(item.sessionId)&&!seen.has(item.sessionId)&&!!seen.add(item.sessionId))].sort((a,b)=>Number(listJobs.get(b.sessionId)?.status==='running')-Number(listJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[chatSessionsAll,otherSessions,listJobs,provider,planRuns,jobs,otherJobs]);
   async function action(command:string,args:Record<string,unknown>={}){setError('');try{const next=await desktopCall<DesktopState>(command,args);if(next)setState(next);}catch(e){setError((e as Error).message);}}
   const laneTarget=(target:BoardChat):BoardChat=>({...target,conversation:undefined,resumeJobId:undefined,note:{...target.note,chat:undefined}});
   async function openBoardChat(target:BoardChat,prepared=false){
@@ -318,7 +321,7 @@ export function DesktopApp(){
       <DesktopChatList sessions={visible} jobs={listJobs} focusId={page==='chats'?selected?.sessionId:undefined}
         actionId={chatAction?.session.sessionId} loading={loading} online={state.online} connection={connection} provider={provider}
         onOpen={openChat} onMenu={target=>setChatAction({...target,onDeleteFailed:(session,message)=>{setDeleteError(label('Could not delete','Не удалось удалить')+' «'+(session.customTitle||session.summary||session.sessionId)+'»: '+message);setRevision(value=>value+1);}})} onCloseMenu={()=>setChatAction(null)} onDeleted={(ids,lane)=>removeChats(ids,true,lane)}
-        beforeChats={<ScheduledTaskList connection={connection} online={state.online} focusId={page==='chats'?selected?.sessionId:undefined} sessions={visible} onOpenChat={openChat} onEdit={setScheduleEditor} onNew={projectRoot?()=>setScheduleEditor('new'):undefined}/>}/></div>
+        beforeChats={<ScheduledTaskList connection={connection} online={state.online} focusId={page==='chats'?selected?.sessionId:undefined} sessions={visible} onOpenChat={openChat} onEdit={setScheduleEditor} onRuns={setPlanRuns} onNew={projectRoot?()=>setScheduleEditor('new'):undefined}/>}/></div>
       </div>
     </aside>
     <main className={'desktop-main'+(page==='work'&&boardChat?.context&&(selected||creating)?' desktop-board-chat':'')}>{state.online&&<ConnectionStatus/>}{error&&<div className="desktop-error" role="alert">{error}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setError('')}><X size={16}/></button></div>}{deleteError&&<div className="desktop-error" role="alert">{deleteError}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setDeleteError('')}><X size={16}/></button></div>}

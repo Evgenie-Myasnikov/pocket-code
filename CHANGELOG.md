@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.29.8 (2026-11-25)
+
+### Validation
+
+- Browser scenarios on Edge: 22 passed across the scheduled tasks (7), the chat list, chat actions and folders; the chat actions scenario that expects an Erase chat dialog fails here and on 0.29.7 alike.
+- Server tests: not rerun for this interface-only release (last on 0.29.4).
+- Not checked: a real scheduled run on the installed host, the installed Windows application, a phone.
+
+### Changes
+
+- No archive (2026-11-25). The chat menu is Rename, Pin, Delete; the Archive item and the Archived list are gone, and chats archived before are back in the chat list.
+  - Validation: the chat list scenarios (row menu, an archived chat shown again, pin kept after a reload) passed.
+
+### Bug Fixes
+
+- A new plan chat opens at once (2026-11-25). A plan chat with no run yet opened its editor on a click; it now opens as its plan chat, which says when the first run starts (or that the task is paused).
+- Plan runs stay out of Chats in the window too (2026-11-25). The PC window now leaves out every chat and job of a plan run itself, from the task list it already reads, also when the host lists them (an older host, or a chat not yet recorded for its task).
+  - Validation: a new browser scenario (a task with no run opens as its plan chat; a run's chat is not under Chats) passed with the other scheduled tasks scenarios (7). The chat actions scenario that expects an Erase chat dialog after Delete fails here and on 0.29.7 alike (Delete removes a chat at once since 0.28.60).
+
 ## [0.29.7](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.6...v0.29.7) (2026-11-25)
 
 Published [0.29.7](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.7) from [9f23e44](https://github.com/Evgenie-Myasnikov/pocket-code/commit/9f23e44da4755c6e77e433dc49ba511039f9550b) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

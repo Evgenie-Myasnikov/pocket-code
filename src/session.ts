@@ -1,5 +1,5 @@
 import type {WorkspaceProvider} from './preferences';
 /** Shared session metadata used by the mobile workspace and desktop reader. */
-export type Session={sessionId:string;summary:string;customTitle?:string;cwd?:string;lastModified:number;gitBranch?:string;source?:string;readOnly?:boolean;/** The latest run of a scheduled task: it is read here and nothing is written to it. */scheduled?:boolean;archived?:boolean;provider?:WorkspaceProvider;board?:BoardLink;account?:string};
+export type Session={sessionId:string;summary:string;customTitle?:string;cwd?:string;lastModified:number;gitBranch?:string;source?:string;readOnly?:boolean;/** The latest run of a scheduled task: it is read here and nothing is written to it. */scheduled?:boolean;/** A plan chat with no run yet says when its first run starts. */scheduledNote?:string;archived?:boolean;provider?:WorkspaceProvider;board?:BoardLink;account?:string};
 /** The board a chat was started from (host chat library). */
 export type BoardLink={id:string;root:string;title:string;noteId?:string;kind?:'discussion'|'note'|'task'};

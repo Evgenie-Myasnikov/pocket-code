@@ -47,3 +47,5 @@
 .plan-chat-working>span{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:plan-chat-pulse 1.2s ease-in-out infinite}
 @keyframes plan-chat-pulse{50%{opacity:.4;transform:scale(.8)}}
 @media(prefers-reduced-motion:reduce){.plan-chat-working>span{animation:none}}
+
+.plan-chat-empty{margin:24px 0;color:var(--muted);text-align:center}

@@ -17,7 +17,7 @@ test('a muted conversation stays identifiable when reopening the library',async(
  await list.locator('.desktop-sessions>button').nth(1).hover();await bells.nth(1).click();await expect(bells.nth(1)).toHaveAttribute('aria-pressed','false');
  await page.reload();await expect(bells.nth(1)).toHaveAttribute('aria-pressed','false');await expect(bells.first()).toHaveAttribute('aria-pressed','true');
  await list.locator('.desktop-sessions>button').nth(1).hover();await list.getByRole('button',{name:'Действия чата',exact:true}).nth(1).click();
- const menu=page.getByRole('menu',{name:'Действия чата'});await expect(menu.getByRole('menuitem')).toHaveText(['Переименовать','Закрепить','В архив','Удалить']);
+ const menu=page.getByRole('menu',{name:'Действия чата'});await expect(menu.getByRole('menuitem')).toHaveText(['Переименовать','Закрепить','Удалить']);
  if(process.env.POCKET_CHAT_NOTIFICATION_PREVIEW){
    await page.evaluate(()=>document.fonts.ready.then(()=>true));
    const a=(await page.locator('.desktop-library>.desktop-list-caption').boundingBox())!,b=(await menu.boundingBox())!;
@@ -78,7 +78,7 @@ test('running chat action keeps deletion unavailable and keyboard focus visible'
  await expect(row).toHaveAttribute('data-running','true');await page.keyboard.press('Tab');await expect(action).toBeFocused();await expect(action).toHaveCSS('opacity','1');
  await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Delete',exact:true})).toBeDisabled();
  await expect(page.getByRole('menuitem',{name:'Rename',exact:true})).toBeEnabled();
- // Muting lives on the bell of the row; the menu is Rename, Pin, Archive, Delete.
+ // Muting lives on the bell of the row; the menu is Rename, Pin, Delete.
  await expect(page.getByRole('menuitem',{name:/notifications/})).toHaveCount(0);await page.keyboard.press('Escape');
  await bell.click();await expect(bell).toHaveAttribute('aria-pressed','true');
 });
