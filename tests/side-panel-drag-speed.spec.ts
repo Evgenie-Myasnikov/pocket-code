@@ -21,7 +21,10 @@ test('dragging the side panel edge over a long chat and a long file stays smooth
  await page.getByRole('button',{name:/claude · Interface review/}).click();
  const card=page.getByRole('region',{name:'Turn result'});await card.getByRole('button',{name:/Files: 1/}).click();
  await card.getByRole('button',{name:'CHANGELOG.md'}).click();
- const panel=page.locator('.chat-side-panel');await expect(panel).toContainText('Version 299');
+ const panel=page.locator('.chat-side-panel');
+ // a file from the turn result opens on its changes; the long file itself is the other view
+ const whole=panel.getByRole('button',{name:'File',exact:true});if(await whole.count())await whole.click();
+ await expect(panel).toContainText('Version 299');
  const edge=(await panel.getByRole('separator',{name:'Panel width'}).boundingBox())!;
  // Each step's main-thread time: the move event and the frame it causes.
  await page.evaluate(()=>{(window as any).frames_=[] as number[];let last=performance.now();const tick=(now:number)=>{(window as any).frames_.push(now-last);last=now;if((window as any).frames_.length<400)requestAnimationFrame(tick);};requestAnimationFrame(tick);});

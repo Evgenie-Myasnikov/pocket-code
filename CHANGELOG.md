@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.29.5 (2026-11-25)
+
+### Validation
+
+- Browser scenarios on Edge: motion (the blur behind the message field), the side panel, its drag speed, settings scroll and transcript rhythm passed; a scroll of the transcript measured a worst frame of 8 ms.
+- Server tests: not rerun for this styling-only release (last on 0.29.4).
+- Not checked: the installed Windows application, a phone.
+
+### Bug Fixes
+
+- No frame around the chat, and a blur only under the message field (2026-11-25). The chat and the side panel lose their frame (inset, rounded corners and outline): the framed scrolling area made scrolling stutter. The chat sits flat beside the rail, set apart by one line. The edge blur no longer covers the blocks above the message field: it lies behind the field only, fading in at its top, and has two layers instead of five, so scrolling stays smooth.
+  - Validation: the motion scenario checks the two layers and that the band starts where the message field does; the side panel scenario checks there is no frame; the side panel drag speed scenario (updated: a file from a turn result opens on its changes) passed; a scroll of the transcript measured a worst frame of 8 ms.
+
 ## [0.29.4](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.3...v0.29.4) (2026-11-25)
 
 Published [0.29.4](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.4) from [468f116](https://github.com/Evgenie-Myasnikov/pocket-code/commit/468f116f28e96dec089063c422ea4bc9aeee53be) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

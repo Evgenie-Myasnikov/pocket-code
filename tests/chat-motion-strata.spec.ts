@@ -116,7 +116,10 @@ test('under the chat the transcript passes beneath the message field through an 
  const blur=page.locator('.workspace.chat-canvas>.chat-edge-blur');
  await expect(blur).toHaveCount(1);
  const layers=await blur.locator('span').evaluateAll(list=>list.map(element=>getComputedStyle(element).backdropFilter));
- expect(layers).toEqual(['blur(1px)','blur(2px)','blur(3px)','blur(6px)','blur(12px)']);
+ expect(layers).toEqual(['blur(4px)','blur(12px)']);
+ // the band ends where the message field starts: nothing above the field is blurred
+ const band=(await blur.boundingBox())!,field=(await page.locator('.chat-overlay-bottom').boundingBox())!;
+ expect(Math.abs(band.y-field.y)).toBeLessThanOrEqual(2);
  expect(await blur.evaluate(element=>getComputedStyle(element).pointerEvents)).toBe('none');
  await page.screenshot({path:'.local/edge-blur.png'});
 });

@@ -37,7 +37,8 @@ test('a file from the turn result opens as a tab of the side panel and the chat 
  const transparent=(value:string)=>value==='rgba(0, 0, 0, 0)';
  // the chat and the panel are framed cards on the app background: the chat is a step darker, both have a 1px outline
  expect(await bg('.desktop-main')).not.toBe(await bg('.desktop-app'));expect(transparent(await bg('.file-reader-docked'))).toBe(true);
- for(const selector of ['.desktop-main','.chat-side-panel']){const border=await page.locator(selector).first().evaluate(e=>({width:getComputedStyle(e).borderTopWidth,color:getComputedStyle(e).borderTopColor,bg:getComputedStyle(document.querySelector('.desktop-app')!).backgroundColor}));expect(border.width).toBe('1px');expect(border.color).not.toBe(border.bg);}expect(await bg('.desktop-chat-host header.chat-header')).toBe(await bg('.desktop-rail'));
+ // no frame around the chat: it sits flat beside the rail (a framed scrolling area cost smooth scrolling)
+ expect(await page.locator('.desktop-main').evaluate(element=>getComputedStyle(element).borderTopLeftRadius)).toBe('0px');
  // the left edge drags like a splitter; the width is remembered and double-click returns to half the chat area
  const edge=panel.getByRole('separator',{name:'Panel width'}),before=(await panel.boundingBox())!;
  const grip=(await edge.boundingBox())!;await page.mouse.move(grip.x+grip.width/2,grip.y+300);await page.mouse.down();await page.mouse.move(grip.x-80,grip.y+300,{steps:6});await page.mouse.up();
