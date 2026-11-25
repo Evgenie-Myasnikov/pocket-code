@@ -72,9 +72,11 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
     if(!run?.sessionId){onOpenChat({sessionId:'pending-'+task.id,cwd:task.cwd,summary:task.prompt,lastModified:task.createdAt,provider:task.provider,...(task.account?{account:task.account}:{}),customTitle:task.name,scheduled:true,
       scheduledNote:task.paused?l('No run yet. The task is paused.','Запусков ещё не было. Задача на паузе.'):l('No run yet. The first run starts ','Запусков ещё не было. Первый запуск — ')+fullTime(task.nextRunAt)+'.'});return;}
     // Only the latest run is there, named by its time (09:00, or the day and time when it is not today); nothing can be written to it.
-    const found=sessions.find(item=>item.sessionId===run.sessionId)||{sessionId:run.sessionId,cwd:task.cwd,summary:task.prompt,lastModified:run.at,provider:task.provider,...(task.account?{account:task.account}:{})};
+    const found=sessions.find(item=>item.sessionId===run.sessionId)||{sessionId:run.sessionId,cwd:task.cwd,summary:task.prompt,lastModified:run.at};
     // The task is the stable chat entry; a new run replaces its visible answer without exposing a new chat title.
-    onOpenChat({...found,customTitle:task.name,scheduled:true});
+    // Use the task's provider/account as the source of truth. A cached session can omit its Claude account; when the
+    // account changes, DesktopApp's account effect would otherwise clear the just-selected plan chat and show Home.
+    onOpenChat({...found,cwd:task.cwd,provider:task.provider,...(task.provider==='claude'?{account:task.account||''}:{}),customTitle:task.name,scheduled:true});
     if(task.unread)void act('/scheduled-tasks/'+task.id+'/read');
   }
   const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem(COLLAPSED)==='1';}catch{return false;}});

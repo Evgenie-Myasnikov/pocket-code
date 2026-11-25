@@ -73,6 +73,18 @@ type Options = {
 export const CHAIN_SWAP_CONTINUATION = 'The local model was swapped for a scheduled run and interrupted this step. It is back now: continue the same step from where you stopped and finish it as its instructions say, including the completion line.';
 const uuid = /^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const activeStep = (step: MarkdownChainStep) => step.status === 'running' || step.status === 'waiting';
+const settledStep = (step: MarkdownChainStep) => step.status === 'done' || step.status === 'failed' || step.status === 'stopped';
+/** In a loop, one unavailable step is a handoff, not a reason to strand the remaining steps. */
+function continueLoopAfterStepFailure(chain: MarkdownChainDetail, step: MarkdownChainStep) {
+  if (!chain.loop) { chain.status = step.status === 'stopped' ? 'stopped' : 'failed'; return; }
+  const report = [
+    `Previous step "${step.title}" ended ${step.status} before confirming completion.`,
+    step.error ? `Reason: ${step.error}` : '',
+    step.output ? `Last output:\n${step.output}` : '',
+  ].filter(Boolean).join('\n\n');
+  step.handoff = report.slice(-6000);
+  chain.status = chain.steps.every(settledStep) ? 'done' : 'running';
+}
 const sameScope = (chain: ChainScope, scope: ChainScope) =>
   chain.provider === scope.provider && chain.cwd === scope.cwd && chain.account === scope.account;
 const scopeHash = ({cwd, provider, account}: ChainScope) =>
@@ -196,9 +208,12 @@ export class MarkdownChains {
         if (step) {
           delete step.paused; delete step.resumeJobId;
           step.status = 'failed'; step.error = 'Host restarted. Check the chat before repeating this task.';
+          continueLoopAfterStepFailure(record.chain, step);
         }
-        record.chain.status = 'failed';
+        if (record.chain.loop && step) this.nextLap(record);
+        else record.chain.status = 'failed';
         await this.save(record);
+        if (record.chain.status === 'running') this.schedule();
       } else {
         // Saved sessions remain navigable. Previous live job IDs cannot be
         // used to open transcripts on the new process.
@@ -540,8 +555,8 @@ export class MarkdownChains {
       step.retryReport = step.output || step.retryReport;
       // A loop must not spin on a step that never confirms its result.
       if (chain.loop && step.retryCount > CHAIN_LOOP_RETRIES) {
-        step.status = 'failed'; step.error = 'The step did not confirm completion after ' + CHAIN_LOOP_RETRIES + ' retries. The loop was stopped.';
-        chain.status = 'failed';
+        step.status = 'failed'; step.error = 'The step did not confirm completion after ' + CHAIN_LOOP_RETRIES + ' retries. Continuing with the next step.';
+        continueLoopAfterStepFailure(chain, step);
         return;
       }
       step.retryAt = Date.now() + Math.min(60000, 1000 * 2 ** Math.min(step.retryCount, 6));
@@ -549,7 +564,7 @@ export class MarkdownChains {
       return;
     } else if (job.error) step.error = job.error;
     step.status = job.status === 'stopped' ? 'stopped' : 'failed';
-    chain.status = step.status;
+    continueLoopAfterStepFailure(chain, step);
   }
   private async verifyStep(record:RecordV1,index:number) {
     const step=record.chain.steps[index],tree=record.trees?.[index];
@@ -601,7 +616,7 @@ export class MarkdownChains {
       if (!job) {
         delete step.jobId;
         step.status = 'failed'; step.error = 'The host lost the job. Check the chat before repeating this task.';
-        chain.status = 'failed';
+        continueLoopAfterStepFailure(chain, step);
       } else this.observe(chain, step, job);
       await this.verifyStep(record,index);
       const old = saved.chain.steps[index];
@@ -664,7 +679,7 @@ export class MarkdownChains {
         delete current.jobId;
         current.status = 'failed';
         current.error = error instanceof HttpError ? error.message : 'Could not start the step. Check the provider connection.';
-        chain.status = 'failed';
+        continueLoopAfterStepFailure(chain, current);
       }
     }
     await this.verifyStep(record,index);

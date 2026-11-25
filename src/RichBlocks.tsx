@@ -178,12 +178,12 @@ const markdownElements:NonNullable<ComponentProps<typeof Streamdown>['components
 /** As in Strata: words of a streamed answer fade in as they arrive (240 ms, ease-out), never ahead of the text; saved text is static. */
 const streamAnimation={animation:'chatWord',duration:450,easing:'cubic-bezier(.85,.1,.9,1.2)',sep:'word' as const,stagger:12,maxBacklogMs:120};
 const reducedMotion=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-export const Markdown=memo(function Markdown({text:written,streaming=false,caret=false,animateInitial=false}:{text:string;streaming?:boolean;caret?:boolean;animateInitial?:boolean}) {
+export const Markdown=memo(function Markdown({text:written,streaming=false,animateInitial=false}:{text:string;streaming?:boolean;animateInitial?:boolean}) {
   useLanguage();
   // What arrives is written into the chat word by word over the window set in Appearance, even a block that arrives whole.
   const {text,pending}=useSmoothText(written,streaming,animateInitial);
   const live=streaming||pending,animate=live&&!reducedMotion();
-  return <div className="markdown" data-caret={caret&&(live||pending)&&text?true:undefined}><Streamdown mode={live?"streaming":"static"} parseIncompleteMarkdown={live} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={animate?streamAnimation:false} isAnimating={animate} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
+  return <div className="markdown"><Streamdown mode={live?"streaming":"static"} parseIncompleteMarkdown={live} parseMarkdownIntoBlocksFn={singleMarkdownBlock} skipHtml controls={false} animated={animate?streamAnimation:false} isAnimating={animate} remarkPlugins={[remarkGfm]} components={markdownElements}>{text}</Streamdown></div>;
 });
 // Native <details> hides content visually but still mounts/parses all of it.
 // Long command output is materialized only while the user asks to inspect it.
@@ -319,13 +319,13 @@ export function TaskNotificationEvent({notification}:{notification:ClaudeTaskNot
   </details>;
 }
 export const notificationSummary=(notification:ClaudeTaskNotification)=>t(notificationTitles[notification.status])+': '+notification.summary;
-export function RichBlock({block,depth=0,result,onSubagent,onCommandToggle,running=false,streaming=false,animateInitial=false,caret=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;animateInitial?:boolean;caret?:boolean;onSubagent?(agent:SubagentView):void;onCommandToggle?(open:boolean):void}) {
+export function RichBlock({block,depth=0,result,onSubagent,onCommandToggle,running=false,streaming=false,animateInitial=false}:{block:Block;depth?:number;result?:Block;running?:boolean;streaming?:boolean;animateInitial?:boolean;onSubagent?(agent:SubagentView):void;onCommandToggle?(open:boolean):void}) {
   if(depth>5)return <p>{t('Вложенный результат слишком большой для просмотра')}</p>;
   if(block.type==='text'){
     const text=block.text || '', notification=parseClaudeTaskNotification(text);
     if(notification)return <TaskNotificationEvent notification={notification}/>;
     if(isClaudeTaskNotificationPrefix(text))return <aside className="claude-task-notification transcript-event pending" aria-live="polite">{t('Обрабатывается уведомление о фоновых задачах')}</aside>;
-    return <Markdown text={text} streaming={streaming} caret={caret} animateInitial={streaming&&animateInitial}/>;
+    return <Markdown text={text} streaming={streaming} animateInitial={streaming&&animateInitial}/>;
   }
   if(block.type==='subagent' && block.agent) {
     const agent=block.agent,label=t(({running:'Работает',completed:'Готово',error:'Ошибка',stopped:'Остановлено',unknown:'Статус неизвестен'} as const)[agent.status]);
