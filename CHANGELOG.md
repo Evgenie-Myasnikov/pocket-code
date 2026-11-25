@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.29.6 (2026-11-25)
+
+### Validation
+
+- Browser scenarios on Edge: the scheduled tasks scenarios (6, including the new one for a run that has just started) passed.
+- Server tests: not rerun for this interface-only release (last on 0.29.4).
+- Not checked: a real scheduled run on the installed host, the installed Windows application, a phone.
+
+### Bug Fixes
+
+- A plan chat opens on its latest run (2026-11-25). After Run now (or at the scheduled time) the plan chat stayed empty: the new run had no chat yet, so the row opened the chat of the earlier run, which had already been removed. The row now opens the latest run itself, through its job while it has no chat yet, says "Preparing the answer…" until the answer is written, and keeps the agent's questions (permission to run a command) visible.
+  - Validation: a new browser scenario (a run that has just started opens at once, shows that it is working, then its answer) passed with the other scheduled tasks scenarios (6).
+
 ## [0.29.5](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.4...v0.29.5) (2026-11-25)
 
 Published [0.29.5](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.5) from [2986317](https://github.com/Evgenie-Myasnikov/pocket-code/commit/2986317ff01dc155683cf489155aef254b291626) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

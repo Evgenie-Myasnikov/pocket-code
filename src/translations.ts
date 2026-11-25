@@ -1745,4 +1745,5 @@ export const english: Record<string, string> = {
   'Подключаемся к ПК…': 'Connecting to the PC…',
   'Подключение к модели недоступно. Проверьте его на ПК.': 'The model connection is unavailable. Check it on the PC.',
   'Копировать код': 'Copy code',
+  'Готовлю ответ…': 'Preparing the answer…',
 };

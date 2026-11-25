@@ -41,3 +41,9 @@
 .scheduled-task-template{display:flex;align-items:flex-end;gap:10px}
 .scheduled-task-template>label{flex:1}
 .scheduled-tasks-notice{margin:4px 8px;color:var(--muted);font-size:calc(12px * var(--ui-scale,1))}
+
+/* A plan chat whose run has not written its answer yet. */
+.plan-chat-working{display:flex;align-items:center;gap:10px;margin:8px 0;color:var(--muted)}
+.plan-chat-working>span{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:plan-chat-pulse 1.2s ease-in-out infinite}
+@keyframes plan-chat-pulse{50%{opacity:.4;transform:scale(.8)}}
+@media(prefers-reduced-motion:reduce){.plan-chat-working>span{animation:none}}

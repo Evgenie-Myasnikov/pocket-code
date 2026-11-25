@@ -62,7 +62,9 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
   // Opening a run's chat from anywhere marks its task read.
   useEffect(()=>{const task=tasks.find(item=>item.unread&&item.runs[0]?.sessionId&&item.runs[0].sessionId===focusId);if(task)void act('/scheduled-tasks/'+task.id+'/read');},[focusId,tasks]);
   function open(task:ScheduledTask){
-    const run=task.runs.find(item=>item.sessionId);
+    // The latest run is the chat: a run that has just started has no chat yet, so its job is opened (pending-<run id>) and
+    // fills in as it answers. An earlier run's chat is removed once the next run has one, so it is never opened instead.
+    const latest=task.runs[0],run=latest?.sessionId?latest:latest&&!latest.error?{...latest,sessionId:'pending-'+latest.id}:task.runs.find(item=>item.sessionId);
     if(!run?.sessionId){onEdit(task);return;}
     // Only the latest run is there, named by its time (09:00, or the day and time when it is not today); nothing can be written to it.
     const found=sessions.find(item=>item.sessionId===run.sessionId)||{sessionId:run.sessionId,cwd:task.cwd,summary:task.prompt,lastModified:run.at,provider:task.provider,...(task.account?{account:task.account}:{})};

@@ -162,3 +162,22 @@ test('choosing a local model for a plan chat starts nothing now: each run starts
   expect(created).toMatchObject({provider:'claude',account:'',model:'',localModel:'coder-iq1_m'});
   expect(await page.evaluate(()=>(window as any).localStarts)).toBe(0);
 });
+
+test('a run that has just started opens at once: the plan chat shows it working, then its answer',async({page})=>{
+  const run='12121212-1212-4121-8121-121212121212';
+  await scheduledHost(page,[{...briefing,unread:true,runs:[{id:run,at:Date.now()},...briefing.runs]}]);
+  await page.addInitScript(id=>{
+    localStorage.setItem('pocket-code-background-v1',JSON.stringify({enabled:false}));
+    (window as any).testHistoryPage=()=>({messages:[],previous:null,next:null});
+    (window as any).testRuns=[{id,provider:'claude',cwd:'C:\Demo\Atlas',status:'running',startedAt:Date.now(),baseMessageCount:0,approvals:[],revision:1,partial:'',
+      messages:[{id:'u',role:'user',blocks:[{type:'text',text:'Summarise the synthetic changes since yesterday.'}]}]}];
+  },run);
+  await page.setViewportSize({width:1440,height:900});await desktop(page);
+  await page.locator('.desktop-rail .scheduled-task').getByRole('button',{name:/Weekday morning brief/}).click();
+  // the run's own job is open, not the chat of an earlier run, and it says it is working
+  await expect(page.locator('.plan-chat-working')).toContainText('Preparing the answer');
+  await expect(page.locator('.composer-area')).toBeHidden();
+  await page.evaluate(()=>{const r=(window as any).testRuns[0];r.sessionId='gamma';r.messages.push({id:'a',role:'assistant',blocks:[{type:'text',text:'Yesterday: three commits. Today: two Jira tasks.'}]});r.revision++;});
+  await expect(page.locator('.conversation-inner')).toContainText('Yesterday: three commits.');
+  await expect(page.locator('.plan-chat-working')).toHaveCount(0);
+});
