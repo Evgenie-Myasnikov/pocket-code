@@ -50,7 +50,12 @@ export function stepReveal(state:Reveal,length:number,now:number,delay:number):R
  */
 export function useSmoothText(text:string,live:boolean,fromEmpty:boolean):{text:string;pending:boolean}{
   const smooth=useRef(live||fromEmpty);
+  const wasLive=useRef(live);
   if(live||fromEmpty)smooth.current=true;
+  if(live)wasLive.current=true;
+  // Once a stream finishes, show its complete final chunk in this render. The
+  // timer may still have words queued from the last provider update.
+  const finished=!live&&wasLive.current;
   const [index,setIndex]=useState(()=>fromEmpty&&readTextDelay()>0?0:text.length);
   const latest=useRef(text);latest.current=text;
   const previous=useRef(text);
@@ -60,7 +65,7 @@ export function useSmoothText(text:string,live:boolean,fromEmpty:boolean):{text:
   useEffect(()=>{
     const delay=readTextDelay(),replaced=!text.startsWith(previous.current);
     previous.current=text;
-    if(delay<=0||!smooth.current||replaced){
+    if(finished||delay<=0||!smooth.current||replaced){
       cancelAnimationFrame(frame.current);frame.current=0;
       state.current=startReveal(text.length,text.length,performance.now(),0);lastIndex.current=text.length;setIndex(text.length);return;
     }
@@ -74,9 +79,9 @@ export function useSmoothText(text:string,live:boolean,fromEmpty:boolean):{text:
       frame.current=next.shown<current.length?requestAnimationFrame(tick):0;
     };
     frame.current=requestAnimationFrame(tick);
-  },[text]);
+  },[text,live,finished]);
   // The cleanup also forgets the frame: a remount (React's development check) must be able to start the loop again.
   useEffect(()=>()=>{cancelAnimationFrame(frame.current);frame.current=0;},[]);
-  const shown=Math.min(index,text.length);
+  const shown=finished?text.length:Math.min(index,text.length);
   return {text:shown>=text.length?text:text.slice(0,shown),pending:shown<text.length};
 }

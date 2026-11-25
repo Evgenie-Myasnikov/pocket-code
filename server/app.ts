@@ -850,7 +850,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     }
   }
   async function launchJob(settings:JobSettings,turn:{id:string;cwd:string;text:string;displayText:string;attachmentPaths:string[];sessionId?:string;baseMessageCount:number}) {
-    const env=settings.account?await customProviders.agentEnv(settings.account,settings.model):undefined;
+    const localContext=settings.account?localModels.contextFor(settings.account):undefined;
+    const env=settings.account?await customProviders.agentEnv(settings.account,settings.model,process.env,localContext):undefined;
     const input={...settings,...turn,approvalTimeoutMs:settings.approvalTimeoutMinutes*60000,...(env?{env}:{})};
     if(settings.provider==='copilot')return copilot().start({...input,access:settings.copilotAccess});
     return engineFor(settings.provider).start(input);

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- Flush the remaining word and character reveal as soon as a live assistant answer or reasoning stream finishes, so completed text no longer continues fading in. Active streaming and initial entrance motion remain.
+  - Validation: npm run build passed; the browser scenario and installed-app check were not run.
+
+- Keep a selected planned chat open while provider and account state restore; opening a plan chat also clears stale new-chat state.
+  - Validation: npm run build passed (TypeScript and Vite). Browser/server tests and installed-app checks were not run.
+
+- Pass Strata's configured context window to Claude Code when launching its local model, so automatic context compaction targets the real window instead of the generic limit for an unknown model ID. Other custom providers remain unchanged when their context size is unknown.
+  - Validation: npm run build and npm run check:docs passed; a real Strata compaction and installed-app check were not run.
+
 ## [0.29.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.8...v0.29.9) (2026-11-25)
 
 Published from [04f6a6fddcdc8dc2026422ffdf3c9afe4343c3d7](https://github.com/Evgenie-Myasnikov/pocket-code/commit/04f6a6fddcdc8dc2026422ffdf3c9afe4343c3d7) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui); tag v0.29.9 points to that commit. The Android APK, PC host bundle, Windows package and update manifest downloaded from GitHub match the audited local assets by SHA-256. Android versionCode 164; APK signature matches v0.29.8. The unpacked artifacts passed the privacy audit (794 APK entries, 1207 Windows entries, 833 host files; no source maps).

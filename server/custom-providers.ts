@@ -66,10 +66,11 @@ export class CustomProviders{
  }
  /** Environment for a Claude Code task that runs against this provider: its URL and key replace the host's own Claude sign-in,
   * and every model slot uses the chosen model so the agent never asks the provider for an unknown Claude model. */
- async agentEnv(id:string,model:string,base:NodeJS.ProcessEnv=process.env):Promise<NodeJS.ProcessEnv>{
+ async agentEnv(id:string,model:string,base:NodeJS.ProcessEnv=process.env,contextWindow?:number):Promise<NodeJS.ProcessEnv>{
   const p=await this.get(id);if(!p.key)throw new HttpError(409,'Sign in to this provider with an API key first','provider_no_key');
   const env:NodeJS.ProcessEnv={...base};for(const name of inheritedAuth)delete env[name];
-  return {...env,ANTHROPIC_BASE_URL:agentBaseUrl(p.url),...(p.agentAuth==='x-api-key'?{ANTHROPIC_API_KEY:p.key}:{ANTHROPIC_AUTH_TOKEN:p.key}),ANTHROPIC_MODEL:model,ANTHROPIC_SMALL_FAST_MODEL:model,ANTHROPIC_DEFAULT_OPUS_MODEL:model,ANTHROPIC_DEFAULT_SONNET_MODEL:model,ANTHROPIC_DEFAULT_HAIKU_MODEL:model,CLAUDE_CODE_SUBAGENT_MODEL:model,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1'};
+  const knownWindow=typeof contextWindow==='number'&&Number.isSafeInteger(contextWindow)&&contextWindow>=32768&&contextWindow<=262144?String(contextWindow):undefined;
+  return {...env,ANTHROPIC_BASE_URL:agentBaseUrl(p.url),...(p.agentAuth==='x-api-key'?{ANTHROPIC_API_KEY:p.key}:{ANTHROPIC_AUTH_TOKEN:p.key}),ANTHROPIC_MODEL:model,ANTHROPIC_SMALL_FAST_MODEL:model,ANTHROPIC_DEFAULT_OPUS_MODEL:model,ANTHROPIC_DEFAULT_SONNET_MODEL:model,ANTHROPIC_DEFAULT_HAIKU_MODEL:model,CLAUDE_CODE_SUBAGENT_MODEL:model,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1',...(knownWindow?{CLAUDE_CODE_MAX_CONTEXT_TOKENS:knownWindow}:{})};
  }
  async taskExecutors():Promise<PlanExecutor[]>{
   const profiles=(await this.load()).filter(p=>p.key);

@@ -177,7 +177,8 @@ export function DesktopApp(){
     const boardTarget=boardChat&&(boardChat.taskRun?.provider||boardChat.note.chat?.provider||(boardChat.conversation?readBoardConversation(boardChat.conversation.key)?.provider:undefined))===provider?boardChat:null;
     const alertTarget=notificationChat?.provider===provider?notificationChat:null;
     const keep=keepChat.current;keepChat.current=false;
-    if(!boardTarget&&!alertTarget&&!keep){setSelected(null);setCreating(false);}
+    const scheduledTarget=selected?.scheduled&&(!selected.provider||selected.provider===provider);
+    if(!boardTarget&&!alertTarget&&!keep&&!scheduledTarget){setSelected(null);setCreating(false);}
     if(!keep)setProject('');
     // A board chat open beside the board switches to this provider's chat of the same board.
     if(!boardTarget&&boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));
@@ -229,7 +230,11 @@ export function DesktopApp(){
     window.addEventListener('pocket-chat-transcripts-removed',removed);
     return()=>{live=false;window.removeEventListener('pocket-chat-transcripts-removed',removed);};
   },[provider]);
-  const previousAccount=useRef(account);useEffect(()=>{if(previousAccount.current===account)return;previousAccount.current=account;if(!selected?.account&&!account||selected?.account===account)return;if(creating&&!selected)return;setSelected(null);setCreating(false);if(boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));},[account]);
+  const previousAccount=useRef(account);useEffect(()=>{const accountChanged=previousAccount.current!==account;previousAccount.current=account;
+    // Restoring an account must not eject a selected plan chat. Keep its task
+    // account as the source of truth if the saved provider choice changes late.
+    if(selected?.scheduled){if(selected.provider==='claude'&&account!==(selected.account||''))setCustomAccount(selected.account||'');return;}
+    if(!accountChanged)return;if(!selected?.account&&!account||selected?.account===account)return;if(creating&&!selected)return;setSelected(null);setCreating(false);if(boardChat?.context&&!boardChat.taskRun)void openBoardChat(laneTarget(boardChat));},[account,selected]);
   const [planRuns,setPlanRuns]=useState<{sessions:Set<string>;jobs:Set<string>}>(()=>({sessions:new Set(),jobs:new Set()}));
   const latestJobs=useMemo(()=>{const map=new Map<string,JobView>();for(const job of [...jobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[jobs]);
   const chatSessionsAll=useMemo(()=>{const map=new Map(sessions.map(item=>[item.sessionId,item]));for(const job of latestJobs.values())if(!job.taskChat&&!planRuns.jobs.has(job.id)&&job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,{sessionId:job.sessionId,cwd:job.cwd,summary:name(job.cwd),lastModified:job.startedAt,...(job.account?{account:job.account}:{})});return [...map.values()].sort((a,b)=>Number(latestJobs.get(b.sessionId)?.status==='running')-Number(latestJobs.get(a.sessionId)?.status==='running')||b.lastModified-a.lastModified);},[sessions,latestJobs]);
@@ -255,9 +260,11 @@ export function DesktopApp(){
   function openChat(session:Session){if(session.board?.kind==='discussion'&&state.online){void openDiscussion(session,session.board);return;}openPlainChat(session);}
   function openPlainChat(session:Session){
     const lane=laneOf(session);setNotificationChat(null);setBoardChat(undefined);
-    if(lane==='claude')setCustomAccount(session.account||'');
     if(lane!==provider){keepChat.current=true;setProject('');setProvider(lane);}
-    setSelected(session);setPage('chats');
+    setSelected(session);setCreating(false);setPage('chats');
+    // Select first so an account-restoration event cannot clear the chat in the
+    // gap before the plan session becomes the active selection.
+    if(lane==='claude')setCustomAccount(session.account||'');
   }
   // The provider chosen inside a new chat: the new chat and its project folder stay.
   function chooseProvider(value:Provider){if(value===provider)return;keepChat.current=true;setProject(projectRoot);setProvider(value);}
