@@ -10,6 +10,12 @@
 .chain-editor-steps>li:not(:last-child)::before { content:"";position:absolute;inset-block:30px -.6rem;inset-inline-start:11.5px;width:1px;background:var(--line); }
 .chain-editor-node { display:grid;place-items:center;width:24px;height:24px;margin-top:6px;border-radius:50%;background:var(--surface);color:var(--muted);font-size:.75rem;font-variant-numeric:tabular-nums; }
 .chain-editor-step { display:grid;gap:.25rem;min-width:0; }
+.chain-editor-reorder{display:flex;align-items:center;gap:2px;min-height:28px;color:var(--muted)}
+.chain-editor-reorder button{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:7px;background:transparent;color:inherit}
+.chain-editor-reorder button:hover:not(:disabled){background:var(--surface);color:var(--text)}
+.chain-editor-reorder button:disabled{opacity:.35}
+.chain-editor-reorder .chain-editor-drag{cursor:grab;touch-action:none}
+.chain-editor-reorder .chain-editor-drag:active{cursor:grabbing}
 :root[data-theme][data-theme] .confirm-modal.chain-editor.chain-editor .chain-editor-step textarea { resize:vertical;min-height:3.4rem;padding:.55rem .75rem; }
 .chain-editor-step-foot { display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-width:0; }
 /* The model is a quiet text control: it reads as a caption until hovered. */

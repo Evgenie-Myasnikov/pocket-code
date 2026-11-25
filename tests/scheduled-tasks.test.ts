@@ -161,6 +161,7 @@ test('scheduled task API: create, list, run now as a new chat, edit, delete; req
     const ran=await(await call(`/scheduled-tasks/${created.id}/run`,{})).json();
     assert.equal(ran.runs.length,1);assert.equal(ran.unread,true);assert.equal(ran.nextRunAt,created.nextRunAt);
     const job=jobs.get(ran.runs[0].id);assert.equal(job.cwd,await (await import('node:fs/promises')).realpath(project));
+    assert.equal(job.permissionMode,'bypassPermissions','scheduled Claude runs have full access');
     await new Promise(resolve=>setTimeout(resolve,50));
     assert.deepEqual(prompts,['List the synthetic files.']);
     // the run's job is the task's chat, not a chat of the list

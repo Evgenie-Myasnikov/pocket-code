@@ -68,8 +68,8 @@ test('a scheduled task with an unread run shows a clock and a dot, and opening i
   await row.getByRole('button',{name:/Weekday morning brief/}).click();
   await expect(page.getByText('The responsive layout is ready.')).toBeVisible();
   await expect(row.locator('.scheduled-task-dot')).toHaveCount(0);
-  // A run is read like a chat, named by its task and time, and nothing can be written to it
-  await expect(page.locator('.desktop-chat-host header h1')).toContainText('Weekday morning brief · ');
+  // The task itself is the stable chat, with no run timestamp in its title.
+  await expect(page.locator('.desktop-chat-host header h1')).toHaveText('Weekday morning brief');
   // it holds one message, the latest answer, and has no message field: the task writes to it on its schedule
   await expect(page.locator('.conversation-inner .message')).toHaveCount(1);
   await expect(page.locator('.conversation-inner .message.assistant')).toContainText('The responsive layout is ready.');
@@ -90,6 +90,8 @@ test('the "…" menu pauses, runs now and deletes a scheduled task',async({page}
   await expect(menu.getByRole('menuitem',{name:'Resume'})).toBeVisible();
   await menu.getByRole('menuitem',{name:'Run now'}).click();
   await expect(row.locator('.scheduled-task-dot')).toBeVisible();
+  // Starting a run updates the task; opening its chat still requires clicking the task row.
+  await expect(page.locator('.desktop-chat-host header h1')).toHaveCount(0);
   await row.hover();await actions.click();await menu.getByRole('menuitem',{name:'Edit'}).click();
   const editor=page.getByRole('dialog',{name:'Edit scheduled task'});
   await expect(editor.getByLabel('Name')).toHaveValue('Weekday morning brief');await expect(editor.getByLabel('Time')).toHaveValue('09:00');

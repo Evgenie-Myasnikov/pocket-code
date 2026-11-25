@@ -65,10 +65,9 @@ export function ScheduledTaskList({connection,online,focusId,sessions,onOpenChat
     const run=task.runs.find(item=>item.sessionId);
     if(!run?.sessionId){onEdit(task);return;}
     // Only the latest run is there, named by its time (09:00, or the day and time when it is not today); nothing can be written to it.
-    const at=new Date(run.at),today=at.toDateString()===new Date().toDateString();
-    const time=today?at.toLocaleTimeString(ru?'ru':'en',{hour:'2-digit',minute:'2-digit'}):at.toLocaleString(ru?'ru':'en',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
     const found=sessions.find(item=>item.sessionId===run.sessionId)||{sessionId:run.sessionId,cwd:task.cwd,summary:task.prompt,lastModified:run.at,provider:task.provider,...(task.account?{account:task.account}:{})};
-    onOpenChat({...found,customTitle:task.name+' · '+time,scheduled:true});
+    // The task is the stable chat entry; a new run replaces its visible answer without exposing a new chat title.
+    onOpenChat({...found,customTitle:task.name,scheduled:true});
     if(task.unread)void act('/scheduled-tasks/'+task.id+'/read');
   }
   const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem(COLLAPSED)==='1';}catch{return false;}});

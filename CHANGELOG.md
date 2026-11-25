@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Animated chat and board activity. New assistant replies use a brief whip-in entrance, the transcript has a subtle blurred lower edge, and real board edit events show an illustrated cursor with a compact live status island. Existing paced text reveal and highlighted code blocks remain in use; reduced-motion preferences disable decorative motion. Step chains can be reordered by drag or accessible up/down controls, and launch in the displayed order.
+  - Validation: TypeScript/Vite build passed; the chain editor browser scenario verifies reordered launch payloads; visual board cursor behavior and installed-device rendering were not checked.
+
+### Bug Fixes
+
+- Plan chats keep one visible chat per task (2026-11-25). The task name remains the chat title as runs replace the previous answer; opening the provider session is still initiated only by clicking the task row, and the scheduled view has no message field. Scheduled runs use full provider access (Claude bypass permissions, Codex full access, Copilot auto-approves tool permissions); unattended Copilot questions receive a fixed no-user response.
+  - Validation: TypeScript/Vite build passed; 5 scheduled-task browser scenarios and 49 focused provider/scheduler/task-chain unit tests passed. The full `npm test` run did not complete in this environment. A real scheduled run with each provider was not checked.
+
 ## [0.29.3](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.2...v0.29.3) (2026-11-25)
 
 Published [0.29.3](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.3) from [e3f8cef](https://github.com/Evgenie-Myasnikov/pocket-code/commit/e3f8cefa8ddeeeb42ffa7229dd17f3b515be6d78) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

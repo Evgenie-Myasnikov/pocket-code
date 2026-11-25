@@ -23,6 +23,9 @@ test('a chain is built from steps and can loop back with a condition and a lap l
   await form.getByRole('button',{name:'Add step',exact:true}).click();
   await expect(start).toBeDisabled();
   await form.getByRole('button',{name:'Remove step 3',exact:true}).click();
+  await form.getByRole('button',{name:'Move step down 1'}).click();
+  await expect(form.locator('.chain-editor-steps textarea').nth(0)).toHaveValue('Fix the listed remarks.');
+  await expect(form.locator('.chain-editor-steps textarea').nth(1)).toHaveValue('Review the glossary and list remarks.');
   await form.getByRole('switch',{name:/Repeat in a loop/}).check();
   await expect(form.getByText('then back to step 1')).toBeVisible();
   await form.getByRole('textbox',{name:'Stop when'}).fill('the review has no remarks');
@@ -34,8 +37,8 @@ test('a chain is built from steps and can loop back with a condition and a lap l
   const sent=await page.evaluate(()=>(window as any).startedChain);
   expect(sent.loop).toEqual({maxLaps:4,until:'the review has no remarks',stopIdle:true});
   expect(sent.tasks.map((task:{title:string;body:string})=>[task.title,task.body])).toEqual([
-    ['Review the glossary and list remarks.','Review the glossary and list remarks.'],['Fix the listed remarks.','Fix the listed remarks.']]);
-  expect(sent.name).toBe('Review the glossary and list remarks.');
+    ['Fix the listed remarks.','Fix the listed remarks.'],['Review the glossary and list remarks.','Review the glossary and list remarks.']]);
+  expect(sent.name).toBe('Fix the listed remarks.');
   await expect(page.getByText('Lap 1 of 4 · until: the review has no remarks')).toBeVisible();
   await page.screenshot({path:'.local/chain-loop-panel.png'});
 });

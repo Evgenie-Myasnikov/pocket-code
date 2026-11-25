@@ -1,6 +1,6 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {Plus,Repeat,X} from 'lucide-react';
+import {ArrowDown,ArrowUp,GripVertical,Plus,Repeat,X} from 'lucide-react';
 import {request} from './api';
 import type {ImproveScope} from './ImproveTaskText';
 import type {MarkdownChainControls} from './MarkdownChainPanel';
@@ -28,6 +28,7 @@ export function ChainEditorDialog({controls,improveScope,onClose,onStarted}:Prop
   const [executors,setExecutors]=useState<Executor[]>([]),[catalogueError,setCatalogueError]=useState(false);
   const [starting,setStarting]=useState(false),[error,setError]=useState('');
   const live=useRef(true),lock=useRef(false),attempt=useRef<{signature:string;id:string}|null>(null);
+  const dragged=useRef<string|null>(null);
   useModal(root,true,()=>{if(!starting)onClose();});
   useEffect(()=>{live.current=true;return()=>{live.current=false;};},[]);
   const connection=improveScope?.connection;
@@ -41,6 +42,8 @@ export function ChainEditorDialog({controls,improveScope,onClose,onStarted}:Prop
   },[connection?.url,connection?.token,connection?.desktop]);
 
   const update=(key:string,patch:Partial<Step>)=>setSteps(list=>list.map(step=>step.key===key?{...step,...patch}:step));
+  const moveStep=(key:string,offset:number)=>setSteps(list=>{const from=list.findIndex(step=>step.key===key),to=Math.max(0,Math.min(list.length-1,from+offset));if(from<0||from===to)return list;const next=[...list];next.splice(to,0,next.splice(from,1)[0]);return next;});
+  const dropStep=(target:string)=>{const source=dragged.current;dragged.current=null;if(!source||source===target)return;setSteps(list=>{const from=list.findIndex(step=>step.key===source),to=list.findIndex(step=>step.key===target);if(from<0||to<0||from===to)return list;const next=[...list];next.splice(to,0,next.splice(from,1)[0]);return next;});};
   const filled=steps.every(step=>step.body.trim());
   const oversized=steps.reduce((size,step)=>size+step.body.length+100,0)>totalLimit;
   const lapCount=Math.max(2,Math.min(CHAIN_LOOP_MAX_LAPS,Math.round(laps)||2));
@@ -69,9 +72,16 @@ export function ChainEditorDialog({controls,improveScope,onClose,onStarted}:Prop
       <fieldset disabled={starting} className="chain-editor-body">
         <ol className="chain-editor-steps">{steps.map((step,index)=>{
           const label=l('Step ','Шаг ')+(index+1);
-          return <li key={step.key}>
+          return <li key={step.key} onDragOver={event=>{if(dragged.current){event.preventDefault();event.dataTransfer.dropEffect='move';}}} onDrop={event=>{event.preventDefault();dropStep(step.key);}}>
             <span className="chain-editor-node" aria-hidden="true">{index+1}</span>
             <div className="chain-editor-step">
+              <div className="chain-editor-reorder">
+                <button type="button" className="chain-editor-drag" draggable aria-label={l('Drag to reorder step ','Перетащить шаг ')+(index+1)} title={l('Drag to reorder','Перетащить для сортировки')}
+                  onDragStart={event=>{dragged.current=step.key;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',step.key);}}
+                  onDragEnd={()=>{dragged.current=null;}}><GripVertical size={15}/></button>
+                <button type="button" aria-label={l('Move step up ','Переместить выше ')+(index+1)} disabled={index===0} onClick={()=>moveStep(step.key,-1)}><ArrowUp size={14}/></button>
+                <button type="button" aria-label={l('Move step down ','Переместить ниже ')+(index+1)} disabled={index===steps.length-1} onClick={()=>moveStep(step.key,1)}><ArrowDown size={14}/></button>
+              </div>
               <textarea rows={2} value={step.body} maxLength={100000} autoFocus={index===0} aria-label={label+' · '+l('instruction','инструкция')}
                 placeholder={index===0?l('What should be done first?','Что сделать сначала?'):l('What next?','Что дальше?')}
                 onChange={e=>update(step.key,{body:e.target.value})}/>

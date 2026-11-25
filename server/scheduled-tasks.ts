@@ -26,7 +26,7 @@ export type ScheduledTaskPatch=Partial<ScheduledTaskInput>&{paused?:boolean};
 type Store={version:1;tasks:ScheduledTask[]};
 type Options={
   file:string;
-  /** Starts one run as a new chat; returns the job it started. A throw records the error on the run. */
+  /** Starts one fresh provider session for the task's stable visible chat; a throw records the error on the run. */
   start(task:ScheduledTask,runId:string):Promise<{sessionId?:string}|void>;
   /** The chat of a run, once its provider has named it; undefined while the run is starting. */
   session?(runId:string):string|undefined;

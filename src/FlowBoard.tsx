@@ -334,7 +334,10 @@ function Board({value,editable,busy,onSave,onChatAt,overlay,toolbarHost,renderCa
                 <path className="wb-link" d={path} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeDasharray={link.style==='dashed'?'6 5':undefined} markerEnd={link.style==='line'?undefined:'url(#canvas-arrow)'}/>
                 <path className="wb-link-hit" d={path} fill="none" stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" role="button" tabIndex={0} aria-label={l('Select connection','Выбрать связь')} onPointerDown={e=>{e.stopPropagation();select([]);setSelectedLink(link.id);}}/>
               </g>:null;})}</svg>}
-            {active&&liveActivity&&aiTarget&&<div className="wb-ai-cursor" data-phase={liveActivity.phase} data-target={aiTarget.id} style={{left:aiTarget.x+aiTarget.width-12,top:aiTarget.y-12} as CSSProperties}><svg aria-hidden="true" width="18" height="22" viewBox="0 0 18 22"><path d="M1 1v17l5-5 4 8 3-2-4-7h7Z" fill="currentColor" stroke="var(--bg)"/></svg><span role="status">{aiLabel}</span></div>}
+            {active&&liveActivity&&aiTarget&&<div className="wb-ai-cursor" data-phase={liveActivity.phase} data-target={aiTarget.id} style={{left:aiTarget.x+aiTarget.width-12,top:aiTarget.y-12} as CSSProperties}>
+              <svg aria-hidden="true" width="20" height="24" viewBox="0 0 20 24"><path d="M2 2v17l5-5 4 8 3-2-4-7h8Z" fill="currentColor" stroke="var(--bg)" strokeWidth="1.5"/><circle cx="3" cy="3" r="2" fill="var(--bg)"/></svg>
+              <span className="wb-dynamic-island" role="status" key={liveActivity.id}><i aria-hidden="true"/>{aiLabel}</span>
+            </div>}
           </ViewportPortal>
           {overlay}
         </ReactFlow>

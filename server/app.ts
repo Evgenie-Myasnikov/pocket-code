@@ -824,11 +824,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const jobSettings = z.object({provider:providerSchema, cwd:text, account:uuid.optional(),
       model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
-      claudeEffort:z.enum(['low','medium','high','xhigh','max']).optional(),claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema, maxBudgetUsd: z.number().min(0.1).max(100).default(5),
+      claudeEffort:z.enum(['low','medium','high','xhigh','max']).optional(),claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema,copilotAccess:z.enum(['full','ask']).optional(), maxBudgetUsd: z.number().min(0.1).max(100).default(5),
       approvalTimeoutMinutes: z.union([z.literal(0), z.literal(10), z.literal(60)]).default(0)});
   type JobSettings=z.infer<typeof jobSettings>;
   function validateJobSettings(body:JobSettings) {
     if (body.provider !== 'codex' && body.reasoningEffort) throw new HttpError(400, 'Reasoning effort is available for Codex chats only.');
+    if (body.provider !== 'copilot' && body.copilotAccess) throw new HttpError(400, 'Copilot access is available for Copilot chats only.');
     // A custom provider runs the same Claude Code agent with that provider's URL, key and chosen model.
     if (body.account) {
       if (workspaceAccess.current()) throw new HttpError(403, 'Only the host can use custom providers');
@@ -847,7 +848,9 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   }
   async function launchJob(settings:JobSettings,turn:{id:string;cwd:string;text:string;displayText:string;attachmentPaths:string[];sessionId?:string;baseMessageCount:number}) {
     const env=settings.account?await customProviders.agentEnv(settings.account,settings.model):undefined;
-    return engineFor(settings.provider).start({...settings,...turn,approvalTimeoutMs:settings.approvalTimeoutMinutes*60000,...(env?{env}:{})});
+    const input={...settings,...turn,approvalTimeoutMs:settings.approvalTimeoutMinutes*60000,...(env?{env}:{})};
+    if(settings.provider==='copilot')return copilot().start({...input,access:settings.copilotAccess});
+    return engineFor(settings.provider).start(input);
   }
   taskChains=new MarkdownChains({
     eraseChainFiles:(id,jobs)=>purgeChainCopies(config.uploads,id,jobs),
@@ -956,7 +959,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const body=z.object({eraseOriginals:z.literal(true),chats:z.array(z.object({provider:z.enum(['claude','codex','copilot']),account:uuid.optional(),sessionId:z.string().min(1).max(4096)}).strict())}).parse(req.body);
     res.json(await taskChains.remove(uuid.parse(req.params.id),await chainScope(req.body),body));
   });
-  // Scheduled chats: the host starts a new chat with the task's prompt at every scheduled time (personal PC chats only).
+  // Scheduled chats: each run gets a fresh provider session; the task row remains the one user-facing chat (personal PC chats only).
   const scheduleSchema=z.discriminatedUnion('kind',[
     z.object({kind:z.literal('daily'),time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)}).strict(),
     z.object({kind:z.literal('weekdays'),time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)}).strict(),
@@ -1072,7 +1075,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
           const listed=await customProviders.models(local.providerId).catch(()=>[]),first=listed[0] as string|{id:string}|undefined;
           const settings=scheduledSettings({...task,provider:'claude',account:local.providerId,model:(typeof first==='string'?first:first?.id)||task.localModel});
           const cwd=await allowedPath(accessRoots(),settings.cwd,true);
-          return await launchJob(settings,{id,cwd,text:task.prompt,displayText:task.prompt,attachmentPaths:[],baseMessageCount:0});
+          return await launchJob({...settings,mode:'default',claudeAccess:'bypassPermissions',codexAccess:'full',copilotAccess:'full'},{id,cwd,text:task.prompt,displayText:task.prompt,attachmentPaths:[],baseMessageCount:0});
         }finally{
           // Also when the run could not start: the previous model comes back and the paused chats continue.
           if(local.started)unloadAfter(id,local.providerId,local.previous,local.swapping);
@@ -1080,7 +1083,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       }
       const settings=scheduledSettings(task);
       const cwd=await allowedPath(accessRoots(),settings.cwd,true);
-      return launchJob(settings,{id,cwd,text:task.prompt,displayText:task.prompt,attachmentPaths:[],baseMessageCount:0});
+      return launchJob({...settings,mode:'default',claudeAccess:'bypassPermissions',codexAccess:'full',copilotAccess:'full'},{id,cwd,text:task.prompt,displayText:task.prompt,attachmentPaths:[],baseMessageCount:0});
     },
   });
   scheduled.start();
