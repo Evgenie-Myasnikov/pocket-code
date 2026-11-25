@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- Investigation: a reported launch fails inside the Strata engine during prefill (`cuBLAS status 14`, exit code 1). The local-model startup code is unchanged in 0.29.10; this error can have hardware- and configuration-specific causes, so the engine log and Strata/engine versions are needed before selecting a Pocket Code change.
+  - Validation: confirmed the host passes the configured model, context, drafting, vision and parallel options to Strata; the board JSON and dependency references parse. No local launch was reproduced.
+  - Follow-up: inspect the supplied engine log excerpt and version details when available.
+
+- The character reveal of a live answer, reasoning or file write no longer replays on characters that were already written: the animation window never reaches back behind what the component has shown, so a streamed paragraph split, a shifted live-write line window or a remounted block keeps written text plain while new characters still animate. A block mounted mid-stream still animates its newest tail once.
+  - Validation: new reveal-window and span assertions in tests/reveal-chars.test.ts passed; npm run build passed. Visual check in the installed app not run.
+
+- Scheduled runs no longer surface as ordinary chats: /api/activity marks a scheduled task's run job as a task chat like /api/jobs does, so a failed or attention-needing run stays out of the waiting rows and chat status badges, and the one-time origins backfill no longer marks scheduled run chats as ordinary Pocket Code chats in the library.
+  - Validation: the scheduled task API test now asserts the activity marking; tests/scheduled-tasks.test.ts (13 tests), tests/reveal-chars.test.ts, tests/activity.test.ts and tests/chat-library.test.ts passed; npm run build passed. Real scheduled provider runs and the installed Windows application were not run.
+
 ## [0.29.10](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.9...v0.29.10) (2026-11-25)
 
 Published [0.29.10](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.10) from [2fe6ba722edcfdbc6c88b2bfdc438b414d0dfc79](https://github.com/Evgenie-Myasnikov/pocket-code/commit/2fe6ba722edcfdbc6c88b2bfdc438b414d0dfc79) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui); the tag points to that exact source commit. Android versionCode 165. All four public assets downloaded from GitHub match the audited local assets by SHA-256. The APK signature matches v0.29.9. The unpacked artifacts passed privacy review (794 APK entries, 1209 Windows entries, 833 embedded host files; no source maps).

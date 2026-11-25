@@ -166,6 +166,10 @@ test('scheduled task API: create, list, run now as a new chat, edit, delete; req
     assert.deepEqual(prompts,['List the synthetic files.']);
     // the run's job is the task's chat, not a chat of the list
     const listed=(await(await call('/jobs?provider=claude')).json()).find((item:any)=>item.id===ran.runs[0].id);assert.equal(listed?.taskChat,true);
+    // and it is not an ordinary chat of the activity feed either (waiting rows and status badges read that feed)
+    const feed=await(await call('/activity')).json();
+    const row=(Array.isArray(feed)?feed:[]).find((item:any)=>item.id===ran.runs[0].id);
+    assert.equal(row?.taskChat,true,'a scheduled run never joins the ordinary chats of the activity feed');
     // and its chat is not a chat of the list
     const chats=await(await call('/sessions?provider=claude')).json();assert.equal((Array.isArray(chats)?chats:chats.sessions||[]).some((chat:any)=>chat.sessionId==='66666666-6666-4666-8666-666666666666'),false);
     const edited=await(await call(`/scheduled-tasks/${created.id}`,{paused:true,schedule:{kind:'interval',hours:6}})).json();

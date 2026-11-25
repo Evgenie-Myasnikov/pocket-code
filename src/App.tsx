@@ -1285,11 +1285,11 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const visible = sessions.filter((s) => (provider!=='claude'||(s.account||'')===account) && `${s.customTitle || ""} ${s.summary} ${s.cwd}`.toLowerCase().includes(search.toLowerCase()));
   // In Settings the provider is a segmented control above the AI account rows (one control, no second Back).
   const workspacePicker = (location:'sidebar'|'header'|'settings') => location==='settings'?<div className="workspace-picker workspace-picker-settings segmented" role="radiogroup" aria-label={t("Провайдер")}>{([['claude','Claude'],['codex','Codex'],['copilot','Copilot']] as const).map(([id,name])=><button key={id} type="button" role="radio" aria-checked={provider===id} disabled={demo} onClick={()=>setProvider(id)}>{name}</button>)}</div>:<ProviderPicker value={provider} onChange={setProvider} disabled={demo||busy||uploading} connection={connection||undefined}/>;
-  const chatStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>item.status===status));
+  const chatStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>!item.taskChat&&item.status===status));
   const chatStatusLabel=chatStatus?t('Чаты')+': '+runStatusLabel(chatStatus):'';
   const chatStatusDot=chatStatus?<RunStatusDot status={chatStatus} className={'chat-tab-status chat-tab-status-'+chatStatus}/>:null;
   // Status of chats other than the open one, shown on the conversation's Back arrow.
-  const otherStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>item.status===status&&!(item.provider===provider&&(item.id===job?.id||item.sessionId&&item.sessionId===(job?.sessionId||selected?.sessionId)))));
+  const otherStatus=(['needs_input','error','running','done'] as const).find(status=>activity.items.some(item=>!item.taskChat&&item.status===status&&!(item.provider===provider&&(item.id===job?.id||item.sessionId&&item.sessionId===(job?.sessionId||selected?.sessionId)))));
   const showSection=(next:typeof tab,page?:SettingsPage)=>{if(next==='tasks'){openTasks();return;}if(next==='files')setDocView('rules');else if(next==='changelog')setDocView('changelog');if(next==='chats'){returnToChats();return;}if(page)setSettingsPage(page);else if(next==='settings')setSettingsPage('index');setTab(next);setMobileChat(true);};
   // Before pairing, Chats shows the connection steps under a plain section header, not an empty conversation.
   const boardPane=Boolean(!embedded&&connection&&(boardVisited||tab==='workspace'));

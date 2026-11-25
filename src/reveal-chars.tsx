@@ -6,10 +6,22 @@ import {useRef,type ReactNode} from 'react';
  */
 export const REVEAL_TAIL=360;
 
+/**
+ * Where the animated tail starts for a text of `length` once `shown` characters were shown here before. A character is
+ * written once: the window never reaches back behind `shown`, so a tail rebuilt around characters already on the screen
+ * (a paragraph split, a shifted line window, a remount of the block) keeps them plain instead of replaying their
+ * animation. A block mounted mid-stream still animates its newest `tail` characters once.
+ */
+export function revealWindow(shown:number,length:number,tail=REVEAL_TAIL){
+  return {tailStart:Math.max(shown,Math.max(0,length-tail)),shown:Math.max(shown,length)};
+}
+
 /** Where the animated tail starts, and the small delay each newly shown character keeps so that a batch follows in order. */
 export function useRevealTail(length:number,animated:boolean,tail=REVEAL_TAIL){
-  const delays=useRef(new Map<number,number>()),seen=useRef(length);
-  const tailStart=animated?Math.max(0,length-tail):length;
+  const delays=useRef(new Map<number,number>()),seen=useRef(length),shown=useRef<number|undefined>(undefined);
+  const range=revealWindow(shown.current??(animated?Math.max(0,length-tail):length),length,tail);
+  const tailStart=animated?range.tailStart:length;
+  shown.current=range.shown;
   if(animated){
     for(let index=seen.current;index<length;index++)delays.current.set(index,Math.min((index-seen.current)*10,240));
     seen.current=Math.max(seen.current,length);

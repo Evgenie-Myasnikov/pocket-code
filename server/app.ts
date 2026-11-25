@@ -556,8 +556,9 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     let data=await chatLibrary.read();
     const fresh=listed.filter(chat=>live.has(chat.sessionId)&&data.chats[provider+':'+chat.sessionId]?.origin!=='pocket').map(chat=>chat.sessionId);
     if(!data.originsReady?.includes(provider)){
-      // Once: chats Pocket Code finished a turn in before origins were recorded.
-      for(const chat of listed)if(await generationStore.has(provider,chat.sessionId).catch(()=>false))fresh.push(chat.sessionId);
+      // Once: chats Pocket Code finished a turn in before origins were recorded. A scheduled run's chat stays out:
+      // it belongs to its task in the rail, and an ordinary library mark could leave it in the chat list later.
+      for(const chat of listed)if(!planned.has(chat.sessionId)&&await generationStore.has(provider,chat.sessionId).catch(()=>false))fresh.push(chat.sessionId);
       await chatLibrary.markOrigins(provider,fresh,'pocket',true);data=await chatLibrary.read();
     }else if(fresh.length){await chatLibrary.markOrigins(provider,fresh,'pocket');data=await chatLibrary.read();}
     // A scheduled run is opened from its task in the rail, not from the chat list.
@@ -801,10 +802,11 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     // In-memory jobs started by this bridge only. Reading activity must never
     // initialize a provider, inspect desktop history or request model output.
     const runs=allJobs().filter(j=>visibleRoot(j.cwd));
-    const linked=taskChains.chatMembership(runs);
+    const linked=taskChains.chatMembership(runs),planned=scheduled.runIds();
+    // A scheduled run is its task's chat: like in /api/jobs it never joins the ordinary chats of the activity feed.
     res.json(recentActivityJobs(runs).map(job=>{
       const item=activityItem(jobView(job.id));
-      return linked(item.provider,job)?{...item,taskChat:true}:item;
+      return linked(item.provider,job)||planned.has(job.id)?{...item,taskChat:true}:item;
     }));
   });
   app.get('/api/jobs', async (req,res)=>{
