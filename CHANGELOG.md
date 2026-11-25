@@ -1,6 +1,15 @@
 # Changelog
 
-## 0.29.9 (Unreleased)
+## [0.29.9](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.8...v0.29.9) (2026-11-25)
+
+Published from [04f6a6fddcdc8dc2026422ffdf3c9afe4343c3d7](https://github.com/Evgenie-Myasnikov/pocket-code/commit/04f6a6fddcdc8dc2026422ffdf3c9afe4343c3d7) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui); tag v0.29.9 points to that commit. The Android APK, PC host bundle, Windows package and update manifest downloaded from GitHub match the audited local assets by SHA-256. Android versionCode 164; APK signature matches v0.29.8. The unpacked artifacts passed the privacy audit (794 APK entries, 1207 Windows entries, 833 host files; no source maps).
+
+### Validation
+
+- npm run build, npm run check:docs, Android, Windows and host builds passed.
+- Published asset hashes, embedded host-file hashes, APK signature continuity and source/archive privacy checks passed.
+- Not run: server or browser tests, installed Windows application, physical Android device.
+
 
 ### Bug Fixes
 
