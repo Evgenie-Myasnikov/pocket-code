@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.29.8 (2026-11-25)
+## [0.29.8](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.7...v0.29.8) (2026-11-25)
+
+Published [0.29.8](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.8) from [debc276](https://github.com/Evgenie-Myasnikov/pocket-code/commit/debc276c51ae897340dfceef23fd3d44bbec8997) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). GitHub answered HTTP 500 when releases were created or published for about half an hour; the release was published from a draft of one of the retries, and the leftover drafts were deleted. The tag points to that commit; the APK and the PC host bundle match the local build by SHA-256 and the APK is signed with the release certificate; the Windows package and update.json come from a retry build of the same commit (the Windows package is not byte-reproducible), and the published update.json names the published APK, host bundle and Windows package by their exact SHA-256. The unpacked APK and Windows package contain no private names, addresses or local paths.
 
 ### Validation
 
