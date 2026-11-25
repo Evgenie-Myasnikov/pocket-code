@@ -146,7 +146,7 @@ test('scheduled task API: create, list, run now as a new chat, edit, delete; req
     void options;
   })()) as any);
   const token='fixture-token-'.repeat(4);
-  const {app,closeTaskServices}=await createApp({roots:[project],token,hostName:'Fixture',uploads:path.join(root,'uploads'),desktopSessionIndexes:[]},jobs,{listSessions:async()=>[],getSessionMessages:async()=>[]} as any);
+  const {app,closeTaskServices}=await createApp({roots:[project],token,hostName:'Fixture',uploads:path.join(root,'uploads'),desktopSessionIndexes:[]},jobs,{listSessions:async()=>[{sessionId:'66666666-6666-4666-8666-666666666666',cwd:project,summary:'List the synthetic files.',lastModified:Date.now()}],getSessionMessages:async()=>[]} as any);
   const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
   const url=`http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}/api`;
   const call=(endpoint:string,body?:unknown)=>fetch(url+endpoint,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -166,6 +166,8 @@ test('scheduled task API: create, list, run now as a new chat, edit, delete; req
     assert.deepEqual(prompts,['List the synthetic files.']);
     // the run's job is the task's chat, not a chat of the list
     const listed=(await(await call('/jobs?provider=claude')).json()).find((item:any)=>item.id===ran.runs[0].id);assert.equal(listed?.taskChat,true);
+    // and its chat is not a chat of the list
+    const chats=await(await call('/sessions?provider=claude')).json();assert.equal((Array.isArray(chats)?chats:chats.sessions||[]).some((chat:any)=>chat.sessionId==='66666666-6666-4666-8666-666666666666'),false);
     const edited=await(await call(`/scheduled-tasks/${created.id}`,{paused:true,schedule:{kind:'interval',hours:6}})).json();
     assert.equal(edited.paused,true);assert.deepEqual(edited.schedule,{kind:'interval',hours:6});assert.equal(edited.model,'haiku','a partial change keeps the other fields');
     assert.equal((await(await call(`/scheduled-tasks/${created.id}/read`,{})).json()).unread,false);

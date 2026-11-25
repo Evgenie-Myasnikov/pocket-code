@@ -23,6 +23,7 @@ import {ChatSidePanel,SidePreview,type SidePanelTab} from './ChatSidePanel';
 import {FilePreview} from './Files';
 import {FileWithChanges} from './FileChanges';
 import {SelectionToolbar} from './SelectionToolbar';
+import {EdgeBlur} from './EdgeBlur';
 import type {FileChange} from './turn-changes';
 import {FolderChip} from './FolderChip';
 import {HeaderModelMenu} from './HeaderModelMenu';
@@ -1411,6 +1412,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           if(keyboardTrigger)focusLatestMessage(transcript);
           setShowScrollActions(false);
         }}><ArrowDown size={20} aria-hidden="true"/>{unseen>0&&<span className="scroll-latest-count" aria-hidden="true">{unseen>99?'99+':unseen}</span>}</button>}
+        {chatSurface&&!planned&&<EdgeBlur/>}
         <ChatOverlay edge="bottom">
         {/* Hosts without the queue view still report how many follow-ups wait. */}
         {Boolean(job?.pendingInputIds?.length)&&!job?.queued&&<p className="followup-status" role="status">{t(running?"Queued follow-ups: {0}":"Unprocessed follow-ups: {0}",job!.pendingInputIds!.length)}</p>}

@@ -85,6 +85,8 @@ export class ScheduledTasks{
     await writeDurable(this.options.file,JSON.stringify({version:1,tasks:this.tasks} satisfies Store),{backup:true});
   }
   private find(id:string){const task=this.tasks.find(item=>item.id===id);if(!task)throw new HttpError(404,'This scheduled task was deleted.');return task;}
+  /** Records the chat of every run whose job has named it, so the chat list can leave it out at once. */
+  async learnSessions(){await this.init();await this.resolveSessions();}
   async list(){
     await this.init();await this.resolveSessions();
     return structuredClone(this.tasks).sort((a,b)=>a.createdAt-b.createdAt);

@@ -1,14 +1,31 @@
 # Changelog
 
-## Unreleased
+## 0.29.4 (2026-11-25)
+
+### Validation
+
+- Server tests of the changed areas (scheduled tasks, Copilot, token counts, smooth text, token speed, turn changes): 47 passed.
+- Browser scenarios on Edge: 26 passed across motion (Whip In, the edge blur), the step editor, the board, code highlighting, selection, plan chats, transcript rhythm and the read file card, and 8 again after the last change.
+- Not checked: the installed Windows application, a real scheduled run, a phone.
 
 ### Features
 
+- Motion after cult-ui (2026-11-25). Following cult-ui components (MIT), written here without copying their code:
+  - Whip In: a word of an answer and a character of a reasoning rise from 0.35em below while they fade in, over 0.45 s on a curve that snaps into place, 10 ms apart within a batch.
+  - Edge blur: in the PC window the transcript passes beneath the message field through five layers of growing blur (1 to 12 px) that fade out upwards; it replaces the single blurred edge there, which stays on the phone.
+  - Code blocks: Copy is always beside the code options, and its icon turns into a check with a short scale and fade.
+  - Board: the AI cursor is an illustrated arrow with a soft shadow that glides between targets on a springy curve, and its status island grows out of a dot into its full width when the action changes.
+  - Step editor (linked and looped tasks): while a step is dragged, the others slide to open a place for it and the dragged step is lifted.
+  - Validation: browser scenarios for motion (Whip In timing, the edge blur layers), the step editor, the board, code highlighting, selection, plan chats, transcript rhythm and the read file card passed (26).
 - Animated chat and board activity. New assistant replies use a brief whip-in entrance, the transcript has a subtle blurred lower edge, and real board edit events show an illustrated cursor with a compact live status island. Existing paced text reveal and highlighted code blocks remain in use; reduced-motion preferences disable decorative motion. Step chains can be reordered by drag or accessible up/down controls, and launch in the displayed order.
   - Validation: TypeScript/Vite build passed; the chain editor browser scenario verifies reordered launch payloads; visual board cursor behavior and installed-device rendering were not checked.
 
 ### Bug Fixes
 
+- A plan chat run never shows under Chats (2026-11-25). The chat of a run appeared under Chats, named by its prompt, until the task had recorded it. The chat list now leaves out the chat of any running scheduled run at once and records it for its task.
+  - Validation: the scheduled task API test checks that the run's chat is not in the chat list.
+- Remove the extra outline around the mobile board chat sheet. The sheet keeps its rounded top, shadow, grip and resize behavior without the 1 px top and side border.
+  - Validation: `git diff --check` passed; visual and touch-device checks were not run.
 - Plan chats keep one visible chat per task (2026-11-25). The task name remains the chat title as runs replace the previous answer; opening the provider session is still initiated only by clicking the task row, and the scheduled view has no message field. Scheduled runs use full provider access (Claude bypass permissions, Codex full access, Copilot auto-approves tool permissions); unattended Copilot questions receive a fixed no-user response.
   - Validation: TypeScript/Vite build passed; 5 scheduled-task browser scenarios and 49 focused provider/scheduler/task-chain unit tests passed. The full `npm test` run did not complete in this environment. A real scheduled run with each provider was not checked.
 

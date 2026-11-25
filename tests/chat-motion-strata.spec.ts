@@ -12,7 +12,7 @@ test('a streamed answer fades in word by word and new blocks rise in, as in Stra
  await expect(words.first()).toBeAttached({timeout:10000});
  expect(await words.count()).toBeGreaterThan(3);
  const style=await words.first().evaluate(element=>{const c=getComputedStyle(element);return {name:c.animationName,duration:c.animationDuration};});
- expect(style).toEqual({name:'sd-chatWord',duration:'0.26s'});
+ expect(style).toEqual({name:'sd-chatWord',duration:'0.45s'});
  // a block that enters during the stream rises in over 240 ms
  const entering=await page.locator('.conversation-inner .message[data-enter=true]').evaluateAll(list=>list.map(element=>getComputedStyle(element).animationDuration));
  for(const duration of entering)expect(duration).toBe('0.24s');
@@ -95,7 +95,7 @@ test('a reasoning writes itself word by word, each new character coming down fro
  const place=()=>body.first().evaluate(element=>{const walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT);let left=40,node:Node|null;while((node=walker.nextNode())){const length=node.textContent!.length;if(left<length){const range=document.createRange();range.setStart(node,left);range.setEnd(node,left+1);const box=range.getBoundingClientRect(),rail=element.getBoundingClientRect();return Math.round(box.left-rail.left)+','+Math.round(box.top-rail.top+element.scrollTop);}left-=length;}return '';});
  for(let i=0;i<150;i++){
    seen.push(await body.count()?((await body.first().textContent())||'').length:0);
-   if(await body.count()&&seen.at(-1)!>60){first??=i;if(i>=first+10&&i%5===0){const at=await place();if(at)places.add(at);}}
+   if(await body.count()&&seen.at(-1)!>60){first??=i;if(i>=first+20&&i%5===0){const at=await place();if(at)places.add(at);}}
    if(!animation&&await body.locator('.rc').count())animation=await body.locator('.rc').first().evaluate(element=>{const c=getComputedStyle(element);return c.animationName+' '+c.display;});
    await page.waitForTimeout(40);
  }
@@ -104,8 +104,19 @@ test('a reasoning writes itself word by word, each new character coming down fro
  // each character is its own box that fades in and comes down into place
  expect(animation).toBe('chat-reasoning-char inline');
  // a character that is written stays where it is (only its own short entrance moves it, and that does not move the text)
- await page.waitForTimeout(400);places.add(await place());
+ await page.waitForTimeout(800);places.add(await place());
  const spots=[...places].map(value=>value.split(',').map(Number));
  for(const [x,y] of spots){expect(Math.abs(x-spots[0][0])).toBeLessThanOrEqual(1);expect(Math.abs(y-spots[0][1])).toBeLessThanOrEqual(1);}
 });
 
+
+test('under the chat the transcript passes beneath the message field through an edge blur',async({page})=>{
+ await desktop(page);
+ await page.locator('.desktop-sessions>button').first().click();
+ const blur=page.locator('.workspace.chat-canvas>.chat-edge-blur');
+ await expect(blur).toHaveCount(1);
+ const layers=await blur.locator('span').evaluateAll(list=>list.map(element=>getComputedStyle(element).backdropFilter));
+ expect(layers).toEqual(['blur(1px)','blur(2px)','blur(3px)','blur(6px)','blur(12px)']);
+ expect(await blur.evaluate(element=>getComputedStyle(element).pointerEvents)).toBe('none');
+ await page.screenshot({path:'.local/edge-blur.png'});
+});

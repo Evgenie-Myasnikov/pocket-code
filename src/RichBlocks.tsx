@@ -66,6 +66,20 @@ export function CopyAction({text,label,compact=false}:{text:string|(()=>string);
   </span>;
 }
 /** Chat and project documents use the same code reader. Wrapping only changes presentation. */
+/** Copy at hand on every code block (after cult-ui's Code Block, MIT): the copy icon turns into a check with a short scale and fade. */
+function CodeCopy({source}:{source():string}){
+  const [copied,setCopied]=useState(false),timer=useRef(0);
+  useEffect(()=>()=>window.clearTimeout(timer.current),[]);
+  const copy=async()=>{
+    const text=source();
+    try{await navigator.clipboard.writeText(text);}catch{return;}
+    setCopied(true);window.clearTimeout(timer.current);timer.current=window.setTimeout(()=>setCopied(false),1600);
+  };
+  const label=copied?t('Скопировано'):t('Копировать код');
+  return <button type="button" className="code-copy" data-copied={copied||undefined} aria-label={label} title={label} onClick={()=>void copy()}>
+    <Copy size={15} aria-hidden="true"/><Check size={15} aria-hidden="true"/>
+  </button>;
+}
 export function CodeBlock({children}:{children?:ReactNode}){
   const pre=useRef<HTMLPreElement>(null);
   const block=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
@@ -104,10 +118,13 @@ export function CodeBlock({children}:{children?:ReactNode}){
       event.preventDefault();event.stopPropagation();trigger.current?.focus();setActionsOpen(false);
     }
   }}>
-    <button type="button" ref={trigger} className="code-options-trigger" aria-label={label} title={label}
-      aria-expanded={actionsOpen} aria-controls={actionsOpen?actionsId:undefined} onClick={()=>setActionsOpen(value=>!value)}>
-      <Ellipsis size={18} aria-hidden="true"/>
-    </button>
+    <div className="code-block-tools">
+      <CodeCopy source={()=>pre.current?.innerText||''}/>
+      <button type="button" ref={trigger} className="code-options-trigger" aria-label={label} title={label}
+        aria-expanded={actionsOpen} aria-controls={actionsOpen?actionsId:undefined} onClick={()=>setActionsOpen(value=>!value)}>
+        <Ellipsis size={18} aria-hidden="true"/>
+      </button>
+    </div>
     {actionsOpen&&<div id={actionsId} role="group" aria-label={label} className="reader-code-actions">
         <button type="button" className="copy-action code-wrap" aria-pressed={wrap} onClick={()=>setWrap(value=>!value)}>
           <WrapText size={15} aria-hidden="true"/><span>{t('Перенос')}</span>
@@ -159,7 +176,7 @@ const markdownElements:NonNullable<ComponentProps<typeof Streamdown>['components
 };
 
 /** As in Strata: words of a streamed answer fade in as they arrive (240 ms, ease-out), never ahead of the text; saved text is static. */
-const streamAnimation={animation:'chatWord',duration:260,easing:'cubic-bezier(0,0,.2,1)',sep:'word' as const,stagger:12,maxBacklogMs:120};
+const streamAnimation={animation:'chatWord',duration:450,easing:'cubic-bezier(.85,.1,.9,1.2)',sep:'word' as const,stagger:12,maxBacklogMs:120};
 const reducedMotion=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const Markdown=memo(function Markdown({text:written,streaming=false,caret=false,animateInitial=false}:{text:string;streaming?:boolean;caret?:boolean;animateInitial?:boolean}) {
   useLanguage();

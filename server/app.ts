@@ -548,7 +548,11 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     const listed=await sessions(provider);
     const runs=engineFor(provider).list(),linked=taskChains.chatMembership(runs);
     // The list holds chats made in Pocket Code and chats imported with Import chats; other provider chats stay in the provider.
-    const live=new Set(runs.map(run=>run.sessionId).filter((id):id is string=>!!id));
+    // A scheduled run's chat is its task's chat from the moment its job names it, before the task has recorded it.
+    await scheduled.learnSessions().catch(()=>{});
+    const runIds=scheduled.runIds(),planned=scheduled.sessionIds();
+    for(const run of runs)if(run.sessionId&&runIds.has(run.id))planned.add(run.sessionId);
+    const live=new Set(runs.map(run=>run.sessionId).filter((id):id is string=>!!id&&!planned.has(id)));
     let data=await chatLibrary.read();
     const fresh=listed.filter(chat=>live.has(chat.sessionId)&&data.chats[provider+':'+chat.sessionId]?.origin!=='pocket').map(chat=>chat.sessionId);
     if(!data.originsReady?.includes(provider)){
@@ -557,7 +561,6 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       await chatLibrary.markOrigins(provider,fresh,'pocket',true);data=await chatLibrary.read();
     }else if(fresh.length){await chatLibrary.markOrigins(provider,fresh,'pocket');data=await chatLibrary.read();}
     // A scheduled run is opened from its task in the rail, not from the chat list.
-    const planned=scheduled.sessionIds();
     return listed.filter(chat=>!linked(provider,chat)&&!planned.has(chat.sessionId)&&(config.listAllProviderChats||live.has(chat.sessionId)||!!data.chats[provider+':'+chat.sessionId]?.origin));
   }
   // Import chats: the provider's current chats join the list. Chats made in Pocket Code keep that mark.

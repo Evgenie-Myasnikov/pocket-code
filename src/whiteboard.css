@@ -101,3 +101,13 @@
 .wb-card .whiteboard-text,.wb-card-meta{overflow:hidden;scrollbar-gutter:stable}
 .wb-card:is(:hover,.wb-selected,:focus-within) :is(.whiteboard-text,.wb-card-meta){overflow:auto}
 .wb-card-meta .board-images{max-height:none;overflow:visible}
+
+/* After cult-ui's Illustration Cursor and Dynamic Island (MIT): the AI cursor glides between targets on a springy curve,
+   its arrow carries a soft shadow, and the status island grows out of a dot into its full width when the action changes. */
+.wb-ai-cursor{transition:left .55s cubic-bezier(.22,1,.36,1),top .55s cubic-bezier(.22,1,.36,1)}
+.wb-ai-cursor>svg{filter:drop-shadow(0 2px 3px color-mix(in srgb,#000 35%,transparent));transform-origin:3px 3px;animation:wb-cursor-tap .5s cubic-bezier(.34,1.56,.64,1)}
+.wb-ai-cursor .wb-dynamic-island{margin-top:20px;margin-left:-4px;overflow:hidden;max-width:min(360px,60vw);animation:wb-island-morph .5s cubic-bezier(.22,1,.36,1) both}
+.wb-ai-cursor .wb-dynamic-island>:not(i),.wb-ai-cursor .wb-dynamic-island{white-space:nowrap}
+@keyframes wb-island-morph{0%{max-width:28px;padding-inline:10px;opacity:.6;border-radius:14px}60%{opacity:1}100%{max-width:min(360px,60vw)}}
+@keyframes wb-cursor-tap{0%{transform:scale(.7) rotate(-8deg)}100%{transform:none}}
+@media(prefers-reduced-motion:reduce){.wb-ai-cursor>svg,.wb-ai-cursor .wb-dynamic-island{animation:none}}

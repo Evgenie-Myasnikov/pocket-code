@@ -11,7 +11,7 @@ export function useRevealTail(length:number,animated:boolean,tail=REVEAL_TAIL){
   const delays=useRef(new Map<number,number>()),seen=useRef(length);
   const tailStart=animated?Math.max(0,length-tail):length;
   if(animated){
-    for(let index=seen.current;index<length;index++)delays.current.set(index,Math.min((index-seen.current)*5,180));
+    for(let index=seen.current;index<length;index++)delays.current.set(index,Math.min((index-seen.current)*10,240));
     seen.current=Math.max(seen.current,length);
     if(delays.current.size>tail*2)for(const key of delays.current.keys())if(key<tailStart)delays.current.delete(key);
   }else seen.current=length;

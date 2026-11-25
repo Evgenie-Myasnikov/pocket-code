@@ -38,3 +38,8 @@
 .markdown-task-dialog .chain-editor-fuses { grid-column:1/-1;color:var(--muted);font-size:.78rem;line-height:1.5; }
 @media(max-width:520px){ .chain-editor-loop-options { grid-template-columns:minmax(0,1fr); } }
 @media(pointer:coarse){ .markdown-task-dialog .chain-editor-remove { min-width:44px;min-height:44px;opacity:1; } }
+
+/* The dragged step is lifted while the others slide (Sortable List, cult-ui, MIT). */
+.markdown-task-dialog .chain-editor-steps>li[data-dragging] .chain-editor-step{transform:scale(1.015);box-shadow:0 10px 30px color-mix(in srgb,#000 30%,transparent);border-radius:12px;transition:transform .18s cubic-bezier(.22,1,.36,1),box-shadow .18s}
+.markdown-task-dialog .chain-editor-steps>li[data-dragging]{opacity:.92;z-index:2}
+@media(prefers-reduced-motion:reduce){.markdown-task-dialog .chain-editor-steps>li[data-dragging] .chain-editor-step{transform:none;transition:none}}

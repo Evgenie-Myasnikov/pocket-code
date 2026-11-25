@@ -3,7 +3,7 @@
 .board-chat-sheet-grip{display:none}
 @media(max-width:760px){
  .app.has-board-stage{position:relative}
- .app.board-chat-sheet-open>.workspace{position:absolute;inset:var(--board-chat-sheet-top,18%) 0 0;min-height:0;width:100%;z-index:8;border:1px solid var(--line);border-bottom:0;border-radius:var(--material-sheet) var(--material-sheet) 0 0;background:var(--bg);box-shadow:var(--shadow-lg);overflow:hidden;animation:board-chat-sheet-enter var(--dur-medium) var(--ease-emphasized-decelerate)}
+ .app.board-chat-sheet-open>.workspace{position:absolute;inset:var(--board-chat-sheet-top,18%) 0 0;min-height:0;width:100%;z-index:8;border:0;border-radius:var(--material-sheet) var(--material-sheet) 0 0;background:var(--bg);box-shadow:var(--shadow-lg);overflow:hidden;animation:board-chat-sheet-enter var(--dur-medium) var(--ease-emphasized-decelerate)}
  .board-chat-sheet-open>.workspace>.chat-overlay-top{padding-top:20px}
  .board-chat-sheet-grip{display:block;position:absolute;top:0;left:calc(50% - 48px);width:96px;height:22px;z-index:4}
  .board-chat-sheet-resizer{height:100%;cursor:row-resize;touch-action:none;border-radius:var(--radius-sm)}

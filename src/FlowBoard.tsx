@@ -335,7 +335,7 @@ function Board({value,editable,busy,onSave,onChatAt,overlay,toolbarHost,renderCa
                 <path className="wb-link-hit" d={path} fill="none" stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" role="button" tabIndex={0} aria-label={l('Select connection','Выбрать связь')} onPointerDown={e=>{e.stopPropagation();select([]);setSelectedLink(link.id);}}/>
               </g>:null;})}</svg>}
             {active&&liveActivity&&aiTarget&&<div className="wb-ai-cursor" data-phase={liveActivity.phase} data-target={aiTarget.id} style={{left:aiTarget.x+aiTarget.width-12,top:aiTarget.y-12} as CSSProperties}>
-              <svg aria-hidden="true" width="20" height="24" viewBox="0 0 20 24"><path d="M2 2v17l5-5 4 8 3-2-4-7h8Z" fill="currentColor" stroke="var(--bg)" strokeWidth="1.5"/><circle cx="3" cy="3" r="2" fill="var(--bg)"/></svg>
+              <svg key={aiTarget.id} aria-hidden="true" width="22" height="26" viewBox="0 0 22 26"><path d="M3 2.5c0-.9 1-1.4 1.7-.8l14 11.2c.8.6.4 1.9-.6 1.9h-6.2l3.7 7.4c.3.6 0 1.3-.6 1.6l-1.6.8c-.6.3-1.3 0-1.6-.6l-3.7-7.5-3.6 4c-.7.7-1.8.2-1.8-.7Z" fill="currentColor" stroke="var(--bg)" strokeWidth="1.6" strokeLinejoin="round"/></svg>
               <span className="wb-dynamic-island" role="status" key={liveActivity.id}><i aria-hidden="true"/>{aiLabel}</span>
             </div>}
           </ViewportPortal>

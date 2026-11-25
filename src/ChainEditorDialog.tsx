@@ -1,4 +1,4 @@
-import {useEffect,useId,useRef,useState} from 'react';
+import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowDown,ArrowUp,GripVertical,Plus,Repeat,X} from 'lucide-react';
 import {request} from './api';
@@ -28,7 +28,9 @@ export function ChainEditorDialog({controls,improveScope,onClose,onStarted}:Prop
   const [executors,setExecutors]=useState<Executor[]>([]),[catalogueError,setCatalogueError]=useState(false);
   const [starting,setStarting]=useState(false),[error,setError]=useState('');
   const live=useRef(true),lock=useRef(false),attempt=useRef<{signature:string;id:string}|null>(null);
-  const dragged=useRef<string|null>(null);
+  const dragged=useRef<string|null>(null),[draggingKey,setDraggingKey]=useState('');
+  // As in cult-ui's Sortable List (MIT): the other steps slide to their new places while a step is dragged over them.
+  const rows=useRef(new Map<string,HTMLLIElement>()),places=useRef(new Map<string,number>());
   useModal(root,true,()=>{if(!starting)onClose();});
   useEffect(()=>{live.current=true;return()=>{live.current=false;};},[]);
   const connection=improveScope?.connection;
@@ -44,6 +46,18 @@ export function ChainEditorDialog({controls,improveScope,onClose,onStarted}:Prop
   const update=(key:string,patch:Partial<Step>)=>setSteps(list=>list.map(step=>step.key===key?{...step,...patch}:step));
   const moveStep=(key:string,offset:number)=>setSteps(list=>{const from=list.findIndex(step=>step.key===key),to=Math.max(0,Math.min(list.length-1,from+offset));if(from<0||from===to)return list;const next=[...list];next.splice(to,0,next.splice(from,1)[0]);return next;});
   const dropStep=(target:string)=>{const source=dragged.current;dragged.current=null;if(!source||source===target)return;setSteps(list=>{const from=list.findIndex(step=>step.key===source),to=list.findIndex(step=>step.key===target);if(from<0||to<0||from===to)return list;const next=[...list];next.splice(to,0,next.splice(from,1)[0]);return next;});};
+  /** Moves the dragged step to where another one is while it is still dragged, so the list opens a place for it. */
+  const dragOver=(target:string)=>{const source=dragged.current;if(!source||source===target)return;setSteps(list=>{const from=list.findIndex(step=>step.key===source),to=list.findIndex(step=>step.key===target);if(from<0||to<0||from===to)return list;const next=[...list];next.splice(to,0,next.splice(from,1)[0]);return next;});};
+  // Each step that changed its place starts from where it was and slides there (FLIP).
+  useLayoutEffect(()=>{
+    const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    for(const [key,row] of rows.current){
+      const top=row.getBoundingClientRect().top,before=places.current.get(key);places.current.set(key,top);
+      if(calm||before===undefined||Math.abs(before-top)<1)continue;
+      row.style.transition='none';row.style.transform=`translateY(${before-top}px)`;
+      requestAnimationFrame(()=>{row.style.transition='transform .32s cubic-bezier(.22,1,.36,1)';row.style.transform='';});
+    }
+  },[steps.map(step=>step.key).join('|')]);
   const filled=steps.every(step=>step.body.trim());
   const oversized=steps.reduce((size,step)=>size+step.body.length+100,0)>totalLimit;
   const lapCount=Math.max(2,Math.min(CHAIN_LOOP_MAX_LAPS,Math.round(laps)||2));
@@ -72,13 +86,14 @@ export function ChainEditorDialog({controls,improveScope,onClose,onStarted}:Prop
       <fieldset disabled={starting} className="chain-editor-body">
         <ol className="chain-editor-steps">{steps.map((step,index)=>{
           const label=l('Step ','Шаг ')+(index+1);
-          return <li key={step.key} onDragOver={event=>{if(dragged.current){event.preventDefault();event.dataTransfer.dropEffect='move';}}} onDrop={event=>{event.preventDefault();dropStep(step.key);}}>
+          return <li key={step.key} ref={element=>{if(element)rows.current.set(step.key,element);else{rows.current.delete(step.key);places.current.delete(step.key);}}} data-dragging={draggingKey===step.key||undefined}
+            onDragEnter={()=>dragOver(step.key)} onDragOver={event=>{if(dragged.current){event.preventDefault();event.dataTransfer.dropEffect='move';}}} onDrop={event=>{event.preventDefault();dropStep(step.key);setDraggingKey('');}}>
             <span className="chain-editor-node" aria-hidden="true">{index+1}</span>
             <div className="chain-editor-step">
               <div className="chain-editor-reorder">
                 <button type="button" className="chain-editor-drag" draggable aria-label={l('Drag to reorder step ','Перетащить шаг ')+(index+1)} title={l('Drag to reorder','Перетащить для сортировки')}
-                  onDragStart={event=>{dragged.current=step.key;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',step.key);}}
-                  onDragEnd={()=>{dragged.current=null;}}><GripVertical size={15}/></button>
+                  onDragStart={event=>{dragged.current=step.key;setDraggingKey(step.key);event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',step.key);}}
+                  onDragEnd={()=>{dragged.current=null;setDraggingKey('');}}><GripVertical size={15}/></button>
                 <button type="button" aria-label={l('Move step up ','Переместить выше ')+(index+1)} disabled={index===0} onClick={()=>moveStep(step.key,-1)}><ArrowUp size={14}/></button>
                 <button type="button" aria-label={l('Move step down ','Переместить ниже ')+(index+1)} disabled={index===steps.length-1} onClick={()=>moveStep(step.key,1)}><ArrowDown size={14}/></button>
               </div>

@@ -1,0 +1,6 @@
+/* Under the chat: the transcript passes beneath the message field through a band of growing blur (Edge Blur, cult-ui, MIT). */
+.workspace.chat-canvas>.chat-edge-blur{position:absolute;inset-inline:0;bottom:0;z-index:2;height:calc(var(--chat-overlay-bottom,170px) + 56px);pointer-events:none;isolation:isolate}
+.chat-edge-blur>span{position:absolute;inset:0;-webkit-backdrop-filter:blur(var(--blur));backdrop-filter:blur(var(--blur));-webkit-mask-image:linear-gradient(to top,#000 calc(100% - 96px),transparent);mask-image:linear-gradient(to top,#000 calc(100% - 96px),transparent)}
+@media(forced-colors:active){.workspace.chat-canvas>.chat-edge-blur{display:none}}
+/* The PC chat has the layered band above; the single sticky blur of the transcript stays for the phone. */
+.workspace.chat-canvas>.conversation::after{display:none}

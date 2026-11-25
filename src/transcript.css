@@ -116,3 +116,15 @@ button.turn-changes:hover{color:var(--text);border-color:var(--accent)}
 .message .tool-card.activity-row>summary{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;border:0;background:transparent}
 .message .tool-card.activity-row{border:0;background:transparent;box-shadow:none}
 .message .tool-card.activity-row>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+
+/* Copy sits beside the code options; its icon turns into a check. */
+.code-block-tools{grid-area:1/2;display:flex;align-items:center;gap:0;align-self:start}
+.code-block-tools>.code-options-trigger{grid-area:auto}
+.code-copy{position:relative;display:grid;place-items:center;width:32px;min-height:32px;margin:3px 0;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--muted);cursor:pointer}
+.code-copy:is(:hover,:focus-visible){color:var(--text);background:var(--surface)}
+.code-copy>svg{grid-area:1/1;transition:opacity .18s cubic-bezier(.85,.1,.9,1.2),transform .22s cubic-bezier(.34,1.56,.64,1)}
+.code-copy>svg:last-child{opacity:0;transform:scale(.4)}
+.code-copy[data-copied]>svg:first-child{opacity:0;transform:scale(.4)}
+.code-copy[data-copied]>svg:last-child{opacity:1;transform:none;color:var(--accent)}
+@media(prefers-reduced-motion:reduce){.code-copy>svg{transition:none}}
+@media(pointer:coarse),(max-width:760px){.code-copy{width:48px;min-height:48px;margin:0}}
