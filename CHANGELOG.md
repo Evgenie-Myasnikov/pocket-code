@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.29.7 (2026-11-25)
+
+### Validation
+
+- Browser scenarios on Edge: the scheduled tasks scenarios (6, updated for the whole run and no token line) passed.
+- Server tests: not rerun for this interface-only release (last on 0.29.4).
+- Not checked: a real scheduled run on the installed host, the installed Windows application, a phone.
+
+### Changes
+
+- A plan chat is its latest run as an ordinary chat (2026-11-25). Opening a plan chat shows its whole latest run as any chat does: the prompt, the reasoning, the actions and the answer, live while the run goes on, with the turn result. There is no message field and no token line: the task writes to this chat on its schedule. Earlier runs are not there. Plan runs carry out commands without asking, since nobody is at the PC when they start.
+  - Validation: the scheduled tasks browser scenarios (6) passed, updated for the whole run and for no token line; a screenshot was checked.
+
 ## [0.29.6](https://github.com/Evgenie-Myasnikov/pocket-code/compare/v0.29.5...v0.29.6) (2026-11-25)
 
 Published [0.29.6](https://github.com/Evgenie-Myasnikov/pocket-code/releases/tag/v0.29.6) from [66ae74c](https://github.com/Evgenie-Myasnikov/pocket-code/commit/66ae74cf87638356ec6f7f31a7bbf980c4b17fef) on [feature/strata-like-ui](https://github.com/Evgenie-Myasnikov/pocket-code/tree/feature/strata-like-ui). The tag points to that commit and all four public downloads (APK, PC host bundle, Windows package, update manifest) match the local build by SHA-256; the APK is signed with the release certificate, and the unpacked APK and Windows package contain no private names, addresses or local paths.

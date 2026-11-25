@@ -70,9 +70,9 @@ test('a scheduled task with an unread run shows a clock and a dot, and opening i
   await expect(row.locator('.scheduled-task-dot')).toHaveCount(0);
   // The task itself is the stable chat, with no run timestamp in its title.
   await expect(page.locator('.desktop-chat-host header h1')).toHaveText('Weekday morning brief');
-  // it holds one message, the latest answer, and has no message field: the task writes to it on its schedule
-  await expect(page.locator('.conversation-inner .message')).toHaveCount(1);
-  await expect(page.locator('.conversation-inner .message.assistant')).toContainText('The responsive layout is ready.');
+  // it is the latest run as an ordinary chat, without a message field or a token line: the task writes to it on its schedule
+  await expect(page.locator('.chat-generation-metrics')).toHaveCount(0);
+  await expect(page.locator('.conversation-inner')).toContainText('The responsive layout is ready.');
   await expect(page.locator('.composer-area')).toBeHidden();await expect(page.getByRole('textbox',{name:/Message/})).toBeHidden();await page.screenshot({path:'.local/plan-chat.png'});
   expect(await page.evaluate(()=>(window as any).scheduledCalls.some((call:any)=>call.path==='/scheduled-tasks/44444444-4444-4444-8444-444444444444/read'))).toBe(true);
 });
@@ -174,10 +174,10 @@ test('a run that has just started opens at once: the plan chat shows it working,
   },run);
   await page.setViewportSize({width:1440,height:900});await desktop(page);
   await page.locator('.desktop-rail .scheduled-task').getByRole('button',{name:/Weekday morning brief/}).click();
-  // the run's own job is open, not the chat of an earlier run, and it says it is working
-  await expect(page.locator('.plan-chat-working')).toContainText('Preparing the answer');
+  // the run's own job is open, not the chat of an earlier run: its prompt is there at once and the run goes on live
+  await expect(page.locator('.conversation-inner')).toContainText('Summarise the synthetic changes since yesterday.');
   await expect(page.locator('.composer-area')).toBeHidden();
   await page.evaluate(()=>{const r=(window as any).testRuns[0];r.sessionId='gamma';r.messages.push({id:'a',role:'assistant',blocks:[{type:'text',text:'Yesterday: three commits. Today: two Jira tasks.'}]});r.revision++;});
   await expect(page.locator('.conversation-inner')).toContainText('Yesterday: three commits.');
-  await expect(page.locator('.plan-chat-working')).toHaveCount(0);
+  await expect(page.locator('.chat-generation-metrics')).toHaveCount(0);
 });

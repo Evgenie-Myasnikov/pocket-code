@@ -479,14 +479,9 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const transcript=useMemo(()=>job?.errorCode==='codex_thread_busy'||!jobTranscript.length?history:uniqueMessages([...history,...jobTranscript]),[history,jobTranscript,job?.errorCode]);
   const toolResults=useMemo(()=>{const blocks=outputMessages.flatMap(message=>message.blocks),calls=new Set(blocks.filter(b=>b.type==='tool_use').map(b=>b.id));return new Map(blocks.filter(b=>b.type==='tool_result'&&b.tool_use_id&&calls.has(b.tool_use_id)).map(b=>[b.tool_use_id!,b]));},[outputMessages]);
   const detail=useDetailMode();
-  // A plan chat holds one message: the latest answer of its latest run, without the prompt, the actions or earlier days.
-  const planned=!!selected?.scheduled;
-  const shownTranscript=useMemo(()=>{
-    if(!planned)return transcript;
-    const last=[...transcript].reverse().find(message=>message.role==='assistant'&&message.blocks.some(block=>block.type==='text'&&!!block.text?.trim()));
-    return last?[{...last,blocks:last.blocks.filter(block=>block.type==='text')}]:[];
-  },[planned,transcript]);
-  const resultRoot=!selected?.readOnly&&!planned&&!demo?(selected?.cwd||job?.cwd||cwd):undefined;
+  // A plan chat is its latest run, shown as an ordinary chat (prompt, reasoning, actions, answer, live while it runs) without a message field.
+  const planned=!!selected?.scheduled,shownTranscript=transcript;
+  const resultRoot=!selected?.readOnly&&!demo?(selected?.cwd||job?.cwd||cwd):undefined;
   const changesByTurn=useMemo(()=>resultRoot?computeTurnChanges(outputMessages,toolResults,running,resultRoot):undefined,[outputMessages,toolResults,running,resultRoot]);
   const plan=useMemo(()=>latestPlan(outputMessages),[outputMessages]);
   // New replies since the person scrolled away from the end, counted for the round "latest" button.
@@ -1436,7 +1431,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             stopLabel={runUnknown?t("Повторить связь"):t("Остановить {0}",engineName)} stopRetry={runUnknown} onStop={running?runUnknown?()=>retryNow():()=>void stopRun():undefined}
             controls={<>{!docked&&embedded?.onProvider&&!selected&&!job&&!taskRun&&!boardChat?.context&&<ProviderPicker connection={connection||undefined} value={provider} onChange={embedded.onProvider} disabled={busy||uploading}/>}{(provider==='claude'||provider==='codex')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}{docked?null:account?<ModelPicker provider="custom" name={engineName} models={customModels.models} value={customModels.model} onChange={customModels.setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>:<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>}{(provider==='codex'||provider==='claude'&&!account)&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
             usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||claudeDefaultModel)).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']}/>}/>
-          {!readingMode&&connection&&!demo&&<ChatGenerationFooter key={JSON.stringify([connection.url,connection.token,provider,account,selected?.sessionId])} connection={connection} provider={provider} account={account} sessionId={selected?.sessionId} job={job}/>}
+          {!readingMode&&!planned&&connection&&!demo&&<ChatGenerationFooter key={JSON.stringify([connection.url,connection.token,provider,account,selected?.sessionId])} connection={connection} provider={provider} account={account} sessionId={selected?.sessionId} job={job}/>}
         </div></ChatOverlay>
       </>}
     </main>
