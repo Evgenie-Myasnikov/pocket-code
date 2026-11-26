@@ -7,7 +7,7 @@ import {AccessModeChip,type AccessMode} from '../src/AccessModeChip';
 import '../src/work-boards.css';
 
 function MenuFixture({element}:{element:HTMLElement}){
- const [card,setCard]=useState(false),[provider,setProvider]=useState<'claude'|'codex'|'copilot'>('claude'),[mode,setMode]=useState<AccessMode>('default');
+ const [card,setCard]=useState(false),[provider,setProvider]=useState<'claude'|'codex'|'copilot'|'gemini'>('claude'),[mode,setMode]=useState<AccessMode>('default');
  return <>
   <ChatHeader title="Synthetic chat" project="Atlas" provider="Claude" onBack={()=>{}} detail={{value:'brief',set:()=>{}}} review={{disabled:false,open:()=>{element.dataset.review='opened';}}}/>
   <button onClick={()=>setCard(true)}>Card actions</button>

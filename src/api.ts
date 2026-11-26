@@ -22,7 +22,7 @@ export function pairDevice(connection:Connection,version:string):Promise<Connect
   const promise=deviceIdentity(platform).then(identity=>request<{deviceId?:string;token:string;workspaceId?:string}>(connection,'/devices/pair',{...identity,platform,version})).then(paired=>({url:connection.url,...paired})).catch(error=>{if(pairing?.key===key)pairing=undefined;throw error;}).finally(()=>{if(pairing?.promise===promise)pairing=undefined;});
   pairing={key,promise};return promise;
 }
-export function providerRequest(provider:'claude'|'codex'|'copilot'){
+export function providerRequest(provider:'claude'|'codex'|'copilot'|'gemini'){
   return <T,>(connection:Connection,endpoint:string,data?:unknown):Promise<T>=>{
     const [pathname,search]=endpoint.split('?');const params=new URLSearchParams(search);
     if(!params.has('provider'))params.set('provider',provider);

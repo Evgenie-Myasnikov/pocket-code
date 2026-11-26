@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.29.11 (2026-11-26)
+
+### Validation
+
+- Server tests: 21 passed (Gemini provider, served local model choice, character reveal, scheduled tasks); TypeScript check passed.
+- Browser scenarios on Edge: 14 passed (Gemini provider, loaded local model chip and sidebar card, scheduled tasks).
+- Not checked: a real Gemini CLI sign-in and chat on the installed host, the installed Windows application, a phone.
+
+### Features
+
+- Google Gemini is a chat provider next to Claude, Codex and Copilot. It runs through the official Gemini CLI (`@google/gemini-cli`) signed in with a Google account, so a Google AI subscription applies and no paid API key is used: API keys in the host environment are not passed to the CLI, and a CLI set to an API key is reported as not supported. Each turn is a headless CLI run with streamed output (`--output-format stream-json`); a new chat gets its own session ID and later turns resume it (`--resume`). Chats are listed and read from the CLI's own history, models come from the CLI catalog (`--list-models`), and a follow-up sent during a turn becomes the next turn of the same chat. The composer offers Read only, Edits, Full and Plan; the CLI declines actions that need a confirmation instead of asking. Settings → Providers shows Gemini as not installed (with the install command), sign-in required (the sign-in window runs the CLI, where the person chooses Sign in with Google) or signed in. Boards, task chains, scheduled tasks and Jira keep Claude, Codex and Copilot; with Gemini chosen, a board chat uses Claude. The Windows shell accepts `gemini` for provider sign-in and run alerts. Board card 4a6d2f81.
+  - Validation: new tests/gemini.test.ts (4 tests: history parsing, sign-in states, streaming/resume/follow-up/error runs against a synthetic CLI, and the HTTP API) passed; new tests/gemini-provider.spec.ts (3 tests) passed on Edge; tests/translation-keys.test.ts passed; `npx tsc --noEmit -p .` passed. Not run: a real Gemini CLI with a Google account (the CLI is not installed on the development PC), the Windows shell build and smoke test, the installed application and a phone.
 
 ### Bug Fixes
 
@@ -8,8 +19,17 @@
   - Validation: confirmed the host passes the configured model, context, drafting, vision and parallel options to Strata; the board JSON and dependency references parse. No local launch was reproduced.
   - Follow-up: inspect the supplied engine log excerpt and version details when available.
 
-- The character reveal of a live answer, reasoning or file write no longer replays on characters that were already written: the animation window never reaches back behind what the component has shown, so a streamed paragraph split, a shifted live-write line window or a remounted block keeps written text plain while new characters still animate. A block mounted mid-stream still animates its newest tail once.
-  - Validation: new reveal-window and span assertions in tests/reveal-chars.test.ts passed; npm run build passed. Visual check in the installed app not run.
+- The character reveal of a live answer, reasoning or file write animates each character once: characters on the screen when a block mounts are plain at once, a character is marked done shortly after it appeared so a rebuilt word never replays it, and the animated part always starts at a word start, so a word is never split between plain and animated text.
+  - Validation: tests/reveal-chars.test.ts (3 tests) passed. Visual check in the installed app not run.
+
+- A chat or plan run through the local Strata connection no longer fails with "Choose a model from the provider catalog" when the chosen model is the default or a model that was swapped out: the host takes the model the local server is serving now. With no local model running it says so and points to the model menu.
+  - Validation: new tests/local-model-choice.test.ts (4 tests) passed.
+
+- A plan chat whose last run failed before it had a chat opens and says why the run failed instead of showing an empty chat.
+  - Validation: new scenario in tests/scheduled-tasks.spec.ts passed with the other plan chat scenarios.
+
+- The local model that is loaded now is shown: the model chip of a Strata chat reads "Strata · <model>" or "Strata · no model loaded", and the PC sidebar has a local model card (as in Strata) with a status dot that opens Settings → Providers.
+  - Validation: new tests/local-model-loaded.spec.ts (3 tests) passed on Edge.
 
 - Scheduled runs no longer surface as ordinary chats: /api/activity marks a scheduled task's run job as a task chat like /api/jobs does, so a failed or attention-needing run stays out of the waiting rows and chat status badges, and the one-time origins backfill no longer marks scheduled run chats as ordinary Pocket Code chats in the library.
   - Validation: the scheduled task API test now asserts the activity marking; tests/scheduled-tasks.test.ts (13 tests), tests/reveal-chars.test.ts, tests/activity.test.ts and tests/chat-library.test.ts passed; npm run build passed. Real scheduled provider runs and the installed Windows application were not run.

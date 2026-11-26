@@ -1,5 +1,5 @@
 import {validModelId} from '../server/provider-model';
-export type WorkspaceProvider = 'claude' | 'codex' | 'copilot';
+export type WorkspaceProvider = 'claude' | 'codex' | 'copilot' | 'gemini';
 export type CodexAccess = 'full' | 'ask' | 'auto';
 function codexAccess(value:unknown):CodexAccess{return value==='ask'||value==='auto'?value:'full';}
 /** The host accepts $0.10–$100 per Claude request; anything else would turn every following message into a 400. */
@@ -35,7 +35,7 @@ export function savePreferredRoot(host: string, root: string, provider: Workspac
   try { const key = `pocket-code-projects-${provider}`, saved = JSON.parse(localStorage.getItem(key) || '{}'); saved[host] = root; localStorage.setItem(key, JSON.stringify(saved)); } catch { /* Keep the current project for this session. */ }
 }
 export function selectedWorkspace(): WorkspaceProvider {
-  try { const value=localStorage.getItem('pocket-code-workspace');return value==='codex'||value==='copilot'?value:'claude'; } catch { return 'claude'; }
+  try { const value=localStorage.getItem('pocket-code-workspace');return value==='codex'||value==='copilot'||value==='gemini'?value:'claude'; } catch { return 'claude'; }
 }
 export function saveSelectedWorkspace(provider: WorkspaceProvider) {
   try { localStorage.setItem('pocket-code-workspace', provider); } catch { /* Keep the workspace selected for this session. */ }

@@ -5,11 +5,12 @@ import {RailButton} from './RailButton';
 import {RunStatusIcon,runStatusLabel} from './run-status';
 import {ChatActions,type ChatActionTarget} from './ChatActions';
 import {DesktopChatList} from './DesktopChatList';
+import {LocalModelCard} from './LocalModelCard';
 import {ScheduledTaskDialog,ScheduledTaskList,type ScheduledTask} from './ScheduledTasks';
 import {PanelResizeHandle} from './PanelResizeHandle';
 import './desktop-sidebar.css';
 import type {BoardSelection} from './board-selection-context';
-import {prepareBoardConversation,adoptBoardConversation,readBoardConversation} from './board-conversation';
+import {prepareBoardConversation,adoptBoardConversation,readBoardConversation,boardProvider} from './board-conversation';
 import {boardConversationHost} from './board-conversation-host';
 import './board-chat-compact.css';
 import './compact-ui.css';
@@ -60,8 +61,8 @@ import {useChatErasures} from './use-chat-erasures';
 import {useBackNavigation,useModal} from './navigation';
 import type {JobView} from '../server/types';
 import type {BoardLink,Session} from './session';
-type Provider='claude'|'codex'|'copilot';
-const chatLanes:Provider[]=['claude','codex','copilot'];
+type Provider='claude'|'codex'|'copilot'|'gemini';
+const chatLanes:Provider[]=['claude','codex','copilot','gemini'];
 const connection:Connection={url:'http://127.0.0.1:4318',token:'',desktop:true};
 const initial:DesktopState={online:false,busy:false,status:'',startup:false,autoReconnect:true,internet:true,addresses:[],jira:false};
 const name=(path:string)=>path.split(/[\\/]/).filter(Boolean).at(-1)||path;
@@ -128,7 +129,7 @@ export function DesktopApp(){
   // Re-selecting Settings (or Ctrl+,) returns to the settings root instead of keeping the last subsection.
   const [settingsNonce,setSettingsNonce]=useState(0),[settingsInitial,setSettingsInitial]=useState('index');
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&!event.altKey&&event.key===','){event.preventDefault();setSettingsNonce(value=>value+1);setPage('settings');}};document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[]);
-  const [provider,setProvider]=useState<Provider>(()=>{const value=saved('provider','claude');return value==='codex'||value==='copilot'?value:'claude';});
+  const [provider,setProvider]=useState<Provider>(()=>{const value=saved('provider','claude');return value==='codex'||value==='copilot'||value==='gemini'?value:'claude';});
   const [scheduleEditor,setScheduleEditor]=useState<ScheduledTask|'new'|null>(null);
   const [chatAction,setChatAction]=useState<ChatActionTarget|null>(null),[attachedProjects,setAttachedProjects]=useState<string[]>([]);
   const [otherSessions,setOtherSessions]=useState<Session[]>([]),[otherJobs,setOtherJobs]=useState<JobView[]>([]);
@@ -167,7 +168,7 @@ export function DesktopApp(){
   useEffect(()=>{if(!state.online){setPrimaryHost('',null);return;}setPrimaryHost(connection.url,()=>request(connection,'/health'));},[state.online]);
   useEffect(()=>{const unwatch=watchDesktop(setState);let active=true;void desktopCall<DesktopState>('state').then(value=>{if(active)setState(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;unwatch();};},[]);
   function openNotificationChat(chat:WatchedChat){
-    if(!['claude','codex','copilot'].includes(chat.provider))return;
+    if(!['claude','codex','copilot','gemini'].includes(chat.provider))return;
     setBoardChat(undefined);setNotificationChat(chat);setProvider(chat.provider as Provider);
     setSelected({sessionId:chat.sessionId||`pending-${chat.jobId}`,cwd:chat.cwd,summary:chat.title,lastModified:Date.now()});setCreating(false);setPage('chats');
   }
@@ -243,7 +244,7 @@ export function DesktopApp(){
   useEffect(()=>{if(!state.online)return;let alive=true;const load=async()=>{await request<string[]>(connection,'/chat-library/projects').then(data=>{if(alive)setAttachedProjects(data);}).catch(()=>{});};const stop=startVisiblePoll(load,60000);window.addEventListener('pocket-chat-project-added',load);return()=>{alive=false;stop();window.removeEventListener('pocket-chat-project-added',load);};},[state.online,revision]);
   // The Project page follows the chat filter, then the open chat, so both views stay on one folder.
   const projectRoot=project||selected?.cwd||allFolders[0]||'';
-  const laneOf=(session:Session):Provider=>session.provider==='codex'||session.provider==='copilot'||session.provider==='claude'?session.provider:provider;
+  const laneOf=(session:Session):Provider=>session.provider==='codex'||session.provider==='copilot'||session.provider==='gemini'||session.provider==='claude'?session.provider:provider;
   const listJobs=useMemo(()=>{const map=new Map(latestJobs);for(const job of [...otherJobs].sort((a,b)=>b.startedAt-a.startedAt))if(job.sessionId&&!map.has(job.sessionId))map.set(job.sessionId,job);return map;},[latestJobs,otherJobs]);
   // Every provider's chats in one list, running ones first, then the most recent.
   const visible=useMemo(()=>{// A plan run's chat belongs to its task in the rail, also when the host lists it (an older host) or its job runs.
@@ -275,7 +276,7 @@ export function DesktopApp(){
       const target:BoardChat={root:board.root,boardId:board.id,connectionUrl:connection.url,context:{name:board.name,revision:(board as {repositoryRevision?:string}).repositoryRevision||String(board.revision)},prompt:boardChatContext(board,[]),note:{id:board.id,title:board.name,description:'',owner:'',status:'idea',priority:'normal',branch:'',x:0,y:0,dependencies:[]}};
       // The chat picked from the list becomes the board's chat, so the board and the list keep one history.
       const prepared=await adoptBoardConversation(connection,target,provider,session.sessionId,boardConversationHost(connection),session.account||account);
-      setNotificationChat(null);setDocDraft('');setBoardChat({...prepared,note:{...prepared.note,chat:{provider,sessionId:session.sessionId}}});setProject(board.root);setSelected(session);setCreating(false);
+      setNotificationChat(null);setDocDraft('');setBoardChat({...prepared,note:{...prepared.note,chat:{provider:boardProvider(provider),sessionId:session.sessionId}}});setProject(board.root);setSelected(session);setCreating(false);
       setNoticeTarget({board,connection,noteId:'',message:'',requestId:Date.now()});setPage('work');
     }catch{openPlainChat(session);}
   }
@@ -329,6 +330,7 @@ export function DesktopApp(){
         actionId={chatAction?.session.sessionId} loading={loading} online={state.online} connection={connection} provider={provider}
         onOpen={openChat} onMenu={target=>setChatAction({...target,onDeleteFailed:(session,message)=>{setDeleteError(label('Could not delete','Не удалось удалить')+' «'+(session.customTitle||session.summary||session.sessionId)+'»: '+message);setRevision(value=>value+1);}})} onCloseMenu={()=>setChatAction(null)} onDeleted={(ids,lane)=>removeChats(ids,true,lane)}
         beforeChats={<ScheduledTaskList connection={connection} online={state.online} focusId={page==='chats'?selected?.sessionId:undefined} sessions={visible} onOpenChat={openChat} onEdit={setScheduleEditor} onRuns={setPlanRuns} onNew={projectRoot?()=>setScheduleEditor('new'):undefined}/>}/></div>
+      {state.online&&<LocalModelCard connection={connection} online={state.online} onOpen={()=>{setSettingsInitial('providers');setSettingsNonce(value=>value+1);setPage('settings');}}/>}
       </div>
     </aside>
     <main className={'desktop-main'+(page==='work'&&boardChat?.context&&(selected||creating)?' desktop-board-chat':'')}>{state.online&&<ConnectionStatus/>}{error&&<div className="desktop-error" role="alert">{error}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setError('')}><X size={16}/></button></div>}{deleteError&&<div className="desktop-error" role="alert">{deleteError}<button className="icon-button" aria-label={label('Dismiss','Закрыть')} onClick={()=>setDeleteError('')}><X size={16}/></button></div>}

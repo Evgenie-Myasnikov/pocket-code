@@ -55,5 +55,7 @@ details[open]>summary>.chat-disclosure-chevron{transform:rotate(90deg)}
 
 /* Text that writes itself (a reasoning, the code of a file being written): each of its newest characters comes down a little from above into its place while it fades in. */
 .rc{position:relative;animation:chat-reasoning-char .45s cubic-bezier(.85,.1,.9,1.2) both}
+/* A character that has had its entrance stays put when its word is drawn again. */
+.rc.rc-done{animation:none}
 @keyframes chat-reasoning-char{from{opacity:0;top:.35em}to{opacity:1;top:0}}
 @media(prefers-reduced-motion:reduce),(forced-colors:active){.rc{animation:none}}

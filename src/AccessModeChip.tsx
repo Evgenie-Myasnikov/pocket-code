@@ -17,6 +17,12 @@ export function accessOptions(provider:WorkspaceProvider):Option[]{
     {value:'ask',label:t('Спрашивать'),note:t('Codex спрашивает, когда действию нужно подтверждение'),Icon:ShieldCheck},
     {value:'auto',label:t('Авто'),note:t('Запросы оценивает проверяющий Codex, папка проекта ограничена'),Icon:Bot},
     {value:'full',label:t('Полный'),note:t('Без подтверждений и песочницы'),Icon:ShieldAlert,danger:true}];
+  // Gemini CLI runs headless: an action that needs confirmation is declined instead of asked.
+  if(provider==='gemini')return [
+    {value:'default',label:t('Только чтение'),note:t('Gemini читает файлы; правки и команды отклоняются'),Icon:ShieldCheck},
+    {value:'acceptEdits',label:t('Правки'),note:t('Правки файлов без вопросов, команды отклоняются'),Icon:FilePen},
+    {value:'bypassPermissions',label:t('Полный'),note:t('Без подтверждений: агент сам правит файлы и выполняет команды'),Icon:ShieldAlert,danger:true},
+    {value:'plan',label:t('План'),note:t('Gemini только планирует, ничего не меняя'),Icon:ListChecks}];
   return [];
 }
 const confirmedKey='pocket-code-full-access-confirmed';

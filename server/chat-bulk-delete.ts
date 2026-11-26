@@ -4,7 +4,7 @@ import path from 'node:path';
 import {ChatLibrary} from './chat-library.js';
 import {HttpError} from './security.js';
 
-type Provider='claude'|'codex'|'copilot';
+type Provider='claude'|'codex'|'copilot'|'gemini';
 type Chat={sessionId:string;cwd?:string;account?:string;readOnly?:boolean;source?:string};
 type Source={
   personal():boolean;
@@ -18,7 +18,7 @@ type Source={
   accounts():Promise<{id:string;name:string}[]>;
 };
 const target=z.object({
-  provider:z.enum(['claude','codex','copilot']),account:z.string().uuid().optional(),
+  provider:z.enum(['claude','codex','copilot','gemini']),account:z.string().uuid().optional(),
   folder:z.string().max(4096).optional(),ids:z.array(z.string().min(1).max(4096)).min(1).optional(),
   action:z.enum(['preview','delete']),eraseOriginals:z.boolean().optional(),
 }).strict().refine(body=>(body.action==='delete'?!!body.ids:!!body.ids||body.folder!==undefined)

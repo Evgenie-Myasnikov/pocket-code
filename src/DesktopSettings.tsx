@@ -76,10 +76,11 @@ export function DesktopSettings({state,connection,appearance,action,initialPage=
     {current==='connection'&&<DesktopConnectionSettings state={state} action={action}/>}
     {current==='updates'&&<><DesktopUpdates state={state} action={action}/><ClaudeEngineUpdate connection={host} block/></>}
     {current==='workspace'&&(custom?<CustomProviderAccount connection={connection} online={state.online} id={custom} onSaved={setCustom} onRemoved={()=>setCustom(null)}/>:<>
-      {(['claude','codex','copilot'] as const).map(id=><ProviderConnections key={id} connection={connection} online={state.online} only={id} rows>
+      {(['claude','codex','copilot','gemini'] as const).map(id=><ProviderConnections key={id} connection={connection} online={state.online} only={id} rows>
         {id==='claude'&&<><ClaudeAccessSettings row/><BudgetSettings row value={device.budget} onChange={device.setBudget}/></>}
         {id==='codex'&&<CodexAccessSettings row value={device.codexAccess} onChange={device.setCodexAccess}/>}
         {id==='copilot'&&<SettingRow title={t('Доступ агента')} note={t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}/>}
+        {id==='gemini'&&<SettingRow title={t('Доступ агента')} note={t('Режим выбирается в поле ввода чата: правки, полный доступ или план. Gemini CLI не спрашивает подтверждений из Pocket Code.')}/>}
       </ProviderConnections>)}
       {host&&<SettingsBlock title={t('Лимиты использования')} className="settings-usage"><UsageRows connection={host}/></SettingsBlock>}
       {state.online&&<SettingsBlock title={t('Свои провайдеры')}><CustomProviderList connection={connection} online={state.online} onOpen={setCustom} rows/></SettingsBlock>}

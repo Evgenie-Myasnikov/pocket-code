@@ -35,7 +35,7 @@ import {SwitchRow} from './SettingsRows';
 
 export type SettingsPage='index'|'appearance'|'workspace'|'usage'|'jira'|'miro'|'updates'|'connection'|'notifications'|'about'|'chat'|'board';
 type Subpage='index'|'account'|'access';
-const providerNames:Record<WorkspaceProvider,string>={claude:'Claude',codex:'Codex',copilot:'GitHub Copilot'};
+const providerNames:Record<WorkspaceProvider,string>={claude:'Claude',codex:'Codex',copilot:'GitHub Copilot',gemini:'Gemini'};
 const storage=(id:string)=>settingsCategories.find(item=>item.id===id)?.storage;
 /** Index row: the title is the button's name, the live value its description (D14: nothing hidden behind aria-label). */
 export function SettingsCategoryButton({category,platform,summary,badge,current,onOpen}:{category:SettingsCategory;platform:SettingsPlatform;summary:ReactNode;badge?:boolean;current?:boolean;onOpen():void}){
@@ -43,6 +43,8 @@ export function SettingsCategoryButton({category,platform,summary,badge,current,
   return <button className={'settings-category'+(current?' current':'')} data-settings-category={category.id} aria-current={current?'page':undefined} aria-labelledby={id+'-title'} aria-describedby={id+'-summary'} onClick={onOpen}><Icon size={20} aria-hidden="true"/><span><strong id={id+'-title'}>{t(categoryTitle(category,platform))}{badge&&<span className="settings-badge" aria-hidden="true"/>}</strong><small id={id+'-summary'}>{summary}</small></span><ChevronRight size={20} aria-hidden="true"/></button>;
 }
 export function usageSummary(provider:WorkspaceProvider,live:ReturnType<typeof useLiveSettings>){
+  // Gemini CLI reports no subscription quota, so none is shown.
+  if(provider==='gemini')return null;
   const narrowest=narrowestWindow(live.usage(provider));
   return narrowest?t('{0} · {1}: осталось {2}%',providerNames[provider],windowLabel(narrowest.window,provider),percentLabel(narrowest.remaining))+(narrowest.window.resetsAt!==null?' · '+resetLabel(narrowest.window.resetsAt):''):null;
 }
@@ -88,11 +90,11 @@ export function SettingsPanel({connectionPanel,workspaceSelector,page:requested,
       <h2 className="settings-page-title">{inSubpage?subTitle:t(category?.title||'Настройки')}</h2>
       {scope&&<p className="settings-scope">{scope}</p>}
       {page==='appearance'&&<><LanguageSelector/><AppearanceSettings {...appearance} connection={connection}/></>}
-      {page==='workspace'&&<>{subpage==='index'&&<>{workspaceSelector}<nav className="settings-index settings-subindex" aria-label={t('Разделы аккаунта AI')}>{subpages.map(item=><button className="settings-category" key={item.id} data-settings-subpage={item.id} aria-labelledby={'settings-sub-'+item.id} aria-describedby={'settings-sub-'+item.id+'-summary'} onClick={()=>setSubpage(item.id)}><span><strong id={'settings-sub-'+item.id}>{t(item.title)}</strong><small id={'settings-sub-'+item.id+'-summary'}>{item.summary}</small></span><ChevronRight size={20} aria-hidden="true"/></button>)}</nav>{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}<h3>{t('Лимиты использования')}</h3><UsageLimits connection={connection} provider={provider}/></>}
+      {page==='workspace'&&<>{subpage==='index'&&<>{workspaceSelector}<nav className="settings-index settings-subindex" aria-label={t('Разделы аккаунта AI')}>{subpages.map(item=><button className="settings-category" key={item.id} data-settings-subpage={item.id} aria-labelledby={'settings-sub-'+item.id} aria-describedby={'settings-sub-'+item.id+'-summary'} onClick={()=>setSubpage(item.id)}><span><strong id={'settings-sub-'+item.id}>{t(item.title)}</strong><small id={'settings-sub-'+item.id+'-summary'}>{item.summary}</small></span><ChevronRight size={20} aria-hidden="true"/></button>)}</nav>{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}<h3>{t('Лимиты использования')}</h3>{provider!=='gemini'&&<UsageLimits connection={connection} provider={provider}/>}</>}
         {subpage==='account'&&<><ProviderConnections connection={connection} only={provider}/>{provider==='copilot'&&<p className="muted settings-note">{t('Разрешения Copilot подтверждаются в чате для каждого инструмента.')}</p>}<h3>{t('Свои провайдеры')}</h3>{custom?<><button className="settings-back" onClick={()=>setCustom(null)}>{t('Все свои провайдеры')}</button><CustomProviderAccount connection={connection} id={custom} onSaved={setCustom} onRemoved={()=>setCustom(null)}/></>:<nav className="settings-index" aria-label={t('Свои провайдеры')}><CustomProviderList connection={connection} onOpen={setCustom}/></nav>}</>}
         {subpage==='access'&&(provider==='codex'?<CodexAccessSettings value={codexAccess} onChange={onCodexAccess}/>:provider==='claude'?<><ClaudeAccessSettings/><BudgetSettings value={budget} onChange={onBudget}/></>:null)}</>}
       {page==='chat'&&<><ComposerSettings desktop={false}/><div className="project-folder-field"><span>{t('Папка для новых чатов')}</span><ProjectFolderPicker paths={roots} value={cwd} label={t('Папка для новых чатов')} disabled={!roots.length} onChange={onProject}/></div><SpeechSettingsPanel connection={connection}/></>}
-      {page==='board'&&<><BoardGridSettings/><h3>Miro</h3><MiroSettings connection={connection} roots={roots}/>{jiraEnabled()&&<><h3>Jira</h3><JiraSettings key={provider} connection={connection} provider={provider}/></>}</>}
+      {page==='board'&&<><BoardGridSettings/><h3>Miro</h3><MiroSettings connection={connection} roots={roots}/>{jiraEnabled()&&provider!=='gemini'&&<><h3>Jira</h3><JiraSettings key={provider} connection={connection} provider={provider}/></>}</>}
       {page==='updates'&&<><div id="settings-updates"/><EngineUpdates connection={connection} provider={provider}/><ClaudeEngineUpdate connection={connection}/><div className="settings-about"><span className="logo"><Terminal size={24}/></span><h3>Pocket Code</h3><span className="version">BETA</span><p>{t('Версия {0}',pkg.version)}</p><p className="muted">{t('Claude Code и Codex с вашего ПК — на телефоне.')}</p></div></>}
       {page==='notifications'&&<><RunAlertsToggle/><LimitAlertsToggle/></>}{page==='connection'&&connectionPanel}
     </>}</div>

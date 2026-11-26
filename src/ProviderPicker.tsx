@@ -7,8 +7,8 @@ import {ProviderMark} from './ProviderMark';
 import {useLanguage} from './i18n';
 import {customProvidersChanged,setCustomAccount,useCustomAccount,useCustomAccountsState} from './custom-account';
 import './provider-picker.css';
-type Provider='claude'|'codex'|'copilot';
-const names:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'Copilot'};
+type Provider='claude'|'codex'|'copilot'|'gemini';
+const names:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'Copilot',gemini:'Gemini'};
 export function ProviderPicker({value,onChange,disabled=false,attention=()=>0,onAdd,connection}:{value:Provider;onChange(value:Provider):void;disabled?:boolean;attention?:(value:Provider)=>number;onAdd?():void;connection?:Connection}){
  const [custom,setCustom]=useState(false),[open,setOpen]=useState(false),root=useRef<HTMLDivElement>(null),menu=useRef<HTMLDivElement>(null),ru=useLanguage()==='ru';
  // Custom providers run the Claude agent with their own URL and key; picking one keeps the Claude workspace.

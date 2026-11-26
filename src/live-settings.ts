@@ -2,7 +2,7 @@ import {useSyncExternalStore} from 'react';
 import type {CodexUsageSnapshot} from '../server/codex-usage';
 
 /** Values the settings index shows as live summaries. They come from reads that already run (usage ring, limits page, update checks); nothing here polls. */
-type Provider='claude'|'codex'|'copilot';
+type Provider='claude'|'codex'|'copilot'|'gemini';
 const usage=new Map<Provider,CodexUsageSnapshot>();
 let update:string|null=null,version=0;
 const listeners=new Set<()=>void>();

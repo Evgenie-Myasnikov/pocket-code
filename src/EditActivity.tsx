@@ -15,7 +15,7 @@ function diffText(file:EditFile){return file.content??file.lines.map(row=>signs[
 function LiveWriteSnippet({text:received,totalLines}:{text:string;totalLines:number|undefined}){
   const viewport=useRef<HTMLSpanElement>(null);
   // The code that arrives is written into the snippet word by word, its newest characters coming down into place one by one.
-  const {text,pending}=useSmoothText(received,true,false),{tailStart,delay}=useRevealTail(text.length,true,160);
+  const {text,pending}=useSmoothText(received,true,false),{tailStart,delay,young}=useRevealTail(text.length,true,160);
   void pending;
   const excerpt=text.slice(-4000),excerptStart=text.length-excerpt.length;
   const visible=excerpt;
@@ -33,7 +33,7 @@ function LiveWriteSnippet({text:received,totalLines}:{text:string;totalLines:num
     if(viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight;
   },[visible]);
   return <span ref={viewport} className="edit-live-snippet" aria-hidden="true"><code>{tail.map((line,i)=>
-    <Fragment key={first===undefined?i:first+i}>{i>0&&'\n'}<span className="edit-live-line" data-number={first===undefined?undefined:first+i}><span>{revealCharacters(line,tailStarts[i]??0,tailStart,delay)}</span></span></Fragment>
+    <Fragment key={first===undefined?i:first+i}>{i>0&&'\n'}<span className="edit-live-line" data-number={first===undefined?undefined:first+i}><span>{revealCharacters(line,tailStarts[i]??0,tailStart,delay,young)}</span></span></Fragment>
   )}</code></span>;
 }
 

@@ -21,6 +21,7 @@ import type {RunMonitor} from './run-monitor.js';
 import {GitProjects} from './git-projects.js';
 import {ProviderConnections} from './provider-connections.js';
 import {CopilotService} from './copilot.js';
+import type {GeminiService} from './gemini.js';
 import express from 'express';
 import {TaskNotifications,jiraNotifications} from './task-notifications';
 import packageJson from '../package.json';
@@ -65,7 +66,7 @@ import {WindowsMiroStore} from './miro-vault.js';
 import {mountMiro} from './miro-routes.js';
 import {ScheduledTasks} from './scheduled-tasks.js';
 
-export type Config = { port?:number; customProviders?:CustomProviders; localModels?:LocalModels;/** Tests: how often a scheduled run checks a busy local model (ms). */localModelWaitMs?:number;claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
+export type Config = { port?:number; customProviders?:CustomProviders; localModels?:LocalModels;/** Tests: how often a scheduled run checks a busy local model (ms). */localModelWaitMs?:number;claudeModels?: Pick<ClaudeModelCatalog,'read'>; runs?:RunMonitor;devices?:DeviceRegistry;refreshPairing?():Promise<void>;routes?():string[]; pcJira?:{key:string;connection:JiraConnection;login:JiraLogin}; jiraForProvider?(provider:'claude'|'codex'|'copilot'):JiraService; engineUpdates?: EngineUpdates; runtime?: { internet(): boolean; lanAccess?(): boolean; stop(): void | Promise<void> }; hostUpdater?: HostUpdater; codex?: CodexService; copilot?: CopilotService; gemini?: GeminiService; updater?: ReleaseUpdater; roots: string[]; token: string; hostName: string; uploads: string; webDir?: string; desktopSessionIndexes?: string[]; jira?: JiraService;
   /** How long a provider's chat listing answers without being read again, and how long it may answer while a new one loads. */
   sessionListFreshMs?: number; sessionListStaleMs?: number;
   /** List every provider chat as if imported (test fixtures that exercise listing itself). */
@@ -78,6 +79,8 @@ type SDK = { listSessions: typeof listSessions; getSessionMessages: typeof getSe
 const uuid = z.string().uuid();
 const text = z.string().min(1).max(4096);
 const providerSchema = z.enum(['claude', 'codex','copilot']).default('claude');
+/** Chats also run through Gemini CLI; Jira, task chains, scheduled tasks and board lanes stay with the three agent providers. */
+const chatProviderSchema = z.enum(['claude', 'codex','copilot','gemini']).default('claude');
 export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { listSessions, getSessionMessages, getSessionInfo, deleteSession, forkSession }, terminals = new Terminals()) {
   const roots = await Promise.all(config.roots.map(p => realpath(p)));
   const claudeCatalog = config.claudeModels || new ClaudeModelCatalog();
@@ -95,12 +98,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const visibleRoot=(_cwd?:string)=>!workspaceAccess.current();
   const codex = () => { if (!config.codex) throw new HttpError(503, 'Codex is unavailable. Update and restart the PC bridge.'); return config.codex; };
   const copilot=()=>{if(!config.copilot)throw new HttpError(503,'Copilot is unavailable. Update the PC host.');return config.copilot;};
-  const engineFor=(provider:string)=>provider==='copilot'?copilot():provider==='codex'?codex():jobs;
-  const allJobs = () => [...jobs.list(), ...(config.codex?.list() || []),...(config.copilot?.list()||[])];
+  const gemini=()=>{if(!config.gemini)throw new HttpError(503,'Gemini is unavailable. Update the PC host.');return config.gemini;};
+  const engineFor=(provider:string)=>provider==='gemini'?gemini():provider==='copilot'?copilot():provider==='codex'?codex():jobs;
+  const allJobs = () => [...jobs.list(), ...(config.codex?.list() || []),...(config.copilot?.list()||[]),...(config.gemini?.list()||[])];
   const textInFlight=new Set<string>();
-  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status()},id=>textInFlight.has(id)||allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!taskChains?.hasWork()||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();},()=>copilot().logout());
-  const jobView = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot.get(id):config.codex?.list().some(j => j.id === id) ? config.codex.view(config.codex.get(id)) : jobs.view(jobs.get(id));
-  const engineForJob = (id: string) => config.copilot?.list().some(j=>j.id===id)?config.copilot:config.codex?.list().some(j => j.id === id) ? config.codex : jobs;
+  const providerConnections=new ProviderConnections({codex:()=>codex().status(),copilot:()=>copilot().status(),...(config.gemini?{gemini:()=>gemini().status()}:{})},id=>textInFlight.has(id)||allJobs().some(job=>job.provider===id&&job.status==='running')||terminals.list().some(t=>t.status==='running')||!!taskChains?.hasWork()||!!queue?.hasWork()||!!codexQueue?.hasWork()||!!copilotQueue?.hasWork()||!!workflow?.isBusy(),async id=>{if(id==='codex')await codex().refreshAuthentication();if(id==='copilot')await copilot().refreshAuthentication();if(id==='gemini')await gemini().refreshAuthentication();},()=>copilot().logout());
+  const jobView = (id: string) => config.gemini?.list().some(j=>j.id===id)?config.gemini.get(id):config.copilot?.list().some(j=>j.id===id)?config.copilot.get(id):config.codex?.list().some(j => j.id === id) ? config.codex.view(config.codex.get(id)) : jobs.view(jobs.get(id));
+  const engineForJob = (id: string) => config.gemini?.list().some(j=>j.id===id)?config.gemini:config.copilot?.list().some(j=>j.id===id)?config.copilot:config.codex?.list().some(j => j.id === id) ? config.codex : jobs;
   function guardProject(cwd: string, id: string) {
     if (allJobs().some(j => j.id !== id && j.status === 'running' && (within(j.cwd, cwd) || within(cwd, j.cwd))))
       throw new HttpError(409, 'An agent is already working in this project. Wait for it to finish or stop the task.');
@@ -390,7 +394,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   mountChatErasures(app,chatLibrary,()=>!workspaceAccess.current());
   jobs.onSession(job=>{const account=job.account;if(account)void customProviders.name(account).catch(()=>undefined).then(name=>chatLibrary.tagAccount(job.sessionId,account,name)).catch(()=>{});});
   const generationStore=new SessionGeneration(path.join(config.uploads,'.tasks','chat-generation'));
-  for(const engine of [jobs,config.codex,config.copilot]){
+  for(const engine of [jobs,config.codex,config.copilot,config.gemini]){
     if(engine)engine.recordGeneration=job=>{void generationStore.record(job).catch(()=>{});if(job.sessionId)void chatLibrary.markOrigins(job.provider||'claude',[job.sessionId],'pocket').then(()=>autoTitle(job)).catch(()=>{});};
   }
   /** After the first turn of a chat started in Pocket Code, its own provider names it in a few words; a name the person gave is kept. */
@@ -404,6 +408,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     if(!first)return;
     titling.add(key);
     try{
+      if(provider==='gemini')return;
       let selection:{provider:'claude'|'codex'|'copilot'|'custom';cwd:string;account?:string;model?:string}={provider,cwd:job.cwd};
       if(provider==='claude'&&job.account){
         const executor=(await customProviders.taskExecutors().catch(()=>[])).find(item=>item.account===job.account);
@@ -414,7 +419,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       if(title)await chatLibrary.edit(data=>{const entry=data.chats[key];if(!entry?.title)data.chats[key]={...entry,title};});
     }finally{titling.delete(key);}
   }
-  const loadSessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude') => {
+  const loadSessions = async (provider: 'claude' | 'codex' | 'copilot' | 'gemini' = 'claude') => {
+    if (provider === 'gemini') return gemini().sessions();
     if (provider === 'copilot') return copilot().sessions();
     if (provider === 'codex') return codex().sessions();
     const [all, desktop] = await Promise.all([sdk.listSessions(), readDesktopSessions(indexes)]);
@@ -432,20 +438,20 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     return permitted.sort((a, b) => b.lastModified - a.lastModified);
   };
   // Concurrent list/project/history requests share one read of a provider's chats.
-  const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
+  const sessionReads = coalesceReads<'claude' | 'codex' | 'copilot' | 'gemini', Awaited<ReturnType<typeof loadSessions>>>(0, 3);
   // Reading a provider's chats can take seconds (Codex scans its whole archive). The chat list, a chat's history and
   // a new turn only need rows that rarely change, so they answer from the last listing while a new one loads in the
   // background. Titles, deletions and access to the chat's folder are still checked on every request.
   const sessionListFresh=config.sessionListFreshMs??2000,sessionListStale=config.sessionListStaleMs??60000,sessionListWait=config.sessionListWaitMs??1200;
-  const sessionLists=new Map<'claude' | 'codex' | 'copilot',{at:number;took:number;value:Awaited<ReturnType<typeof loadSessions>>}>();
-  const refreshSessions=(provider:'claude' | 'codex' | 'copilot')=>sessionReads(provider,async()=>{const started=Date.now(),value=await loadSessions(provider);sessionLists.set(provider,{at:Date.now(),took:Date.now()-started,value});return value;});
+  const sessionLists=new Map<'claude' | 'codex' | 'copilot' | 'gemini',{at:number;took:number;value:Awaited<ReturnType<typeof loadSessions>>}>();
+  const refreshSessions=(provider:'claude' | 'codex' | 'copilot' | 'gemini')=>sessionReads(provider,async()=>{const started=Date.now(),value=await loadSessions(provider);sessionLists.set(provider,{at:Date.now(),took:Date.now()-started,value});return value;});
   /**
    * saved: answer from the saved listing without waiting (one chat is looked up: its history, a new turn).
    * recent: a chat list; it waits a moment for a provider that answers quickly and otherwise uses the saved listing.
    * current: always read the provider's chats now (a chat created a moment ago, deletion).
    */
   type ListingNeed='saved'|'recent'|'current';
-  const providerSessions=async(provider:'claude' | 'codex' | 'copilot',need:ListingNeed)=>{
+  const providerSessions=async(provider:'claude' | 'codex' | 'copilot' | 'gemini',need:ListingNeed)=>{
     const saved=sessionLists.get(provider),age=saved?Date.now()-saved.at:Infinity;
     // A slow provider is asked again less often: its listing stays current for three times as long as it took to read (20 s at most).
     if(saved&&need!=='current'&&sessionListFresh>0&&age<Math.max(sessionListFresh,Math.min(20000,saved.took*3)))return saved.value;
@@ -458,7 +464,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     try{return await Promise.race([loading.catch(()=>saved.value),new Promise<typeof saved.value>(resolve=>{timer=setTimeout(()=>resolve(saved.value),sessionListWait);})]);}
     finally{clearTimeout(timer);}
   };
-  const sessions = async (provider: 'claude' | 'codex' | 'copilot' = 'claude',includeDeleted=false,need:ListingNeed='recent') => {
+  const sessions = async (provider: 'claude' | 'codex' | 'copilot' | 'gemini' = 'claude',includeDeleted=false,need:ListingNeed='recent') => {
     if(workspaceAccess.current())return [];
     const listed=await chatLibrary.decorate<Awaited<ReturnType<typeof loadSessions>>[number]>(provider,await providerSessions(provider,need),workspaceAccess.store.chatLinks(),includeDeleted);
     if(provider!=='claude')return listed;
@@ -471,8 +477,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     return providers?chatLibrary.resolveAccounts(tagged,providers):tagged;
   };
   const historyReads = coalesceReads<string, Awaited<ReturnType<SDK['getSessionMessages']>>>(0, 8);
-  async function session(id: string, provider: 'claude' | 'codex' | 'copilot' = 'claude') {
-    if(provider==='copilot')z.string().min(1).max(4096).parse(id);else uuid.parse(id);
+  async function session(id: string, provider: 'claude' | 'codex' | 'copilot' | 'gemini' = 'claude') {
+    if(provider==='copilot'||provider==='gemini')z.string().min(1).max(4096).parse(id);else uuid.parse(id);
     type Row=Awaited<ReturnType<typeof sessions>>[number];
     const permitted=async(found:Row)=>{if (found.cwd && (!found.readOnly||workspaceAccess.current())) await allowedPath(accessRoots(), found.cwd, true);return found;};
     const saved = (await sessions(provider,false,'saved')).find(s => s.sessionId === id);
@@ -484,17 +490,17 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     return permitted(found);
   }
   app.get('/api/sessions/:id/subagents', async (req, res) => {
-    const provider = providerSchema.parse(req.query.provider), parent = await session(String(req.params.id), provider);
+    const provider = chatProviderSchema.parse(req.query.provider), parent = await session(String(req.params.id), provider);
     if (!parent.cwd) throw new HttpError(409, 'The parent chat has no local project folder.');
     const cwd = await allowedPath(accessRoots(), parent.cwd, true);
-    res.json({ agents: provider==='copilot'?[]:provider === 'codex' ? await codex().subagents(parent.sessionId) : await claudeSubagents(parent.sessionId, cwd) });
+    res.json({ agents: provider==='copilot'||provider==='gemini'?[]:provider === 'codex' ? await codex().subagents(parent.sessionId) : await claudeSubagents(parent.sessionId, cwd) });
   });
   app.get('/api/sessions/:id/subagents/:agent/messages', async (req, res) => {
-    const provider = providerSchema.parse(req.query.provider), parent = await session(String(req.params.id), provider);
+    const provider = chatProviderSchema.parse(req.query.provider), parent = await session(String(req.params.id), provider);
     const agent = z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/).parse(req.params.agent);
     if (!parent.cwd) throw new HttpError(409, 'The parent chat has no local project folder.');
     const cwd = await allowedPath(accessRoots(), parent.cwd, true);
-    const messages = provider==='copilot'?[]:provider === 'codex' ? await codex().subagentMessages(parent.sessionId, agent) : await claudeSubagentMessages(parent.sessionId, agent, cwd);
+    const messages = provider==='copilot'||provider==='gemini'?[]:provider === 'codex' ? await codex().subagentMessages(parent.sessionId, agent) : await claudeSubagentMessages(parent.sessionId, agent, cwd);
     res.json({ messages });
   });
   app.get('/api/review', async (req, res) => { const query = reviewQuery.extend({cwd:text,mode:z.enum(['working','staged','branch']).default('working'),base:z.string().max(300).optional()}).parse(req.query); res.json(await review(roots,query.cwd,query.mode,query.base,query.file,{whitespace:query.whitespace==='1',context:query.context,paths:query.path,offset:query.offset})); });
@@ -518,31 +524,33 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   // Codex and Copilot check their sign-in and models over their own processes and the network. Both are asked at once,
   // and one that does not answer in time is reported from its last known state, so it never holds back the other providers.
-  const providerStates=new Map<'codex'|'copilot',object>();
-  const providerState=async(id:'codex'|'copilot',read:()=>Promise<object>)=>{
+  const providerStates=new Map<'codex'|'copilot'|'gemini',object>();
+  const providerState=async(id:'codex'|'copilot'|'gemini',read:()=>Promise<object>)=>{
     let timer:ReturnType<typeof setTimeout>|undefined;
     const loading=read().then(value=>{providerStates.set(id,value);return value;});
     const late=new Promise<object>(resolve=>{timer=setTimeout(()=>resolve(providerStates.get(id)??{available:false,authenticated:false,models:[],access:'checking',error:'Still checking this provider.'}),config.providerStatusWaitMs??4000);});
     try{return await Promise.race([loading,late]);}finally{clearTimeout(timer);loading.catch(()=>{});}
   };
   app.get('/api/providers', async (_req, res) => {
-    const [codexState,copilotState]=await Promise.all([
+    const [codexState,copilotState,geminiState]=await Promise.all([
       config.codex?providerState('codex',()=>config.codex!.status()):{ available: false, authenticated: false, models: [], error: 'Codex is not configured on this PC.' },
-      config.copilot?providerState('copilot',()=>config.copilot!.status()):{available:false,authenticated:false,models:[]}]);
-    res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...codexState },{id:'copilot',name:'GitHub Copilot',...copilotState}]);
+      config.copilot?providerState('copilot',()=>config.copilot!.status()):{available:false,authenticated:false,models:[]},
+      config.gemini?providerState('gemini',()=>config.gemini!.status()):undefined]);
+    res.json([{ id: 'claude', name: 'Claude', available: true, models: claudeFallbackModels }, { id: 'codex', name: 'Codex', ...codexState },{id:'copilot',name:'GitHub Copilot',...copilotState},...(geminiState?[{id:'gemini',name:'Gemini',...geminiState}]:[])]);
   });
   mountCustomProviders(app,customProviders,guardCustomProviders);
   mountLocalModels(app,localModels,guardLocalModels);
   app.get('/api/provider-connections',async(_req,res)=>res.json(await providerConnections.status()));
-  app.post('/api/provider-connections/:provider/login/cancel',async(req,res)=>res.json(await providerConnections.cancel(providerSchema.parse(req.params.provider))));
-  app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(providerSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));
-  app.post('/api/provider-connections/:provider/logout',async(req,res)=>res.json(await providerConnections.logout(providerSchema.parse(req.params.provider))));
+  app.post('/api/provider-connections/:provider/login/cancel',async(req,res)=>res.json(await providerConnections.cancel(chatProviderSchema.parse(req.params.provider))));
+  app.post('/api/provider-connections/:provider/login/:method',async(req,res)=>res.json(await providerConnections.start(chatProviderSchema.parse(req.params.provider),z.string().max(24).parse(req.params.method))));
+  app.post('/api/provider-connections/:provider/logout',async(req,res)=>res.json(await providerConnections.logout(chatProviderSchema.parse(req.params.provider))));
   app.get('/api/copilot/status',async(_req,res)=>res.json(await copilot().status()));
+  app.get('/api/gemini/status',async(_req,res)=>res.json(await gemini().status()));
   app.get('/api/copilot/login',(_req,res)=>res.json(copilot().loginStatus()));
   app.post('/api/copilot/login',async(_req,res)=>res.json(await copilot().login()));
   // Project folders are shared; conversation histories remain provider-specific.
   const gitProjects=new GitProjects(roots);
-  async function librarySessions(provider:'claude'|'codex'|'copilot'){
+  async function librarySessions(provider:'claude'|'codex'|'copilot'|'gemini'){
     if(workspaceAccess.current())return [];
     await taskChains.init();
     const listed=await sessions(provider);
@@ -567,16 +575,16 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   // Import chats: the provider's current chats join the list. Chats made in Pocket Code keep that mark.
   app.post('/api/chat-library/import',async(req,res)=>{
     if(workspaceAccess.current())throw new HttpError(403,'Personal chats belong to the connected PC');
-    const body=z.object({providers:z.array(providerSchema).min(1).max(3).optional()}).strict().parse(req.body||{});
+    const body=z.object({providers:z.array(chatProviderSchema).min(1).max(4).optional()}).strict().parse(req.body||{});
     const result:Record<string,{imported:number;total:number}>={};
-    for(const provider of body.providers||['claude','codex','copilot'] as const){
+    for(const provider of body.providers||(['claude','codex','copilot',...(config.gemini?['gemini' as const]:[])])){
       try{const listed=await sessions(provider,false,'current');result[provider]={imported:await chatLibrary.markOrigins(provider,listed.map(chat=>chat.sessionId),'imported'),total:listed.length};}
       catch{result[provider]={imported:0,total:0};}
     }
     res.json(result);
   });
   async function projectFolders() {
-    const results = await Promise.allSettled([librarySessions('claude'), librarySessions('codex'),librarySessions('copilot')]);
+    const results = await Promise.allSettled([librarySessions('claude'), librarySessions('codex'),librarySessions('copilot'),...(config.gemini?[librarySessions('gemini')]:[])]);
     const projects = new Set([...roots,...await gitProjects.list()]);
     for (const result of results) if (result.status === 'fulfilled') {
       for (const session of result.value) {
@@ -589,8 +597,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   }
   app.get('/api/projects',async(_req,res)=>res.json(await projectFolders()));
   app.get('/api/document-projects',async(req,res)=>res.json(await documentProjects(await projectFolders(),z.enum(['rules','changelog','files']).parse(req.query.kind))));
-  app.get('/api/sessions', async (req, res) => res.json(await librarySessions(providerSchema.parse(req.query.provider))));
-  const chatRuns=(provider:'claude'|'codex'|'copilot')=>{
+  app.get('/api/sessions', async (req, res) => res.json(await librarySessions(chatProviderSchema.parse(req.query.provider))));
+  const chatRuns=(provider:'claude'|'codex'|'copilot'|'gemini')=>{
     const observing=taskChains?.observingJobs();
     return [
       ...engineFor(provider).list().map(job=>observing?.has(job.id)?{...job,status:'running' as const}:job),
@@ -608,7 +616,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     },
     jobs:chatRuns,
     accounts:()=>customProviders.list(),
-    originals:createChatOriginals({sdk,codex:config.codex,copilot:config.copilot}),
+    originals:createChatOriginals({sdk,codex:config.codex,copilot:config.copilot,gemini:config.gemini}),
     allowedOriginalCwd:async cwd=>{try{await allowedPath(accessRoots(),cwd,true);return true;}catch{return false;}},
     verifyDesktopOriginal:async(id,cwd)=>{
       const row=await sdk.getSessionInfo?.(id,{dir:cwd});
@@ -645,7 +653,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({ok:true});
   });
   app.post('/api/sessions/:id/manage',async(req,res)=>{
-    const body=z.object({provider:providerSchema,action:z.enum(['rename','delete','erase','board','account']),eraseOriginals:z.boolean().optional(),account:uuid.optional(),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
+    const body=z.object({provider:chatProviderSchema,action:z.enum(['rename','delete','erase','board','account']),eraseOriginals:z.boolean().optional(),account:uuid.optional(),title:z.string().trim().min(1).max(200).optional(),board:z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),root:z.string().min(1).max(4096),title:z.string().trim().min(1).max(200),noteId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),kind:z.enum(['discussion','note','task']).optional()}).optional()}).parse(req.body);
     if(body.action==='erase'){
       if(!body.eraseOriginals)throw new HttpError(400,'Confirm original history removal.');
       const id=String(req.params.id),result=await processChats({provider:body.provider,account:body.account,ids:[id],action:'delete',eraseOriginals:true},undefined,{listing:'saved',outsideRoots:res.locals.deviceAdmin===true});
@@ -678,13 +686,14 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({sessionId:found.sessionId,deleted:body.action==='delete',title:body.title});
   });
   app.post('/api/sessions/:id/branch',async(req,res)=>{
-    const body=z.object({provider:providerSchema,messageId:z.string().min(1).max(200)}).parse(req.body);
+    const body=z.object({provider:chatProviderSchema,messageId:z.string().min(1).max(200)}).parse(req.body);
     const source=await session(String(req.params.id),body.provider);
     if(source.readOnly||!source.cwd)throw new HttpError(403,'This conversation is read-only.');
     if(engineFor(body.provider).list().some(j=>j.sessionId===source.sessionId&&j.status==='running'))throw new HttpError(409,'Stop the current turn before branching.');
     let sessionId:string|undefined;
     if(body.provider==='codex')sessionId=await codex().forkBeforeMessage(source.sessionId,body.messageId);
     else if(body.provider==='copilot')sessionId=await copilot().forkBeforeMessage(source.sessionId,body.messageId);
+    else if(body.provider==='gemini')sessionId=await gemini().forkBeforeMessage(source.sessionId,body.messageId);
     else {
       const raw=await sdk.getSessionMessages(source.sessionId,{dir:source.cwd}),index=raw.findIndex(m=>m.uuid===body.messageId&&m.type==='user');
       if(index<0)throw new HttpError(404,'The selected user message is unavailable.');
@@ -695,13 +704,13 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   // Chat grid previews: computed only for the tiles a client shows, cached per session version, at most three transcript reads at once.
   const previews=new SessionPreviews({capacity:500,concurrency:3});
   type ListedSession=Awaited<ReturnType<typeof sessions>>[number];
-  const previewMessages=async(provider:'claude'|'codex'|'copilot',s:ListedSession)=>provider==='codex'?(await codex().messagePage(s.sessionId,{window:80})).messages
-    :provider==='copilot'?(await copilot().messages(s.sessionId)).slice(-300)
+  const previewMessages=async(provider:'claude'|'codex'|'copilot'|'gemini',s:ListedSession)=>provider==='codex'?(await codex().messagePage(s.sessionId,{window:80})).messages
+    :provider==='copilot'||provider==='gemini'?(await (provider==='gemini'?gemini():copilot()).messages(s.sessionId)).slice(-300)
     :(await historyReads(JSON.stringify([provider,s.sessionId,s.cwd]),()=>sdk.getSessionMessages(s.sessionId,{dir:s.cwd}))).slice(-400).map(normalize).filter((m):m is NonNullable<typeof m>=>!!m);
   // Local image files need a permitted project folder, exactly like /message-attachment; read-only history shows inline images only.
   const previewCwd=async(s:ListedSession)=>{if(!s.cwd||s.readOnly)return null;try{return await allowedPath(accessRoots(),s.cwd,true);}catch{return null;}};
   app.get('/api/sessions/previews',async(req,res)=>{
-    const provider=providerSchema.parse(req.query.provider),ids=z.string().max(48*40).parse(req.query.ids||'').split(',').filter(Boolean);
+    const provider=chatProviderSchema.parse(req.query.provider),ids=z.string().max(48*40).parse(req.query.ids||'').split(',').filter(Boolean);
     const wanted=z.array(uuid).max(48).parse([...new Set(ids)]),listed=new Map((await sessions(provider)).map(s=>[s.sessionId,s]));
     const result:SessionPreview[]=await Promise.all(wanted.map(async id=>{
       const s=listed.get(id);if(!s)return {sessionId:id,error:true as const};
@@ -715,7 +724,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({previews:result});
   });
   app.get('/api/sessions/:id/preview-image',async(req,res)=>{
-    const provider=providerSchema.parse(req.query.provider),s=await session(String(req.params.id),provider);
+    const provider=chatProviderSchema.parse(req.query.provider),s=await session(String(req.params.id),provider);
     const entry=await previews.get(provider,s.sessionId,s.lastModified,()=>previewMessages(provider,s));
     if(!entry.image)throw new HttpError(404,'This chat has no image.');
     if(entry.image.path){
@@ -729,7 +738,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     res.json({name:entry.image.name,mimeType:inline.mimeType,data:inline.data});
   });
   app.get('/api/sessions/:id/generation',async(req,res)=>{
-    const provider=providerSchema.parse(req.query.provider),chat=await session(req.params.id,provider);
+    const provider=chatProviderSchema.parse(req.query.provider),chat=await session(req.params.id,provider);
     const account='account' in chat && typeof chat.account==='string'?chat.account:undefined;
     const matches=engineFor(provider).list().filter(job=>job.sessionId===chat.sessionId&&job.account===account)
       .sort((a,b)=>b.startedAt-a.startedAt);
@@ -740,7 +749,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   });
   const chatPageSync=new ChatPageSync();
   app.get('/api/sessions/:id/messages', async (req, res) => {
-    const provider = providerSchema.parse(req.query.provider);
+    const provider = chatProviderSchema.parse(req.query.provider);
     const s = await session(req.params.id, provider);
     const known=req.query.known===undefined?undefined:z.string().regex(/^[a-f0-9]{64}$/).parse(req.query.known);
     const context=JSON.stringify([provider,s.sessionId,s.cwd,req.query.window,req.query.offset,req.query.end,req.query.from]);
@@ -752,8 +761,8 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       send(await codex().messagePage(s.sessionId, { window, offset: window === undefined ? offset : 0, end, fromStart: req.query.from === 'start' }));
       return;
     }
-    if (provider==='copilot') {
-      const all = await (provider==='copilot'?copilot():codex()).messages(s.sessionId);
+    if (provider==='copilot'||provider==='gemini') {
+      const all = await (provider==='gemini'?gemini():copilot()).messages(s.sessionId);
       if (req.query.window !== undefined) {
         const size = z.coerce.number().int().min(1).max(5000).parse(req.query.window);
         const end = req.query.end === undefined ? all.length : z.coerce.number().int().min(0).parse(req.query.end);
@@ -810,7 +819,7 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
     }));
   });
   app.get('/api/jobs', async (req,res)=>{
-    const provider=providerSchema.parse(req.query.provider);
+    const provider=chatProviderSchema.parse(req.query.provider);
     if(workspaceAccess.current()){res.json([]);return;}
     await taskChains.init();
     const data=await chatLibrary.read(),runs=engineFor(provider).list().filter(job=>visibleRoot(job.cwd));
@@ -829,21 +838,23 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   const jobSettings = z.object({provider:providerSchema, cwd:text, account:uuid.optional(),
       model: z.union([z.literal(''), z.string().regex(modelIdPattern)]).default(''),
       reasoningEffort: z.string().regex(codexEffortPattern).optional(),
-      claudeEffort:z.enum(['low','medium','high','xhigh','max']).optional(),claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema,copilotAccess:z.enum(['full','ask']).optional(), maxBudgetUsd: z.number().min(0.1).max(100).default(5),
+      claudeEffort:z.enum(['low','medium','high','xhigh','max']).optional(),claudeAccess:z.enum(['default','acceptEdits','bypassPermissions']).optional(), mode: z.enum(['default', 'plan']).default('default'), codexAccess: codexAccessSchema,copilotAccess:z.enum(['full','ask']).optional(),geminiAccess:z.enum(['default','auto_edit','yolo']).optional(), maxBudgetUsd: z.number().min(0.1).max(100).default(5),
       approvalTimeoutMinutes: z.union([z.literal(0), z.literal(10), z.literal(60)]).default(0)});
   type JobSettings=z.infer<typeof jobSettings>;
-  function validateJobSettings(body:JobSettings) {
+  const chatJobSettings=jobSettings.extend({provider:chatProviderSchema});
+  type ChatJobSettings=z.infer<typeof chatJobSettings>;
+  function validateJobSettings(body:ChatJobSettings) {
     if (body.provider !== 'codex' && body.reasoningEffort) throw new HttpError(400, 'Reasoning effort is available for Codex chats only.');
     if (body.provider !== 'copilot' && body.copilotAccess) throw new HttpError(400, 'Copilot access is available for Copilot chats only.');
+    if (body.provider !== 'gemini' && body.geminiAccess) throw new HttpError(400, 'Gemini access is available for Gemini chats only.');
     // A custom provider runs the same Claude Code agent with that provider's URL, key and chosen model.
     if (body.account) {
       if (workspaceAccess.current()) throw new HttpError(403, 'Only the host can use custom providers');
       if (body.provider !== 'claude') throw new HttpError(400, 'Custom providers run through the Claude agent');
-      if (!body.model) throw new HttpError(400, 'Choose a model from the provider catalog');
       if (body.claudeEffort) throw new HttpError(400, 'Effort levels are not available for custom providers');
     }
   }
-  async function validateJobEffort(body:JobSettings,cwd:string) {
+  async function validateJobEffort(body:ChatJobSettings,cwd:string) {
     if(body.claudeEffort){
       if(body.provider!=='claude')throw new HttpError(400,'Claude effort is only available for Claude');
       const catalog=await claudeCatalog.read(cwd);
@@ -851,11 +862,26 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       if(catalog.source!=='sdk'||!selected?.reasoningEfforts?.includes(body.claudeEffort))throw new HttpError(400,'This Claude model does not advertise the selected effort. Refresh its model catalog.');
     }
   }
-  async function launchJob(settings:JobSettings,turn:{id:string;cwd:string;text:string;displayText:string;attachmentPaths:string[];sessionId?:string;baseMessageCount:number}) {
+  /**
+   * The model a chat through an API connection answers with: the one it asks for while the connection serves it, otherwise
+   * the one the connection serves now. A local model swapped in Strata, or a chat saved with "Default", keeps working.
+   */
+  async function servedModel(account:string,asked:string){
+    const listed=await customProviders.models(account).catch(()=>[]) as (string|{id:string})[];
+    const ids=listed.map(item=>typeof item==='string'?item:item.id).filter(Boolean);
+    if(asked&&ids.includes(asked))return asked;
+    if(ids.length)return ids[0];
+    const known=(await customProviders.list().catch(()=>[])).find(p=>p.id===account) as {name?:string;url?:string}|undefined;
+    const local=localModels.serving()?.providerId===account||!!known&&(/^strata/i.test(known.name||'')||/\/\/(127\.0\.0\.1|localhost)[:/]/.test(known.url||''));
+    throw new HttpError(409,local?'The local model is not running. Start it in the model menu, then send again.':'This connection lists no models right now. Check it in Settings → Providers.');
+  }
+  async function launchJob(settings:ChatJobSettings,turn:{id:string;cwd:string;text:string;displayText:string;attachmentPaths:string[];sessionId?:string;baseMessageCount:number}) {
+    if(settings.account)settings={...settings,model:await servedModel(settings.account,settings.model||'')};
     const localContext=settings.account?localModels.contextFor(settings.account):undefined;
     const env=settings.account?await customProviders.agentEnv(settings.account,settings.model,process.env,localContext):undefined;
     const input={...settings,...turn,approvalTimeoutMs:settings.approvalTimeoutMinutes*60000,...(env?{env}:{})};
     if(settings.provider==='copilot')return copilot().start({...input,access:settings.copilotAccess});
+    if(settings.provider==='gemini')return gemini().start({...input,access:settings.geminiAccess});
     return engineFor(settings.provider).start(input);
   }
   taskChains=new MarkdownChains({
@@ -1117,11 +1143,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
   app.post('/api/scheduled-tasks/:id/read',async(req,res)=>{personalSchedules();res.json(await scheduled.read(uuid.parse(req.params.id)));});
   app.post('/api/scheduled-tasks/:id/delete',async(req,res)=>{personalSchedules();res.json(await scheduled.remove(uuid.parse(req.params.id)));});
   app.post('/api/jobs', async (req, res) => {
-    const body = jobSettings.extend({id:uuid,sessionId:uuid.optional(),text:z.string().max(100000),attachments:z.array(uuid).max(10).default([]),
+    const body = chatJobSettings.extend({id:uuid,sessionId:uuid.optional(),text:z.string().max(100000),attachments:z.array(uuid).max(10).default([]),
       taskRunId:uuid.optional(),taskRunRevision:z.number().int().positive().optional(),takeoverConfirmed:z.boolean().default(false)}).parse(req.body);
     const cwd=await allowedPath(accessRoots(),body.cwd,true);
     engineFor(body.provider);
     validateJobSettings(body);
+    if(body.provider==='gemini'&&body.taskRunId)throw new HttpError(400,'Task runs use Claude, Codex or Copilot.');
     const replyToRetry=async(existing:ReturnType<typeof allJobs>[number])=>{
       if((existing.provider||'claude')!==body.provider||await realpath(existing.cwd)!==cwd||body.sessionId&&existing.sessionId&&body.sessionId!==existing.sessionId)throw new HttpError(409,'This request identifier belongs to another chat or project.');
       if(body.taskRunId){const run=await taskRuntime!.get(body.taskRunId);if(run.jobId!==existing.id||run.worktree?.cwd!==cwd)throw new HttpError(409,'This request identifier belongs to another task run.');}
@@ -1142,12 +1169,12 @@ export async function createApp(config: Config, jobs = new Jobs(), sdk: SDK = { 
       });
       if (!body.text.trim() && !attached.length) throw new HttpError(400, 'Введите сообщение или прикрепите файл');
       const prompt = body.text + (attached.length ? '\n\nFiles attached by the user (read these local files as needed):\n' + attached.map(f => JSON.stringify(f.path)).join('\n') : '');
-      const baseMessageCount = body.sessionId ? (body.provider === 'copilot' ? (await copilot().messages(body.sessionId)).length : body.provider === 'codex' ? await codex().messageCount(body.sessionId) : (await sdk.getSessionMessages(body.sessionId, { dir: cwd })).length) : 0;
+      const baseMessageCount = body.sessionId ? (body.provider === 'copilot' || body.provider === 'gemini' ? (await (body.provider==='gemini'?gemini():copilot()).messages(body.sessionId)).length : body.provider === 'codex' ? await codex().messageCount(body.sessionId) : (await sdk.getSessionMessages(body.sessionId, { dir: cwd })).length) : 0;
       const raced = allJobs().find(j => j.id === body.id);
       if (raced) { await replyToRetry(raced);return; }
       if(body.taskRunId)guardProject(cwd,body.id);
       if(body.sessionId && (allJobs().some(job=>job.id!==body.id && job.status==='running' && (job.provider||'claude')===body.provider && job.sessionId===body.sessionId) || body.provider==='claude' && terminals.list().some(terminal=>terminal.status==='running' && terminal.sessionId===body.sessionId))) throw new HttpError(409,'This chat is already running. Send a follow-up to its active turn.');
-      const bound=await taskRuntime!.bindJob({...body,cwd});
+      const bound=body.provider==='gemini'?undefined:await taskRuntime!.bindJob({...body,provider:body.provider,cwd});
       try {res.json(await launchJob(body,{id:body.id,cwd,sessionId:body.sessionId,text:prompt,displayText:body.text,attachmentPaths:attached.map(f=>f.path),baseMessageCount}));}
       catch(error){if(bound)await taskRuntime!.runs.observeJob(bound.id,{id:body.id,status:'error',error:'The provider could not start this task. Check its connection and retry.'});throw error;}
     });

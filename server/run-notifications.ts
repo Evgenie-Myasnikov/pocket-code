@@ -7,7 +7,7 @@ import type {JobView} from './types.js';
 import type {RunEvent} from './run-monitor.js';
 
 export type RunNotification = {
-  id:string; provider:'claude'|'codex'|'copilot'; sessionId?:string; jobId?:string;
+  id:string; provider:'claude'|'codex'|'copilot'|'gemini'; sessionId?:string; jobId?:string;
   cwd:string; title:string; status:'done'|'error'|'stopped'|'needs_input'; at:number; version?:string;
 };
 const attention = new Set(['done','error','stopped','needs_input']);

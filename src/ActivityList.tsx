@@ -13,7 +13,7 @@ const groups:{id:ActivityFilter;name:string;statuses:ActivityItem['status'][]}[]
 /** One two-line row per process: title, then provider · project · time; a pill only when the person must act. */
 export function ActivityList({connection,feed,busy,onOpen,filter,onClearFinished}:{connection?:Connection;feed:ActivityFeed;busy?:boolean;onOpen(item:ActivityItem):void;filter?:ActivityFilter;onClearFinished?():void}){
  useLanguage();
- const loaders=useMemo(()=>connection?{claude:new PreviewLoader(connection,'claude',12000),codex:new PreviewLoader(connection,'codex',12000),copilot:new PreviewLoader(connection,'copilot',12000)}:null,[connection?.url,connection?.token]);
+ const loaders=useMemo(()=>connection?{claude:new PreviewLoader(connection,'claude',12000),codex:new PreviewLoader(connection,'codex',12000),copilot:new PreviewLoader(connection,'copilot',12000),gemini:new PreviewLoader(connection,'gemini',12000)}:null,[connection?.url,connection?.token]);
  useEffect(()=>()=>{if(loaders)Object.values(loaders).forEach(loader=>loader.dispose());},[loaders]);
  const shown=groups.filter(group=>!filter||group.id===filter);
  const empty=!feed.items.some(item=>shown.some(group=>group.statuses.includes(item.status)));

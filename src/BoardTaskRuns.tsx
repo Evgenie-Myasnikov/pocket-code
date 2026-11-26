@@ -14,7 +14,8 @@ const providerKey=(root:string)=>'pocket-task-provider:'+root;
 /** The provider last used for this project's tasks, otherwise the one chosen in the app. */
 function defaultProvider(root:string,desktop?:boolean):Provider{
   try{const value=localStorage.getItem(providerKey(root))||(desktop?localStorage.getItem('pocket-desktop-provider'):null);if(value==='claude'||value==='codex'||value==='copilot')return value;}catch{/* Storage can be unavailable. */}
-  return selectedWorkspace();
+  const chosen=selectedWorkspace();
+  return chosen==='gemini'?'claude':chosen;
 }
 /** The chat target for a task run: the full task prompt for a new chat, or a visible follow-up draft. */
 export function taskRunChat(connection:Connection,board:BoardView,note:BoardNote,run:TaskRun,ru:boolean,draft?:string):BoardChat|null{

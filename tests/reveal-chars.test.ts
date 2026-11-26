@@ -1,30 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type {ReactNode} from 'react';
-import {REVEAL_TAIL,revealCharacters,revealWindow} from '../src/reveal-chars';
+import {isValidElement,type ReactElement} from 'react';
+import {revealCharacters} from '../src/reveal-chars';
 
-test('the reveal window never reaches back behind characters already shown',()=>{
-  const first=revealWindow(600-REVEAL_TAIL,600,REVEAL_TAIL);
-  assert.equal(first.tailStart,600-REVEAL_TAIL);assert.equal(first.shown,600);
-  // A stream append animates only the new characters; the older part of the tail stays written.
-  const appended=revealWindow(first.shown,610,REVEAL_TAIL);
-  assert.equal(appended.tailStart,600);assert.equal(appended.shown,610);
-  // Rebuilding the same tail (a paragraph split, a shifted line window, a remount of the block) animates nothing again.
-  assert.equal(revealWindow(appended.shown,610,REVEAL_TAIL).tailStart,610);
-  // A block mounted mid-stream still animates its newest tail once.
-  assert.equal(revealWindow(Math.max(0,1000-REVEAL_TAIL),1000,REVEAL_TAIL).tailStart,1000-REVEAL_TAIL);
-  // A batch larger than the tail animates its newest `tail` characters.
-  assert.equal(revealWindow(100,700,REVEAL_TAIL).tailStart,340);
+const words=(nodes:unknown[])=>nodes.filter(isValidElement) as ReactElement<{className?:string;children:ReactElement<{className:string}>[]}>[];
+
+test('the animated part starts at the beginning of a word, so a word is never split between plain and animated text',()=>{
+  const nodes=revealCharacters('alpha beta',0,8,()=>0);
+  assert.equal(nodes[0],'alpha ');
+  const [beta]=words(nodes);
+  assert.equal(beta.props.children.length,4);
 });
 
-const isElement=(node:ReactNode)=>!!node&&typeof node==='object'&&'props'in(node as any);
+test('a character past its entrance is drawn without animation, a new one with its delay',()=>{
+  const nodes=revealCharacters('ab',0,0,index=>index*10,index=>index===1);
+  const [word]=words(nodes);
+  assert.deepEqual(word.props.children.map(child=>child.props.className),['rc rc-done','rc']);
+});
 
-test('characters before the window are plain text and later ones animate by absolute index',()=>{
-  const nodes=revealCharacters('ab cd',0,3,()=>0);
-  assert.equal(nodes[0],'ab ','characters already written stay plain text');
-  const word=nodes[1] as any;
-  assert.equal(word.props.className,'rc-word');
-  assert.deepEqual(word.props.children.map((span:any)=>[span.key,span.props.className,span.props.children]),[['3','rc','c'],['4','rc','d']]);
-  // The same run rebuilt with the whole text written produces no animated spans at all.
+test('text before the animated part is plain',()=>{
   assert.deepEqual(revealCharacters('ab cd',0,5,()=>0),['ab cd']);
 });

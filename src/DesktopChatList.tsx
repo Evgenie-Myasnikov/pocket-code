@@ -15,7 +15,7 @@ import type {JobView} from '../server/types';
 
 type Target={folder?:string;ids?:string[]};
 type Preview={ids:string[];running:string[];unavailable:string[];failed?:string[];unsupported?:string[];alreadyRemoved?:string[];eraseOriginals?:boolean};
-type Provider='claude'|'codex'|'copilot';
+type Provider='claude'|'codex'|'copilot'|'gemini';
 type Scope={connection:Connection;provider:Provider;account:string};
 const basename=(path:string)=>path.split(/[\\/]/).filter(Boolean).at(-1)||path;
 
@@ -93,7 +93,7 @@ function readFolders():ChatFolder[]{
 }
 function writeFolders(folders:ChatFolder[]){try{localStorage.setItem(FOLDERS,JSON.stringify(folders));}catch{/* The folders still hold until the window closes. */}}
 const CHAT_DRAG='application/x-pocket-chat',FOLDER_DRAG='application/x-pocket-folder';
-const providerNames:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'Copilot'};
+const providerNames:Record<Provider,string>={claude:'Claude',codex:'Codex',copilot:'Copilot',gemini:'Gemini'};
 type Props={
   /** Chats of every provider, newest first; each carries its provider. */
   sessions:Session[];jobs:Map<string,JobView>;focusId?:string;actionId?:string;connection:Connection;provider:Provider;
@@ -146,7 +146,7 @@ export function DesktopChatList({sessions:allSessions,jobs,focusId,actionId,load
   // The open chat is always rendered, even when it is older than the first page.
   const focusIndex=focusId?sessions.findIndex(s=>s.sessionId===focusId):-1;
   const shown=sessions.slice(0,Math.max(limit,focusIndex+1)),hidden=sessions.length-shown.length;
-  const laneOf=(s:Session):Provider=>s.provider==='codex'||s.provider==='copilot'||s.provider==='claude'?s.provider:provider;
+  const laneOf=(s:Session):Provider=>s.provider==='codex'||s.provider==='copilot'||s.provider==='gemini'||s.provider==='claude'?s.provider:provider;
   const rows=()=>Array.from(tree.current?.querySelectorAll<HTMLButtonElement>('.desktop-sessions > button[data-chat-id]')||[]);
   useEffect(()=>{
     if(!marked.size)return;

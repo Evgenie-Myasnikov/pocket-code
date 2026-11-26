@@ -1,0 +1,13 @@
+/* The loaded local model, at the foot of the rail (as in Strata). */
+.local-model-card{display:flex;align-items:center;gap:12px;width:100%;margin:8px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.local-model-card:hover{background:color-mix(in srgb,var(--text) 8%,var(--surface))}
+.local-model-card>span:last-child{display:flex;flex-direction:column;min-width:0}
+.local-model-card strong{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:calc(13px * var(--ui-scale,1));font-weight:var(--fw-semibold,600)}
+.local-model-card small{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted);font-size:calc(12px * var(--ui-scale,1))}
+.local-model-card-icon{position:relative;display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:9px;background:var(--panel);color:var(--muted)}
+.local-model-card-icon>i{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;background:var(--muted);box-shadow:0 0 0 2px var(--surface)}
+.local-model-card[data-state=loaded] .local-model-card-icon{color:var(--text)}
+.local-model-card[data-state=loaded] .local-model-card-icon>i{background:var(--success-fg,var(--diff-add-fg))}
+.local-model-card:is([data-state=starting],[data-state=stopping]) .local-model-card-icon>i{background:var(--warning-fg,var(--accent));animation:local-model-pulse 1.2s ease-in-out infinite}
+@keyframes local-model-pulse{50%{opacity:.4}}
+@media(prefers-reduced-motion:reduce){.local-model-card-icon>i{animation:none!important}}

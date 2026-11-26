@@ -2,9 +2,12 @@ import type {Connection} from './api';
 import type {BoardChat} from './WorkBoards';
 import type {WorkspaceProvider} from './preferences';
 
-type Conversation={version:1;generation:string;provider:WorkspaceProvider;sessionId?:string;jobId?:string};
+/** Board discussions run with Claude, Codex or Copilot; with Gemini chosen a board chat uses Claude. */
+type BoardProvider=Exclude<WorkspaceProvider,'gemini'>;
+export const boardProvider=(provider:WorkspaceProvider):BoardProvider=>provider==='gemini'?'claude':provider;
+type Conversation={version:1;generation:string;provider:BoardProvider;sessionId?:string;jobId?:string};
 export type BoardConversationRef={key:string;generation:string};
-export type SharedConversation={provider:WorkspaceProvider;sessionId:string};
+export type SharedConversation={provider:BoardProvider;sessionId:string};
 /**
  * The PC keeps which chat is a board's current discussion, so the desktop window and every phone resume the same
  * conversation instead of each device starting its own. `undefined` from read means the host cannot say (older host,
@@ -12,7 +15,7 @@ export type SharedConversation={provider:WorkspaceProvider;sessionId:string};
  */
 export type BoardConversationHost={read(root:string,boardId:string,lane?:string):Promise<SharedConversation|null|undefined>;write(root:string,boardId:string,value:SharedConversation|null,lane?:string):Promise<void>};
 /** A board keeps one chat per provider lane (a provider, or a custom provider account), so picking another provider opens that provider's board chat instead of switching back. */
-export function boardChatLane(provider:WorkspaceProvider,account=''){return provider+(provider==='claude'&&account?':'+account:'');}
+export function boardChatLane(chosen:WorkspaceProvider,account=''){const provider=boardProvider(chosen);return provider+(provider==='claude'&&account?':'+account:'');}
 const prefix='pocket-board-conversation-v1:';
 export function readBoardConversation(key:string):Conversation|null{
  if(!key.startsWith(prefix))return null;
@@ -20,7 +23,8 @@ export function readBoardConversation(key:string):Conversation|null{
  try{const value=JSON.parse(raw);return value?.version===1&&typeof value.generation==='string'&&/^[a-f0-9-]{36}$/.test(value.generation)&&['claude','codex','copilot'].includes(value.provider)&&[value.sessionId,value.jobId].every(id=>id===undefined||typeof id==='string'&&id.length>0&&id.length<=512)?value:null;}catch{return null;}
 }
 export function currentBoardConversation(ref:BoardConversationRef){try{return readBoardConversation(ref.key)?.generation===ref.generation;}catch{return false;}}
-export function attachBoardConversation(ref:BoardConversationRef,provider:WorkspaceProvider,sessionId?:string,jobId?:string){
+export function attachBoardConversation(ref:BoardConversationRef,chosen:WorkspaceProvider,sessionId?:string,jobId?:string){
+ const provider=boardProvider(chosen);
  const prior=readBoardConversation(ref.key);if(!prior||prior.generation!==ref.generation||(prior.provider!==provider&&(prior.sessionId||prior.jobId))||prior.sessionId&&sessionId&&prior.sessionId!==sessionId||!prior.sessionId&&prior.jobId&&jobId&&prior.jobId!==jobId)return false;
  const value={...prior,provider,...(sessionId?{sessionId}:{}),...(jobId?{jobId}:{})};localStorage.setItem(ref.key,JSON.stringify(value));return true;
 }
@@ -31,7 +35,8 @@ async function conversationKey(connection:Connection,target:Pick<BoardChat,'root
 }
 const prepared=(target:BoardChat,key:string,value:Conversation):BoardChat=>({...target,conversation:{key,generation:value.generation},resumeJobId:value.jobId,note:{...target.note,chat:value.sessionId||value.jobId?{provider:value.provider,sessionId:value.sessionId||'pending-'+value.jobId}:undefined}});
 /** Device storage holds the association; the host, when it can, says which chat every device should resume. */
-export async function prepareBoardConversation(connection:Connection,target:BoardChat,provider:WorkspaceProvider,replace=false,host?:BoardConversationHost,account=''):Promise<BoardChat>{
+export async function prepareBoardConversation(connection:Connection,target:BoardChat,chosen:WorkspaceProvider,replace=false,host?:BoardConversationHost,account=''):Promise<BoardChat>{
+ const provider=boardProvider(chosen);
  if(!target.context)return target;
  const lane=boardChatLane(provider,account),key=await conversationKey(connection,target,lane);let prior=readBoardConversation(key);
  // A chat of another provider stored under this lane (single-chat era) is not this provider's chat.
@@ -47,7 +52,8 @@ export async function prepareBoardConversation(connection:Connection,target:Boar
  return prepared(target,key,value);
 }
 /** A board discussion opened from the chat list becomes the board's current chat: what is written there is what the board shows next time. */
-export async function adoptBoardConversation(connection:Connection,target:BoardChat,provider:WorkspaceProvider,sessionId:string,host?:BoardConversationHost,account=''):Promise<BoardChat>{
+export async function adoptBoardConversation(connection:Connection,target:BoardChat,chosen:WorkspaceProvider,sessionId:string,host?:BoardConversationHost,account=''):Promise<BoardChat>{
+ const provider=boardProvider(chosen);
  if(!target.context)return target;
  const lane=boardChatLane(provider,account),key=await conversationKey(connection,target,lane),prior=readBoardConversation(key);
  const value:Conversation=prior&&prior.sessionId===sessionId&&prior.provider===provider?prior:{version:1,generation:crypto.randomUUID(),provider,sessionId};

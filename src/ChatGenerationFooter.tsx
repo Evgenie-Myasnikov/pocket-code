@@ -12,7 +12,7 @@ const positive=(value:unknown):value is number=>typeof value==='number'&&Number.
 const count=(value:unknown):value is number=>positive(value)&&Number.isSafeInteger(value);
 
 export function ChatGenerationFooter({connection,provider,account,sessionId,job}:{
-  connection:Connection;provider:'claude'|'codex'|'copilot';account?:string;sessionId?:string;job:JobView|null|undefined;
+  connection:Connection;provider:'claude'|'codex'|'copilot'|'gemini';account?:string;sessionId?:string;job:JobView|null|undefined;
 }){
   const ru=useLanguage()==='ru',locale=ru?'ru':'en';
   const [record,setRecord]=useState<GenerationMetrics>();

@@ -13,7 +13,7 @@ import {ChatHistorySkeleton} from './ChatHistorySkeleton';
 import {ThreadPrimitive} from '@assistant-ui/react';
 import {matchingBoardSelection,type BoardSelection} from './board-selection-context';
 import {boardImageMime,boardImageFile,takeBoardImageDrag,takeQueuedBoardImages,type BoardImage} from './board-image-drag';
-import {prepareBoardConversation,attachBoardConversation,currentBoardConversation,boardChatLane} from './board-conversation';
+import {prepareBoardConversation,attachBoardConversation,currentBoardConversation,boardChatLane,boardProvider} from './board-conversation';
 import {boardConversationHost} from './board-conversation-host';
 import {captureTextAnchor,restoreTextAnchor} from './chat-text-anchor';
 import {chatHistoryRequest,readHistoryView,writeHistoryView,recentTranscript,rememberTranscript,transcriptScope,legacyTranscriptScope} from './chat-history-cache';
@@ -125,6 +125,8 @@ type ProviderInfo = {id: WorkspaceProvider;name: string;available: boolean;authe
 /** The provider list a PC reported last: a chat opened later can be written to at once instead of waiting for the next check. */
 const knownProviders=new Map<string,ProviderInfo[]>();
 const defaultProviders=():ProviderInfo[]=>[{id:'claude',name:'Claude',available:true}];
+/** Task chains run with the three agent providers; Gemini works in chats. */
+const taskProviders:readonly WorkspaceProvider[]=['claude','codex','copilot'];
 type Attachment = DraftAttachment;
 export type ChatDraft = {text: string;attachments: Attachment[];};
 type RejectedDraft = ChatDraft & {restored: boolean;};
@@ -159,7 +161,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const warm=embedded&&desktopHealth.has(embedded.connection)&&desktopScope.has(embedded.connection)?embedded.connection:null;
   const [providers, setProviders] = useState<ProviderInfo[]>(()=>embedded&&knownProviders.get(embedded.connection.url)||defaultProviders());
   const providerInfo = providers.find(item => item.id === provider);
-  const engineName = provider==='copilot'?'Copilot':provider === 'codex' ? 'Codex' : 'Claude';
+  const engineName = provider==='gemini'?'Gemini':provider==='copilot'?'Copilot':provider === 'codex' ? 'Codex' : 'Claude';
 
   const [cacheScope,setCacheScope]=useState(()=>warm?desktopScope.get(warm)!:'');
   const connectEpoch=useRef(0);
@@ -263,7 +265,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   const [notificationTarget,setNotificationTarget]=useState<(WatchedChat & {account?:string})|null>(null);
   useRunNotifications(demo||connection?.workspaceId?null:connection,locale().startsWith('ru')?'ru':'en',false,!!embedded?.taskDrawer);
   useChatNotifications(connection,demo?null:tab==='chats'?(mobileChat&&(selected||job)?{provider,sessionId:job?.sessionId||selected?.sessionId,jobId:job?.id,cwd,title:selected?.customTitle||selected?.summary||engineName}:null):undefined,locale().startsWith('ru')?'ru':'en',chat=>{
-    if(chat.provider!=='claude'&&chat.provider!=='codex'&&chat.provider!=='copilot')return;
+    if(chat.provider!=='claude'&&chat.provider!=='codex'&&chat.provider!=='copilot'&&chat.provider!=='gemini')return;
     setNotificationTarget(chat);setProvider(chat.provider);
   },!!embedded?.taskDrawer,openTasks);
   useEffect(()=>{
@@ -374,7 +376,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
   /** stored: the chat is being left, so the message goes into its saved draft rather than the visible field. */
   function releasePending(stored=false){const pending=pendingSend;if(!pending)return;setPendingSend(null);mergeDraft(pending.key,pending.text,pending.attachments,stored);}
   // Settings hold the device default; the composer chip overrides it for this chat only.
-  const defaultAccess:AccessMode=provider==='claude'?claudeAccess:provider==='codex'?codexAccess:'default';
+  const defaultAccess:AccessMode=provider==='claude'?claudeAccess:provider==='codex'?codexAccess:provider==='gemini'?'acceptEdits':'default';
   const chatAccess:AccessMode=accessChoices[currentDraftKey()]??defaultAccess;
   async function changeAccess(value:AccessMode){
     const key=currentDraftKey();setAccessChoices(old=>({...old,[key]:value}));
@@ -670,7 +672,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     }catch(e){if((e as {status?:number}).status===428)setWorkspacePasswordRequest(c);setError((e as Error).message);}finally{setBusy(false);}
   }
   useEffect(()=>{if(!boardChat?.conversation||!job)return;try{// The host learns the board's current chat as soon as its session exists, so other devices resume this one.
-      if(attachBoardConversation(boardChat.conversation,provider,job.sessionId,job.id)&&boardChat.context&&connection&&job.sessionId&&!job.sessionId.startsWith('pending-'))void boardConversationHost(connection).write(boardChat.root,boardChat.boardId,{provider,sessionId:job.sessionId},boardChatLane(provider,account));}catch{setError(t('Не удалось сохранить привязку чата доски.'));}},[boardChat?.conversation?.key,boardChat?.conversation?.generation,provider,job?.id,job?.sessionId]);
+      if(attachBoardConversation(boardChat.conversation,provider,job.sessionId,job.id)&&boardChat.context&&connection&&job.sessionId&&!job.sessionId.startsWith('pending-'))void boardConversationHost(connection).write(boardChat.root,boardChat.boardId,{provider:boardProvider(provider),sessionId:job.sessionId},boardChatLane(provider,account));}catch{setError(t('Не удалось сохранить привязку чата доски.'));}},[boardChat?.conversation?.key,boardChat?.conversation?.generation,provider,job?.id,job?.sessionId]);
   useEffect(()=>{if(embedded&&!embedded.session&&job?.sessionId&&(!boardChat?.conversation||currentBoardConversation(boardChat.conversation)))embedded.onCreated?.({sessionId:job.sessionId,cwd:job.cwd,summary:job.messages.find(m=>m.role==='user')?.blocks.find(b=>b.type==='text')?.text||'New',lastModified:job.startedAt,...(job.account?{account:job.account}:{})},job);},[job?.sessionId]);
   const embeddedTarget=embedded?.session?.sessionId||'new:'+embedded?.cwd;
   const embeddedOpened=useRef<string|null>(null);
@@ -698,7 +700,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       try {
         const list = await request<ProviderInfo[]>(connection!, '/providers');
         if (!cancelled && Array.isArray(list)) {
-          const known=list.filter(item => item.id === 'claude' || item.id === 'codex'||item.id==='copilot');
+          const known=list.filter(item => item.id === 'claude' || item.id === 'codex'||item.id==='copilot'||item.id==='gemini');
           // A provider whose check has not finished yet is asked again shortly; it never replaces a state the PC already confirmed.
           const checking=known.some(item=>(item as {access?:string}).access==='checking');
           const previous=knownProviders.get(connection!.url);
@@ -1050,6 +1052,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
     const timeout=approvalTimeout(composerPreferences);
     const common={provider,cwd,mode:'default',...(timeout?{approvalTimeoutMinutes:timeout}:{})};
     if(provider==='copilot')return {...common,model:model||'auto'};
+    if(provider==='gemini')return {...common,model,mode:chatAccess==='plan'?'plan':'default',...(chatAccess==='plan'?{}:{geminiAccess:chatAccess==='bypassPermissions'?'yolo':chatAccess==='default'?'default':'auto_edit'})};
     if(provider==='codex')return {...common,
       model:codexEffort.options.length?codexEffort.modelId||model:model,
       codexAccess:chatAccess as CodexAccess,reasoningEffort:codexEffort.value||codexEffort.defaultValue||undefined};
@@ -1332,7 +1335,7 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
           Keep it inside the desktop shell to inherit its resizable sidebar width. */}
       {!docked&&reviewOpen && tab==='chats' && (!embedded||embedded.visible!==false) && connection && reviewCwd && createPortal(<Review key={reviewContext} connection={connection} cwd={reviewCwd} taskRunId={taskRun?.id} initialMode={availableReview?.mode} onlyPaths={reviewPaths} onQuote={quoteToDraft} onClose={()=>{setReviewOpen(false);setReviewPaths(undefined);}}/>,document.querySelector('.desktop-app')||document.body)}
       {taskPanel&&taskRun&&connection&&<TaskRunPanel key={taskRun.id} connection={connection} initial={taskRun} onClose={()=>setTaskPanel(false)} onChat={(_run,followUp)=>{setTaskPanel(false);if(followUp)appendDraft(followUp);}} onBoard={target=>{if(embedded?.onBoard)embedded.onBoard(target);else{setNoticeTarget(target);setLocalBoards(true);setTab('workspace');}}}/>}
-      {!docked&&agentPanel && connection && parentChatId && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
+      {!docked&&agentPanel && connection && parentChatId && provider!=='gemini' && <Subagents key={`${provider}-${parentChatId}`} connection={connection} provider={provider} parentId={parentChatId} initialAgent={agentPanel.initial} initialAgentId={agentPanel.initial?.id} onClose={()=>setAgentPanel(null)}/>}
       {!docked&&outputsOpen && connection && <ChatOutputs provider={provider} sessionId={parentChatId||undefined} key={`${provider}:${parentChatId||cwd}`} connection={connection} cwd={cwd} messages={outputMessages} onClose={()=>setOutputsOpen(false)} hasMore={hasMore!==null&&historyWindow.current<5000} loadingMore={loadingOlder} onLoadMore={()=>void extendHistory()} />}
       {docked&&activePreview&&connection&&embedded?.visible!==false&&<ChatSidePanel tabs={sideTabs} active={activePreview.id} expanded={sideExpanded} onSelect={setPreview} onExpand={()=>setSideExpanded(value=>!value)} onClose={closeSide} onCloseTab={closePreview} onRefresh={()=>setPreviewRevision(value=>value+1)}>
         <FileWithChanges key={activePreview.id} change={activePreview.change}><FilePreview docked connection={connection} root={activePreview.root} path={activePreview.path} scoped revision={previewRevision} onClose={()=>closePreview(activePreview.id)}/></FileWithChanges>
@@ -1363,12 +1366,12 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
       </ChatOverlay>
       {contentTab === 'tasks' ? <TasksPage key={JSON.stringify([cacheScope,provider,account,taskCwd,embedded?.tasksPage?.initialId||taskChainId])}
         initialId={embedded?embedded.tasksPage?.initialId:taskChainId} controls={chainControls}
-        improveScope={chainControls&&connection?{connection,cwd:taskCwd,provider}:undefined}
+        improveScope={chainControls&&connection&&provider!=='gemini'?{connection,cwd:taskCwd,provider}:undefined}
         onPrepareDraft={connection&&!busy&&!uploading?prepareTaskDraft:undefined} maxDraftLength={taskFileRoom?1024*1024:taskTextRoom}
         unavailable={!connection||demo||connection.workspaceId?t('Подключитесь к ПК в настройках'):undefined}
         scopePicker={connection&&!demo&&!connection.workspaceId&&<div className="tasks-scope">
           {/* The PC window chooses the provider and model here with the same menu as the chat header. */}
-          {docked?<HeaderModelMenu connection={connection} provider={provider} onProvider={value=>{rememberDraft();setTaskProject(taskCwd);setTaskChainId(undefined);(embedded?.onTaskProvider||setProvider)(value);}} models={(account?customModels.models:provider==='claude'?claudeCatalog.models:providerInfo?.models)||[]} model={account?customModels.model:model} onModel={account?customModels.setModel:setModel} onManage={()=>embedded?.onOpenSettings?.('providers')} disabled={busy||uploading}/>
+          {docked?<HeaderModelMenu connection={connection} provider={provider} providers={taskProviders} onProvider={value=>{rememberDraft();setTaskProject(taskCwd);setTaskChainId(undefined);(embedded?.onTaskProvider||setProvider)(value);}} models={(account?customModels.models:provider==='claude'?claudeCatalog.models:providerInfo?.models)||[]} model={account?customModels.model:model} onModel={account?customModels.setModel:setModel} onManage={()=>embedded?.onOpenSettings?.('providers')} disabled={busy||uploading}/>
           :<ProviderPicker connection={connection} value={provider} onChange={value=>{rememberDraft();setTaskProject(taskCwd);setTaskChainId(undefined);(embedded?.onTaskProvider||setProvider)(value);}} disabled={busy||uploading}/>}
           {/* Any folder the AI works in, not only a Git project. */}
           <div className="project-folder-field"><span>{t('Рабочая папка')}</span>
@@ -1416,13 +1419,13 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
         <div className="composer-area" hidden={planned||undefined}>{boardChat?.context&&<div className="board-context-chip">{boardChat.context.name}</div>}{plan&&!readingMode&&(running||plan.some(item=>item.status!=='completed'))&&<PlanBar items={plan}/>}
           {!readingMode&&<OutboxShelf items={outbox} busy={busy}/>}
           {/* Only lost contact needs a notice here; action details stay in the transcript. */}
-          {running&&job&&runUnknown&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)&&!runUnknown} lostAt={runUnknown?runLost??jobContact.current.at:undefined}/>}{!error&&connection&&!demo&&!readingMode&&!job?.approvals.length&&<LimitAlert provider={provider} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}{error &&<div className="error-banner" role="alert">{t(error)}{!embedded&&t(error)===t(budgetRangeMessage)&&<button className="text-button" onClick={()=>{setError('');setSettingsSubpage('access');setSettingsPage('workspace');setTab('settings');setMobileChat(true);}}>{t('Открыть настройки бюджета')}</button>}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
+          {running&&job&&runUnknown&&!job.approvals.length&&!readingMode&&<RunningAction job={job} stopping={stopping} stopHint={Boolean(embedded)&&!runUnknown} lostAt={runUnknown?runLost??jobContact.current.at:undefined}/>}{!error&&connection&&!demo&&!readingMode&&!job?.approvals.length&&provider!=='gemini'&&<LimitAlert provider={provider} onOpen={()=>{setSettingsPage('usage');setTab('settings');setMobileChat(true);}}/>}{error &&<div className="error-banner" role="alert">{t(error)}{!embedded&&t(error)===t(budgetRangeMessage)&&<button className="text-button" onClick={()=>{setError('');setSettingsSubpage('access');setSettingsPage('workspace');setTab('settings');setMobileChat(true);}}>{t('Открыть настройки бюджета')}</button>}<button aria-label={t("Закрыть ошибку")} className="icon-button" onClick={() => setError('')}><X size={14} /></button></div>}
           {(rejectedDraft || job?.errorCode==='codex_thread_busy') && <div className="error-banner" role="alert"><p>{t(codexBusyMessage)}</p>{rejectedDraft && <><p>{rejectedDraft.restored?t("Сообщение и вложения возвращены в черновик. Нажмите «Отправить», когда чат освободится на ПК."):t("Новый черновик сохранён. Неотправленное сообщение и вложения можно добавить к нему.")}</p>{!rejectedDraft.restored && <button className="secondary" disabled={busy||running||uploading} onClick={addRejectedDraft}>{t("Добавить неотправленное сообщение в черновик")}</button>}</>}</div>}
           {!readingMode&&!planned&&(()=>{const folder=!selected&&!job&&!taskRun&&!boardChat?.context?{
               label:language==='ru'?'Папка чата':'Chat folder',value:cwd,paths:projects||health.roots,disabled:busy||uploading||demo,
               onChange:(root:string)=>{void api('/chat-library/projects',{cwd:root}).then(()=>{projectChosen.current=true;setCwd(root);window.dispatchEvent(new Event('pocket-chat-project-added'));}).catch(e=>setError(e.message));}
             }:undefined;return folder?<FolderChip {...folder}/>:null;})()}
-          <ChatComposer improveScope={connection&&!connection.workspaceId&&!demo&&cwd?{connection,cwd,provider}:undefined} scopeKey={JSON.stringify([cacheScope,account,provider,cwd,job?.sessionId||selected?.sessionId,tab,embedded?.visible])} onRevealBoardSelection={id=>{const selection=matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId);if(!selection?.ids.includes(id))return;const target={boardId:selection.boardId,root:selection.root,objectId:id,requestId:Date.now()};if(embedded)embedded.onRevealBoardSelection?.(target);else{setBoardReveal(target);setTab('workspace');setMobileChat(true);}}} boardSelection={matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)} text={draft} onText={setDraft} label={t("Сообщение {0}",engineName)}
+          <ChatComposer improveScope={connection&&!connection.workspaceId&&!demo&&cwd&&provider!=='gemini'?{connection,cwd,provider}:undefined} scopeKey={JSON.stringify([cacheScope,account,provider,cwd,job?.sessionId||selected?.sessionId,tab,embedded?.visible])} onRevealBoardSelection={id=>{const selection=matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId);if(!selection?.ids.includes(id))return;const target={boardId:selection.boardId,root:selection.root,objectId:id,requestId:Date.now()};if(embedded)embedded.onRevealBoardSelection?.(target);else{setBoardReveal(target);setTab('workspace');setMobileChat(true);}}} boardSelection={matchingBoardSelection(embedded?embedded.boardSelection:boardSelection,connection,cwd,boardChat?.boardId)} text={draft} onText={setDraft} label={t("Сообщение {0}",engineName)}
             placeholder={demo?t("Подключите ПК, чтобы отправлять сообщения"):t("Что нужно сделать?")}
             disabled={demo||selected?.readOnly||boardMissing||Boolean(embedded&&readyChatTarget!==embeddedTarget)} uploading={uploading} busy={busy} stopping={stopping}
             mode={canQueue?'later':running?provider==='codex'?'steer':'queue':'send'} blockedReason={unreachable&&!canQueue&&!demo&&connection?t('Нет связи с ПК · черновик сохранится'):undefined} enterSends={enterSendsPreference(composerPreferences,Boolean(embedded))} keyHint={Boolean(embedded)}
@@ -1430,8 +1433,8 @@ function WorkspaceApp({onDisconnect,embedded}: {onDisconnect():void;embedded?:Em
             onBoardImage={connection&&boardChat?.context?data=>{const image=takeBoardImageDrag(data,connection,cwd);if(image)uploadBoardImages([image]);else setError(t('Это изображение относится к другой доске или подключению.'));}:undefined}
             attachments={attachments} onRemove={id=>{boardImageLoads.current.delete(id);setAttachments(old=>old.filter(a=>a.id!==id));}} onFiles={(files,options)=>upload(files,options)} onRetry={retryUpload} onInsertText={id=>void insertPastedText(id)} onRecall={recallLast} onSend={()=>void send()}
             stopLabel={runUnknown?t("Повторить связь"):t("Остановить {0}",engineName)} stopRetry={runUnknown} onStop={running?runUnknown?()=>retryNow():()=>void stopRun():undefined}
-            controls={<>{!docked&&embedded?.onProvider&&!selected&&!job&&!taskRun&&!boardChat?.context&&<ProviderPicker connection={connection||undefined} value={provider} onChange={embedded.onProvider} disabled={busy||uploading}/>}{(provider==='claude'||provider==='codex')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}{docked?null:account?<ModelPicker provider="custom" name={engineName} models={customModels.models} value={customModels.model} onChange={customModels.setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>:<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>}{(provider==='codex'||provider==='claude'&&!account)&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
-            usage={connection&&!demo&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||claudeDefaultModel)).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']}/>}/>
+            controls={<>{!docked&&embedded?.onProvider&&!selected&&!job&&!taskRun&&!boardChat?.context&&<ProviderPicker connection={connection||undefined} value={provider} onChange={embedded.onProvider} disabled={busy||uploading}/>}{(provider==='claude'||provider==='codex'||provider==='gemini')&&<AccessModeChip provider={provider} value={chatAccess} onChange={value=>void changeAccess(value)} running={running} liveChange={provider==='claude'} disabled={demo||Boolean(selected?.readOnly)}/>}{docked?null:account?<ModelPicker provider="custom" name={engineName} models={customModels.models} value={customModels.model} onChange={customModels.setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>:<ModelPicker provider={provider} name={engineName} models={provider==='claude'?claudeCatalog.models:providerInfo?.models} value={model} onChange={setModel} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined} unavailable={provider==='claude'&&claudeCatalog.unavailable}/>}{(provider==='codex'||provider==='claude'&&!account)&&<EffortPicker provider={engineName} {...(provider==='claude'?claudeEffort:codexEffort)} disabled={busy||running||uploading||selected?.readOnly} disabledHint={running?t('Модель можно сменить после хода'):undefined}/>}</>}
+            usage={connection&&!demo&&provider!=='gemini'&&<UsageIndicator key={provider+connection.url+connection.token} connection={connection} provider={provider} models={[...(provider==='claude'?claudeCatalog.models.filter(item=>item.id===(model||claudeDefaultModel)).flatMap(item=>[item.id,item.name,item.resolvedModel||'']):[]),model||(provider==='claude'?'sonnet':providerInfo?.models?.find(item=>item.isDefault||providerInfo.models?.length===1)?.id||''),providerInfo?.models?.find(item=>item.id===model||!model&&(item.isDefault||providerInfo.models?.length===1))?.name||'']}/>}/>
           {!readingMode&&!planned&&connection&&!demo&&<ChatGenerationFooter key={JSON.stringify([connection.url,connection.token,provider,account,selected?.sessionId])} connection={connection} provider={provider} account={account} sessionId={selected?.sessionId} job={job}/>}
         </div></ChatOverlay>
       </>}

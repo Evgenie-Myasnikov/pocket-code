@@ -1,4 +1,4 @@
-export type SubagentView = { id: string; name: string; status: 'running' | 'completed' | 'error' | 'stopped' | 'unknown'; prompt?: string; result?: string; sessionId?: string; provider: 'claude' | 'codex' | 'copilot' };
+export type SubagentView = { id: string; name: string; status: 'running' | 'completed' | 'error' | 'stopped' | 'unknown'; prompt?: string; result?: string; sessionId?: string; provider: 'claude' | 'codex' | 'copilot' | 'gemini' };
 export type Block = { type: string; attachmentPath?: string; agent?: SubagentView; text?: string; name?: string; input?: unknown; content?: unknown; id?: string; tool_use_id?: string; thinking?: string; is_error?: boolean; title?: string; source?: { type?: string; media_type?: string; data?: string; url?: string; text?: string }; data?: string; mimeType?: string };
 export type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; blocks: Block[] };
 /** In-flight provider-supplied file input. Content may be a bounded tail; counts describe all text received. */
@@ -11,7 +11,7 @@ export type ApprovalDecision = { allow: boolean; answers?: Record<string, string
 export type QueuedInput = { id: string; text: string; attachments: number };
 export type ActivityItem = {
   taskChat?:boolean;
-  id: string; provider: 'claude' | 'codex' | 'copilot'; cwd: string; sessionId?: string; title: string;
+  id: string; provider: 'claude' | 'codex' | 'copilot' | 'gemini'; cwd: string; sessionId?: string; title: string;
   status: 'running' | 'needs_input' | 'done' | 'error' | 'stopped'; startedAt: number; version: string;
   /** For completed jobs only: the latest assistant message that must actually be viewed before acknowledging from history. */
   resultMessageId?: string;
@@ -41,7 +41,7 @@ export type JobView = {
   heldFor?:'local-model';
   /** Claude's current permission mode; a running turn can change it. */
   permissionMode?:'default'|'acceptEdits'|'bypassPermissions'|'plan';
-  provider?: 'claude' | 'codex' | 'copilot';
+  provider?: 'claude' | 'codex' | 'copilot' | 'gemini';
   /** Custom provider whose URL and key this Claude agent task runs with. */
   account?: string;
   id: string; cwd: string; sessionId?: string; status: 'running' | 'done' | 'error' | 'stopped';

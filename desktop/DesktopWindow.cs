@@ -33,7 +33,7 @@ public static class DesktopRunAlertBatch {
     static string Field(Dictionary<string,object> item,string name){object value;return item.TryGetValue(name,out value)?Convert.ToString(value):"";}
     static IEnumerable<string> ChatKeys(Dictionary<string,object> item){
         string provider=Field(item,"provider");
-        if(provider!="claude"&&provider!="codex"&&provider!="copilot")yield break;
+        if(provider!="claude"&&provider!="codex"&&provider!="copilot"&&provider!="gemini")yield break;
         foreach(string field in new[]{"sessionId","jobId"}){
             string id=Field(item,field);
             if(id!="")yield return provider+":"+field+":"+id;
@@ -78,7 +78,7 @@ public static class DesktopRunAlertBatch {
         foreach(object raw in events){
             var item=raw as Dictionary<string,object>;if(item==null)continue;
             string identity=Field(item,"id");if(identity==""||!seen.Add(identity))continue;retained.Add(identity);
-            if(!baseline&&!Suppressed(preferences,item)&&Regex.IsMatch(Field(item,"provider"),@"^(claude|codex|copilot)$")&&Regex.IsMatch(Field(item,"status"),@"^(done|error|stopped|needs_input)$"))waiting.Add(item);
+            if(!baseline&&!Suppressed(preferences,item)&&Regex.IsMatch(Field(item,"provider"),@"^(claude|codex|copilot|gemini)$")&&Regex.IsMatch(Field(item,"status"),@"^(done|error|stopped|needs_input)$"))waiting.Add(item);
         }
         preferences.NotificationCursor=Convert.ToInt64(body["now"]);
         if(preferences.RunAlertMutes!=null)foreach(string key in new List<string>(preferences.RunAlertMutes.Keys))
@@ -357,15 +357,15 @@ public sealed class PocketDesktop:Form {
                 result=new{chat=pendingChat};pendingChat=null;
             }else if(action=="provider-logout"){
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"";
-                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$"))throw new InvalidOperationException("Invalid provider.");
+                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot|gemini)$"))throw new InvalidOperationException("Invalid provider.");
                 result=await Send(reader,"/provider-connections/"+provider+"/logout",true);
             }else if(action=="provider-login-cancel"){
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"";
-                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$"))throw new InvalidOperationException("Invalid provider.");
+                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot|gemini)$"))throw new InvalidOperationException("Invalid provider.");
                 result=await Send(reader,"/provider-connections/"+provider+"/login/cancel",true);
             }else if(action=="provider-login"){
                 string provider=message.ContainsKey("provider")?message["provider"] as string:"",method=message.ContainsKey("method")?message["method"] as string:"";
-                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot)$")||!Regex.IsMatch(method??"",@"^(browser|console|sso|device|key|token|accessToken)$"))throw new InvalidOperationException("Invalid sign-in method.");
+                if(preview||!Regex.IsMatch(provider??"",@"^(claude|codex|copilot|gemini)$")||!Regex.IsMatch(method??"",@"^(browser|console|sso|device|key|token|accessToken)$"))throw new InvalidOperationException("Invalid sign-in method.");
                 result=await Send(reader,"/provider-connections/"+provider+"/login/"+method,true);
             }else if(action=="write"){
                 string endpoint=message.ContainsKey("endpoint")?message["endpoint"] as string:null;

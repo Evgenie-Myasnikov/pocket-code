@@ -195,3 +195,16 @@ test('a plan chat opens at once after it is made, before its first run, and its 
   await expect(page.locator('.plan-chat-empty')).toContainText('No run yet. The first run starts');
   await expect(page.locator('.composer-area')).toBeHidden();
 });
+
+test('a plan chat whose last run failed before it had a chat opens and says why',async({page})=>{
+ await page.addInitScript(()=>{
+  const w=window as any;w.scheduledCalls=[];
+  w.scheduledTasks=[{id:'44444444-4444-4444-8444-444444444444',name:'Morning brief',prompt:'Summarise.',provider:'claude',model:'',cwd:'C:\Demo\Atlas',schedule:{kind:'weekdays',time:'09:00'},paused:false,createdAt:1,updatedAt:1,anchor:1,nextRunAt:Date.now()+3600000,unread:false,
+   runs:[{id:'55555555-5555-4555-8555-555555555555',at:Date.now()-60000,error:'Claude Code process exited with code 1'}]}];
+  w.testScheduledRequest=(path:string,data:any)=>{w.scheduledCalls.push({path,data});if(path==='/scheduled-tasks'&&!data)return {value:w.scheduledTasks};return {value:w.scheduledTasks[0]};};
+ });
+ await page.setViewportSize({width:1440,height:900});await desktop(page);
+ await page.locator('.desktop-rail .scheduled-task').getByRole('button',{name:/Morning brief/}).click();
+ await page.waitForTimeout(1500);
+ expect(await page.locator('.desktop-empty').count()).toBe(0);await expect(page.locator('.plan-chat-empty')).toContainText('The last run failed: Claude Code process exited with code 1');
+});

@@ -11,7 +11,7 @@ import './approval-card.css';
 /** How the person decided. message goes to the agent with a denial; remember applies the provider's own "allow such" rules; mode sets how an approved plan runs. */
 export type ApprovalExtra={message?:string;remember?:boolean;mode?:'default'|'acceptEdits'};
 export type Decide=(allow:boolean,answers?:Record<string,string>,extra?:ApprovalExtra)=>Promise<void>;
-type Provider='claude'|'codex'|'copilot';
+type Provider='claude'|'codex'|'copilot'|'gemini';
 const str=(value:unknown)=>typeof value==='string'?value:Array.isArray(value)?value.filter(item=>typeof item==='string').join(' '):'';
 const base=(value:string)=>value.replace(/[\\/]+$/,'').split(/[\\/]/).pop()||value;
 const lines=(value:string)=>value?value.replace(/\r\n/g,'\n').replace(/\n$/,'').split('\n').length:0;

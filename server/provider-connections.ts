@@ -6,12 +6,19 @@ import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 import {discoverCodex} from './codex-rpc.js';
 import {HttpError} from './security.js';
+import {discoverGemini} from './gemini.js';
 
-export type ProviderId='claude'|'codex'|'copilot';
-export const loginMethods={claude:{browser:['auth','login','--claudeai'],console:['auth','login','--console'],sso:['auth','login','--sso']},codex:{browser:['login'],device:['login','--device-auth'],key:['login','--with-api-key'],accessToken:['login','--with-access-token']},copilot:{browser:['login','--web-flow'],device:['login','--device-code'],token:['login','--with-token']}} as const;
+export type ProviderId='claude'|'codex'|'copilot'|'gemini';
+export const loginMethods={claude:{browser:['auth','login','--claudeai'],console:['auth','login','--console'],sso:['auth','login','--sso']},codex:{browser:['login'],device:['login','--device-auth'],key:['login','--with-api-key'],accessToken:['login','--with-access-token']},copilot:{browser:['login','--web-flow'],device:['login','--device-code'],token:['login','--with-token']},gemini:{browser:[]}} as const;
 type Probe=()=>Promise<{available:boolean;authenticated:boolean;access?:string}>;
 type Login={state:'idle'|'waiting'|'checking'|'complete'|'error';method?:string;reason?:string};
+/** The CLI with the arguments that run it: Gemini CLI is a Node script started by this Node. */
+export async function providerCommand(provider:ProviderId):Promise<{file:string;args:string[]}>{
+ if(provider==='gemini'){const cli=await discoverGemini();return{file:cli.command,args:cli.args};}
+ return{file:await providerExecutable(provider),args:[]};
+}
 export async function providerExecutable(provider:ProviderId){
+ if(provider==='gemini')throw Error('Gemini CLI runs through providerCommand');
  if(provider==='codex')return discoverCodex();
  if(provider==='copilot')return fileURLToPath(import.meta.resolve(`@github/copilot-${process.platform}-${process.arch}`));
  let sdk:string|undefined;try{sdk=createRequire(import.meta.url).resolve(`@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/${process.platform==='win32'?'claude.exe':'claude'}`);}catch{}
@@ -23,9 +30,9 @@ export function runCheck(file:string,args:string[]){return new Promise<{code:num
 export function parseClaudeAuth(result:{code:number;stdout:string}):boolean|null{try{const value=JSON.parse(result.stdout);return typeof value.loggedIn==='boolean'?value.loggedIn:null;}catch{return null;}}
 const quote=(value:string)=>"'"+value.replace(/'/g,"''")+"'";
 /** Only fixed, validated CLI operations; secrets are read locally, never in the renderer or argv. */
-export function loginScript(executable:string,provider:ProviderId,method:string){
+export function loginScript(executable:string,provider:ProviderId,method:string,prefix:string[]=[]){
  if(!Object.hasOwn(loginMethods,provider)||!Object.hasOwn(loginMethods[provider],method))throw new HttpError(400,'Unsupported sign-in method');
- const args=(loginMethods[provider] as Record<string,readonly string[]>)[method];
+ const args=[...prefix,...(loginMethods[provider] as Record<string,readonly string[]>)[method]];
  const command=`& ${quote(executable)} ${args.map(quote).join(' ')}`;
  const secret=['key','token','accessToken'].includes(method);
  return `$ErrorActionPreference='Stop'; $Host.UI.RawUI.WindowTitle='Pocket Code - ${provider} sign-in'; try { ${secret?`$secure=Read-Host 'Enter your key or token (hidden)' -AsSecureString; $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure); try { $plain=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr); $plain | ${command} } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr); $plain=$null; $secure.Dispose() }`:command}; $result=$LASTEXITCODE; if($result -ne 0){Write-Host 'Sign-in did not complete. Close this window and retry in Pocket Code.'; Read-Host 'Press Enter to close' | Out-Null}; exit $result } catch { Write-Host 'Sign-in failed. Check the CLI installation and retry.'; Read-Host 'Press Enter to close' | Out-Null; exit 1 }`;
@@ -39,6 +46,7 @@ export class ProviderConnections{
   if(this.busy(id)||this.isSigningIn())throw new HttpError(409,'Finish active provider tasks before changing sign-in.');
   this.loginState.set(id,{state:'checking',method:'logout'});this.cache=undefined;
   try{
+   if(id==='gemini')throw Error('Sign out of Gemini inside the CLI (/auth).');
    if(id==='copilot'){if(!this.copilotLogout)throw Error();await this.copilotLogout();}
    else{const result=await runCheck(await providerExecutable(id),id==='claude'?['auth','logout']:['logout']);if(result.code!==0)throw Error();}
    await this.refresh(id);const result=await this.load();const provider=result.providers.find(item=>item.id===id);
@@ -49,9 +57,9 @@ export class ProviderConnections{
  }
  isSigningIn(){return [...this.loginState.values()].some(value=>value.state==='waiting'||value.state==='checking');}
  async status(refresh=false){if(!refresh&&this.cache&&Date.now()-this.cache.at<8000)return this.cache.value;if(this.pending)return this.pending;this.pending=this.load().finally(()=>{this.pending=undefined;});return this.pending;}
- private async load(){const providers=await Promise.all((['claude','codex','copilot'] as const).map(async id=>{
+ private async load(){const providers=await Promise.all((['claude','codex','copilot',...(this.probes.gemini?['gemini' as const]:[])] as const).map(async id=>{
   let installed=false,authenticated:boolean|null=null,server='unavailable',version='',access:string|undefined;
-  try{const exe=await providerExecutable(id);installed=true;const checked=await runCheck(exe,['--version']);version=checked.stdout.match(/\b\d+\.\d+\.\d+(?:[-.][a-zA-Z0-9]+)*\b/)?.[0]||'';
+  try{const cli=await providerCommand(id),exe=cli.file;installed=true;const checked=await runCheck(exe,[...cli.args,'--version']);version=checked.stdout.match(/\b\d+\.\d+\.\d+(?:[-.][a-zA-Z0-9]+)*\b/)?.[0]||'';
    if(id==='claude'){authenticated=parseClaudeAuth(await runCheck(exe,['auth','status']));server=checked.code===0?'on-demand':'unavailable';}
    else{const probe=await this.probes[id]?.();server=probe?.available?'ready':'unavailable';authenticated=probe?.available&&probe.access!=='verification-failed'?probe.authenticated:null;access=probe?.access;}
   }catch{/* Do not expose raw CLI output, account names, paths or credentials. */}
@@ -64,9 +72,9 @@ export class ProviderConnections{
   if(['waiting','checking'].includes(this.loginState.get(id)?.state||''))return this.loginState.get(id);
   if(process.platform!=='win32')throw new HttpError(409,'Manual sign-in is available in the Windows host.');
   this.loginState.set(id,{state:'waiting',method});this.cache=undefined;
-  let executable:string;try{executable=await providerExecutable(id);}catch{this.loginState.set(id,{state:'error',method});throw new HttpError(409,'Provider CLI is not installed. Follow its setup guide.');}
+  let executable:string,prefix:string[]=[];try{const cli=await providerCommand(id);executable=cli.file;prefix=cli.args;}catch{this.loginState.set(id,{state:'error',method});throw new HttpError(409,'Provider CLI is not installed. Follow its setup guide.');}
   if(this.closed){this.loginState.set(id,{state:'error',method});throw new HttpError(503,'Host is stopping');}
-  const script=loginScript(executable,id,method);
+  const script=loginScript(executable,id,method,prefix);
   // A visible console is intentional: the user selected an interactive sign-in method.
   const child=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:false,detached:true,stdio:'ignore'});
   this.children.set(id,child);this.loginState.set(id,{state:'waiting',method});this.cache=undefined;
